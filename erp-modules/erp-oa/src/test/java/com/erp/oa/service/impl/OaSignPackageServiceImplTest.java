@@ -443,8 +443,7 @@ class OaSignPackageServiceImplTest
         when(documentService.readConfiguredFileBytes(any()))
                 .thenReturn(TEST_TEMPLATE_SOURCE);
 
-        byte[] png = new byte[] {(byte) 0x89, 0x50, 0x4e, 0x47,
-                0x0d, 0x0a, 0x1a, 0x0a};
+        byte[] png = SignatureImageTestFixtures.signature(1);
         String sampleHash = sha256(png);
         String rootHash = "a".repeat(64);
         Date capturedTime = new Date(1_752_990_400_456L);
@@ -3149,7 +3148,7 @@ class OaSignPackageServiceImplTest
                 "SP-500-V1", "request-conflict", fixture.first, fixture.second);
         changed.setSignatureDataUrl("data:image/png;base64,"
                 + Base64.getEncoder().encodeToString(
-                        "different-signature".getBytes(StandardCharsets.UTF_8)));
+                        SignatureImageTestFixtures.signature(2)));
 
         assertThatThrownBy(() -> fixture.service.signPackage(500L, changed))
                 .isInstanceOf(ServiceException.class)
@@ -3524,7 +3523,7 @@ class OaSignPackageServiceImplTest
         request.setDocumentHashes(Arrays.asList(hashes));
         request.setSignConfirmText("本人确认签署本签约包");
         request.setSignatureDataUrl("data:image/png;base64,"
-                + Base64.getEncoder().encodeToString("signature".getBytes(StandardCharsets.UTF_8)));
+                + Base64.getEncoder().encodeToString(SignatureImageTestFixtures.signature(1)));
         return request;
     }
 

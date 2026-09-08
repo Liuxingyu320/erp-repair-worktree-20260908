@@ -696,6 +696,8 @@ public class OaSignOnboardDataRequestService
         {
             throw new ServiceException("入职签约包唯一手写签名不完整或校验不一致");
         }
+        if (!OaSignImageValidator.isValidSignaturePng(sample))
+            throw new ServiceException("已留存的唯一手写签名图片无效，请联系HR处理");
         packageService.recordStagedSignatureFirstSampleForSystem(
                 row.getPackageId(), row.getTaskId(), request.getRequestId(),
                 request.getSignatureRequestId(), sample, request.getSignatureSampleHash(),
@@ -815,6 +817,8 @@ public class OaSignOnboardDataRequestService
         String dataUrl = trim(action.getSignatureDataUrl());
         if (dataUrl == null || !dataUrl.startsWith(PNG_PREFIX))
             throw new ServiceException("请使用PNG格式留存手写签名");
+        if (dataUrl.length() > PNG_PREFIX.length() + 4 * ((MAX_SIGNATURE_BYTES + 2) / 3))
+            throw new ServiceException("手写签名图片大小无效");
         byte[] bytes;
         try
         {
@@ -826,9 +830,7 @@ public class OaSignOnboardDataRequestService
         }
         if (bytes.length < PNG_MAGIC.length || bytes.length > MAX_SIGNATURE_BYTES)
             throw new ServiceException("手写签名图片大小无效");
-        for (int index = 0; index < PNG_MAGIC.length; index++)
-            if (bytes[index] != PNG_MAGIC[index])
-                throw new ServiceException("手写签名图片不是有效PNG");
+        OaSignImageValidator.requireSignaturePng(bytes);
         return new SignatureCapture(confirmationText, requestId, bytes,
                 sha256(bytes), new Date());
     }
@@ -846,11 +848,8 @@ public class OaSignOnboardDataRequestService
         {
             return false;
         }
-        for (int index = 0; index < PNG_MAGIC.length; index++)
-        {
-            if (sample[index] != PNG_MAGIC[index]) return false;
-        }
-        return request.getSignatureSampleHash().equalsIgnoreCase(sha256(sample));
+        return request.getSignatureSampleHash().equalsIgnoreCase(sha256(sample))
+                && OaSignImageValidator.isValidSignaturePng(sample);
     }
 
     private boolean hasAnySignatureEvidence(OaSignOnboardDataRequest request)

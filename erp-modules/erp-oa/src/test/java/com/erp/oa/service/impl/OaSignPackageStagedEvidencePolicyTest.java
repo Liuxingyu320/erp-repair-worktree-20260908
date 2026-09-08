@@ -20,14 +20,24 @@ import com.erp.oa.domain.OaSignTask;
 
 class OaSignPackageStagedEvidencePolicyTest
 {
-    private static final byte[] PNG = new byte[] {
-            (byte) 0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a};
+    private static final byte[] PNG = SignatureImageTestFixtures.signature(1);
     private static final Date CAPTURED_TIME = new Date(1_752_990_400_456L);
     private static final String SAMPLE_HASH = sha256(PNG);
     private static final String ROOT_HASH = "a".repeat(64);
 
     private final OaSignPackageStagedEvidencePolicy policy =
             new OaSignPackageStagedEvidencePolicy();
+
+    @Test
+    void matchingDigestDoesNotMakeDamagedOrBlankImageValid()
+    {
+        for (byte[] invalid : new byte[][] {java.util.Arrays.copyOf(PNG, 8),
+                SignatureImageTestFixtures.png(new java.awt.image.BufferedImage(
+                        320, 120, java.awt.image.BufferedImage.TYPE_INT_ARGB))})
+            assertThatThrownBy(() -> policy.validateCandidateSample(
+                    500L, "request-1", invalid, sha256(invalid), CAPTURED_TIME))
+                    .isInstanceOf(ServiceException.class);
+    }
 
     @Test
     void candidateSampleRequiresPositiveSourceValidPngTimeAndMatchingHash()

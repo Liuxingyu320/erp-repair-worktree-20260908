@@ -78,6 +78,8 @@ class OaSalaryServiceImplTest
         }).when(salaries).insertOaSalaryRecord(any(OaSalaryRecord.class));
         when(salaries.selectOaSalaryRecordById(anyLong())).thenAnswer(value ->
                 stored.get(value.getArgument(0)));
+        when(salaries.selectOaSalaryRecordList(any())).thenAnswer(value ->
+                new ArrayList<>(stored.values()));
         when(salaries.deleteByShopDeptIdAndMonth(anyLong(), anyString()))
                 .thenAnswer(value -> { stored.clear(); return 1; });
 
@@ -329,6 +331,64 @@ class OaSalaryServiceImplTest
         assertThatThrownBy(() -> service.calculateSalary(201L, "2026-06", 201L))
                 .hasMessageContaining("未完整入档");
         verify(salaries, never()).deleteByShopDeptIdAndMonth(anyLong(), anyString());
+    }
+
+    @Test
+    void shouldPreserveOldSalaryWhenSettledEmployeeIsMissingFromRoster()
+    {
+        OaSalaryRecord original = new OaSalaryRecord();
+        original.setSalaryId(99L);
+        original.setUserId(11L);
+        original.setUserName("former-store-employee");
+        stored.put(99L, original);
+        when(employees.selectSalaryEmployeesByShopDeptId(201L, "2026-06"))
+                .thenReturn(List.of(employee(12L, "current-employee", "3000")));
+        when(attendance.selectPublishedDayResultsForPayroll(anyLong(), any(), any()))
+                .thenReturn(List.of(settled(1L, 11L, LocalDate.of(2026, 6, 1),
+                        480, 480, 0, 0, 0, 0, 0, "NORMAL"),
+                        settled(2L, 12L, LocalDate.of(2026, 6, 1),
+                                480, 480, 0, 0, 0, 0, 0, "NORMAL")));
+
+        assertThat(service.preflightAttendance(201L, "2026-06", 201L).isBlocked()).isTrue();
+        assertThatThrownBy(() -> service.calculateSalary(201L, "2026-06", 201L))
+                .hasMessageContaining("未进入工资名单");
+        verify(salaries, never()).deleteByShopDeptIdAndMonth(anyLong(), anyString());
+        assertThat(stored).containsEntry(99L, original);
+    }
+
+    @Test
+    void shouldPreserveOldSalaryWhenAnUnlistedEmployeeHasNoRemainingSchedule()
+    {
+        OaSalaryRecord original = new OaSalaryRecord();
+        original.setSalaryId(99L);
+        original.setUserId(11L);
+        stored.put(99L, original);
+        when(employees.selectSalaryEmployeesByShopDeptId(201L, "2026-06"))
+                .thenReturn(List.of(employee(12L, "current-employee", "3000")));
+        when(attendance.selectPublishedDayResultsForPayroll(anyLong(), any(), any()))
+                .thenReturn(List.of(settled(2L, 12L, LocalDate.of(2026, 6, 1),
+                        480, 480, 0, 0, 0, 0, 0, "NORMAL")));
+        assertThatThrownBy(() -> service.calculateSalary(201L, "2026-06", 201L))
+                .hasMessageContaining("已有工资员工未进入本次名单");
+        verify(salaries, never()).deleteByShopDeptIdAndMonth(anyLong(), anyString());
+        assertThat(stored).containsEntry(99L, original);
+    }
+
+    @Test
+    void shouldCalculateHistoricalRosterEmployeeUsingOriginalMonthAndShop()
+    {
+        OaSalaryEmployee former = employee(11L, "former-store-employee", "3000");
+        former.setDeptId(202L);
+        when(employees.selectSalaryEmployeesByShopDeptId(201L, "2026-06"))
+                .thenReturn(List.of(former));
+        when(attendance.selectPublishedDayResultsForPayroll(anyLong(), any(), any()))
+                .thenReturn(List.of(settled(1L, 11L, LocalDate.of(2026, 6, 1),
+                        480, 480, 0, 0, 0, 0, 0, "NORMAL")));
+        OaSalaryRecord result = service.calculateSalary(201L, "2026-06", 201L).get(0);
+        assertThat(result.getUserId()).isEqualTo(11L);
+        assertThat(result.getShopDeptId()).isEqualTo(201L);
+        assertThat(result.getSalaryMonth()).isEqualTo("2026-06");
+        assertThat(result.getTotalSalary()).isEqualByComparingTo("3000");
     }
 
     private OaSalaryEmployee employee(Long userId, String userName,

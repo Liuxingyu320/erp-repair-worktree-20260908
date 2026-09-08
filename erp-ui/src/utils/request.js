@@ -20,6 +20,7 @@ const { resolveApiBaseUrl } = require("./apiBaseUrl")
 const { assertTrustedRequestBaseUrl, assertTrustedRequestUrl } = require("./requestSecurity")
 const { createSingleFlight } = require("./singleFlight")
 const { createTransferCommandRecovery } = require("./transferCommandRecovery")
+const { createTransferRequestReplay } = require("./transferRequestReplay")
 const { applyInventoryDeptRequestContext } = require("./requestInventoryContext")
 const {
   applyPersistentCommandRequestId,
@@ -206,6 +207,7 @@ const rejectResponseFailure = (res, payload, fallbackCode, details = {}) => {
 service.interceptors.request.use(config => {
   assertTrustedRequestBaseUrl(config.baseURL, service.defaults.baseURL)
   assertTrustedRequestUrl(config.url, service.defaults.baseURL)
+  transferReplay.restore(config)
   if (config.__transferCommandScope) {
     transferRecovery.assertContext(config, config.__transferCommandScope)
   }
@@ -386,10 +388,21 @@ export function download(url, params, filename, config) {
   })
 }
 
+const transferReplay = createTransferRequestReplay({
+  context: () => ({
+    actor: store.getters.id,
+    dept: getSelectedInventoryDeptId(),
+    revision: store.state && store.state.user && store.state.user.sessionRevision,
+    token: getToken()
+  }),
+  baseURL: service.defaults.baseURL,
+  resolveAdapter: adapter => axios.getAdapter(adapter || service.defaults.adapter)
+})
+
 const transferRecovery = createTransferCommandRecovery({
   storage: () => typeof sessionStorage === 'undefined' ? null : sessionStorage,
   context: () => ({ actor: store.getters.id, dept: getSelectedInventoryDeptId() }),
-  transport: config => service(config),
+  transport: config => service(transferReplay.prepare(config)),
   confirmRecovery: () => MessageBox.confirm(
     '上一笔调拨的结果尚未确认，本次内容也已变化。是否先按上次提交的内容核对结果？本次修改暂不提交。',
     '核对上次调拨', { confirmButtonText: '核对上次操作', cancelButtonText: '返回', type: 'warning' }

@@ -126,7 +126,7 @@ class OaSignPackageSigningRequestPolicyTest
     @DisplayName("签名图片仅接受非空且不超过五兆的 PNG data URL")
     void decodesBoundedPngDataUrl()
     {
-        byte[] signature = "signature".getBytes(StandardCharsets.UTF_8);
+        byte[] signature = SignatureImageTestFixtures.signature(1);
         String dataUrl = "data:image/png;base64,"
                 + Base64.getEncoder().encodeToString(signature);
 

@@ -634,8 +634,7 @@ class OaSignOnboardDataRequestServiceTest
                 "本人已核对本入职签约包的合同生成信息，并完成本合同包唯一一次手写签名");
         request.setSignatureRequestId("sig-original");
         request.setSignaturePayloadHash("c".repeat(64));
-        byte[] originalSample = new byte[] {(byte) 0x89, 0x50, 0x4e, 0x47,
-                0x0d, 0x0a, 0x1a, 0x0a, 7};
+        byte[] originalSample = SignatureImageTestFixtures.signature(7);
         request.setSignatureSampleBytes(originalSample);
         request.setSignatureSampleHash(HexFormat.of().formatHex(
                 MessageDigest.getInstance("SHA-256").digest(originalSample)));
@@ -719,10 +718,74 @@ class OaSignOnboardDataRequestServiceTest
                 any(), any(), any(), any(), any(), any(), any(), any());
     }
 
+    @Test
+    void invalidFirstSignatureIsRejectedBeforeAnySubmissionOrPackageWrite()
+    {
+        OaSignOnboardDataRequestMapper requestMapper = mock(OaSignOnboardDataRequestMapper.class);
+        OaSignOnboardImportRowMapper rowMapper = mock(OaSignOnboardImportRowMapper.class);
+        IOaSignPackageService packages = mock(IOaSignPackageService.class);
+        OaSignOnboardDataRequestService service = new OaSignOnboardDataRequestService(
+                requestMapper, rowMapper, mock(OaSignOnboardImportService.class),
+                mock(OaSignHrAccessService.class), mock(RemoteUserService.class), new ObjectMapper(), packages);
+        OaSignOnboardDataRequest request = recoveryRequest("PENDING_EMPLOYEE");
+        request.setSigningSequence("SIGNATURE_FIRST");
+        request.setAllowedFieldsJson("[]");
+        OaSignOnboardImportRow row = new OaSignOnboardImportRow();
+        row.setRowId(71L); row.setBatchId(31L); row.setEmployeeId(42L); row.setDataRequestId(93L);
+        when(requestMapper.selectById(93L)).thenReturn(request);
+        when(rowMapper.selectById(71L)).thenReturn(row);
+        SecurityContextHolder.setUserId("42");
+        byte[] header = java.util.Arrays.copyOf(SignatureImageTestFixtures.signature(1), 8);
+        byte[] transparent = SignatureImageTestFixtures.png(
+                new java.awt.image.BufferedImage(320, 120, java.awt.image.BufferedImage.TYPE_INT_ARGB));
+        for (byte[] invalid : new byte[][] {header, transparent})
+        {
+            OaSignOnboardDataSubmitRequest action = signatureAction("sig-1", (byte) 1);
+            action.setSignatureDataUrl("data:image/png;base64," + Base64.getEncoder().encodeToString(invalid));
+            assertThatThrownBy(() -> service.submit(93L, action)).isInstanceOf(ServiceException.class);
+        }
+        assertThat(request.getStatus()).isEqualTo("PENDING_EMPLOYEE");
+        verify(requestMapper, never()).submit(any(), any(), any(), any(), any(),
+                any(), any(), any(), any(), any(), any(), any());
+        org.mockito.Mockito.verifyNoInteractions(packages);
+    }
+
+    @Test
+    void damagedHistoricalSignatureCannotBeSilentlyOverwritten() throws Exception
+    {
+        OaSignOnboardDataRequestMapper requestMapper = mock(OaSignOnboardDataRequestMapper.class);
+        OaSignOnboardImportRowMapper rowMapper = mock(OaSignOnboardImportRowMapper.class);
+        OaSignOnboardDataRequestService service = new OaSignOnboardDataRequestService(
+                requestMapper, rowMapper, mock(OaSignOnboardImportService.class),
+                mock(OaSignHrAccessService.class), mock(RemoteUserService.class),
+                new ObjectMapper(), mock(IOaSignPackageService.class));
+        OaSignOnboardDataRequest request = recoveryRequest("REJECTED");
+        request.setSigningSequence("SIGNATURE_FIRST");
+        request.setAllowedFieldsJson("[]");
+        OaSignOnboardDataSubmitRequest action = signatureAction("new-signature", (byte) 2);
+        byte[] header = java.util.Arrays.copyOf(SignatureImageTestFixtures.signature(1), 8);
+        request.setFactConfirmationText(action.getFactConfirmationText());
+        request.setSignatureRequestId("old-signature");
+        request.setSignatureSampleBytes(header);
+        request.setSignatureSampleHash(HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(header)));
+        request.setSignaturePayloadHash("c".repeat(64));
+        request.setSignatureSampleTime(new Date(2_000L));
+        OaSignOnboardImportRow row = new OaSignOnboardImportRow();
+        row.setRowId(71L); row.setBatchId(31L); row.setEmployeeId(42L); row.setDataRequestId(93L);
+        when(requestMapper.selectById(93L)).thenReturn(request);
+        when(rowMapper.selectById(71L)).thenReturn(row);
+        SecurityContextHolder.setUserId("42");
+        assertThatThrownBy(() -> service.submit(93L, action)).hasMessageContaining("请联系HR处理");
+        assertThat(request.getSignatureSampleBytes()).containsExactly(header);
+        verify(requestMapper, never()).submit(any(), any(), any(), any(), any(),
+                any(), any(), any(), any(), any(), any(), any());
+        verify(requestMapper, never()).resubmitPreservingSignature(
+                any(), any(), any(), any(), any(), any(), any(), any());
+    }
+
     private static OaSignOnboardDataSubmitRequest signatureAction(String requestId, byte tail)
     {
-        byte[] png = new byte[] {(byte) 0x89, 0x50, 0x4e, 0x47,
-                0x0d, 0x0a, 0x1a, 0x0a, tail};
+        byte[] png = SignatureImageTestFixtures.signature(tail);
         OaSignOnboardDataSubmitRequest action = new OaSignOnboardDataSubmitRequest();
         action.setVersion(1L);
         action.setFactConfirmationText(
@@ -782,8 +845,7 @@ class OaSignOnboardDataRequestServiceTest
 
     private static OaSignOnboardDataRequest completedStagedRequest() throws Exception
     {
-        byte[] sample = new byte[] {(byte) 0x89, 0x50, 0x4e, 0x47,
-                0x0d, 0x0a, 0x1a, 0x0a, 1};
+        byte[] sample = SignatureImageTestFixtures.signature(1);
         OaSignOnboardDataRequest request = recoveryRequest("COMPLETED");
         request.setSigningSequence("SIGNATURE_FIRST");
         request.setSignatureRequestId("sig-recovery");

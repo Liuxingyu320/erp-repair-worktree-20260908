@@ -171,6 +171,7 @@ const user = {
   state: {
     token: getToken(),
     id: '',
+    sessionRevision: 0,
     deptId: '',
     name: '',
     nickName: '',
@@ -195,6 +196,7 @@ const user = {
       state.expires_in = time
     },
     SET_ID: (state, id) => {
+      if (String(state.id) !== String(id)) state.sessionRevision = (state.sessionRevision || 0) + 1
       state.id = id
     },
     SET_DEPT_ID: (state, deptId) => {

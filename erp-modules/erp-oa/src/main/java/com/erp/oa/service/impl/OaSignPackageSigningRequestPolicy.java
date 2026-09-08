@@ -154,6 +154,9 @@ final class OaSignPackageSigningRequestPolicy
         {
             throw new ServiceException("签名图片必须为无损图片格式");
         }
+        if (signatureDataUrl.length() > PNG_DATA_URL_PREFIX.length()
+                + 4 * ((MAX_SIGNATURE_BYTES + 2) / 3))
+            throw new ServiceException("签名图片内容不合法");
         try
         {
             byte[] bytes = Base64.getDecoder().decode(
@@ -162,6 +165,7 @@ final class OaSignPackageSigningRequestPolicy
             {
                 throw new ServiceException("签名图片内容不合法");
             }
+            OaSignImageValidator.requireSignaturePng(bytes);
             return bytes;
         }
         catch (IllegalArgumentException e)

@@ -572,6 +572,16 @@ async function run() {
   assert.strictEqual(idempotentRuntime.clearDeptCalls, 2,
     "repeating the same local session boundary must remain safe and idempotent")
 
+  idempotentHarness.context.commit("SET_ID", "101")
+  const firstRevision = idempotentHarness.state.sessionRevision
+  idempotentHarness.context.commit("SET_ID", 101)
+  assert.strictEqual(idempotentHarness.state.sessionRevision, firstRevision,
+    "refreshing the same identity must not invalidate active requests")
+  await idempotentModule.actions.FedLogOut(idempotentHarness.context)
+  idempotentHarness.context.commit("SET_ID", "101")
+  assert.strictEqual(idempotentHarness.state.sessionRevision, firstRevision + 2,
+    "signing back into the same account must invalidate old request replay permits")
+
   console.log("mobile session boundary tests passed")
 }
 

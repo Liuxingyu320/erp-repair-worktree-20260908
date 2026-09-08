@@ -26,10 +26,6 @@ import com.erp.oa.domain.OaSignTask;
  */
 final class OaSignPackageStagedEvidencePolicy
 {
-    private static final int MAX_SIGNATURE_BYTES = 5 * 1024 * 1024;
-    private static final byte[] PNG_MAGIC = new byte[] {
-            (byte) 0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a};
-
     void validateCandidateSample(Long dataRequestId, String signatureRequestId,
             byte[] signatureSampleBytes, String signatureSampleHash,
             Date signatureSampleTime)
@@ -216,8 +212,7 @@ final class OaSignPackageStagedEvidencePolicy
 
     private boolean validSignatureBytes(byte[] bytes)
     {
-        return bytes != null && bytes.length > 0 && bytes.length <= MAX_SIGNATURE_BYTES
-                && isPng(bytes);
+        return OaSignImageValidator.isValidSignaturePng(bytes);
     }
 
     private boolean sameHash(String left, String right)
@@ -229,14 +224,6 @@ final class OaSignPackageStagedEvidencePolicy
     {
         return first != null && second != null
                 && first.getTime() / 1_000L == second.getTime() / 1_000L;
-    }
-
-    private boolean isPng(byte[] bytes)
-    {
-        if (bytes == null || bytes.length < PNG_MAGIC.length) return false;
-        for (int index = 0; index < PNG_MAGIC.length; index++)
-            if (bytes[index] != PNG_MAGIC[index]) return false;
-        return true;
     }
 
     private String sha256(byte[] bytes)

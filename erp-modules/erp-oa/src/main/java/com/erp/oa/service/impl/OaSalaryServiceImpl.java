@@ -187,7 +187,7 @@ public class OaSalaryServiceImpl implements IOaSalaryService
             UserAttendanceAgg agg = aggMap.get(row.userId);
             if (agg == null)
             {
-                continue;
+                throw new ServiceException("本月排班员工未进入工资名单，已停止重算");
             }
             requireSettledResult(row);
             int scheduled = nonNegative(row.scheduledMinutes);
@@ -293,9 +293,23 @@ public class OaSalaryServiceImpl implements IOaSalaryService
         List<OaSalaryAttendanceIssueVo> issues = new ArrayList<>();
         Set<String> affectedEmployees = new HashSet<>();
         Set<Long> scheduledUsers = new HashSet<>();
+        Set<Long> rosterUsers = new HashSet<>();
+        for (OaSalaryEmployee employee : employees)
+            if (employee.getUserId() != null) rosterUsers.add(employee.getUserId());
+        Set<String> missingRoster = new HashSet<>();
         for (DayResult row : rows)
         {
             if (row.userId != null) scheduledUsers.add(row.userId);
+            String employeeKey = affectedEmployeeKey(row);
+            if ((row.userId == null || !rosterUsers.contains(row.userId))
+                    && missingRoster.add(employeeKey))
+            {
+                OaSalaryAttendanceIssueVo issue = toIssue(row,
+                        "本月排班员工未进入工资名单，请核对员工档案；原工资不会覆盖");
+                issue.setCategory("SALARY_ROSTER");
+                issues.add(issue);
+                affectedEmployees.add(employeeKey);
+            }
             String reason = resultIssue(row);
             if (reason != null)
             {
@@ -324,6 +338,25 @@ public class OaSalaryServiceImpl implements IOaSalaryService
             issue.setReason("本月没有已发布排班");
             issues.add(issue);
             affectedEmployees.add("id:" + employee.getUserId());
+        }
+        OaSalaryRecord previousQuery = new OaSalaryRecord();
+        previousQuery.setShopDeptId(targetShopId);
+        previousQuery.setSalaryMonth(salaryMonth);
+        List<OaSalaryRecord> previous = salaryMapper.selectOaSalaryRecordList(previousQuery);
+        for (OaSalaryRecord record : previous == null ? List.<OaSalaryRecord>of() : previous)
+        {
+            String employeeKey = "id:" + record.getUserId();
+            if ((record.getUserId() == null || !rosterUsers.contains(record.getUserId()))
+                    && missingRoster.add(employeeKey))
+            {
+                OaSalaryAttendanceIssueVo issue = new OaSalaryAttendanceIssueVo();
+                issue.setUserId(record.getUserId());
+                issue.setUserName(record.getUserName());
+                issue.setCategory("SALARY_ROSTER");
+                issue.setReason("已有工资员工未进入本次名单，请核对历史排班和员工档案；原工资不会覆盖");
+                issues.add(issue);
+                affectedEmployees.add(employeeKey);
+            }
         }
         issues.sort(Comparator
                 .comparing((OaSalaryAttendanceIssueVo issue) -> !"SALARY_PROFILE".equals(issue.getCategory()))
