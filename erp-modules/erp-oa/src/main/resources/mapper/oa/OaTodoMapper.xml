@@ -1,0 +1,538 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.oa.mapper.OaTodoMapper">
+
+    <select id="selectExistingTodoTables" resultType="java.lang.String">
+        select table_name
+        from information_schema.tables
+        where table_schema = database()
+          and table_name in
+          <foreach collection="tableNames" item="tableName" open="(" close=")" separator=",">
+              #{tableName}
+          </foreach>
+    </select>
+
+    <resultMap id="TodoItemResult" type="com.erp.oa.domain.vo.OaTodoCandidate">
+        <result property="source" column="source"/>
+        <result property="type" column="type"/>
+        <result property="category" column="category"/>
+        <result property="businessId" column="business_id"/>
+        <result property="businessNo" column="business_no"/>
+        <result property="title" column="title"/>
+        <result property="summary" column="summary"/>
+        <result property="status" column="status"/>
+        <result property="priority" column="priority"/>
+        <result property="createdTime" column="created_time"/>
+        <result property="waitingSeconds" column="waiting_seconds"/>
+        <result property="deptId" column="dept_id"/>
+        <result property="deptName" column="dept_name"/>
+        <result property="deptType" column="dept_type"/>
+        <result property="scopeMode" column="scope_mode"/>
+        <result property="routeType" column="route_type"/>
+        <result property="routeReference" column="route_reference"/>
+        <result property="requiredPermission" column="required_permission"/>
+    </resultMap>
+
+    <!-- Returned and shared-pool actions default to the selected organization. -->
+    <sql id="OperationalScopeMode">
+        <choose>
+            <when test="query != null and query.scopeMode == 'all_authorized'">'all_authorized'</when>
+            <otherwise>'current_org'</otherwise>
+        </choose>
+    </sql>
+
+    <sql id="OperationalOrganizationScope">
+        <choose>
+            <when test="query != null and query.scopeMode == 'all_authorized'">
+                <choose>
+                    <when test="authorizedScopeDeptIds != null and authorizedScopeDeptIds.size() > 0">
+                        and ${scopeColumn} in
+                        <foreach collection="authorizedScopeDeptIds" item="deptId" open="(" close=")" separator=",">
+                            #{deptId}
+                        </foreach>
+                    </when>
+                    <otherwise>and 1 = 0</otherwise>
+                </choose>
+            </when>
+            <otherwise>
+                <choose>
+                    <when test="currentScopeDeptIds != null and currentScopeDeptIds.size() > 0">
+                        and ${scopeColumn} in
+                        <foreach collection="currentScopeDeptIds" item="deptId" open="(" close=")" separator=",">
+                            #{deptId}
+                        </foreach>
+                    </when>
+                    <otherwise>and 1 = 0</otherwise>
+                </choose>
+            </otherwise>
+        </choose>
+    </sql>
+
+    <sql id="ActionableScopeMode">'actionable'</sql>
+
+    <!-- Explicit HR assignment crosses the selected store but remains inside authorized organizations. -->
+    <sql id="DirectOwnerAuthorizedOrganizationScope">
+        <choose>
+            <when test="authorizedScopeDeptIds != null and authorizedScopeDeptIds.size() > 0">
+                and ${scopeColumn} in
+                <foreach collection="authorizedScopeDeptIds" item="deptId" open="(" close=")" separator=",">
+                    #{deptId}
+                </foreach>
+            </when>
+            <otherwise>and 1 = 0</otherwise>
+        </choose>
+    </sql>
+
+    <sql id="SignTaskSummary">
+        concat_ws(' · ',
+            coalesce(nullif(sp.employee_name_snapshot, ''), nullif(u.nick_name, ''),
+                     concat('账号 ', t.employee_id)),
+            case upper(trim(t.scenario))
+                when 'ONBOARD' then '入职'
+                when 'RENEW' then '续签'
+                when 'RENEWAL' then '续签'
+                when 'TRANSFER' then '调岗'
+                when 'REGULARIZE' then '转正'
+                when 'OFFBOARD' then '离职'
+                else coalesce(nullif(t.scenario, ''), '签约')
+            end) collate utf8mb4_general_ci
+    </sql>
+
+    <sql id="OaTodoUnion">
+        select cast(null as char(16)) as source,
+               cast(null as char(64)) as type,
+               cast(null as char(16)) as category,
+               cast(null as signed) as business_id,
+               cast(null as char(128)) collate utf8mb4_general_ci as business_no,
+               cast(null as char(255)) collate utf8mb4_general_ci as title,
+               cast(null as char(500)) collate utf8mb4_general_ci as summary,
+               cast(null as char(32)) collate utf8mb4_general_ci as status,
+               cast(null as char(16)) as priority,
+               cast(null as datetime) as created_time,
+               cast(null as signed) as waiting_seconds,
+               cast(null as signed) as dept_id,
+               cast(null as char(128)) collate utf8mb4_general_ci as dept_name,
+               cast(null as char(32)) collate utf8mb4_general_ci as dept_type,
+               cast(null as char(32)) as scope_mode,
+               cast(null as char(32)) as route_type,
+               cast(null as char(180)) collate utf8mb4_general_ci as route_reference,
+               cast(null as char(128)) as required_permission,
+               cast(1 as signed) as count_value
+        from dual
+        where 1 = 0
+
+        <if test="enabledTypes != null and enabledTypes.contains('OA_PURCHASE_APPROVAL')">
+            union all
+            select 'oa' as source,
+                   'OA_PURCHASE_APPROVAL' as type,
+                   'returned' as category,
+                   p.purchase_id as business_id,
+                   concat('PURCHASE-', p.purchase_id) collate utf8mb4_general_ci as business_no,
+                   concat('采购申请已退回：', p.title) collate utf8mb4_general_ci as title,
+                   '请修改后重新提交' collate utf8mb4_general_ci as summary,
+                   p.status collate utf8mb4_general_ci as status,
+                   'important' as priority,
+                   coalesce(p.update_time, p.create_time, current_timestamp) as created_time,
+                   greatest(timestampdiff(second,
+                           coalesce(p.update_time, p.create_time, current_timestamp),
+                           current_timestamp), 0) as waiting_seconds,
+                   d.dept_id as dept_id,
+                   d.dept_name collate utf8mb4_general_ci as dept_name,
+                   d.dept_type collate utf8mb4_general_ci as dept_type,
+                   <include refid="OperationalScopeMode"/> as scope_mode,
+                   'revise' as route_type,
+                   cast(null as char(180)) collate utf8mb4_general_ci as route_reference,
+                   'oa:purchase:add' as required_permission,
+                   1 as count_value
+            from oa_purchase p
+                 left join sys_dept d on d.dept_id = p.shop_dept_id
+            where p.status = 'returned'
+              and p.applicant_id = #{userId}
+              <include refid="OperationalOrganizationScope">
+                  <property name="scopeColumn" value="p.shop_dept_id"/>
+              </include>
+        </if>
+
+        <if test="enabledTypes != null and enabledTypes.contains('OA_LABOR_CONTRACT_SIGN')">
+            union all
+            select 'oa' as source,
+                   'OA_LABOR_CONTRACT_SIGN' as type,
+                   'personal' as category,
+                   c.contract_id as business_id,
+                   coalesce(c.contract_no, concat('CONTRACT-', c.contract_id)) collate utf8mb4_general_ci as business_no,
+                   concat('劳动合同待签署：', coalesce(c.contract_title, c.contract_no, '劳动合同')) collate utf8mb4_general_ci as title,
+                   concat_ws(' · ', c.employee_name, c.post_name) collate utf8mb4_general_ci as summary,
+                   c.status collate utf8mb4_general_ci as status,
+                   'important' as priority,
+                   coalesce(c.sent_time, c.update_time, c.create_time, current_timestamp) as created_time,
+                   greatest(timestampdiff(second,
+                           coalesce(c.sent_time, c.update_time, c.create_time, current_timestamp),
+                           current_timestamp), 0) as waiting_seconds,
+                   cast(null as signed) as dept_id,
+                   cast(null as char(128)) collate utf8mb4_general_ci as dept_name,
+                   cast(null as char(32)) collate utf8mb4_general_ci as dept_type,
+                   <include refid="ActionableScopeMode"/> as scope_mode,
+                   'sign' as route_type,
+                   cast(null as char(180)) collate utf8mb4_general_ci as route_reference,
+                   cast(null as char(128)) as required_permission,
+                   1 as count_value
+            from oa_labor_contract c
+            where c.status = 'pending_sign'
+              and c.employee_id = #{userId}
+        </if>
+
+        <if test="enabledTypes != null and enabledTypes.contains('OA_SIGN_PACKAGE_SIGN')">
+            union all
+            select 'oa' as source,
+                   'OA_SIGN_PACKAGE_SIGN' as type,
+                   'personal' as category,
+                   sp.package_id as business_id,
+                   coalesce(sp.package_no, concat('SIGN-', sp.package_id)) collate utf8mb4_general_ci as business_no,
+                   case when sp.status = 'pending_final_confirm'
+                        then concat('最终合同待确认：', coalesce(sp.package_no, sp.employee_name_snapshot))
+                        else concat('签约包待签署：', coalesce(sp.package_no, sp.employee_name_snapshot))
+                   end collate utf8mb4_general_ci as title,
+                   concat_ws(' · ',
+                       case upper(trim(sp.scenario))
+                           when 'ONBOARD' then '入职'
+                           when 'RENEW' then '续签'
+                           when 'RENEWAL' then '续签'
+                           when 'TRANSFER' then '调岗'
+                           when 'REGULARIZE' then '转正'
+                           when 'OFFBOARD' then '离职'
+                           else '员工合同'
+                       end,
+                       sp.employee_name_snapshot) collate utf8mb4_general_ci as summary,
+                   sp.status collate utf8mb4_general_ci as status,
+                   'important' as priority,
+                   coalesce(sp.sent_time, sp.update_time, sp.create_time, current_timestamp) as created_time,
+                   greatest(timestampdiff(second,
+                           coalesce(sp.sent_time, sp.update_time, sp.create_time, current_timestamp),
+                           current_timestamp), 0) as waiting_seconds,
+                   cast(null as signed) as dept_id,
+                   cast(null as char(128)) collate utf8mb4_general_ci as dept_name,
+                   cast(null as char(32)) collate utf8mb4_general_ci as dept_type,
+                   <include refid="ActionableScopeMode"/> as scope_mode,
+                   'sign' as route_type,
+                   cast(null as char(180)) collate utf8mb4_general_ci as route_reference,
+                   cast(null as char(128)) as required_permission,
+                   1 as count_value
+            from oa_sign_package sp
+            where sp.status in ('pending_sign', 'part_viewed', 'pending_final_confirm')
+              and sp.employee_id = #{userId}
+        </if>
+
+        <if test="enabledTypes != null and enabledTypes.contains('OA_SIGN_ONBOARD_DATA_REQUEST')">
+            union all
+            select 'oa' as source,
+                   'OA_SIGN_ONBOARD_DATA_REQUEST' as type,
+                   'personal' as category,
+                   r.request_id as business_id,
+                   r.request_no collate utf8mb4_general_ci as business_no,
+                   case when r.status = 'PENDING_EMPLOYEE' then '补充入职合同资料'
+                        else '修改入职合同资料'
+                   end collate utf8mb4_general_ci as title,
+                   concat_ws(' · ',
+                       coalesce(nullif(u.nick_name, ''), concat('账号 ', r.employee_id)),
+                       '请补充签约所需的个人事实') collate utf8mb4_general_ci as summary,
+                   r.status collate utf8mb4_general_ci as status,
+                   case when r.status = 'REJECTED' then 'important'
+                        else 'normal'
+                   end as priority,
+                   coalesce(r.update_time, r.create_time, current_timestamp) as created_time,
+                   greatest(timestampdiff(second,
+                           coalesce(r.update_time, r.create_time, current_timestamp),
+                           current_timestamp), 0) as waiting_seconds,
+                   cast(null as signed) as dept_id,
+                   cast(null as char(128)) collate utf8mb4_general_ci as dept_name,
+                   cast(null as char(32)) collate utf8mb4_general_ci as dept_type,
+                   cast(null as char(32)) as scope_mode,
+                   'onboard_data_request' as route_type,
+                   cast(r.request_id as char(180)) collate utf8mb4_general_ci as route_reference,
+                   cast(null as char(128)) as required_permission,
+                   1 as count_value
+            from oa_sign_onboard_data_request r
+                 left join sys_user u on u.user_id = r.employee_id
+            where r.status in ('PENDING_EMPLOYEE', 'REJECTED')
+              and r.employee_id = #{userId}
+              and not exists (
+                  select 1
+                  from oa_sign_onboard_import_row ir
+                  where ir.data_request_id = r.request_id
+                    and ir.package_id is not null
+              )
+        </if>
+
+        <if test="enabledTypes != null and enabledTypes.contains('OA_SIGN_NEEDS_DATA')">
+            union all
+            select 'oa' as source,
+                   'OA_SIGN_NEEDS_DATA' as type,
+                   'execution' as category,
+                   t.task_id as business_id,
+                   coalesce(t.task_no, concat('SIGN-TASK-', t.task_id)) collate utf8mb4_general_ci as business_no,
+                   '补充签约资料' collate utf8mb4_general_ci as title,
+                   <include refid="SignTaskSummary"/> as summary,
+                   t.status collate utf8mb4_general_ci as status,
+                   'normal' as priority,
+                   coalesce(t.created_time, current_timestamp) as created_time,
+                   greatest(timestampdiff(second, coalesce(t.created_time, current_timestamp),
+                           current_timestamp), 0) as waiting_seconds,
+                   t.shop_dept_id as dept_id,
+                   d.dept_name collate utf8mb4_general_ci as dept_name,
+                   d.dept_type collate utf8mb4_general_ci as dept_type,
+                   <include refid="OperationalScopeMode"/> as scope_mode,
+                   'revalidate_sign_task' as route_type,
+                   cast(null as char(180)) collate utf8mb4_general_ci as route_reference,
+                   'oa:signTask:revalidate' as required_permission,
+                   1 as count_value
+            from oa_sign_task t
+                 left join oa_sign_package sp on sp.package_id = t.package_id
+                 left join sys_user u on u.user_id = t.employee_id
+                 left join sys_dept d on d.dept_id = t.shop_dept_id
+            where t.status = 'NEEDS_DATA'
+              and t.assigned_hr_user_id = #{userId}
+              <include refid="OperationalOrganizationScope">
+                  <property name="scopeColumn" value="t.shop_dept_id"/>
+              </include>
+        </if>
+
+        <if test="enabledTypes != null and enabledTypes.contains('OA_SIGN_COMPANY_FINALIZE')">
+            union all
+            select 'oa' as source,
+                   'OA_SIGN_COMPANY_FINALIZE' as type,
+                   'execution' as category,
+                   t.task_id as business_id,
+                   coalesce(t.task_no, concat('SIGN-TASK-', t.task_id)) collate utf8mb4_general_ci as business_no,
+                   '选择公司并加盖印章' collate utf8mb4_general_ci as title,
+                   <include refid="SignTaskSummary"/> as summary,
+                   t.status collate utf8mb4_general_ci as status,
+                   'important' as priority,
+                   coalesce(t.created_time, current_timestamp) as created_time,
+                   greatest(timestampdiff(second, coalesce(t.created_time, current_timestamp),
+                           current_timestamp), 0) as waiting_seconds,
+                   t.shop_dept_id as dept_id,
+                   d.dept_name collate utf8mb4_general_ci as dept_name,
+                   d.dept_type collate utf8mb4_general_ci as dept_type,
+                   <include refid="OperationalScopeMode"/> as scope_mode,
+                   'finalize_sign_package' as route_type,
+                   cast(null as char(180)) collate utf8mb4_general_ci as route_reference,
+                   'oa:signPackage:send' as required_permission,
+                   1 as count_value
+            from oa_sign_task t
+                 left join oa_sign_package sp on sp.package_id = t.package_id
+                 left join sys_user u on u.user_id = t.employee_id
+                 left join sys_dept d on d.dept_id = t.shop_dept_id
+            where t.status = 'PENDING_COMPANY'
+              and t.assigned_hr_user_id = #{userId}
+              <include refid="OperationalOrganizationScope">
+                  <property name="scopeColumn" value="t.shop_dept_id"/>
+              </include>
+        </if>
+
+        <if test="enabledTypes != null and enabledTypes.contains('OA_SIGN_SEND_FAILED')">
+            union all
+            select 'oa' as source,
+                   'OA_SIGN_SEND_FAILED' as type,
+                   'risk' as category,
+                   t.task_id as business_id,
+                   coalesce(t.task_no, concat('SIGN-TASK-', t.task_id)) collate utf8mb4_general_ci as business_no,
+                   '处理合同任务异常' collate utf8mb4_general_ci as title,
+                   <include refid="SignTaskSummary"/> as summary,
+                   t.status collate utf8mb4_general_ci as status,
+                   'important' as priority,
+                   coalesce(t.created_time, current_timestamp) as created_time,
+                   greatest(timestampdiff(second, coalesce(t.created_time, current_timestamp),
+                           current_timestamp), 0) as waiting_seconds,
+                   t.shop_dept_id as dept_id,
+                   d.dept_name collate utf8mb4_general_ci as dept_name,
+                   d.dept_type collate utf8mb4_general_ci as dept_type,
+                   <include refid="OperationalScopeMode"/> as scope_mode,
+                   'retry_sign_task' as route_type,
+                   cast(null as char(180)) collate utf8mb4_general_ci as route_reference,
+                   'oa:signTask:retry' as required_permission,
+                   1 as count_value
+            from oa_sign_task t
+                 left join oa_sign_package sp on sp.package_id = t.package_id
+                 left join sys_user u on u.user_id = t.employee_id
+                 left join sys_dept d on d.dept_id = t.shop_dept_id
+            where t.status = 'FAILED'
+              and t.assigned_hr_user_id = #{userId}
+              <include refid="OperationalOrganizationScope">
+                  <property name="scopeColumn" value="t.shop_dept_id"/>
+              </include>
+        </if>
+
+        <if test="enabledTypes != null and enabledTypes.contains('OA_SIGN_REFUSED')">
+            union all
+            select 'oa' as source,
+                   'OA_SIGN_REFUSED' as type,
+                   'risk' as category,
+                   t.task_id as business_id,
+                   coalesce(t.task_no, concat('SIGN-TASK-', t.task_id)) collate utf8mb4_general_ci as business_no,
+                   '处理员工拒签' collate utf8mb4_general_ci as title,
+                   <include refid="SignTaskSummary"/> as summary,
+                   t.status collate utf8mb4_general_ci as status,
+                   'urgent' as priority,
+                   coalesce(t.created_time, current_timestamp) as created_time,
+                   greatest(timestampdiff(second, coalesce(t.created_time, current_timestamp),
+                           current_timestamp), 0) as waiting_seconds,
+                   t.shop_dept_id as dept_id,
+                   d.dept_name collate utf8mb4_general_ci as dept_name,
+                   d.dept_type collate utf8mb4_general_ci as dept_type,
+                   <include refid="OperationalScopeMode"/> as scope_mode,
+                   'handle_sign_refusal' as route_type,
+                   cast(null as char(180)) collate utf8mb4_general_ci as route_reference,
+                   'oa:signTask:resolveRefusal' as required_permission,
+                   1 as count_value
+            from oa_sign_task t
+                 left join oa_sign_package sp on sp.package_id = t.package_id
+                 left join sys_user u on u.user_id = t.employee_id
+                 left join sys_dept d on d.dept_id = t.shop_dept_id
+            where t.status = 'REFUSED'
+              and t.resolution_status = 'OPEN'
+              and t.assigned_hr_user_id = #{userId}
+              <include refid="OperationalOrganizationScope">
+                  <property name="scopeColumn" value="t.shop_dept_id"/>
+              </include>
+        </if>
+
+        <if test="enabledTypes != null and enabledTypes.contains('OA_SIGN_EXPIRED')">
+            union all
+            select 'oa' as source,
+                   'OA_SIGN_EXPIRED' as type,
+                   'risk' as category,
+                   t.task_id as business_id,
+                   coalesce(t.task_no, concat('SIGN-TASK-', t.task_id)) collate utf8mb4_general_ci as business_no,
+                   '处理逾期合同' collate utf8mb4_general_ci as title,
+                   <include refid="SignTaskSummary"/> as summary,
+                   t.status collate utf8mb4_general_ci as status,
+                   'urgent' as priority,
+                   coalesce(t.created_time, current_timestamp) as created_time,
+                   greatest(timestampdiff(second, coalesce(t.created_time, current_timestamp),
+                           current_timestamp), 0) as waiting_seconds,
+                   t.shop_dept_id as dept_id,
+                   d.dept_name collate utf8mb4_general_ci as dept_name,
+                   d.dept_type collate utf8mb4_general_ci as dept_type,
+                   <include refid="OperationalScopeMode"/> as scope_mode,
+                   'handle_sign_expiry' as route_type,
+                   cast(null as char(180)) collate utf8mb4_general_ci as route_reference,
+                   'oa:signTask:resolveExpiry' as required_permission,
+                   1 as count_value
+            from oa_sign_task t
+                 left join oa_sign_package sp on sp.package_id = t.package_id
+                 left join sys_user u on u.user_id = t.employee_id
+                 left join sys_dept d on d.dept_id = t.shop_dept_id
+            where t.status = 'EXPIRED'
+              and t.resolution_status = 'OPEN'
+              and t.assigned_hr_user_id = #{userId}
+              <include refid="OperationalOrganizationScope">
+                  <property name="scopeColumn" value="t.shop_dept_id"/>
+              </include>
+        </if>
+
+        <!--
+          One oldest actionable notification failure per task. Both delivery channels share one
+          business key, and requeueing that key reveals the next oldest failed event. FIFO selection
+          prevents an older DEAD event from being starved by continuously arriving failures.
+        -->
+        <if test="enabledTypes != null and enabledTypes.contains('OA_SIGN_SEND_FAILED')">
+            union all
+            select 'oa' as source,
+                   'OA_SIGN_SEND_FAILED' as type,
+                   'risk' as category,
+                   t.task_id as business_id,
+                   coalesce(t.task_no, concat('SIGN-TASK-', t.task_id)) collate utf8mb4_general_ci as business_no,
+                   '合同通知发送异常' collate utf8mb4_general_ci as title,
+                   concat_ws(' · ',
+                       coalesce(nullif(sp.employee_name_snapshot, ''), nullif(u.nick_name, ''),
+                                concat('账号 ', t.employee_id)),
+                       '系统通知多次发送失败')
+                       collate utf8mb4_general_ci as summary,
+                   o.status collate utf8mb4_general_ci as status,
+                   'important' as priority,
+                   coalesce(o.updated_time, o.created_time, current_timestamp) as created_time,
+                   greatest(timestampdiff(second,
+                           coalesce(o.updated_time, o.created_time, current_timestamp),
+                           current_timestamp), 0) as waiting_seconds,
+                   t.shop_dept_id as dept_id,
+                   d.dept_name collate utf8mb4_general_ci as dept_name,
+                   d.dept_type collate utf8mb4_general_ci as dept_type,
+                   <include refid="OperationalScopeMode"/> as scope_mode,
+                   'retry_sign_notification' as route_type,
+                   o.business_key collate utf8mb4_general_ci as route_reference,
+                   'oa:signTask:retry' as required_permission,
+                   1 as count_value
+            from oa_sign_task t
+                 inner join (
+                     select cast(json_unquote(json_extract(dead.payload_json, '$.taskId')) as unsigned) as task_id,
+                            min(dead.outbox_id) as outbox_id
+                     from oa_sign_notification_outbox dead
+                     inner join oa_sign_task current_task
+                             on current_task.task_id = cast(json_unquote(json_extract(dead.payload_json, '$.taskId')) as unsigned)
+                     where dead.status = 'DEAD'
+                       and (
+                             (json_unquote(json_extract(dead.payload_json, '$.routeType')) = 'OA_SIGN_HR_TASK'
+                                 and dead.recipient_user_id = current_task.assigned_hr_user_id)
+                          or (json_unquote(json_extract(dead.payload_json, '$.routeType')) = 'OA_SIGN_PACKAGE_SIGN'
+                                 and dead.recipient_user_id = current_task.employee_id)
+                       )
+                     group by cast(json_unquote(json_extract(dead.payload_json, '$.taskId')) as unsigned)
+                 ) oldest_dead on oldest_dead.task_id = t.task_id
+                 inner join oa_sign_notification_outbox o on o.outbox_id = oldest_dead.outbox_id
+                 left join oa_sign_package sp on sp.package_id = t.package_id
+                 left join sys_user u on u.user_id = t.employee_id
+                 left join sys_dept d on d.dept_id = t.shop_dept_id
+            where 1 = 1
+              and t.assigned_hr_user_id = #{userId}
+              <include refid="OperationalOrganizationScope">
+                  <property name="scopeColumn" value="t.shop_dept_id"/>
+              </include>
+        </if>
+    </sql>
+
+    <sql id="OaTodoFilters">
+        <where>
+            <if test="query != null and query.type != null and query.type != ''">
+                type = #{query.type}
+            </if>
+            <if test="query != null and query.category != null and query.category != ''">
+                and category = #{query.category}
+            </if>
+            <if test="query != null and query.keyword != null and query.keyword != ''">
+                and (business_no like concat('%', #{query.keyword}, '%')
+                     or title like concat('%', #{query.keyword}, '%')
+                     or summary like concat('%', #{query.keyword}, '%'))
+            </if>
+        </where>
+    </sql>
+
+    <select id="selectOaTodoList" resultMap="TodoItemResult">
+        select source, type, category, business_id, business_no, title, summary,
+               status, priority, created_time, waiting_seconds,
+               dept_id, dept_name, dept_type, scope_mode, route_type, route_reference,
+               required_permission
+        from (<include refid="OaTodoUnion"/>) oa_todo
+        <include refid="OaTodoFilters"/>
+        order by field(priority, 'urgent', 'important', 'normal'), created_time asc,
+                 business_id asc, type asc, route_type asc
+    </select>
+
+    <select id="selectRecentOaTodos" resultMap="TodoItemResult">
+        select source, type, category, business_id, business_no, title, summary,
+               status, priority, created_time, waiting_seconds,
+               dept_id, dept_name, dept_type, scope_mode, route_type, route_reference,
+               required_permission
+        from (<include refid="OaTodoUnion"/>) oa_todo
+        <include refid="OaTodoFilters"/>
+        order by field(priority, 'urgent', 'important', 'normal'), created_time asc,
+                 business_id asc, type asc, route_type asc
+        limit #{limit}
+    </select>
+
+    <select id="selectOaTodoCounts" resultType="com.erp.oa.domain.vo.OaTodoCountRow">
+        select type, category, priority, sum(count_value) as count
+        from (<include refid="OaTodoUnion"/>) oa_todo
+        <include refid="OaTodoFilters"/>
+        group by type, category, priority
+    </select>
+</mapper>

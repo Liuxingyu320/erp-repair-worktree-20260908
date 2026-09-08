@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.system.mapper.SecuritySessionInvalidationOutboxMapper">
+    <resultMap id="OutboxResult" type="com.erp.system.domain.SecuritySessionInvalidationOutbox">
+        <id property="outboxId" column="outbox_id" />
+        <result property="eventId" column="event_id" />
+        <result property="eventType" column="event_type" />
+        <result property="userId" column="user_id" />
+        <result property="reasonCode" column="reason_code" />
+        <result property="status" column="status" />
+        <result property="attempts" column="attempts" />
+        <result property="availableAt" column="available_at" />
+        <result property="nextAttemptAt" column="next_attempt_at" />
+        <result property="lockOwner" column="lock_owner" />
+        <result property="lockedAt" column="locked_at" />
+        <result property="lastErrorCode" column="last_error_code" />
+        <result property="createdAt" column="created_at" />
+        <result property="processedAt" column="processed_at" />
+    </resultMap>
+
+    <insert id="insert" parameterType="com.erp.system.domain.SecuritySessionInvalidationOutbox"
+            useGeneratedKeys="true" keyProperty="outboxId">
+        insert into sys_security_session_outbox
+            (event_id, event_type, user_id, reason_code, status, attempts, available_at, created_at)
+        values
+            (#{eventId}, 'INVALIDATE_USER_SESSIONS', #{userId}, #{reasonCode}, 'PENDING', 0, now(), now())
+    </insert>
+
+    <update id="markDone">
+        update sys_security_session_outbox
+        set status = 'DONE', processed_at = now(), lock_owner = null, locked_at = null,
+            last_error_code = null
+        where event_id = #{eventId} and status in ('PENDING', 'PROCESSING')
+    </update>
+
+    <update id="releaseForRetry">
+        update sys_security_session_outbox
+        set status = <choose><when test="terminal">'FAILED'</when><otherwise>'PENDING'</otherwise></choose>,
+            attempts = attempts + 1,
+            next_attempt_at = #{nextAttemptAt}, last_error_code = #{lastErrorCode},
+            lock_owner = null, locked_at = null
+        where event_id = #{eventId} and status in ('PENDING', 'PROCESSING')
+    </update>
+
+    <update id="resetStaleClaims">
+        update sys_security_session_outbox
+        set status = 'PENDING', lock_owner = null, locked_at = null,
+            next_attempt_at = now(), last_error_code = 'STALE_CLAIM_RECOVERED'
+        where status = 'PROCESSING' and locked_at &lt; #{staleBefore}
+    </update>
+
+    <update id="claimPending">
+        update sys_security_session_outbox
+        set status = 'PROCESSING', lock_owner = #{lockOwner}, locked_at = now()
+        where status = 'PENDING'
+          and available_at &lt;= now()
+          and (next_attempt_at is null or next_attempt_at &lt;= now())
+        order by outbox_id
+        limit #{limit}
+    </update>
+
+    <select id="selectClaimed" resultMap="OutboxResult">
+        select outbox_id, event_id, event_type, user_id, reason_code, status, attempts,
+               available_at, next_attempt_at, lock_owner, locked_at, last_error_code,
+               created_at, processed_at
+        from sys_security_session_outbox
+        where status = 'PROCESSING' and lock_owner = #{lockOwner}
+        order by outbox_id
+    </select>
+</mapper>
+

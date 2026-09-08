@@ -1,0 +1,241 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.oa.attendance.timecredit.AttendanceTimeCreditMapper">
+
+    <resultMap id="timeCreditDayResult"
+            type="com.erp.oa.attendance.domain.AttendanceModels$DayResult">
+        <id property="dayResultId" column="day_result_id"/>
+        <result property="scheduleId" column="schedule_id"/>
+        <result property="userId" column="user_id"/>
+        <result property="userName" column="user_name"/>
+        <result property="shopId" column="shop_id"/>
+        <result property="businessDate" column="business_date"/>
+        <result property="shiftId" column="shift_id"/>
+        <result property="scheduledMinutes" column="scheduled_minutes"/>
+        <result property="workedMinutes" column="worked_minutes"/>
+        <result property="paidLeaveMinutes" column="paid_leave_minutes"/>
+        <result property="unpaidLeaveMinutes" column="unpaid_leave_minutes"/>
+        <result property="absenceMinutes" column="absence_minutes"/>
+        <result property="lateMinutes" column="late_minutes"/>
+        <result property="earlyLeaveMinutes" column="early_leave_minutes"/>
+        <result property="resultStatus" column="result_status"/>
+        <result property="exceptionCodes" column="exception_codes"/>
+        <result property="settledAt" column="settled_at"/>
+        <result property="rowVersion" column="row_version"/>
+    </resultMap>
+
+    <resultMap id="adjustment"
+            type="com.erp.oa.attendance.timecredit.AttendanceTimeCreditModels$Adjustment">
+        <id property="adjustmentId" column="adjustment_id"/>
+        <result property="adjustmentNo" column="adjustment_no"/>
+        <result property="clientRequestId" column="client_request_id"/>
+        <result property="requestFingerprint" column="request_fingerprint"/>
+        <result property="adjustmentAction" column="adjustment_action"/>
+        <result property="originalAdjustmentId" column="original_adjustment_id"/>
+        <result property="shopId" column="shop_id"/>
+        <result property="userId" column="user_id"/>
+        <result property="userName" column="user_name"/>
+        <result property="salaryMonth" column="salary_month"/>
+        <result property="sourceDayResultId" column="source_day_result_id"/>
+        <result property="sourceScheduleId" column="source_schedule_id"/>
+        <result property="sourceBusinessDate" column="source_business_date"/>
+        <result property="targetDayResultId" column="target_day_result_id"/>
+        <result property="targetScheduleId" column="target_schedule_id"/>
+        <result property="targetBusinessDate" column="target_business_date"/>
+        <result property="adjustmentMinutes" column="adjustment_minutes"/>
+        <result property="reason" column="reason"/>
+        <result property="operatorUserId" column="operator_user_id"/>
+        <result property="operatorName" column="operator_name"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="reversed" column="reversed"/>
+        <result property="reversalAdjustmentId" column="reversal_adjustment_id"/>
+        <result property="reversalReason" column="reversal_reason"/>
+        <result property="reversalOperatorName" column="reversal_operator_name"/>
+        <result property="reversedAt" column="reversed_at"/>
+    </resultMap>
+
+    <sql id="adjustmentColumns">
+        adjustment_id, adjustment_no, client_request_id,
+        request_fingerprint, adjustment_action, original_adjustment_id,
+        shop_id, user_id, user_name, salary_month,
+        source_day_result_id, source_schedule_id, source_business_date,
+        target_day_result_id, target_schedule_id, target_business_date,
+        adjustment_minutes, reason, operator_user_id, operator_name,
+        create_by, create_time
+    </sql>
+
+    <select id="selectDatabaseNow" resultType="java.time.LocalDateTime">
+        select now()
+    </select>
+
+    <select id="selectDayResultById" resultMap="timeCreditDayResult">
+        select day_result_id, schedule_id, user_id, user_name, shop_id,
+               business_date, shift_id, scheduled_minutes, worked_minutes,
+               paid_leave_minutes, unpaid_leave_minutes, absence_minutes,
+               late_minutes, early_leave_minutes, result_status,
+               exception_codes, settled_at, row_version
+        from oa_attendance_day_result
+        where day_result_id = #{dayResultId}
+    </select>
+
+    <select id="selectDayResultsForUpdate" resultMap="timeCreditDayResult">
+        select day_result_id, schedule_id, user_id, user_name, shop_id,
+               business_date, shift_id, scheduled_minutes, worked_minutes,
+               paid_leave_minutes, unpaid_leave_minutes, absence_minutes,
+               late_minutes, early_leave_minutes, result_status,
+               exception_codes, settled_at, row_version
+        from oa_attendance_day_result
+        where day_result_id in
+        <foreach collection="dayResultIds" item="dayResultId"
+                open="(" close=")" separator=",">
+            #{dayResultId}
+        </foreach>
+        order by day_result_id
+        for update
+    </select>
+
+    <select id="selectNetSourceUsed" resultType="int">
+        select coalesce(sum(case
+                 when adjustment_action = 'APPLY' then adjustment_minutes
+                 when adjustment_action = 'REVERSE' then -adjustment_minutes
+                 else 0 end), 0)
+        from oa_attendance_time_credit_adjustment
+        where source_day_result_id = #{sourceDayResultId}
+    </select>
+
+    <select id="selectNetTargetOffset" resultType="int">
+        select coalesce(sum(case
+                 when adjustment_action = 'APPLY' then adjustment_minutes
+                 when adjustment_action = 'REVERSE' then -adjustment_minutes
+                 else 0 end), 0)
+        from oa_attendance_time_credit_adjustment
+        where target_day_result_id = #{targetDayResultId}
+    </select>
+
+    <select id="selectSourceCandidates"
+            resultType="com.erp.oa.attendance.timecredit.AttendanceTimeCreditModels$SourceCandidate">
+        select d.day_result_id dayResultId,
+               d.schedule_id scheduleId,
+               d.business_date businessDate,
+               coalesce(d.scheduled_minutes, 0) scheduledMinutes,
+               coalesce(d.worked_minutes, 0) workedMinutes,
+               greatest(coalesce(d.worked_minutes, 0)
+                        - coalesce(d.scheduled_minutes, 0), 0)
+                    rawOvertimeMinutes,
+               coalesce(c.used_minutes, 0) usedMinutes,
+               greatest(coalesce(d.worked_minutes, 0)
+                        - coalesce(d.scheduled_minutes, 0), 0)
+                    - coalesce(c.used_minutes, 0) availableMinutes
+        from oa_attendance_day_result d
+        left join (
+            select source_day_result_id,
+                   sum(case
+                     when adjustment_action = 'APPLY' then adjustment_minutes
+                     when adjustment_action = 'REVERSE' then -adjustment_minutes
+                     else 0 end) used_minutes
+            from oa_attendance_time_credit_adjustment
+            group by source_day_result_id
+        ) c on c.source_day_result_id = d.day_result_id
+        where d.shop_id = #{shopId}
+          and d.user_id = #{userId}
+          and d.business_date between #{monthStart} and #{targetDate}
+          and d.settled_at is not null
+          and greatest(coalesce(d.worked_minutes, 0)
+                       - coalesce(d.scheduled_minutes, 0), 0)
+                &gt; coalesce(c.used_minutes, 0)
+        order by d.business_date, d.day_result_id
+    </select>
+
+    <select id="selectHistoryByTargetDayResultId" resultMap="adjustment">
+        select a.adjustment_id, a.adjustment_no, a.client_request_id,
+               a.request_fingerprint, a.adjustment_action,
+               a.original_adjustment_id, a.shop_id, a.user_id, a.user_name,
+               a.salary_month, a.source_day_result_id, a.source_schedule_id,
+               a.source_business_date, a.target_day_result_id,
+               a.target_schedule_id, a.target_business_date,
+               a.adjustment_minutes, a.reason, a.operator_user_id,
+               a.operator_name, a.create_by, a.create_time,
+               case when r.adjustment_id is null then 0 else 1 end reversed,
+               r.adjustment_id reversal_adjustment_id,
+               r.reason reversal_reason,
+               r.operator_name reversal_operator_name,
+               r.create_time reversed_at
+        from oa_attendance_time_credit_adjustment a
+        left join oa_attendance_time_credit_adjustment r
+          on r.original_adjustment_id = a.adjustment_id
+         and r.adjustment_action = 'REVERSE'
+        where a.target_day_result_id = #{targetDayResultId}
+          and a.adjustment_action = 'APPLY'
+        order by a.adjustment_id desc
+    </select>
+
+    <select id="selectAdjustmentById" resultMap="adjustment">
+        select <include refid="adjustmentColumns"/>
+        from oa_attendance_time_credit_adjustment
+        where adjustment_id = #{adjustmentId}
+    </select>
+
+    <select id="selectAdjustmentByIdForUpdate" resultMap="adjustment">
+        select <include refid="adjustmentColumns"/>
+        from oa_attendance_time_credit_adjustment
+        where adjustment_id = #{adjustmentId}
+        for update
+    </select>
+
+    <select id="selectByClientRequest" resultMap="adjustment">
+        select <include refid="adjustmentColumns"/>
+        from oa_attendance_time_credit_adjustment
+        where shop_id = #{shopId}
+          and operator_user_id = #{operatorUserId}
+          and client_request_id = #{clientRequestId}
+    </select>
+
+    <select id="countReverse" resultType="int">
+        select count(1)
+        from oa_attendance_time_credit_adjustment
+        where original_adjustment_id = #{originalAdjustmentId}
+          and adjustment_action = 'REVERSE'
+    </select>
+
+    <select id="countSalaryRecords" resultType="int">
+        select count(1)
+        from oa_salary_record
+        where user_id = #{userId}
+          and salary_month = #{salaryMonth}
+    </select>
+
+    <insert id="ensurePeriodLock">
+        insert ignore into oa_attendance_time_credit_period_lock
+            (shop_id, salary_month, create_time)
+        values (#{shopId}, #{salaryMonth}, now())
+    </insert>
+
+    <select id="lockPeriod" resultType="int">
+        select 1
+        from oa_attendance_time_credit_period_lock
+        where shop_id = #{shopId} and salary_month = #{salaryMonth}
+        for update
+    </select>
+
+    <insert id="insertAdjustment"
+            parameterType="com.erp.oa.attendance.timecredit.AttendanceTimeCreditModels$Adjustment"
+            useGeneratedKeys="true" keyProperty="adjustmentId">
+        insert into oa_attendance_time_credit_adjustment
+            (adjustment_no, client_request_id, request_fingerprint,
+             adjustment_action, original_adjustment_id, shop_id, user_id,
+             user_name, salary_month, source_day_result_id,
+             source_schedule_id, source_business_date, target_day_result_id,
+             target_schedule_id, target_business_date, adjustment_minutes,
+             reason, operator_user_id, operator_name, create_by, create_time)
+        values
+            (#{adjustmentNo}, #{clientRequestId}, #{requestFingerprint},
+             #{adjustmentAction}, #{originalAdjustmentId}, #{shopId},
+             #{userId}, #{userName}, #{salaryMonth}, #{sourceDayResultId},
+             #{sourceScheduleId}, #{sourceBusinessDate},
+             #{targetDayResultId}, #{targetScheduleId},
+             #{targetBusinessDate}, #{adjustmentMinutes}, #{reason},
+             #{operatorUserId}, #{operatorName}, #{createBy}, now())
+    </insert>
+</mapper>

@@ -1,0 +1,140 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.oa.mapper.OaSignOnboardImportBatchMapper">
+    <resultMap id="BatchResult" type="com.erp.oa.domain.OaSignOnboardImportBatch">
+        <id property="batchId" column="batch_id"/>
+        <result property="batchNo" column="batch_no"/>
+        <result property="shopDeptId" column="shop_dept_id"/>
+        <result property="shopDeptName" column="shop_dept_name"/>
+        <result property="selectedEmployeeIdsJson" column="selected_employee_ids_json"/>
+        <result property="selectionHash" column="selection_hash"/>
+        <result property="selectedCount" column="selected_count"/>
+        <result property="originalFileName" column="original_file_name"/>
+        <result property="fileSize" column="file_size"/>
+        <result property="fileSha256" column="file_sha256"/>
+        <result property="sheetName" column="sheet_name"/>
+        <result property="status" column="status"/>
+        <result property="totalRowCount" column="total_row_count"/>
+        <result property="matchedCount" column="matched_count"/>
+        <result property="excludedCount" column="excluded_count"/>
+        <result property="errorCount" column="error_count"/>
+        <result property="warningCount" column="warning_count"/>
+        <result property="generatedCount" column="generated_count"/>
+        <result property="createdByUserId" column="created_by_user_id"/>
+        <result property="createdByName" column="created_by_name"/>
+        <result property="expiresTime" column="expires_time"/>
+        <result property="version" column="version"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateTime" column="update_time"/>
+    </resultMap>
+
+    <sql id="columns">
+        batch_id, batch_no, shop_dept_id, shop_dept_name, selected_employee_ids_json,
+        selection_hash, selected_count, original_file_name, file_size, file_sha256, sheet_name,
+        status, total_row_count, matched_count, excluded_count, error_count, warning_count,
+        generated_count, created_by_user_id, created_by_name, expires_time, version,
+        create_time, update_time
+    </sql>
+
+    <insert id="insertBatch" parameterType="com.erp.oa.domain.OaSignOnboardImportBatch"
+            useGeneratedKeys="true" keyProperty="batchId">
+        insert into oa_sign_onboard_import_batch (
+            batch_no, shop_dept_id, shop_dept_name, selected_employee_ids_json,
+            selection_hash, selected_count, original_file_name, file_size, file_sha256, sheet_name,
+            status, total_row_count, matched_count, excluded_count, error_count, warning_count,
+            generated_count, created_by_user_id, created_by_name, expires_time, version,
+            create_time, update_time
+        ) values (
+            #{batchNo}, #{shopDeptId}, #{shopDeptName}, #{selectedEmployeeIdsJson},
+            #{selectionHash}, #{selectedCount}, #{originalFileName}, #{fileSize}, #{fileSha256}, #{sheetName},
+            #{status}, #{totalRowCount}, #{matchedCount}, #{excludedCount}, #{errorCount}, #{warningCount},
+            #{generatedCount}, #{createdByUserId}, #{createdByName}, #{expiresTime}, #{version},
+            sysdate(), sysdate()
+        )
+    </insert>
+
+    <select id="selectReusable" resultMap="BatchResult">
+        select <include refid="columns"/>
+        from oa_sign_onboard_import_batch b
+        where b.shop_dept_id = #{shopDeptId}
+          and b.created_by_user_id = #{createdByUserId}
+          and b.selection_hash = #{selectionHash}
+          and b.file_sha256 = #{fileSha256}
+          and b.expires_time &gt; #{now}
+          and b.status in ('PREVIEW_READY', 'PARTIAL_GENERATED', 'GENERATED')
+          and not exists (
+              select 1
+              from oa_sign_onboard_import_row r
+              where r.batch_id = b.batch_id
+                and r.status in ('PLAN_CHANGED_REPREVIEW', 'PROFILE_CHANGED_REPREVIEW',
+                                 'PROFILE_SYNC_FAILED')
+          )
+        order by b.batch_id desc
+        limit 1
+    </select>
+
+    <select id="selectById" resultMap="BatchResult">
+        select <include refid="columns"/>
+        from oa_sign_onboard_import_batch where batch_id = #{batchId}
+    </select>
+
+    <select id="selectByIds" resultMap="BatchResult">
+        select <include refid="columns"/>
+        from oa_sign_onboard_import_batch
+        where batch_id in
+        <foreach collection="batchIds" item="batchId" open="(" separator="," close=")">
+            #{batchId}
+        </foreach>
+    </select>
+
+    <select id="selectStaleGeneratingBatchIds" resultType="long">
+        select distinct b.batch_id
+        from oa_sign_onboard_import_batch b
+        inner join oa_sign_onboard_import_row r on r.batch_id = b.batch_id
+        where b.status = 'GENERATING'
+          and b.update_time &lt;= #{staleBefore}
+          and r.status = 'GENERATING'
+          and r.update_time &lt;= #{staleBefore}
+        order by b.batch_id asc
+        limit #{maxRows}
+    </select>
+
+    <update id="claimGeneration">
+        update oa_sign_onboard_import_batch
+        set status = 'GENERATING', version = version + 1, update_time = sysdate()
+        where batch_id = #{batchId}
+          and version = #{expectedVersion}
+          and (
+              status in ('PREVIEW_READY', 'PARTIAL_GENERATED', 'GENERATED')
+              or (status = 'GENERATING' and update_time &lt;= #{staleBefore})
+          )
+    </update>
+
+    <update id="updateSummary">
+        update oa_sign_onboard_import_batch
+        set status = #{status}, matched_count = #{matchedCount}, excluded_count = #{excludedCount},
+            error_count = #{errorCount}, warning_count = #{warningCount}, generated_count = #{generatedCount},
+            version = version + 1, update_time = sysdate()
+        where batch_id = #{batchId}
+    </update>
+
+    <update id="refreshAfterHardDelete">
+        update oa_sign_onboard_import_batch b
+        set b.generated_count = (
+                select count(*)
+                from oa_sign_onboard_import_row r
+                where r.batch_id = b.batch_id and r.task_id is not null
+            ),
+            b.status = case
+                when b.status not in ('GENERATING', 'PARTIAL_GENERATED', 'GENERATED') then b.status
+                when not exists (
+                    select 1 from oa_sign_onboard_import_row r
+                    where r.batch_id = b.batch_id and r.task_id is not null
+                ) then 'PREVIEW_READY'
+                else 'PARTIAL_GENERATED'
+            end,
+            b.version = b.version + 1,
+            b.update_time = sysdate()
+        where b.batch_id = #{batchId}
+    </update>
+</mapper>

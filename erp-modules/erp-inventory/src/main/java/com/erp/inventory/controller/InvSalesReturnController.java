@@ -1,0 +1,105 @@
+package com.erp.inventory.controller;
+
+import java.util.List;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+import com.erp.common.core.utils.poi.ExcelUtil;
+import com.erp.common.core.web.domain.AjaxResult;
+import com.erp.common.core.web.page.TableDataInfo;
+import com.erp.common.log.annotation.Log;
+import com.erp.common.log.enums.BusinessType;
+import com.erp.common.security.annotation.IdempotentSubmit;
+import com.erp.common.security.annotation.RequiresPermissions;
+import com.erp.inventory.domain.InvSalesReturn;
+import com.erp.inventory.domain.dto.InvSalesReturnSaveRequest;
+import com.erp.inventory.service.IInvSalesReturnService;
+
+@RestController
+@RequestMapping("/salesReturn")
+public class InvSalesReturnController extends InvBaseController
+{
+    @Autowired
+    private IInvSalesReturnService salesReturnService;
+
+    @RequiresPermissions("inv:salesReturn:list")
+    @GetMapping("/list")
+    public TableDataInfo list(InvSalesReturn salesReturn, HttpServletRequest request)
+    {
+        startPage();
+        List<InvSalesReturn> list = salesReturnService.selectReturnList(salesReturn, resolveShopDeptId(request));
+        return getDataTable(list);
+    }
+
+    @RequiresPermissions("inv:salesReturn:list")
+    @GetMapping("/my")
+    public TableDataInfo my(InvSalesReturn salesReturn, HttpServletRequest request)
+    {
+        startPage();
+        List<InvSalesReturn> list = salesReturnService.selectMyReturns(salesReturn, resolveShopDeptId(request));
+        return getDataTable(list);
+    }
+
+    @RequiresPermissions("inv:salesReturn:query")
+    @GetMapping("/{returnId}")
+    public AjaxResult getInfo(@PathVariable("returnId") Long returnId, HttpServletRequest request)
+    {
+        return success(salesReturnService.getReturnDetail(returnId, resolveShopDeptId(request)));
+    }
+
+    @RequiresPermissions("inv:salesReturn:add")
+    @IdempotentSubmit(timeout = 30)
+    @Log(title = "销售退货管理", businessType = BusinessType.INSERT)
+    @PostMapping("/save")
+    public AjaxResult save(@Validated @RequestBody InvSalesReturnSaveRequest request, HttpServletRequest httpRequest)
+    {
+        return success(salesReturnService.saveDraft(request, request.getDetails(), resolveShopDeptId(httpRequest)));
+    }
+
+    @RequiresPermissions("inv:salesReturn:submit")
+    @IdempotentSubmit(timeout = 30)
+    @Log(title = "销售退货管理", businessType = BusinessType.UPDATE)
+    @PostMapping("/submit")
+    public AjaxResult submit(@Validated @RequestBody InvSalesReturnSaveRequest request, HttpServletRequest httpRequest)
+    {
+        return success(salesReturnService.submitReturn(request, request.getDetails(), resolveShopDeptId(httpRequest)));
+    }
+
+    @RequiresPermissions("inv:salesReturn:confirm")
+    @IdempotentSubmit(timeout = 30)
+    @Log(title = "销售退货管理", businessType = BusinessType.UPDATE)
+    @PostMapping("/confirm/{returnId}")
+    public AjaxResult confirm(@PathVariable("returnId") Long returnId, HttpServletRequest request)
+    {
+        salesReturnService.confirmReturn(returnId, resolveShopDeptId(request));
+        return success();
+    }
+
+    @RequiresPermissions("inv:salesReturn:remove")
+    @IdempotentSubmit(timeout = 30)
+    @Log(title = "销售退货管理", businessType = BusinessType.DELETE)
+    @DeleteMapping("/{returnId}")
+    public AjaxResult remove(@PathVariable("returnId") Long returnId, HttpServletRequest request)
+    {
+        salesReturnService.cancelReturn(returnId, resolveShopDeptId(request));
+        return success();
+    }
+
+    @RequiresPermissions("inv:salesReturn:export")
+    @Log(title = "销售退货管理", businessType = BusinessType.EXPORT)
+    @PostMapping("/export")
+    public void export(HttpServletResponse response, InvSalesReturn salesReturn, HttpServletRequest request)
+    {
+        List<InvSalesReturn> list = salesReturnService.selectReturnList(salesReturn, resolveShopDeptId(request));
+        ExcelUtil<InvSalesReturn> util = new ExcelUtil<>(InvSalesReturn.class);
+        util.exportExcel(response, list, "销售退货数据");
+    }
+}

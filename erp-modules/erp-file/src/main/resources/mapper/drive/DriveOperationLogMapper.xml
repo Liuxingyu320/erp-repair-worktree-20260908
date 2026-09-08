@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.file.drive.mapper.DriveOperationLogMapper">
+
+    <resultMap id="DriveRecentNodeResult" type="com.erp.file.drive.domain.DriveNode">
+        <id property="nodeId" column="node_id" />
+        <result property="spaceId" column="space_id" />
+        <result property="spaceName" column="space_name" />
+        <result property="parentId" column="parent_id" />
+        <result property="ancestors" column="ancestors" />
+        <result property="nodeType" column="node_type" />
+        <result property="nodeName" column="node_name" />
+        <result property="normalizedName" column="normalized_name" />
+        <result property="extension" column="extension" />
+        <result property="contentType" column="content_type" />
+        <result property="sizeBytes" column="size_bytes" />
+        <result property="status" column="status" />
+        <result property="activeFlag" column="active_flag" />
+        <result property="version" column="version" />
+        <result property="createBy" column="create_by" />
+        <result property="createTime" column="create_time" />
+        <result property="updateBy" column="update_by" />
+        <result property="updateTime" column="update_time" />
+    </resultMap>
+
+    <insert id="insertOperation" useGeneratedKeys="true" keyProperty="operationId">
+        insert into drive_operation_log (
+            space_id, node_id, action, operator_user_id, operator_dept_id,
+            operator_name, request_id, ip_address, user_agent, before_summary,
+            after_summary, result, error_code, create_time
+        ) values (
+            #{spaceId}, #{nodeId}, #{action}, #{operatorUserId}, #{operatorDeptId},
+            #{operatorName}, #{requestId}, #{ipAddress}, #{userAgent}, #{beforeSummary},
+            #{afterSummary}, #{result}, #{errorCode}, #{createTime}
+        )
+    </insert>
+
+    <select id="selectRecentNodes" resultMap="DriveRecentNodeResult">
+        select n.node_id, n.space_id, s.space_name, n.parent_id, n.ancestors,
+               n.node_type, n.node_name, n.normalized_name, n.extension,
+               n.content_type, n.size_bytes, n.status, n.active_flag, n.version,
+               n.create_by, n.create_time, n.update_by, n.update_time
+        from drive_operation_log l
+        inner join (
+            select node_id, max(operation_id) as operation_id
+            from drive_operation_log
+            where operator_user_id = #{userId}
+              and result = 'SUCCESS'
+              and action in ('OPEN', 'PREVIEW', 'DOWNLOAD')
+              and node_id is not null
+            group by node_id
+        ) latest on latest.operation_id = l.operation_id
+        inner join drive_node n on n.node_id = l.node_id
+            and n.status = 'ACTIVE' and n.active_flag = 1
+        inner join drive_space s on s.space_id = n.space_id and s.status = 'ACTIVE'
+        order by l.operation_id desc
+        limit #{limit}
+    </select>
+
+</mapper>

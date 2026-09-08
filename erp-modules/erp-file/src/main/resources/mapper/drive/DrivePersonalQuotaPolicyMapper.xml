@@ -1,0 +1,180 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.file.drive.mapper.DrivePersonalQuotaPolicyMapper">
+
+    <resultMap id="PolicyResult" type="com.erp.file.drive.domain.DrivePersonalQuotaPolicy">
+        <id property="policyId" column="policy_id" />
+        <result property="subjectType" column="subject_type" />
+        <result property="subjectId" column="subject_id" />
+        <result property="subjectName" column="subject_name" />
+        <result property="quotaBytes" column="quota_bytes" />
+        <result property="priority" column="priority" />
+        <result property="expireTime" column="expire_time" />
+        <result property="status" column="status" />
+        <result property="version" column="version" />
+        <result property="createBy" column="create_by" />
+        <result property="createTime" column="create_time" />
+        <result property="updateBy" column="update_by" />
+        <result property="updateTime" column="update_time" />
+        <result property="remark" column="remark" />
+    </resultMap>
+
+    <sql id="PolicyColumns">
+        p.policy_id, p.subject_type, p.subject_id, p.quota_bytes, p.priority,
+        p.expire_time, p.status, p.version, p.create_by, p.create_time,
+        p.update_by, p.update_time, p.remark
+    </sql>
+
+    <select id="selectBySubject" resultMap="PolicyResult">
+        select <include refid="PolicyColumns" />, null as subject_name
+        from drive_personal_quota_policy p
+        where p.subject_type = #{subjectType}
+          and p.subject_id = #{subjectId}
+    </select>
+
+    <select id="selectGlobalPolicy" resultMap="PolicyResult">
+        select <include refid="PolicyColumns" />, '全员默认' as subject_name
+        from drive_personal_quota_policy p
+        where p.subject_type = 'GLOBAL'
+          and p.subject_id = 0
+          and p.status = 'ACTIVE'
+        limit 1
+    </select>
+
+    <select id="selectActiveUserPolicy" resultMap="PolicyResult">
+        select <include refid="PolicyColumns" />, u.nick_name as subject_name
+        from drive_personal_quota_policy p
+        join sys_user u on u.user_id = p.subject_id
+        where p.subject_type = 'USER'
+          and p.subject_id = #{userId}
+          and p.status = 'ACTIVE'
+          and (p.expire_time is null or p.expire_time &gt; #{now})
+          and u.status = '0'
+          and u.del_flag = '0'
+        limit 1
+    </select>
+
+    <select id="selectActivePostPolicies" resultMap="PolicyResult">
+        select <include refid="PolicyColumns" />, post.post_name as subject_name
+        from drive_personal_quota_policy p
+        join sys_post post
+          on post.post_id = p.subject_id
+         and post.status = '0'
+        join sys_user_post up
+          on up.post_id = post.post_id
+         and up.user_id = #{userId}
+        where p.subject_type = 'POST'
+          and p.status = 'ACTIVE'
+          and (p.expire_time is null or p.expire_time &gt; #{now})
+        order by p.priority desc, p.quota_bytes desc, p.policy_id asc
+    </select>
+
+    <select id="selectAllPolicies" resultMap="PolicyResult">
+        select <include refid="PolicyColumns" />,
+               case p.subject_type
+                 when 'GLOBAL' then '全员默认'
+                 when 'POST' then post.post_name
+                 when 'USER' then coalesce(user.nick_name, user.user_name)
+                 else null
+               end as subject_name
+        from drive_personal_quota_policy p
+        left join sys_post post
+          on p.subject_type = 'POST' and post.post_id = p.subject_id
+        left join sys_user user
+          on p.subject_type = 'USER' and user.user_id = p.subject_id
+        order by case p.subject_type when 'GLOBAL' then 0 when 'POST' then 1 else 2 end,
+                 p.priority desc, p.subject_id
+    </select>
+
+    <select id="selectPostOptions" resultType="com.erp.file.drive.domain.vo.DrivePostQuotaOptionVo">
+        select post.post_id as postId,
+               post.post_code as postCode,
+               post.post_name as postName,
+               count(distinct case when u.status = '0' and u.del_flag = '0'
+                                   then up.user_id end) as userCount,
+               case when policy.policy_id is null then false else true end as configured
+        from sys_post post
+        left join sys_user_post up on up.post_id = post.post_id
+        left join sys_user u on u.user_id = up.user_id
+        left join drive_personal_quota_policy policy
+          on policy.subject_type = 'POST'
+         and policy.subject_id = post.post_id
+        where post.status = '0'
+        group by post.post_id, post.post_code, post.post_name, post.post_sort,
+                 policy.policy_id
+        order by post.post_sort, post.post_id
+    </select>
+
+    <select id="selectActiveUserContexts" resultType="com.erp.file.drive.domain.DriveUserQuotaContext">
+        select u.user_id as userId,
+               u.user_name as userName,
+               u.nick_name as nickName,
+               d.dept_id as deptId,
+               d.dept_name as deptName,
+               post.post_id as postId,
+               post.post_name as postName
+        from sys_user u
+        left join sys_dept d
+          on d.dept_id = u.dept_id
+         and d.status = '0'
+         and d.del_flag = '0'
+        left join sys_user_post up on up.user_id = u.user_id
+        left join sys_post post
+          on post.post_id = up.post_id
+         and post.status = '0'
+        where u.status = '0'
+          and u.del_flag = '0'
+        order by u.user_id, post.post_sort, post.post_id
+    </select>
+
+    <select id="countActiveUser" resultType="int">
+        select count(*)
+        from sys_user
+        where user_id = #{userId}
+          and status = '0'
+          and del_flag = '0'
+    </select>
+
+    <select id="countActivePost" resultType="int">
+        select count(*)
+        from sys_post
+        where post_id = #{postId}
+          and status = '0'
+    </select>
+
+    <insert id="insertPolicy" useGeneratedKeys="true" keyProperty="policyId">
+        insert into drive_personal_quota_policy (
+            subject_type, subject_id, quota_bytes, priority, expire_time,
+            status, version, create_by, create_time, update_by, update_time, remark
+        ) values (
+            #{subjectType}, #{subjectId}, #{quotaBytes}, #{priority}, #{expireTime},
+            #{status}, #{version}, #{createBy}, #{createTime}, #{updateBy}, #{updateTime}, #{remark}
+        )
+    </insert>
+
+    <update id="updatePolicy">
+        update drive_personal_quota_policy
+        set quota_bytes = #{quotaBytes},
+            priority = #{priority},
+            expire_time = #{expireTime},
+            status = #{status},
+            version = version + 1,
+            update_by = #{updateBy},
+            update_time = #{updateTime},
+            remark = #{remark}
+        where subject_type = #{subjectType}
+          and subject_id = #{subjectId}
+          and version = #{version}
+    </update>
+
+    <delete id="deletePolicy">
+        delete from drive_personal_quota_policy
+        where subject_type = #{subjectType}
+          and subject_id = #{subjectId}
+          and version = #{version}
+          and subject_type &lt;&gt; 'GLOBAL'
+    </delete>
+
+</mapper>

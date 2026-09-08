@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.system.mapper.SysSalaryImpactMapper">
+
+    <select id="selectSchemeImpact" parameterType="Long" resultType="com.erp.system.domain.vo.SysSalaryImpactStats">
+        select
+            (select count(distinct us.user_id)
+               from sys_user_salary_scheme us
+              where us.scheme_id = #{schemeId}) as direct_user_count,
+            (select count(distinct ur.user_id)
+               from sys_role_salary_scheme rs
+               join sys_user_role ur on ur.role_id = rs.role_id
+              where rs.scheme_id = #{schemeId}) as role_inherited_user_count,
+            (select count(distinct impacted.user_id)
+               from (
+                    select us.user_id from sys_user_salary_scheme us where us.scheme_id = #{schemeId}
+                    union
+                    select ur.user_id
+                      from sys_role_salary_scheme rs
+                      join sys_user_role ur on ur.role_id = rs.role_id
+                     where rs.scheme_id = #{schemeId}
+               ) impacted) as affected_user_count,
+            (select count(distinct active_rows.user_id)
+               from (
+                    select us.user_id
+                      from sys_user_salary_scheme us
+                     where us.scheme_id = #{schemeId}
+                       and us.status = '0'
+                       and (us.effective_date is null or us.effective_date = '' or us.effective_date &lt;= date_format(curdate(), '%Y-%m-%d'))
+                       and (us.end_date is null or us.end_date = '' or us.end_date &gt;= date_format(curdate(), '%Y-%m-%d'))
+                    union
+                    select ur.user_id
+                      from sys_role_salary_scheme rs
+                      join sys_user_role ur on ur.role_id = rs.role_id
+                     where rs.scheme_id = #{schemeId}
+                       and (rs.effective_date is null or rs.effective_date = '' or rs.effective_date &lt;= date_format(curdate(), '%Y-%m-%d'))
+               ) active_rows) as effective_now_count,
+            (select count(distinct future_rows.user_id)
+               from (
+                    select us.user_id
+                      from sys_user_salary_scheme us
+                     where us.scheme_id = #{schemeId}
+                       and us.status = '0'
+                       and us.effective_date &gt; date_format(curdate(), '%Y-%m-%d')
+                    union
+                    select ur.user_id
+                      from sys_role_salary_scheme rs
+                      join sys_user_role ur on ur.role_id = rs.role_id
+                     where rs.scheme_id = #{schemeId}
+                       and rs.effective_date &gt; date_format(curdate(), '%Y-%m-%d')
+               ) future_rows) as future_effective_count,
+            (select count(distinct us.user_id)
+               from sys_user_salary_scheme us
+              where us.scheme_id = #{schemeId}
+                and exists (
+                    select 1
+                      from sys_user_role ur
+                      join sys_role_salary_scheme rs on rs.role_id = ur.role_id
+                     where ur.user_id = us.user_id
+                       and rs.scheme_id = us.scheme_id
+                )) as conflict_user_count
+    </select>
+
+    <select id="selectItemImpact" parameterType="Long" resultType="com.erp.system.domain.vo.SysSalaryImpactStats">
+        select
+            (select count(distinct us.user_id) from sys_user_salary_scheme us where us.item_id = #{itemId}) as direct_user_count,
+            (select count(distinct ur.user_id)
+               from sys_role_salary_scheme rs join sys_user_role ur on ur.role_id = rs.role_id
+              where rs.item_id = #{itemId}) as role_inherited_user_count,
+            (select count(distinct impacted.user_id)
+               from (
+                    select us.user_id from sys_user_salary_scheme us where us.item_id = #{itemId}
+                    union
+                    select ur.user_id from sys_role_salary_scheme rs
+                    join sys_user_role ur on ur.role_id = rs.role_id where rs.item_id = #{itemId}
+               ) impacted) as affected_user_count,
+            (select count(distinct active_rows.user_id)
+               from (
+                    select us.user_id from sys_user_salary_scheme us
+                     where us.item_id = #{itemId} and us.status = '0'
+                       and (us.effective_date is null or us.effective_date = '' or us.effective_date &lt;= date_format(curdate(), '%Y-%m-%d'))
+                       and (us.end_date is null or us.end_date = '' or us.end_date &gt;= date_format(curdate(), '%Y-%m-%d'))
+                    union
+                    select ur.user_id from sys_role_salary_scheme rs
+                    join sys_user_role ur on ur.role_id = rs.role_id
+                     where rs.item_id = #{itemId}
+                       and (rs.effective_date is null or rs.effective_date = '' or rs.effective_date &lt;= date_format(curdate(), '%Y-%m-%d'))
+               ) active_rows) as effective_now_count,
+            (select count(distinct future_rows.user_id)
+               from (
+                    select us.user_id from sys_user_salary_scheme us
+                     where us.item_id = #{itemId} and us.status = '0'
+                       and us.effective_date &gt; date_format(curdate(), '%Y-%m-%d')
+                    union
+                    select ur.user_id from sys_role_salary_scheme rs
+                    join sys_user_role ur on ur.role_id = rs.role_id
+                     where rs.item_id = #{itemId}
+                       and rs.effective_date &gt; date_format(curdate(), '%Y-%m-%d')
+               ) future_rows) as future_effective_count,
+            0 as conflict_user_count
+    </select>
+
+    <select id="countUsersByRoleId" parameterType="Long" resultType="int">
+        select count(distinct user_id) from sys_user_role where role_id = #{roleId}
+    </select>
+
+    <select id="countUsersWithDirectSalaryByRoleId" parameterType="Long" resultType="int">
+        select count(distinct ur.user_id)
+        from sys_user_role ur
+        join sys_user_salary_scheme us on us.user_id = ur.user_id and us.status = '0'
+        where ur.role_id = #{roleId}
+    </select>
+
+    <select id="countRoleSalaryBindingsByUserId" parameterType="Long" resultType="int">
+        select count(distinct rs.relation_id)
+        from sys_user_role ur
+        join sys_role_salary_scheme rs on rs.role_id = ur.role_id
+        where ur.user_id = #{userId}
+    </select>
+</mapper>

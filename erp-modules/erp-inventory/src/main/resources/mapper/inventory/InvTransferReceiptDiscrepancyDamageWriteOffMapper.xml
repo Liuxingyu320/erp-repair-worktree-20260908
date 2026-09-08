@@ -1,0 +1,572 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.inventory.mapper.InvTransferReceiptDiscrepancyDamageWriteOffMapper">
+
+    <resultMap id="FactResult"
+            type="com.erp.inventory.domain.transfer.InvTransferReceiptDiscrepancyDamageWriteOffFact">
+        <id property="caseId" column="discrepancy_case_id"/>
+        <result property="receiptId" column="receipt_id"/>
+        <result property="receiptAllocationId" column="receipt_allocation_id"/>
+        <result property="shipmentId" column="shipment_id"/>
+        <result property="transferId" column="transfer_id"/>
+        <result property="shipmentAllocationId"
+                column="shipment_allocation_id"/>
+        <result property="targetWarehouseId" column="target_warehouse_id"/>
+        <result property="itemType" column="item_type"/>
+        <result property="itemId" column="item_id"/>
+        <result property="productId" column="product_id"/>
+        <result property="trackingPolicy" column="tracking_policy"/>
+        <result property="damagedQuantity" column="damaged_quantity"/>
+        <result property="sourceCostPrice" column="cost_price"/>
+        <result property="damagedCost" column="damaged_cost"/>
+        <result property="damagedTargetLotId"
+                column="damaged_target_lot_id"/>
+        <result property="quarantineLocationId"
+                column="quarantine_location_id"/>
+        <result property="damagedTargetBalanceId"
+                column="damaged_target_balance_id"/>
+    </resultMap>
+
+    <resultMap id="StockResult"
+            type="com.erp.inventory.domain.transfer.InvTransferReceiptTargetStock">
+        <id property="stockId" column="stock_id"/>
+        <result property="itemType" column="item_type"/>
+        <result property="itemId" column="item_id"/>
+        <result property="productId" column="product_id"/>
+        <result property="shopDeptId" column="shop_dept_id"/>
+        <result property="warehouseId" column="warehouse_id"/>
+        <result property="currentQuantity" column="current_quantity"/>
+        <result property="lockedQuantity" column="locked_quantity"/>
+        <result property="availableQuantity" column="available_quantity"/>
+        <result property="quarantineQuantity"
+                column="quarantine_quantity"/>
+        <result property="costPrice" column="cost_price"/>
+        <result property="totalCost" column="total_cost"/>
+        <result property="version" column="version"/>
+    </resultMap>
+
+    <resultMap id="LotResult"
+            type="com.erp.inventory.domain.transfer.InvTransferReceiptTargetLot">
+        <id property="lotId" column="lot_id"/>
+        <result property="lotNo" column="lot_no"/>
+        <result property="itemType" column="item_type"/>
+        <result property="itemId" column="item_id"/>
+        <result property="productId" column="product_id"/>
+        <result property="warehouseId" column="warehouse_id"/>
+        <result property="sourceLotId" column="source_lot_id"/>
+        <result property="receiptDisposition"
+                column="receipt_disposition"/>
+        <result property="qcStatus" column="qc_status"/>
+        <result property="lotStatus" column="lot_status"/>
+    </resultMap>
+
+    <resultMap id="LocationResult"
+            type="com.erp.inventory.domain.transfer.InvTransferReceiptLocationCandidate">
+        <id property="locationId" column="location_id"/>
+        <result property="warehouseId" column="warehouse_id"/>
+        <result property="locationCode" column="location_code"/>
+        <result property="locationName" column="location_name"/>
+        <result property="locationType" column="location_type"/>
+        <result property="sortOrder" column="sort_order"/>
+        <result property="status" column="status"/>
+        <result property="virtualFlag" column="is_virtual"/>
+    </resultMap>
+
+    <resultMap id="BalanceResult"
+            type="com.erp.inventory.domain.transfer.InvTransferReceiptTargetBalance">
+        <id property="balanceId" column="balance_id"/>
+        <result property="itemType" column="item_type"/>
+        <result property="itemId" column="item_id"/>
+        <result property="productId" column="product_id"/>
+        <result property="warehouseId" column="warehouse_id"/>
+        <result property="lotId" column="lot_id"/>
+        <result property="locationId" column="location_id"/>
+        <result property="currentQuantity" column="current_quantity"/>
+        <result property="lockedQuantity" column="locked_quantity"/>
+        <result property="availableQuantity" column="available_quantity"/>
+        <result property="quarantineQuantity"
+                column="quarantine_quantity"/>
+        <result property="costPrice" column="cost_price"/>
+        <result property="totalCost" column="total_cost"/>
+        <result property="version" column="version"/>
+    </resultMap>
+
+    <resultMap id="SerialResult"
+            type="com.erp.inventory.domain.transfer.InvTransferReceiptDiscrepancyDamageWriteOffSerialFact">
+        <id property="receiptSerialId" column="receipt_serial_id"/>
+        <result property="receiptId" column="receipt_id"/>
+        <result property="receiptAllocationId" column="receipt_allocation_id"/>
+        <result property="shipmentId" column="shipment_id"/>
+        <result property="shipmentAllocationId"
+                column="shipment_allocation_id"/>
+        <result property="serialId" column="serial_id"/>
+        <result property="serialNoSnapshot" column="serial_no_snapshot"/>
+        <result property="currentSerialNo" column="current_serial_no"/>
+        <result property="disposition" column="disposition"/>
+        <result property="itemType" column="item_type"/>
+        <result property="itemId" column="item_id"/>
+        <result property="currentWarehouseId" column="current_warehouse_id"/>
+        <result property="currentBalanceId" column="current_balance_id"/>
+        <result property="currentLotId" column="current_lot_id"/>
+        <result property="currentLocationId" column="current_location_id"/>
+        <result property="receiptStatusAfter" column="receipt_status_after"/>
+        <result property="currentStatus" column="current_status"/>
+    </resultMap>
+
+    <select id="selectFactForUpdate" resultMap="FactResult">
+        select c.discrepancy_case_id, c.receipt_id,
+               c.receipt_allocation_id, c.shipment_id, c.transfer_id,
+               c.shipment_allocation_id, r.target_warehouse_id,
+               ra.item_type, ra.item_id, ra.product_id, ra.tracking_policy,
+               ra.damaged_quantity, ra.cost_price, ra.damaged_cost,
+               ra.damaged_target_lot_id, ra.quarantine_location_id,
+               ra.damaged_target_balance_id
+        from inv_transfer_receipt_discrepancy_case c
+        inner join inv_transfer_shipment_receipt r
+                on r.receipt_id = c.receipt_id
+               and r.shipment_id = c.shipment_id
+               and r.transfer_id = c.transfer_id
+        inner join inv_transfer_shipment_receipt_allocation ra
+                on ra.receipt_allocation_id = c.receipt_allocation_id
+               and ra.receipt_id = c.receipt_id
+               and ra.shipment_id = c.shipment_id
+               and ra.shipment_allocation_id = c.shipment_allocation_id
+        where c.discrepancy_case_id = #{caseId}
+          and c.discrepancy_type = 'damaged'
+          and c.discrepancy_quantity = ra.damaged_quantity
+          and c.source_cost_price = ra.cost_price
+          and c.discrepancy_amount = ra.damaged_cost
+          and ra.damaged_quantity &gt; 0
+          and ra.damaged_target_lot_id is not null
+          and ra.quarantine_location_id is not null
+          and ra.damaged_target_balance_id is not null
+        for update
+    </select>
+
+    <select id="selectWrittenOffQuantity" resultType="java.math.BigDecimal">
+        select coalesce(sum(loss_quantity), 0.0000)
+        from inv_transfer_receipt_discrepancy_damage_loss_ledger
+        where receipt_allocation_id = #{receiptAllocationId}
+    </select>
+
+    <select id="selectStockForUpdate" resultMap="StockResult">
+        select stock_id, item_type, item_id, product_id, shop_dept_id,
+               warehouse_id, current_quantity, locked_quantity,
+               available_quantity, quarantine_quantity, cost_price,
+               total_cost, version
+        from inv_stock
+        where shop_dept_id = #{fact.targetWarehouseId}
+          and warehouse_id = #{fact.targetWarehouseId}
+          and item_type = #{fact.itemType}
+          and item_id = #{fact.itemId}
+        for update
+    </select>
+
+    <select id="selectLotForUpdate" resultMap="LotResult">
+        select lot_id, lot_no, item_type, item_id, product_id, warehouse_id,
+               source_lot_id, receipt_disposition, qc_status, lot_status
+        from inv_inventory_lot
+        where lot_id = #{fact.damagedTargetLotId}
+        for update
+    </select>
+
+    <select id="selectLocationForUpdate" resultMap="LocationResult">
+        select location_id, warehouse_id, location_code, location_name,
+               location_type, sort_order, status, is_virtual
+        from inv_warehouse_location
+        where location_id = #{fact.quarantineLocationId}
+        for update
+    </select>
+
+    <select id="selectBalanceForUpdate" resultMap="BalanceResult">
+        select balance_id, item_type, item_id, product_id, warehouse_id,
+               lot_id, location_id, current_quantity, locked_quantity,
+               available_quantity, quarantine_quantity, cost_price,
+               total_cost, version
+        from inv_stock_balance_detail
+        where balance_id = #{fact.damagedTargetBalanceId}
+        for update
+    </select>
+
+    <select id="selectEligibleSerialsForUpdate" resultMap="SerialResult">
+        select rs.receipt_serial_id, rs.receipt_id,
+               rs.receipt_allocation_id, rs.shipment_id,
+               rs.shipment_allocation_id, rs.serial_id,
+               rs.serial_no_snapshot, serial.serial_no as current_serial_no,
+               rs.disposition, serial.item_type, serial.item_id,
+               serial.warehouse_id as current_warehouse_id,
+               serial.balance_id as current_balance_id,
+               serial.lot_id as current_lot_id,
+               serial.location_id as current_location_id,
+               rs.status_after as receipt_status_after,
+               serial.serial_status as current_status
+        from inv_transfer_shipment_receipt_serial rs
+        inner join inv_inventory_serial serial
+                on serial.serial_id = rs.serial_id
+               and serial.item_type = #{fact.itemType}
+               and serial.item_id = #{fact.itemId}
+        where rs.receipt_allocation_id = #{fact.receiptAllocationId}
+          and rs.receipt_id = #{fact.receiptId}
+          and rs.shipment_id = #{fact.shipmentId}
+          and rs.shipment_allocation_id = #{fact.shipmentAllocationId}
+          and rs.disposition = 'damaged'
+          and rs.status_after = 'quarantine'
+          and serial.warehouse_id = #{fact.targetWarehouseId}
+          and serial.balance_id = #{fact.damagedTargetBalanceId}
+          and serial.lot_id = #{fact.damagedTargetLotId}
+          and serial.location_id = #{fact.quarantineLocationId}
+          and serial.serial_status = 'quarantine'
+          and not exists (
+              select 1
+              from inv_transfer_receipt_discrepancy_damage_loss_serial used
+              where used.receipt_serial_id = rs.receipt_serial_id
+                 or used.serial_id = rs.serial_id
+          )
+        order by rs.receipt_serial_id, serial.serial_id
+        for update
+    </select>
+
+    <update id="decrementStock">
+        update inv_stock
+        set current_quantity = #{effect.stockCurrentAfter},
+            quarantine_quantity = #{effect.stockQuarantineAfter},
+            total_cost = #{effect.stockTotalCostAfter},
+            cost_price = #{effect.stockCostPriceAfter},
+            version = #{effect.stockVersionAfter},
+            last_out_time = #{effect.execution.executedAt},
+            update_by = #{effect.execution.executorName},
+            update_time = sysdate()
+        where stock_id = #{effect.stockId}
+          and shop_dept_id = #{effect.fact.targetWarehouseId}
+          and warehouse_id = #{effect.fact.targetWarehouseId}
+          and item_type = #{effect.fact.itemType}
+          and item_id = #{effect.fact.itemId}
+          and version = #{effect.stockVersionBefore}
+          and current_quantity = #{effect.stockCurrentBefore}
+          and available_quantity = #{effect.stockAvailableQuantity}
+          and locked_quantity = #{effect.stockLockedQuantity}
+          and quarantine_quantity = #{effect.stockQuarantineBefore}
+          and total_cost = #{effect.stockTotalCostBefore}
+          and current_quantity = available_quantity + locked_quantity
+              + quarantine_quantity
+          and #{effect.stockCurrentAfter} = current_quantity
+              - #{effect.quantity}
+          and #{effect.stockQuarantineAfter} = quarantine_quantity
+              - #{effect.quantity}
+          and #{effect.stockTotalCostAfter} = total_cost - #{effect.amount}
+          and #{effect.stockVersionAfter} = version + 1
+          and current_quantity &gt;= #{effect.quantity}
+          and quarantine_quantity &gt;= #{effect.quantity}
+          and total_cost &gt;= #{effect.amount}
+    </update>
+
+    <update id="decrementBalance">
+        update inv_stock_balance_detail
+        set current_quantity = #{effect.balanceCurrentAfter},
+            quarantine_quantity = #{effect.balanceQuarantineAfter},
+            total_cost = #{effect.balanceTotalCostAfter},
+            cost_price = #{effect.balanceCostPriceAfter},
+            version = #{effect.balanceVersionAfter},
+            last_out_time = #{effect.execution.executedAt},
+            update_by = #{effect.execution.executorName},
+            update_time = sysdate()
+        where balance_id = #{effect.balanceId}
+          and warehouse_id = #{effect.fact.targetWarehouseId}
+          and item_type = #{effect.fact.itemType}
+          and item_id = #{effect.fact.itemId}
+          and lot_id = #{effect.fact.damagedTargetLotId}
+          and location_id = #{effect.fact.quarantineLocationId}
+          and version = #{effect.balanceVersionBefore}
+          and current_quantity = #{effect.balanceCurrentBefore}
+          and available_quantity = #{effect.balanceAvailableQuantity}
+          and available_quantity = 0
+          and locked_quantity = #{effect.balanceLockedQuantity}
+          and quarantine_quantity = #{effect.balanceQuarantineBefore}
+          and total_cost = #{effect.balanceTotalCostBefore}
+          and current_quantity = available_quantity + locked_quantity
+              + quarantine_quantity
+          and #{effect.balanceCurrentAfter} = current_quantity
+              - #{effect.quantity}
+          and #{effect.balanceQuarantineAfter} = quarantine_quantity
+              - #{effect.quantity}
+          and #{effect.balanceTotalCostAfter} = total_cost - #{effect.amount}
+          and #{effect.balanceVersionAfter} = version + 1
+          and current_quantity &gt;= #{effect.quantity}
+          and quarantine_quantity &gt;= #{effect.quantity}
+          and total_cost &gt;= #{effect.amount}
+    </update>
+
+    <update id="scrapSerial">
+        update inv_inventory_serial
+        set serial_status = 'scrapped',
+            update_by = #{effect.execution.executorName},
+            update_time = sysdate(),
+            remark = concat('adjudication damage write-off action=',
+                    #{effect.execution.actionId})
+        where serial_id = #{serial.serialId}
+          and serial_no = #{serial.serialNo}
+          and item_type = #{effect.fact.itemType}
+          and item_id = #{effect.fact.itemId}
+          and warehouse_id = #{effect.fact.targetWarehouseId}
+          and balance_id = #{effect.fact.damagedTargetBalanceId}
+          and lot_id = #{effect.fact.damagedTargetLotId}
+          and location_id = #{effect.fact.quarantineLocationId}
+          and serial_status = 'quarantine'
+    </update>
+
+    <insert id="insertStockLedger">
+        insert into inv_stock_ledger_detail (
+            request_id, command_request_id, warehouse_id, item_type,
+            item_id, product_id, movement_type, business_type, business_id,
+            business_no, from_balance_id, from_lot_id, from_location_id,
+            change_quantity, before_quantity, after_quantity, cost_price,
+            total_cost, operator_user_id, operator_name, occurred_time,
+            create_by, create_time, remark
+        ) values (
+            #{effect.stockLedgerRequestId}, #{effect.execution.requestId},
+            #{effect.fact.targetWarehouseId}, #{effect.fact.itemType},
+            #{effect.fact.itemId}, #{effect.fact.productId},
+            'damage_write_off', 'transfer_discrepancy',
+            #{effect.execution.caseId},
+            concat('adjudication-action:', #{effect.execution.actionId}),
+            #{effect.balanceId}, #{effect.fact.damagedTargetLotId},
+            #{effect.fact.quarantineLocationId}, -#{effect.quantity},
+            #{effect.balanceCurrentBefore}, #{effect.balanceCurrentAfter},
+            #{effect.execution.sourceCostPrice}, #{effect.amount},
+            #{effect.execution.executorUserId},
+            #{effect.execution.executorName}, #{effect.execution.executedAt},
+            #{effect.execution.executorName}, sysdate(),
+            concat('V2 damaged quarantine write-off, loss=',
+                    #{effect.lossType})
+        )
+    </insert>
+
+    <insert id="insertDamageLossLedger">
+        insert into inv_transfer_receipt_discrepancy_damage_loss_ledger (
+            request_id, stock_ledger_request_id, discrepancy_case_id,
+            adjudication_id, adjudication_action_id, action_version_before,
+            action_version_after, case_version_before, case_version_after,
+            case_status_before, case_status_after, plan_status_before,
+            plan_status_after, action_status_before, action_status_after,
+            action_sequence, receipt_id, receipt_allocation_id, shipment_id,
+            transfer_id, shipment_allocation_id, target_warehouse_id,
+            item_type, item_id, product_id, tracking_policy,
+            damaged_target_lot_id, quarantine_location_id,
+            damaged_target_balance_id, discrepancy_type, action_type,
+            effect_kind, loss_type, responsible_party, loss_quantity,
+            source_cost_price, loss_amount, allocation_damaged_quantity,
+            allocation_written_off_before, allocation_written_off_after,
+            stock_id, stock_version_before, stock_version_after,
+            stock_current_before, stock_current_after,
+            stock_quarantine_before, stock_quarantine_after,
+            stock_total_cost_before, stock_total_cost_after,
+            balance_version_before, balance_version_after,
+            balance_current_before, balance_current_after,
+            balance_quarantine_before, balance_quarantine_after,
+            balance_total_cost_before, balance_total_cost_after,
+            decision_fingerprint, execution_fingerprint,
+            adjudication_note, action_note, evidence_refs,
+            required_permission, operator_user_id, operator_name,
+            occurred_time, create_by, create_time
+        )
+        select #{effect.execution.requestId},
+               #{effect.stockLedgerRequestId}, c.discrepancy_case_id,
+               a.adjudication_id, x.adjudication_action_id,
+               #{effect.execution.executionVersionBefore},
+               #{effect.execution.executionVersionAfter},
+               #{effect.execution.caseVersionBefore},
+               #{effect.execution.caseVersionAfter},
+               #{effect.execution.caseStatusBefore},
+               #{effect.execution.caseStatusAfter},
+               #{effect.execution.planStatusBefore},
+               #{effect.execution.planStatusAfter},
+               #{effect.execution.actionStatusBefore},
+               #{effect.execution.actionStatusAfter}, x.action_sequence,
+               c.receipt_id, c.receipt_allocation_id, c.shipment_id,
+               c.transfer_id, c.shipment_allocation_id,
+               #{effect.fact.targetWarehouseId}, ra.item_type, ra.item_id,
+               ra.product_id, ra.tracking_policy,
+               ra.damaged_target_lot_id, ra.quarantine_location_id,
+               ra.damaged_target_balance_id, c.discrepancy_type,
+               x.action_type, #{effect.execution.effectKind},
+               #{effect.lossType}, x.responsible_party, x.action_quantity,
+               a.source_cost_price, x.action_amount, ra.damaged_quantity,
+               #{effect.allocationWrittenOffBefore},
+               #{effect.allocationWrittenOffAfter}, #{effect.stockId},
+               #{effect.stockVersionBefore}, #{effect.stockVersionAfter},
+               #{effect.stockCurrentBefore}, #{effect.stockCurrentAfter},
+               #{effect.stockQuarantineBefore},
+               #{effect.stockQuarantineAfter},
+               #{effect.stockTotalCostBefore},
+               #{effect.stockTotalCostAfter},
+               #{effect.balanceVersionBefore},
+               #{effect.balanceVersionAfter},
+               #{effect.balanceCurrentBefore},
+               #{effect.balanceCurrentAfter},
+               #{effect.balanceQuarantineBefore},
+               #{effect.balanceQuarantineAfter},
+               #{effect.balanceTotalCostBefore},
+               #{effect.balanceTotalCostAfter}, a.decision_fingerprint,
+               #{effect.execution.eventFingerprint}, a.adjudication_note,
+               x.action_note, a.evidence_refs,
+               #{effect.execution.requiredPermission},
+               #{effect.execution.executorUserId},
+               #{effect.execution.executorName},
+               #{effect.execution.executedAt},
+               #{effect.execution.executorName}, sysdate()
+        from inv_transfer_receipt_discrepancy_case c
+        inner join inv_transfer_receipt_discrepancy_adjudication a
+                on a.discrepancy_case_id = c.discrepancy_case_id
+               and a.adjudication_id =
+                   #{effect.execution.adjudicationId}
+        inner join
+            inv_transfer_receipt_discrepancy_adjudication_action x
+                on x.discrepancy_case_id = c.discrepancy_case_id
+               and x.adjudication_id = a.adjudication_id
+               and x.adjudication_action_id =
+                   #{effect.execution.actionId}
+        inner join inv_transfer_shipment_receipt_allocation ra
+                on ra.receipt_allocation_id = c.receipt_allocation_id
+               and ra.receipt_id = c.receipt_id
+               and ra.shipment_id = c.shipment_id
+               and ra.shipment_allocation_id = c.shipment_allocation_id
+        where c.discrepancy_case_id = #{effect.execution.caseId}
+          and c.case_version = #{effect.execution.caseVersionBefore}
+          and c.status = #{effect.execution.caseStatusBefore}
+          and c.discrepancy_type = 'damaged'
+          and a.plan_status = #{effect.execution.planStatusBefore}
+          and a.decision_fingerprint =
+              #{effect.execution.decisionFingerprint}
+          and a.source_cost_price = #{effect.execution.sourceCostPrice}
+          and x.action_sequence = #{effect.execution.actionSequence}
+          and x.action_type in
+              ('damage_write_off', 'transport_loss_write_off')
+          and x.action_type = #{effect.execution.actionType}
+          and x.coverage_kind = 'resolution'
+          and x.coverage_kind = #{effect.execution.coverageKind}
+          and x.action_quantity = #{effect.quantity}
+          and x.action_amount = #{effect.amount}
+          and x.responsible_party = #{effect.execution.responsibleParty}
+          and x.execution_status = 'pending'
+          and x.execution_status =
+              #{effect.execution.actionStatusBefore}
+          and x.execution_version =
+              #{effect.execution.executionVersionBefore}
+          and x.execution_effect_reference is null
+          and ra.damaged_quantity = #{effect.fact.damagedQuantity}
+          and ra.cost_price = #{effect.fact.sourceCostPrice}
+          and ra.damaged_cost = c.discrepancy_amount
+          and ra.damaged_cost = round(
+              ra.cost_price * ra.damaged_quantity, 6)
+          and ra.damaged_target_lot_id =
+              #{effect.fact.damagedTargetLotId}
+          and ra.quarantine_location_id =
+              #{effect.fact.quarantineLocationId}
+          and ra.damaged_target_balance_id =
+              #{effect.fact.damagedTargetBalanceId}
+          and #{effect.execution.effectKind} =
+              'quarantine_write_off_and_loss_ledger'
+          and #{effect.execution.command} = 'dispatch'
+          and #{effect.execution.actionStatusAfter} = 'completed'
+          and #{effect.execution.executionVersionAfter} =
+              #{effect.execution.executionVersionBefore} + 1
+          and #{effect.execution.caseVersionAfter} =
+              #{effect.execution.caseVersionBefore} + 1
+          and #{effect.execution.effectReference} is null
+          and #{effect.allocationWrittenOffAfter} =
+              #{effect.allocationWrittenOffBefore} + #{effect.quantity}
+          and #{effect.allocationWrittenOffAfter} &lt;=
+              ra.damaged_quantity
+          and #{effect.execution.requiredPermission} =
+              'inv:transfer:discrepancy:execute'
+          and length(trim(a.adjudication_note)) between 1 and 500
+          and length(trim(x.action_note)) between 1 and 500
+          and length(trim(a.evidence_refs)) between 1 and 2000
+          and exists (
+              select 1
+              from inv_transfer_receipt_discrepancy_adjudication_execution_event event
+              where event.request_id = #{effect.execution.requestId}
+                and event.discrepancy_case_id =
+                    #{effect.execution.caseId}
+                and event.adjudication_id =
+                    #{effect.execution.adjudicationId}
+                and event.adjudication_action_id =
+                    #{effect.execution.actionId}
+                and event.action_version_before =
+                    #{effect.execution.executionVersionBefore}
+                and event.action_version_after =
+                    #{effect.execution.executionVersionAfter}
+                and event.effect_kind = #{effect.execution.effectKind}
+                and event.event_fingerprint =
+                    #{effect.execution.eventFingerprint}
+          )
+          and not exists (
+              select 1
+              from inv_transfer_receipt_discrepancy_damage_loss_ledger prior
+              where prior.request_id = #{effect.execution.requestId}
+                 or prior.stock_ledger_request_id =
+                        #{effect.stockLedgerRequestId}
+                 or (prior.adjudication_action_id =
+                         #{effect.execution.actionId}
+                     and prior.action_version_before =
+                         #{effect.execution.executionVersionBefore})
+          )
+    </insert>
+
+    <insert id="insertDamageLossSerial">
+        insert into inv_transfer_receipt_discrepancy_damage_loss_serial (
+            damage_loss_ledger_id, request_id, adjudication_action_id,
+            receipt_serial_id, serial_id, serial_no_snapshot,
+            warehouse_id, balance_id, lot_id, location_id,
+            status_before, status_after, create_by, create_time
+        )
+        select loss.damage_loss_ledger_id, loss.request_id,
+               loss.adjudication_action_id, rs.receipt_serial_id,
+               rs.serial_id, rs.serial_no_snapshot,
+               #{effect.fact.targetWarehouseId},
+               #{effect.fact.damagedTargetBalanceId},
+               #{effect.fact.damagedTargetLotId},
+               #{effect.fact.quarantineLocationId},
+               'quarantine', 'scrapped',
+               #{effect.execution.executorName}, sysdate()
+        from inv_transfer_receipt_discrepancy_damage_loss_ledger loss
+        inner join inv_transfer_shipment_receipt_serial rs
+                on rs.receipt_serial_id = #{serial.receiptSerialId}
+               and rs.serial_id = #{serial.serialId}
+               and rs.serial_no_snapshot = #{serial.serialNo}
+               and rs.receipt_id = #{effect.fact.receiptId}
+               and rs.receipt_allocation_id =
+                   #{effect.fact.receiptAllocationId}
+               and rs.shipment_id = #{effect.fact.shipmentId}
+               and rs.shipment_allocation_id =
+                   #{effect.fact.shipmentAllocationId}
+               and rs.disposition = 'damaged'
+               and rs.status_after = 'quarantine'
+        inner join inv_inventory_serial serial_current
+                on serial_current.serial_id = rs.serial_id
+               and serial_current.serial_no = rs.serial_no_snapshot
+               and serial_current.item_type = #{effect.fact.itemType}
+               and serial_current.item_id = #{effect.fact.itemId}
+               and serial_current.warehouse_id =
+                   #{effect.fact.targetWarehouseId}
+               and serial_current.balance_id =
+                   #{effect.fact.damagedTargetBalanceId}
+               and serial_current.lot_id =
+                   #{effect.fact.damagedTargetLotId}
+               and serial_current.location_id =
+                   #{effect.fact.quarantineLocationId}
+               and serial_current.serial_status = 'scrapped'
+        where loss.request_id = #{effect.execution.requestId}
+          and loss.adjudication_action_id =
+              #{effect.execution.actionId}
+          and loss.action_version_before =
+              #{effect.execution.executionVersionBefore}
+          and not exists (
+              select 1
+              from inv_transfer_receipt_discrepancy_damage_loss_serial prior
+              where prior.receipt_serial_id = #{serial.receiptSerialId}
+                 or prior.serial_id = #{serial.serialId}
+          )
+    </insert>
+
+</mapper>

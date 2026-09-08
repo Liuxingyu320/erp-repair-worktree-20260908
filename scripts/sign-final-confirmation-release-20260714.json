@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "releaseId": "sign-final-confirmation-20260714",
+  "baselineCommit": "b694659dd2c1",
+  "migrationList": "scripts/sign-final-confirmation-migrations-20260714.list",
+  "migrationCount": 1,
+  "sourceDirectory": "sql",
+  "deployDirectory": "docker/mysql/releases/sign-final-confirmation-20260714",
+  "executionPolicy": "manual-phased",
+  "featureFlags": [],
+  "migrations": [
+    {
+      "file": "erp_oa_sign_final_confirmation_20260714.sql",
+      "sha256": "c1209b88f37371cbc8a7b32c7ecf1cdb0997712b143eff192218d94cd55746e1",
+      "creates": [
+        "sys_legal_entity",
+        "oa_sign_final_confirmation",
+        "oa_sign_final_confirmation_document"
+      ],
+      "backupTables": [
+        "oa_company_seal_config",
+        "oa_sign_package",
+        "oa_sign_package_document",
+        "oa_sign_plan_version",
+        "oa_sign_task",
+        "sys_dept",
+        "sys_role"
+      ]
+    }
+  ],
+  "integrationTests": [
+    "erp-modules/erp-oa/src/test/java/com/erp/oa/service/impl/OaSignFinalConfirmationFlowTest.java"
+  ],
+  "artifactSha256Required": true
+}

@@ -1,0 +1,2 @@
+# 库存流水业务类型扩容热修复；必须在重试门店要货发货前执行。
+erp_inventory_stock_log_business_type_20260804.sql

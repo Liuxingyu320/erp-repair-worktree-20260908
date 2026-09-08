@@ -1,0 +1,222 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.inventory.mapper.InvProductMapper">
+
+    <resultMap type="InvProduct" id="InvProductResult">
+        <id property="productId" column="product_id"/>
+        <result property="productName" column="product_name"/>
+        <result property="productCode" column="product_code"/>
+        <result property="categoryId" column="category_id"/>
+        <result property="categoryName" column="category_name"/>
+        <result property="categoryFullPath" column="category_full_path"/>
+        <result property="grade" column="grade"/>
+        <result property="sku" column="sku"/>
+        <result property="spec" column="spec"/>
+        <result property="size" column="size"/>
+        <result property="unit" column="unit"/>
+        <result property="purchasePrice" column="purchase_price"/>
+        <result property="salesPrice" column="sales_price"/>
+        <result property="salePrice250g" column="sale_price_250g"/>
+        <result property="salePrice500g" column="sale_price_500g"/>
+        <result property="costPrice" column="cost_price"/>
+        <result property="safetyStockMin" column="safety_stock_min"/>
+        <result property="safetyStockMax" column="safety_stock_max"/>
+        <result property="supplierName" column="supplier_name"/>
+        <result property="supplierPhone" column="supplier_phone"/>
+        <result property="supplierRemark" column="supplier_remark"/>
+        <result property="internalTeaName" column="internal_tea_name"/>
+        <result property="productDescription" column="product_description"/>
+        <result property="barcode" column="barcode"/>
+        <result property="imageUrl" column="image_url"/>
+        <result property="packageImageUrl" column="package_image_url"/>
+        <result property="dryTeaImageUrl" column="dry_tea_image_url"/>
+        <result property="teaSoupImageUrl" column="tea_soup_image_url"/>
+        <result property="leafBottomImageUrl" column="leaf_bottom_image_url"/>
+        <result property="extraImageUrl" column="extra_image_url"/>
+        <result property="shopDeptId" column="shop_dept_id"/>
+        <result property="shopDeptName" column="shop_dept_name"/>
+        <result property="status" column="status"/>
+        <result property="delFlag" column="del_flag"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateBy" column="update_by"/>
+        <result property="updateTime" column="update_time"/>
+        <result property="remark" column="remark"/>
+    </resultMap>
+
+    <sql id="selectInvProductVo">
+        select p.product_id, p.product_name, p.product_code, p.category_id, c.category_name,
+               (
+                   select group_concat(pc.category_name order by find_in_set(pc.category_id, concat(c.ancestors, ',', c.category_id)) separator ' / ')
+                   from inv_product_category pc
+                   where pc.del_flag = '0'
+                     and find_in_set(pc.category_id, concat(c.ancestors, ',', c.category_id)) > 0
+               ) as category_full_path,
+               p.grade, p.sku, p.spec, p.size, p.unit,
+               p.purchase_price, p.sales_price, p.sale_price_250g, p.sale_price_500g,
+               p.cost_price, p.safety_stock_min, p.safety_stock_max,
+               p.supplier_name, p.supplier_phone, p.supplier_remark, p.internal_tea_name,
+               p.product_description, p.barcode, p.image_url, p.package_image_url,
+               p.dry_tea_image_url, p.tea_soup_image_url, p.leaf_bottom_image_url, p.extra_image_url,
+               p.shop_dept_id, shop_dept.dept_name as shop_dept_name,
+               p.status, p.del_flag, p.create_by, p.create_time,
+               p.update_by, p.update_time, p.remark
+        from inv_product p
+        left join inv_product_category c on c.category_id = p.category_id and c.del_flag = '0'
+        left join sys_dept shop_dept on shop_dept.dept_id = p.shop_dept_id
+    </sql>
+
+    <select id="selectInvProductList" parameterType="InvProduct" resultMap="InvProductResult">
+        <include refid="selectInvProductVo"/>
+        where p.del_flag = '0'
+        <if test="keyword != null and keyword != ''">
+            and (
+                p.product_name like concat('%', #{keyword}, '%')
+                or p.product_code like concat('%', #{keyword}, '%')
+                or p.spec like concat('%', #{keyword}, '%')
+            )
+        </if>
+        <if test="productName != null and productName != ''">and p.product_name like concat('%', #{productName}, '%')</if>
+        <if test="productCode != null and productCode != ''">and p.product_code = #{productCode}</if>
+        <if test="sku != null and sku != ''">and p.sku like concat('%', #{sku}, '%')</if>
+        <if test="categoryId != null">and (p.category_id = #{categoryId} or find_in_set(#{categoryId}, c.ancestors))</if>
+        <if test="grade != null and grade != ''">and p.grade = #{grade}</if>
+        <if test="supplierName != null and supplierName != ''">and p.supplier_name like concat('%', #{supplierName}, '%')</if>
+        <if test="shopDeptId != null">and p.shop_dept_id = #{shopDeptId}</if>
+        <if test="status != null and status != ''">and p.status = #{status}</if>
+        <if test="params.scopeDeptIds != null">and p.shop_dept_id in <foreach collection="params.scopeDeptIds" item="deptId" open="(" close=")" separator=",">#{deptId}</foreach></if>
+        ${params.dataScope}
+        order by p.create_time desc
+    </select>
+
+    <select id="selectInvProductById" parameterType="Long" resultMap="InvProductResult">
+        <include refid="selectInvProductVo"/>
+        where p.product_id = #{productId} and p.del_flag = '0'
+    </select>
+
+    <select id="selectInvProductListBySupplier" resultMap="InvProductResult">
+        <include refid="selectInvProductVo"/>
+        where p.del_flag = '0'
+          and p.supplier_name = #{supplierName}
+        <if test="scopeDeptIds != null and scopeDeptIds.size > 0">
+            and p.shop_dept_id in
+            <foreach collection="scopeDeptIds" item="deptId" open="(" close=")" separator=",">
+                #{deptId}
+            </foreach>
+        </if>
+        order by p.product_name asc, p.product_id asc
+    </select>
+
+    <select id="selectInvProductByCodeAndShop" resultMap="InvProductResult">
+        <include refid="selectInvProductVo"/>
+        where p.del_flag = '0' and p.product_code = #{productCode}
+        <if test="shopDeptId != null">and p.shop_dept_id = #{shopDeptId}</if>
+        limit 1
+    </select>
+
+    <select id="selectInvProductByNaturalKey" resultMap="InvProductResult">
+        <include refid="selectInvProductVo"/>
+        where p.del_flag = '0'
+          and p.category_id = #{categoryId}
+          and p.product_name = #{productName}
+          and ifnull(p.spec, '') = ifnull(#{spec}, '')
+        <if test="shopDeptId != null">and p.shop_dept_id = #{shopDeptId}</if>
+        limit 1
+    </select>
+
+    <select id="countBusinessReferenceByProductId" parameterType="Long" resultType="int">
+        select
+            (select count(1) from inv_stock where product_id = #{productId})
+            + (select count(1) from inv_stock_log where product_id = #{productId})
+            + (select count(1) from inv_purchase_detail where product_id = #{productId})
+            + (select count(1) from inv_sales_detail where product_id = #{productId})
+            + (select count(1) from inv_purchase_return_detail where product_id = #{productId})
+            + (select count(1) from inv_sales_return_detail where product_id = #{productId})
+            + (select count(1) from inv_delivery_notice_detail where product_id = #{productId})
+            + (select count(1) from inv_inbound_record where product_id = #{productId})
+            + (select count(1) from inv_outbound_record where product_id = #{productId})
+            + (select count(1) from inv_transfer_detail where product_id = #{productId})
+            + (select count(1) from inv_transfer_shipment_detail where product_id = #{productId})
+            + (select count(1) from inv_stock_check_detail where product_id = #{productId})
+    </select>
+
+    <insert id="insertInvProduct" parameterType="InvProduct" useGeneratedKeys="true" keyProperty="productId">
+        insert into inv_product (
+            product_name, product_code, category_id, grade, sku, spec, size, unit,
+            purchase_price, sales_price, sale_price_250g, sale_price_500g,
+            cost_price, safety_stock_min, safety_stock_max,
+            supplier_name, supplier_phone, supplier_remark, internal_tea_name, product_description,
+            barcode, image_url, package_image_url, dry_tea_image_url, tea_soup_image_url,
+            leaf_bottom_image_url, extra_image_url, shop_dept_id,
+            status, del_flag, create_by, create_time, remark
+        ) values (
+            #{productName}, #{productCode}, #{categoryId}, #{grade}, #{sku}, #{spec}, #{size}, #{unit},
+            #{purchasePrice}, #{salesPrice}, #{salePrice250g}, #{salePrice500g},
+            #{costPrice}, #{safetyStockMin}, #{safetyStockMax},
+            #{supplierName}, #{supplierPhone}, #{supplierRemark}, #{internalTeaName}, #{productDescription},
+            #{barcode}, #{imageUrl}, #{packageImageUrl}, #{dryTeaImageUrl}, #{teaSoupImageUrl},
+            #{leafBottomImageUrl}, #{extraImageUrl}, #{shopDeptId},
+            #{status}, '0', #{createBy}, sysdate(), #{remark}
+        )
+    </insert>
+
+    <update id="updateInvProduct" parameterType="InvProduct">
+        update inv_product
+        <set>
+            <if test="productName != null and productName != ''">product_name = #{productName},</if>
+            <if test="productCode != null and productCode != ''">product_code = #{productCode},</if>
+            <if test="categoryId != null">category_id = #{categoryId},</if>
+            <if test="grade != null">grade = #{grade},</if>
+            <if test="sku != null">sku = #{sku},</if>
+            <if test="spec != null">spec = #{spec},</if>
+            <if test="size != null">size = #{size},</if>
+            <if test="unit != null">unit = #{unit},</if>
+            <if test="purchasePrice != null">purchase_price = #{purchasePrice},</if>
+            <choose>
+                <when test="clearSalesPrice == true">sales_price = null,</when>
+                <when test="salesPrice != null">sales_price = #{salesPrice},</when>
+            </choose>
+            <choose>
+                <when test="clearSalePrice250g == true">sale_price_250g = null,</when>
+                <when test="salePrice250g != null">sale_price_250g = #{salePrice250g},</when>
+            </choose>
+            <choose>
+                <when test="clearSalePrice500g == true">sale_price_500g = null,</when>
+                <when test="salePrice500g != null">sale_price_500g = #{salePrice500g},</when>
+            </choose>
+            <if test="costPrice != null">cost_price = #{costPrice},</if>
+            <choose>
+                <when test="clearSafetyStockMin == true">safety_stock_min = null,</when>
+                <when test="safetyStockMin != null">safety_stock_min = #{safetyStockMin},</when>
+            </choose>
+            <choose>
+                <when test="clearSafetyStockMax == true">safety_stock_max = null,</when>
+                <when test="safetyStockMax != null">safety_stock_max = #{safetyStockMax},</when>
+            </choose>
+            <if test="supplierName != null">supplier_name = #{supplierName},</if>
+            <if test="supplierPhone != null">supplier_phone = #{supplierPhone},</if>
+            <if test="supplierRemark != null">supplier_remark = #{supplierRemark},</if>
+            <if test="internalTeaName != null">internal_tea_name = #{internalTeaName},</if>
+            <if test="productDescription != null">product_description = #{productDescription},</if>
+            <if test="barcode != null">barcode = #{barcode},</if>
+            <if test="imageUrl != null">image_url = #{imageUrl},</if>
+            <if test="packageImageUrl != null">package_image_url = #{packageImageUrl},</if>
+            <if test="dryTeaImageUrl != null">dry_tea_image_url = #{dryTeaImageUrl},</if>
+            <if test="teaSoupImageUrl != null">tea_soup_image_url = #{teaSoupImageUrl},</if>
+            <if test="leafBottomImageUrl != null">leaf_bottom_image_url = #{leafBottomImageUrl},</if>
+            <if test="extraImageUrl != null">extra_image_url = #{extraImageUrl},</if>
+            <if test="status != null">status = #{status},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            update_by = #{updateBy}, update_time = sysdate()
+        </set>
+        where product_id = #{productId}
+    </update>
+
+    <update id="deleteInvProductByIds" parameterType="Long">
+        update inv_product set del_flag = '2' where product_id in
+        <foreach collection="array" item="productId" open="(" close=")" separator=",">
+            #{productId}
+        </foreach>
+    </update>
+
+</mapper>

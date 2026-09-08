@@ -1,0 +1,175 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.oa.mapper.OaHrRenewalGuardMapper">
+
+    <resultMap id="HrRenewalGuardResult" type="com.erp.oa.api.domain.HrRenewalGuard">
+        <id property="employeeId" column="employee_id"/>
+        <result property="scenario" column="scenario"/>
+        <result property="status" column="status"/>
+        <result property="actionId" column="action_id"/>
+        <result property="taskId" column="task_id"/>
+        <result property="version" column="version"/>
+    </resultMap>
+
+    <select id="selectForUpdate" resultMap="HrRenewalGuardResult">
+        select employee_id, scenario, status, action_id, task_id, version
+        from sys_hr_renewal_guard
+        where employee_id = #{employeeId}
+          and scenario = #{scenario}
+        for update
+    </select>
+
+    <update id="activate">
+        update sys_hr_renewal_guard
+        set status = 'ACTIVE',
+            task_id = #{taskId},
+            version = version + 1,
+            update_time = sysdate()
+        where employee_id = #{employeeId}
+          and scenario = #{scenario}
+          and status = 'RESERVED'
+          and action_id = #{actionId}
+          and task_id is null
+          and version = #{expectedVersion}
+    </update>
+
+    <update id="activateReplacement">
+        update sys_hr_renewal_guard g
+        set status = 'ACTIVE',
+            action_id = #{actionId},
+            task_id = #{replacementTaskId},
+            version = version + 1,
+            update_time = sysdate()
+        where g.employee_id = #{employeeId}
+          and g.scenario = #{scenario}
+          and g.status = 'IDLE'
+          and g.action_id is null
+          and g.task_id is null
+          and g.version = #{expectedVersion}
+          and exists (
+              select 1
+              from sys_hr_lifecycle_action action_row
+              where action_row.action_id = #{actionId}
+                and action_row.employee_id = #{employeeId}
+                and action_row.action_type in ('RENEWAL_CONFIRMED', 'RENEWAL_DECLINED')
+          )
+          and not exists (
+              select 1
+              from oa_sign_task other_open
+              where other_open.employee_id = #{employeeId}
+                and other_open.scenario = 'RENEWAL'
+                and other_open.task_id != #{replacementTaskId}
+                and other_open.status not in ('SIGNED', 'REFUSED', 'EXPIRED', 'CANCELLED', 'NO_ACTION')
+          )
+          and exists (
+              select 1
+              from oa_sign_task source_task
+              inner join oa_sign_task replacement_task
+                      on replacement_task.task_id = #{replacementTaskId}
+                     and replacement_task.reissue_of_task_id = source_task.task_id
+                     and replacement_task.employee_id = source_task.employee_id
+                     and replacement_task.scenario = source_task.scenario
+                     and replacement_task.status = 'NEW'
+              where source_task.task_id = #{sourceTerminalTaskId}
+                and source_task.employee_id = #{employeeId}
+                and source_task.scenario = 'RENEWAL'
+                and source_task.status in ('REFUSED', 'EXPIRED')
+                and source_task.resolution_status = 'REISSUED'
+                and source_task.reissued_to_task_id = replacement_task.task_id
+                and source_task.source_business_id = cast(#{actionId} as char)
+          )
+    </update>
+
+    <update id="reserveIdleForEarliestRecoverableAction">
+        update sys_hr_renewal_guard g
+        set status = 'RESERVED',
+            action_id = #{actionId},
+            version = version + 1,
+            update_time = sysdate()
+        where g.employee_id = #{employeeId}
+          and g.scenario = #{scenario}
+          and g.status = 'IDLE'
+          and g.action_id is null
+          and g.task_id is null
+          and g.version = #{expectedVersion}
+          and exists (
+              select 1
+              from sys_hr_lifecycle_action a
+              inner join sys_hr_sign_event_outbox o
+                      on o.action_id = a.action_id
+                     and o.event_version = a.version
+              where a.action_id = #{actionId}
+                and a.employee_id = #{employeeId}
+                and a.action_type in ('RENEWAL_CONFIRMED', 'RENEWAL_DECLINED')
+                and o.status in ('PENDING', 'RETRY', 'SENDING', 'DEAD')
+                and not exists (
+                    select 1
+                    from sys_hr_lifecycle_action older
+                    inner join sys_hr_sign_event_outbox older_o
+                            on older_o.action_id = older.action_id
+                           and older_o.event_version = older.version
+                    where older.employee_id = a.employee_id
+                      and older.action_type in ('RENEWAL_CONFIRMED', 'RENEWAL_DECLINED')
+                      and older.action_id &lt; a.action_id
+                      and older_o.status in ('PENDING', 'RETRY', 'SENDING', 'DEAD')
+                )
+          )
+    </update>
+
+    <update id="rebindActive">
+        update sys_hr_renewal_guard
+        set action_id = #{newActionId},
+            task_id = #{newTaskId},
+            version = version + 1,
+            update_time = sysdate()
+        where employee_id = #{employeeId}
+          and scenario = #{scenario}
+          and status = 'ACTIVE'
+          and action_id = #{expectedActionId}
+          and task_id = #{expectedTaskId}
+    </update>
+
+    <update id="release">
+        update sys_hr_renewal_guard
+        set status = 'IDLE',
+            action_id = null,
+            task_id = null,
+            version = version + 1,
+            update_time = sysdate()
+        where employee_id = #{employeeId}
+          and scenario = #{scenario}
+          and status = 'ACTIVE'
+          and action_id = #{actionId}
+          and task_id = #{taskId}
+    </update>
+
+    <update id="releaseReserved">
+        update sys_hr_renewal_guard
+        set status = 'IDLE',
+            action_id = null,
+            task_id = null,
+            version = version + 1,
+            update_time = sysdate()
+        where employee_id = #{employeeId}
+          and scenario = #{scenario}
+          and status = 'RESERVED'
+          and action_id = #{actionId}
+          and task_id is null
+          and version = #{expectedVersion}
+    </update>
+
+    <update id="releaseByTaskForHardDelete">
+        update sys_hr_renewal_guard
+        set status = 'IDLE',
+            action_id = null,
+            task_id = null,
+            version = version + 1,
+            update_time = sysdate()
+        where employee_id = #{employeeId}
+          and scenario = #{scenario}
+          and status = 'ACTIVE'
+          and task_id = #{taskId}
+    </update>
+</mapper>

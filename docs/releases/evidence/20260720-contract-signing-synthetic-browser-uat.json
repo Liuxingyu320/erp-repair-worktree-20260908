@@ -1,0 +1,66 @@
+{
+  "schemaVersion": 1,
+  "releaseId": "contract-signing-consistency-20260720",
+  "evidenceType": "synthetic-isolated-browser-uat",
+  "status": "passed",
+  "pathBase": "repository-root",
+  "productionMutation": false,
+  "realIdentityUsed": false,
+  "realSignaturePerformed": false,
+  "realDualFlowSignedUatSatisfied": false,
+  "manualVisualApproval": "not-claimed",
+  "runnerObservation": {
+    "browserConsoleErrorCount": 0,
+    "criticalApiNon200Count": 0,
+    "preConfirmationOriginalPdfRequestCount": 0,
+    "completedFlowFinalArchiveDownloadCount": 2,
+    "hardDeleteExpectedVersionObserved": true,
+    "signedTaskDeleteProtectionObserved": true,
+    "criticalApiObservedStatusCodes": [
+      200
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "company-first-signed",
+      "expectedState": "SIGNED",
+      "file": "output/playwright/contract-signing-20260720/company-first-signed.png",
+      "sha256": "423eaee029236dc64735175f6591799d44d198df6d2c18af7dae3baf1dd282f2",
+      "size": 61959,
+      "pixelWidth": 390,
+      "pixelHeight": 844
+    },
+    {
+      "id": "signature-first-pending-company",
+      "expectedState": "PENDING_COMPANY",
+      "file": "output/playwright/contract-signing-20260720/signature-first-pending-company.png",
+      "sha256": "59f8344586b4b2299e28252183afe545df071de7a9be5a91e38e36f9684e1599",
+      "size": 72272,
+      "pixelWidth": 390,
+      "pixelHeight": 844
+    },
+    {
+      "id": "signature-first-final-confirmed",
+      "expectedState": "SIGNED",
+      "file": "output/playwright/contract-signing-20260720/signature-first-final-confirmed.png",
+      "sha256": "f19ed9dce9299a39907523c5301a14ff1d6e5038c6cb694f4adf3c24e30f8be9",
+      "size": 73416,
+      "pixelWidth": 390,
+      "pixelHeight": 844
+    },
+    {
+      "id": "batch-delete-protected-signed",
+      "expectedState": "SIGNED_TASK_RETAINED",
+      "file": "output/playwright/contract-signing-20260720/batch-delete-protected-signed.png",
+      "sha256": "62b960c7b6b79d853ee86b3d3c8d42bc43de7b349914f6b0c7d278806cf59743",
+      "size": 266972,
+      "pixelWidth": 1440,
+      "pixelHeight": 1000
+    }
+  ],
+  "limitations": [
+    "API responses and identities were synthetic and isolated from production.",
+    "No real employee or company representative signed a contract.",
+    "This evidence does not satisfy realDualFlowSignedUat or any HR, business, or legal approval gate."
+  ]
+}

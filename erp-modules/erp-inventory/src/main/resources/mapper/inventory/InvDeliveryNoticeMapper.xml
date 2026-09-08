@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.inventory.mapper.InvDeliveryNoticeMapper">
+
+    <resultMap type="InvDeliveryNotice" id="InvDeliveryNoticeResult">
+        <id property="noticeId" column="notice_id"/>
+        <result property="noticeNo" column="notice_no"/>
+        <result property="salesOrderId" column="sales_order_id"/>
+        <result property="salesOrderNo" column="sales_order_no"/>
+        <result property="customerName" column="customer_name"/>
+        <result property="status" column="status"/>
+        <result property="shopDeptId" column="shop_dept_id"/>
+        <result property="shopDeptName" column="shop_dept_name"/>
+        <result property="warehouseId" column="warehouse_id"/>
+        <result property="warehouseName" column="warehouse_name"/>
+        <result property="noticeQuantity" column="notice_quantity"/>
+        <result property="deliveredQuantity" column="delivered_quantity"/>
+        <result property="remainingQuantity" column="remaining_quantity"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateBy" column="update_by"/>
+        <result property="updateTime" column="update_time"/>
+        <result property="remark" column="remark"/>
+    </resultMap>
+
+    <sql id="selectInvDeliveryNoticeVo">
+        select n.notice_id, n.notice_no, n.sales_order_id, n.sales_order_no, n.customer_name,
+               n.status, n.shop_dept_id, shop_dept.dept_name as shop_dept_name,
+               coalesce(n.warehouse_id, detail_warehouse.warehouse_id) as warehouse_id,
+               coalesce(warehouse_dept.dept_name, detail_warehouse.warehouse_name) as warehouse_name,
+               coalesce(detail_summary.notice_quantity, 0) as notice_quantity,
+               coalesce(detail_summary.delivered_quantity, 0) as delivered_quantity,
+               coalesce(detail_summary.remaining_quantity, 0) as remaining_quantity,
+               n.create_by, n.create_time, n.update_by, n.update_time, n.remark
+        from inv_delivery_notice n
+             left join sys_dept shop_dept on shop_dept.dept_id = n.shop_dept_id
+             left join sys_dept warehouse_dept on warehouse_dept.dept_id = n.warehouse_id
+             left join (
+                 select nd.notice_id,
+                        case when count(distinct nd.warehouse_id) = 1 then min(nd.warehouse_id) end as warehouse_id,
+                        group_concat(distinct planned_warehouse.dept_name order by planned_warehouse.dept_name separator '、') as warehouse_name
+                 from inv_delivery_notice_detail nd
+                      left join sys_dept planned_warehouse on planned_warehouse.dept_id = nd.warehouse_id
+                 group by nd.notice_id
+             ) detail_warehouse on detail_warehouse.notice_id = n.notice_id
+             left join (
+                 select notice_id,
+                        sum(coalesce(notice_qty, 0)) as notice_quantity,
+                        sum(coalesce(delivered_qty, 0)) as delivered_quantity,
+                        sum(coalesce(notice_qty, 0) - coalesce(delivered_qty, 0)) as remaining_quantity
+                 from inv_delivery_notice_detail
+                 group by notice_id
+             ) detail_summary on detail_summary.notice_id = n.notice_id
+    </sql>
+
+    <select id="selectInvDeliveryNoticeById" parameterType="Long" resultMap="InvDeliveryNoticeResult">
+        <include refid="selectInvDeliveryNoticeVo"/>
+        where n.notice_id = #{noticeId}
+    </select>
+
+    <select id="selectInvDeliveryNoticeByIdForUpdate" parameterType="Long" resultMap="InvDeliveryNoticeResult">
+        select notice_id, notice_no, sales_order_id, sales_order_no, customer_name,
+               status, shop_dept_id, warehouse_id, create_by, create_time,
+               update_by, update_time, remark
+        from inv_delivery_notice
+        where notice_id = #{noticeId} for update
+    </select>
+
+    <select id="selectInvDeliveryNoticeList" parameterType="InvDeliveryNotice" resultMap="InvDeliveryNoticeResult">
+        <include refid="selectInvDeliveryNoticeVo"/>
+        <where>
+            <if test="noticeNo != null and noticeNo != ''">and n.notice_no like concat('%', #{noticeNo}, '%')</if>
+            <if test="salesOrderNo != null and salesOrderNo != ''">and n.sales_order_no like concat('%', #{salesOrderNo}, '%')</if>
+            <if test="customerName != null and customerName != ''">and n.customer_name like concat('%', #{customerName}, '%')</if>
+            <choose>
+                <when test="statusGroup == 'deliverable'">
+                    and n.status in ('pending', 'delivering')
+                </when>
+                <otherwise>
+                    <if test="status != null and status != ''">and n.status = #{status}</if>
+                </otherwise>
+            </choose>
+            <if test="shopDeptId != null">and n.shop_dept_id = #{shopDeptId}</if>
+            <if test="warehouseId != null">
+                and (
+                    n.warehouse_id = #{warehouseId}
+                    or exists (
+                        select 1
+                        from inv_delivery_notice_detail nd_warehouse
+                        where nd_warehouse.notice_id = n.notice_id
+                          and nd_warehouse.warehouse_id = #{warehouseId}
+                    )
+                )
+            </if>
+            <if test="params.scopeDeptIds != null">
+                and (
+                    n.shop_dept_id in
+                    <foreach collection="params.scopeDeptIds" item="deptId" open="(" close=")" separator=",">#{deptId}</foreach>
+                    or n.warehouse_id in
+                    <foreach collection="params.scopeDeptIds" item="deptId" open="(" close=")" separator=",">#{deptId}</foreach>
+                    or exists (
+                        select 1
+                        from inv_delivery_notice_detail nd_scope
+                        where nd_scope.notice_id = n.notice_id
+                          and nd_scope.warehouse_id in
+                          <foreach collection="params.scopeDeptIds" item="deptId" open="(" close=")" separator=",">#{deptId}</foreach>
+                    )
+                )
+            </if>
+        </where>
+        order by n.create_time desc
+    </select>
+
+    <select id="selectInvDeliveryNoticeBySalesOrderId" parameterType="Long" resultMap="InvDeliveryNoticeResult">
+        <include refid="selectInvDeliveryNoticeVo"/>
+        where n.sales_order_id = #{salesOrderId}
+        order by n.create_time desc
+    </select>
+
+    <insert id="insertInvDeliveryNotice" parameterType="InvDeliveryNotice" useGeneratedKeys="true" keyProperty="noticeId">
+        insert into inv_delivery_notice (
+            notice_no, sales_order_id, sales_order_no, customer_name, status,
+            shop_dept_id, warehouse_id, create_by, create_time, remark
+        ) values (
+            #{noticeNo}, #{salesOrderId}, #{salesOrderNo}, #{customerName}, #{status},
+            #{shopDeptId}, #{warehouseId}, #{createBy}, sysdate(), #{remark}
+        )
+    </insert>
+
+    <update id="updateInvDeliveryNotice" parameterType="InvDeliveryNotice">
+        update inv_delivery_notice
+        <set>
+            <if test="noticeNo != null and noticeNo != ''">notice_no = #{noticeNo},</if>
+            <if test="salesOrderId != null">sales_order_id = #{salesOrderId},</if>
+            <if test="salesOrderNo != null and salesOrderNo != ''">sales_order_no = #{salesOrderNo},</if>
+            <if test="customerName != null and customerName != ''">customer_name = #{customerName},</if>
+            <if test="status != null and status != ''">status = #{status},</if>
+            <if test="shopDeptId != null">shop_dept_id = #{shopDeptId},</if>
+            <if test="warehouseId != null">warehouse_id = #{warehouseId},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            update_by = #{updateBy},
+            update_time = sysdate()
+        </set>
+        where notice_id = #{noticeId}
+    </update>
+</mapper>

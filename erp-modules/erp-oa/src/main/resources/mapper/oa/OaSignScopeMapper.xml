@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.oa.mapper.OaSignScopeMapper">
+
+    <resultMap id="SignScopeOptionResult" type="com.erp.oa.domain.vo.OaSignScopeOption">
+        <id property="deptId" column="dept_id"/>
+        <result property="deptName" column="dept_name"/>
+        <result property="deptType" column="dept_type"/>
+        <result property="parentId" column="parent_id"/>
+    </resultMap>
+
+    <select id="countActiveSignScopeDept" resultType="int">
+        select count(1)
+        from sys_dept d
+        where d.dept_id = #{deptId}
+          and d.del_flag = '0'
+          and d.status = '0'
+          and d.dept_type in ('STORE', 'COMPANY')
+    </select>
+
+    <select id="countUserSignScope" resultType="int">
+        select count(1)
+        from sys_user_shop us
+             inner join sys_dept scope_dept on scope_dept.dept_id = us.dept_id
+             inner join sys_dept target_dept on target_dept.dept_id = #{deptId}
+        where us.user_id = #{userId}
+          and scope_dept.del_flag = '0'
+          and scope_dept.status = '0'
+          and scope_dept.dept_type in ('GROUP', 'COMPANY', 'STORE', 'WAREHOUSE')
+          and target_dept.del_flag = '0'
+          and target_dept.status = '0'
+          and target_dept.dept_type in ('STORE', 'COMPANY')
+          and (
+              target_dept.dept_id = scope_dept.dept_id
+              or find_in_set(scope_dept.dept_id, target_dept.ancestors)
+          )
+    </select>
+
+    <select id="selectSignScopeDeptIds" resultType="java.lang.Long">
+        select d.dept_id
+        from sys_dept d
+        where d.del_flag = '0'
+          and d.status = '0'
+          and d.dept_type in ('STORE', 'COMPANY')
+          and (d.dept_id = #{deptId} or find_in_set(#{deptId}, d.ancestors))
+        order by case when d.dept_id = #{deptId} then 0 else 1 end,
+                 d.parent_id, d.order_num, d.dept_id
+    </select>
+
+    <select id="selectSignScopeDeptName" resultType="java.lang.String">
+        select d.dept_name
+        from sys_dept d
+        where d.dept_id = #{deptId}
+          and d.del_flag = '0'
+          and d.status = '0'
+          and d.dept_type in ('STORE', 'COMPANY')
+        limit 1
+    </select>
+
+    <select id="selectUserSignScopeOptions" resultMap="SignScopeOptionResult">
+        select distinct target_dept.dept_id, target_dept.dept_name,
+               target_dept.dept_type, target_dept.parent_id
+        from sys_user_shop us
+             inner join sys_dept scope_dept on scope_dept.dept_id = us.dept_id
+             inner join sys_dept target_dept on (
+                 target_dept.dept_id = scope_dept.dept_id
+                 or find_in_set(scope_dept.dept_id, target_dept.ancestors)
+             )
+        where us.user_id = #{userId}
+          and scope_dept.del_flag = '0'
+          and scope_dept.status = '0'
+          and scope_dept.dept_type in ('GROUP', 'COMPANY', 'STORE', 'WAREHOUSE')
+          and target_dept.del_flag = '0'
+          and target_dept.status = '0'
+          and target_dept.dept_type in ('STORE', 'COMPANY')
+        order by target_dept.dept_type, target_dept.parent_id,
+                 target_dept.dept_name, target_dept.dept_id
+    </select>
+
+    <select id="selectAllSignScopeOptions" resultMap="SignScopeOptionResult">
+        select d.dept_id, d.dept_name, d.dept_type, d.parent_id
+        from sys_dept d
+        where d.del_flag = '0'
+          and d.status = '0'
+          and d.dept_type in ('STORE', 'COMPANY')
+        order by d.dept_type, d.parent_id, d.order_num, d.dept_id
+    </select>
+
+</mapper>

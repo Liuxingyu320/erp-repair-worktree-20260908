@@ -1,0 +1,312 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.inventory.mapper.InvStockCheckMapper">
+
+    <resultMap type="InvStockCheck" id="InvStockCheckResult">
+        <id property="checkId" column="check_id"/>
+        <result property="checkNo" column="check_no"/>
+        <result property="checkDate" column="check_date"/>
+        <result property="shopDeptId" column="shop_dept_id"/>
+        <result property="shopDeptName" column="shop_dept_name"/>
+        <result property="warehouseId" column="warehouse_id"/>
+        <result property="warehouseName" column="warehouse_name"/>
+        <result property="checkScope" column="check_scope"/>
+        <result property="categoryId" column="category_id"/>
+        <result property="sampleSize" column="sample_size"/>
+        <result property="blindCheck" column="blind_check"/>
+        <result property="counterUserId" column="counter_user_id"/>
+        <result property="counterName" column="counter_name"/>
+        <result property="deadline" column="deadline"/>
+        <result property="recountThreshold" column="recount_threshold"/>
+        <result property="itemCount" column="item_count"/>
+        <result property="profitItemCount" column="profit_item_count"/>
+        <result property="lossItemCount" column="loss_item_count"/>
+        <result property="totalDiffQuantity" column="total_diff_quantity"/>
+        <result property="status" column="status"/>
+        <result property="approvalInstanceId" column="approval_instance_id"/>
+        <result property="approvalRound" column="approval_round"/>
+        <result property="approvalEngine" column="approval_engine"/>
+        <result property="lastApprovalEventKey" column="last_approval_event_key"/>
+        <result property="rowVersion" column="row_version"/>
+        <result property="submittedUserId" column="submitted_user_id"/>
+        <result property="submittedBy" column="submitted_by"/>
+        <result property="submittedTime" column="submitted_time"/>
+        <result property="approvedUserId" column="approved_user_id"/>
+        <result property="approvedBy" column="approved_by"/>
+        <result property="approvedTime" column="approved_time"/>
+        <result property="lastRejectReason" column="last_reject_reason"/>
+        <result property="lastRejectedUserId" column="last_rejected_user_id"/>
+        <result property="lastRejectedBy" column="last_rejected_by"/>
+        <result property="lastRejectedTime" column="last_rejected_time"/>
+        <result property="lastInvalidReason" column="last_invalid_reason"/>
+        <result property="lastInvalidDetailSnapshot" column="last_invalid_detail_snapshot"/>
+        <result property="lastInvalidatedTime" column="last_invalidated_time"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateBy" column="update_by"/>
+        <result property="updateTime" column="update_time"/>
+        <result property="remark" column="remark"/>
+    </resultMap>
+
+    <resultMap type="com.erp.inventory.domain.vo.InvStockCheckCounterCandidate"
+               id="InvStockCheckCounterCandidateResult">
+        <id property="userId" column="user_id"/>
+        <result property="userName" column="user_name"/>
+        <result property="displayName" column="display_name"/>
+    </resultMap>
+
+    <sql id="selectInvStockCheckVo">
+        select s.check_id, s.check_no, s.check_date,
+               s.shop_dept_id, shop_dept.dept_name as shop_dept_name,
+               s.warehouse_id, warehouse_dept.dept_name as warehouse_name,
+               s.check_scope, s.category_id, s.sample_size, s.blind_check,
+               s.counter_user_id, s.counter_name, s.deadline, s.recount_threshold,
+               coalesce(detail_summary.item_count, 0) as item_count,
+               coalesce(detail_summary.profit_item_count, 0) as profit_item_count,
+               coalesce(detail_summary.loss_item_count, 0) as loss_item_count,
+               coalesce(detail_summary.total_diff_quantity, 0) as total_diff_quantity,
+               s.status, s.approval_instance_id, s.approval_round,
+               s.approval_engine, s.last_approval_event_key, s.row_version,
+               s.submitted_user_id, s.submitted_by, s.submitted_time,
+               s.approved_user_id, s.approved_by, s.approved_time,
+               s.last_reject_reason, s.last_rejected_user_id, s.last_rejected_by,
+               s.last_rejected_time, s.last_invalid_reason,
+               s.last_invalid_detail_snapshot, s.last_invalidated_time,
+               s.create_by, s.create_time, s.update_by, s.update_time, s.remark
+        from inv_stock_check s
+             left join sys_dept shop_dept on shop_dept.dept_id = s.shop_dept_id
+             left join sys_dept warehouse_dept on warehouse_dept.dept_id = s.warehouse_id
+             left join (
+                 select check_id,
+                        count(1) as item_count,
+                        sum(case when diff_type = 'profit' then 1 else 0 end) as profit_item_count,
+                        sum(case when diff_type = 'loss' then 1 else 0 end) as loss_item_count,
+                        sum(coalesce(diff_qty, 0)) as total_diff_quantity
+                 from inv_stock_check_detail
+                 group by check_id
+             ) detail_summary on detail_summary.check_id = s.check_id
+    </sql>
+
+    <select id="selectInvStockCheckById" parameterType="Long" resultMap="InvStockCheckResult">
+        <include refid="selectInvStockCheckVo"/>
+        where s.check_id = #{checkId}
+    </select>
+
+    <select id="selectInvStockCheckByIdForUpdate" parameterType="Long" resultMap="InvStockCheckResult">
+        select check_id, check_no, check_date, shop_dept_id, warehouse_id,
+               check_scope, category_id, sample_size, blind_check,
+               counter_user_id, counter_name, deadline, recount_threshold,
+               status, approval_instance_id, approval_round,
+               approval_engine, last_approval_event_key, row_version,
+               submitted_user_id, submitted_by, submitted_time,
+               approved_user_id, approved_by, approved_time,
+               last_reject_reason, last_rejected_user_id, last_rejected_by,
+               last_rejected_time, last_invalid_reason,
+               last_invalid_detail_snapshot, last_invalidated_time,
+               create_by, create_time, update_by, update_time, remark
+        from inv_stock_check
+        where check_id = #{checkId}
+        for update
+    </select>
+
+    <select id="selectInvStockCheckList" parameterType="InvStockCheck" resultMap="InvStockCheckResult">
+        <include refid="selectInvStockCheckVo"/>
+        <where>
+            <if test="checkNo != null and checkNo != ''">and s.check_no like concat('%', #{checkNo}, '%')</if>
+            <if test="status != null and status != ''">and s.status = #{status}</if>
+            <if test="shopDeptId != null">and s.shop_dept_id = #{shopDeptId}</if>
+            <if test="warehouseId != null">and s.warehouse_id = #{warehouseId}</if>
+            <if test="params.beginCheckDate != null and params.beginCheckDate != ''">and s.check_date &gt;= #{params.beginCheckDate}</if>
+            <if test="params.endCheckDate != null and params.endCheckDate != ''">and s.check_date &lt;= #{params.endCheckDate}</if>
+            <if test="params.scopeDeptIds != null">and s.shop_dept_id in <foreach collection="params.scopeDeptIds" item="deptId" open="(" close=")" separator=",">#{deptId}</foreach></if>
+            ${params.dataScope}
+        </where>
+        order by s.create_time desc
+    </select>
+
+    <select id="selectInvStockCheckApprovalTodoList" parameterType="InvStockCheck"
+            resultMap="InvStockCheckResult">
+        <include refid="selectInvStockCheckVo"/>
+        <where>
+            s.status = 'pending_approval'
+            and coalesce(s.approval_engine, 'LEGACY') = 'LEGACY'
+            and exists (
+                select 1
+                from inv_stock_check_approval_instance ai
+                join inv_stock_check_approval_task at on at.instance_id = ai.instance_id
+                where ai.instance_id = coalesce(
+                          s.approval_instance_id,
+                          (select fallback_ai.instance_id
+                             from inv_stock_check_approval_instance fallback_ai
+                            where fallback_ai.check_id = s.check_id
+                              and fallback_ai.status = 'running'
+                            order by fallback_ai.round_no desc,
+                                     fallback_ai.instance_id desc
+                            limit 1)
+                      )
+                  and ai.check_id = s.check_id
+                  and ai.status = 'running'
+                  and at.status = 'pending'
+            )
+            and exists (
+                select 1
+                from sys_user u
+                join sys_user_post up on up.user_id = u.user_id
+                join sys_post p on p.post_id = up.post_id
+                join sys_user_role ur on ur.user_id = u.user_id
+                join sys_role r on r.role_id = ur.role_id
+                join sys_role_menu rm on rm.role_id = r.role_id
+                join sys_menu m on m.menu_id = rm.menu_id
+                join sys_user_shop us on us.user_id = u.user_id
+                join sys_dept scope_dept on scope_dept.dept_id = us.dept_id
+                join sys_dept target_dept on target_dept.dept_id = s.shop_dept_id
+                where u.user_id = #{params.approvalUserId}
+                  and u.del_flag = '0' and u.status = '0'
+                  and p.status = '0' and p.post_code = 'yyzj'
+                  and r.del_flag = '0' and r.status = '0'
+                  and m.status = '0' and m.perms = 'inv:stockCheck:approve'
+                  and scope_dept.del_flag = '0' and scope_dept.status = '0'
+                  and target_dept.del_flag = '0' and target_dept.status = '0'
+                  and (
+                      target_dept.dept_id = scope_dept.dept_id
+                      or find_in_set(scope_dept.dept_id, target_dept.ancestors)
+                  )
+            )
+            <if test="checkNo != null and checkNo != ''">and s.check_no like concat('%', #{checkNo}, '%')</if>
+            <if test="shopDeptId != null">and s.shop_dept_id = #{shopDeptId}</if>
+            <if test="warehouseId != null">and s.warehouse_id = #{warehouseId}</if>
+            <if test="params.scopeDeptIds != null">and s.shop_dept_id in <foreach collection="params.scopeDeptIds" item="deptId" open="(" close=")" separator=",">#{deptId}</foreach></if>
+            ${params.dataScope}
+        </where>
+        order by s.submitted_time asc, s.create_time asc
+    </select>
+
+    <sql id="activeStockCheckCounterScope">
+        from sys_user u
+        join sys_user_shop us on us.user_id = u.user_id
+        join sys_dept scope_dept on scope_dept.dept_id = us.dept_id
+        join sys_dept target_dept on target_dept.dept_id = #{inventoryDeptId}
+        left join sys_user_profile profile on profile.user_id = u.user_id
+        where u.del_flag = '0'
+          and u.status = '0'
+          and scope_dept.del_flag = '0'
+          and scope_dept.status = '0'
+          and scope_dept.dept_type in ('GROUP', 'COMPANY', 'STORE', 'WAREHOUSE')
+          and target_dept.del_flag = '0'
+          and target_dept.status = '0'
+          and target_dept.dept_type in ('STORE', 'WAREHOUSE')
+          and (
+              target_dept.dept_id = scope_dept.dept_id
+              or find_in_set(scope_dept.dept_id, target_dept.ancestors)
+          )
+          and (profile.employee_status is null
+               or trim(profile.employee_status) = ''
+               or trim(profile.employee_status) &lt;&gt; '离职')
+          and exists (
+              select 1
+              from sys_user_role ur
+              join sys_role r on r.role_id = ur.role_id
+              join sys_role_menu rm on rm.role_id = r.role_id
+              join sys_menu m on m.menu_id = rm.menu_id
+              where ur.user_id = u.user_id
+                and r.del_flag = '0'
+                and r.status = '0'
+                and m.status = '0'
+                and m.perms = 'inv:stockCheck:submit'
+          )
+    </sql>
+
+    <select id="selectCounterCandidates" resultMap="InvStockCheckCounterCandidateResult">
+        select distinct u.user_id,
+               u.user_name,
+               coalesce(nullif(trim(u.nick_name), ''), u.user_name) as display_name
+        <include refid="activeStockCheckCounterScope"/>
+        <if test="keyword != null and keyword != ''">
+            and (u.user_name like concat('%', #{keyword}, '%')
+                 or u.nick_name like concat('%', #{keyword}, '%'))
+        </if>
+        order by display_name, u.user_id
+        limit 100
+    </select>
+
+    <select id="selectCounterCandidate" resultMap="InvStockCheckCounterCandidateResult">
+        select distinct u.user_id,
+               u.user_name,
+               coalesce(nullif(trim(u.nick_name), ''), u.user_name) as display_name
+        <include refid="activeStockCheckCounterScope"/>
+          and u.user_id = #{userId}
+        limit 1
+    </select>
+
+    <insert id="insertInvStockCheck" parameterType="InvStockCheck" useGeneratedKeys="true" keyProperty="checkId">
+        insert into inv_stock_check (
+            check_no, check_date, shop_dept_id, warehouse_id,
+            check_scope, category_id, sample_size, blind_check,
+            counter_user_id, counter_name, deadline, recount_threshold, status,
+            create_by, create_time, remark
+        ) values (
+            #{checkNo}, #{checkDate}, #{shopDeptId}, #{warehouseId},
+            #{checkScope}, #{categoryId}, #{sampleSize}, #{blindCheck},
+            #{counterUserId}, #{counterName}, #{deadline}, #{recountThreshold}, #{status},
+            #{createBy}, sysdate(), #{remark}
+        )
+    </insert>
+
+    <update id="updateInvStockCheck" parameterType="InvStockCheck">
+        update inv_stock_check
+        <set>
+            <if test="checkDate != null">check_date = #{checkDate},</if>
+            <if test="counterUserId != null">counter_user_id = #{counterUserId},</if>
+            <if test="counterName != null and counterName != ''">counter_name = #{counterName},</if>
+            <if test="deadline != null">deadline = #{deadline},</if>
+            <if test="recountThreshold != null">recount_threshold = #{recountThreshold},</if>
+            <if test="status != null and status != ''">status = #{status},</if>
+            <choose>
+                <when test="approvalInstanceId != null">approval_instance_id = #{approvalInstanceId},</when>
+                <when test="'NATIVE'.equals(approvalEngine) and approvalRound != null">approval_instance_id = null,</when>
+            </choose>
+            <if test="approvalRound != null">approval_round = #{approvalRound},</if>
+            <if test="approvalEngine != null and approvalEngine != ''">approval_engine = #{approvalEngine},</if>
+            <if test="lastApprovalEventKey != null and lastApprovalEventKey != ''">last_approval_event_key = #{lastApprovalEventKey},</if>
+            <if test="submittedUserId != null">submitted_user_id = #{submittedUserId},</if>
+            <if test="submittedBy != null">submitted_by = #{submittedBy},</if>
+            <if test="submittedTime != null">submitted_time = #{submittedTime},</if>
+            <if test="approvedUserId != null">approved_user_id = #{approvedUserId},</if>
+            <if test="approvedBy != null">approved_by = #{approvedBy},</if>
+            <if test="approvedTime != null">approved_time = #{approvedTime},</if>
+            <if test="lastRejectReason != null">last_reject_reason = #{lastRejectReason},</if>
+            <if test="lastRejectedUserId != null">last_rejected_user_id = #{lastRejectedUserId},</if>
+            <if test="lastRejectedBy != null">last_rejected_by = #{lastRejectedBy},</if>
+            <if test="lastRejectedTime != null">last_rejected_time = #{lastRejectedTime},</if>
+            <if test="lastInvalidReason != null">last_invalid_reason = #{lastInvalidReason},</if>
+            <if test="lastInvalidDetailSnapshot != null">last_invalid_detail_snapshot = #{lastInvalidDetailSnapshot},</if>
+            <if test="lastInvalidatedTime != null">last_invalidated_time = #{lastInvalidatedTime},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            update_by = #{updateBy},
+            update_time = sysdate(),
+            row_version = row_version + 1
+        </set>
+        where check_id = #{checkId}
+    </update>
+
+    <update id="finalizeNativeApprovalStart">
+        update inv_stock_check
+        set approval_instance_id = #{instanceId},
+            update_by = #{updateBy}, update_time = sysdate(),
+            row_version = row_version + 1
+        where check_id = #{checkId}
+          and status = 'pending_approval'
+          and approval_engine = 'NATIVE'
+          and approval_round = #{businessRound}
+          and row_version = #{expectedRowVersion}
+          and approval_instance_id is null
+    </update>
+
+    <delete id="deleteInvStockCheckByIds" parameterType="Long">
+        delete from inv_stock_check where check_id in
+        <foreach collection="array" item="checkId" open="(" separator="," close=")">
+            #{checkId}
+        </foreach>
+    </delete>
+
+</mapper>

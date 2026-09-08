@@ -1,0 +1,116 @@
+{
+  "schemaVersion": 1,
+  "releaseId": "sign-original-placement-export-20260809",
+  "evidenceType": "local-mysql8-scratch-migration-and-release-gate",
+  "mysqlVersion": "8.0.45",
+  "executedAt": "2026-08-09T22:29:05+08:00",
+  "scratchSchemas": [
+    "erp_rev06_scratch_20260809_2116",
+    "erp_rev06_scratch_20260809_2220"
+  ],
+  "migration": {
+    "file": "erp_oa_sign_labor_contract_placement_v7_20260809.sql",
+    "sha256": "829ae042311b6b4bc14f5969062951f4991fdc84340a60272a9e103bf35f1584",
+    "identicalTrackedCopies": 3,
+    "forwardExecutions": 2,
+    "forwardSecondExecutionChangedState": false,
+    "rollbackExecutions": 2,
+    "rollbackSecondExecutionChangedState": false,
+    "temporaryRoutineCountAfterEachScenario": 0
+  },
+  "positiveResult": {
+    "reviewedLaborPlans": [35, 36, 49, 66],
+    "enabledLaborBindingCount": 4,
+    "allEnabledLaborBindingsUseExactV7": true,
+    "exactV7SourceSha256": "1226728ec0e703d513efda83dc5578ee4cdd65cb3e7d0e7cb5afee813f466558",
+    "servicePlansUnaffected": {
+      "37": [
+        "ONBOARD_COMMITMENT",
+        "ONBOARD_SERVICE_CONTRACT",
+        "ONBOARD_SERVICE_RECEIPT"
+      ],
+      "45": [
+        "ONBOARD_COMMITMENT",
+        "ONBOARD_SERVICE_CONTRACT",
+        "ONBOARD_SERVICE_RECEIPT",
+        "ONBOARD_CONFIDENTIAL_NONCOMPETE"
+      ]
+    }
+  },
+  "negativeScenarios": [
+    {
+      "name": "missing-salary-confirm",
+      "expectedFailure": true,
+      "beforeSha256": "4a7e3938215156576115c33669e1125d7346e23527b84248abcf3631d7cdcfcc",
+      "afterSha256": "4a7e3938215156576115c33669e1125d7346e23527b84248abcf3631d7cdcfcc"
+    },
+    {
+      "name": "hidden-handbook-receipt",
+      "expectedFailure": true,
+      "beforeSha256": "a4c28c1c653b18b8ee117b5d4d465be6cc9e1927fdbfae4bee950e2eb99c0782",
+      "afterSha256": "a4c28c1c653b18b8ee117b5d4d465be6cc9e1927fdbfae4bee950e2eb99c0782"
+    },
+    {
+      "name": "hidden-salary-confirm",
+      "expectedFailure": true,
+      "beforeSha256": "e31f76ef1677bfee9deb1968ed3962a7697f0a164fdd79907a44e8cab6e303ae",
+      "afterSha256": "e31f76ef1677bfee9deb1968ed3962a7697f0a164fdd79907a44e8cab6e303ae"
+    },
+    {
+      "name": "duplicate-handbook-family",
+      "expectedFailure": true,
+      "beforeSha256": "8e548bb30eea004dc86f4f03b174ff9da64aaefca7e444e6dce3448812f43cac",
+      "afterSha256": "8e548bb30eea004dc86f4f03b174ff9da64aaefca7e444e6dce3448812f43cac"
+    },
+    {
+      "name": "fifth-enabled-labor-plan",
+      "expectedFailure": true,
+      "beforeSha256": "d5ff258ee76198d7bc11d863338834e01497c1b39a0cbe2cadf6aaf1ff83faf8",
+      "afterSha256": "d5ff258ee76198d7bc11d863338834e01497c1b39a0cbe2cadf6aaf1ff83faf8"
+    },
+    {
+      "name": "rollback-with-third-enabled-version",
+      "expectedFailure": true,
+      "beforeSha256": "a3986a3647ddc6cd34755f20d7c87b0fc392616b35507011f38b50387f678edc",
+      "afterSha256": "a3986a3647ddc6cd34755f20d7c87b0fc392616b35507011f38b50387f678edc"
+    }
+  ],
+  "javaDatabaseVerifier": {
+    "pre": {
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "evidenceSha256": "342acc99613c5ed663c9968f4bd9bee9d5ff3f8cbc5432f043aa1e8bc46e976a"
+    },
+    "post": {
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "evidenceSha256": "68e2ab7d68fc3bb2cd18807023da74610a6a6944433bd32b9d767282dd49a2c7"
+    },
+    "signedConfirmedLaborContractDocumentCount": 0,
+    "historicalCoverageStatus": "COVERAGE_ZERO_NO_HISTORICAL_EXPORT_CLAIM",
+    "businessFingerprintsUnchanged": true,
+    "derivedFilesRemaining": 0
+  },
+  "targetDatabaseProtection": {
+    "database": "BossERP_NEW",
+    "writeStatementsExecuted": 0,
+    "packageCount": 3,
+    "documentCount": 10,
+    "confirmationCount": 0,
+    "confirmationDocumentCount": 0,
+    "releaseRoutineCount": 0
+  },
+  "privacy": {
+    "containsEmployeeIdentity": false,
+    "containsIdentityDocumentNumber": false,
+    "containsFileContents": false,
+    "containsCredentials": false
+  },
+  "cleanup": {
+    "scratchSchemasDroppedAfterEvidenceCapture": true
+  }
+}

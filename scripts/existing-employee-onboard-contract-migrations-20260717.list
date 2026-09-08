@@ -1,0 +1,3 @@
+# 已建档员工入职合同功能的非 Docker 生产迁移顺序。
+# 必须在 OA 后端部署前手工执行；不得加入冻结的 20260716 Release A。
+erp_oa_sign_onboard_open_guard_20260717.sql

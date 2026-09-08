@@ -1,0 +1,348 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.system.mapper.SysDeptMapper">
+
+	<resultMap type="SysDept" id="SysDeptResult">
+		<id     property="deptId"     column="dept_id"     />
+		<result property="parentId"   column="parent_id"   />
+		<result property="ancestors"  column="ancestors"   />
+		<result property="deptName"   column="dept_name"   />
+		<result property="orderNum"   column="order_num"   />
+		<result property="leader"     column="leader"      />
+		<result property="leaderUserId" column="leader_user_id" />
+		<result property="phone"      column="phone"       />
+		<result property="email"      column="email"       />
+		<result property="status"     column="status"      />
+		<result property="deptType"   column="dept_type"   />
+		<result property="legalEntityId" column="legal_entity_id" />
+		<result property="legalEntityName" column="legal_entity_name" />
+		<result property="delFlag"    column="del_flag"    />
+		<result property="parentName" column="parent_name" />
+		<result property="createBy"   column="create_by"   />
+		<result property="createTime" column="create_time" />
+		<result property="updateBy"   column="update_by"   />
+		<result property="updateTime" column="update_time" />
+	</resultMap>
+	
+	<sql id="selectDeptVo">
+		select d.dept_id, d.parent_id, d.ancestors, d.dept_name, d.order_num, d.leader, d.leader_user_id,
+		       d.phone, d.email, d.status, d.dept_type, d.legal_entity_id,
+		       (select le.legal_entity_name from sys_legal_entity le
+		        where le.legal_entity_id = d.legal_entity_id limit 1) as legal_entity_name,
+		       d.del_flag, d.create_by, d.create_time
+        from sys_dept d
+    </sql>
+    
+	<select id="selectDeptList" parameterType="SysDept" resultMap="SysDeptResult">
+        <include refid="selectDeptVo"/>
+        where d.del_flag = '0'
+		<if test="deptId != null and deptId != 0">
+			AND dept_id = #{deptId}
+		</if>
+        <if test="parentId != null and parentId != 0">
+			AND parent_id = #{parentId}
+		</if>
+		<if test="deptName != null and deptName != ''">
+			AND dept_name like concat('%', #{deptName}, '%')
+		</if>
+		<if test="status != null and status != ''">
+			AND status = #{status}
+		</if>
+		<if test="deptType != null and deptType != ''">
+			AND dept_type = #{deptType}
+		</if>
+		<!-- 数据范围过滤 -->
+		${params.dataScope}
+		order by d.parent_id, d.order_num
+    </select>
+
+	<select id="selectShopList" resultMap="SysDeptResult">
+		<include refid="selectDeptVo"/>
+		where d.del_flag = '0'
+		  and d.status = '0'
+		  and d.dept_type = 'STORE'
+		order by d.parent_id, d.order_num
+	</select>
+
+	<select id="selectWarehouseList" resultMap="SysDeptResult">
+		<include refid="selectDeptVo"/>
+		where d.del_flag = '0'
+		  and d.status = '0'
+		  and d.dept_type = 'WAREHOUSE'
+		order by d.parent_id, d.order_num
+	</select>
+
+	<select id="selectReplenishmentSourceWarehouseList" resultMap="SysDeptResult">
+		<include refid="selectDeptVo"/>
+		inner join sys_dept current_dept on current_dept.dept_id = #{scopeDeptId}
+		inner join sys_dept scope_root on scope_root.dept_id = cast(
+			case
+				when current_dept.ancestors is null or current_dept.ancestors = '' or current_dept.ancestors = '0'
+					then current_dept.dept_id
+				when current_dept.ancestors like '0,%'
+					then substring_index(substring_index(current_dept.ancestors, ',', 2), ',', -1)
+				else substring_index(current_dept.ancestors, ',', 1)
+			end as unsigned
+		)
+		where current_dept.del_flag = '0'
+		  and current_dept.status = '0'
+		  and current_dept.dept_type = 'STORE'
+		  and scope_root.del_flag = '0'
+		  and scope_root.status = '0'
+		  and d.del_flag = '0'
+		  and d.status = '0'
+		  and d.dept_type = 'WAREHOUSE'
+		  and cast(
+			case
+				when d.ancestors is null or d.ancestors = '' or d.ancestors = '0'
+					then d.dept_id
+				when d.ancestors like '0,%'
+					then substring_index(substring_index(d.ancestors, ',', 2), ',', -1)
+				else substring_index(d.ancestors, ',', 1)
+			end as unsigned
+		  ) = scope_root.dept_id
+		order by d.parent_id, d.order_num
+	</select>
+
+	<select id="selectVisibleStoreListByScopeDeptId" resultMap="SysDeptResult">
+		<include refid="selectDeptVo"/>
+		inner join sys_dept current_dept on current_dept.dept_id = #{scopeDeptId}
+		inner join sys_dept scope_root on scope_root.dept_id = cast(
+			case
+				when current_dept.ancestors is null or current_dept.ancestors = '' or current_dept.ancestors = '0'
+					then current_dept.dept_id
+				when current_dept.ancestors like '0,%'
+					then substring_index(substring_index(current_dept.ancestors, ',', 2), ',', -1)
+				else substring_index(current_dept.ancestors, ',', 1)
+			end as unsigned
+		)
+		where d.del_flag = '0'
+		  and d.status = '0'
+		  and d.dept_type = 'STORE'
+		  and (d.dept_id = scope_root.dept_id or find_in_set(scope_root.dept_id, d.ancestors))
+		order by d.parent_id, d.order_num
+	</select>
+
+	<select id="selectShopAuthTreeList" resultMap="SysDeptResult">
+		<include refid="selectDeptVo"/>
+		where d.del_flag = '0'
+		  and d.status = '0'
+		  and d.dept_type in ('GROUP', 'COMPANY', 'STORE', 'WAREHOUSE')
+		order by d.parent_id, d.order_num
+	</select>
+
+	<select id="selectShopAuthTreeListByShopIds" resultMap="SysDeptResult">
+		<include refid="selectDeptVo"/>
+		where d.del_flag = '0'
+		  and d.status = '0'
+		  and d.dept_type in ('GROUP', 'COMPANY', 'STORE', 'WAREHOUSE')
+		  <choose>
+			  <when test="deptIds != null and deptIds.size() > 0">
+				  and (
+					  d.dept_id in
+					  <foreach collection="deptIds" item="deptId" open="(" separator="," close=")">
+						  #{deptId}
+					  </foreach>
+					  or exists (
+						  select 1
+						  from sys_dept scope
+						  where scope.del_flag = '0'
+						    and scope.status = '0'
+						    and scope.dept_type in ('GROUP', 'COMPANY', 'STORE', 'WAREHOUSE')
+						    and scope.dept_id in
+						    <foreach collection="deptIds" item="deptId" open="(" separator="," close=")">
+							    #{deptId}
+						    </foreach>
+						    and (
+						        find_in_set(scope.dept_id, d.ancestors)
+						        or find_in_set(d.dept_id, scope.ancestors)
+						    )
+					  )
+				  )
+			  </when>
+			  <otherwise>
+				  and 1 = 0
+			  </otherwise>
+		  </choose>
+		order by d.parent_id, d.order_num
+	</select>
+
+	<select id="selectShopListByIds" resultMap="SysDeptResult">
+		<include refid="selectDeptVo"/>
+		where d.del_flag = '0'
+		  and d.status = '0'
+		  and d.dept_type in ('STORE', 'WAREHOUSE')
+		  <choose>
+			  <when test="deptIds != null and deptIds.size() > 0">
+				  and d.dept_id in
+				  <foreach collection="deptIds" item="deptId" open="(" separator="," close=")">
+					  #{deptId}
+				  </foreach>
+			  </when>
+			  <otherwise>
+				  and 1 = 0
+			  </otherwise>
+		  </choose>
+		order by d.parent_id, d.order_num
+	</select>
+
+	<select id="countNormalShopByIds" resultType="int">
+		select count(1)
+		from sys_dept d
+		where d.del_flag = '0'
+		  and d.status = '0'
+		  and d.dept_type in ('GROUP', 'COMPANY', 'STORE', 'WAREHOUSE')
+		  <choose>
+			  <when test="deptIds != null and deptIds.size() > 0">
+				  and d.dept_id in
+				  <foreach collection="deptIds" item="deptId" open="(" separator="," close=")">
+					  #{deptId}
+				  </foreach>
+			  </when>
+			  <otherwise>
+				  and 1 = 0
+			  </otherwise>
+		  </choose>
+	</select>
+    
+    <select id="selectDeptListByRoleId" resultType="Long">
+		select d.dept_id
+		from sys_dept d
+            left join sys_role_dept rd on d.dept_id = rd.dept_id
+        where rd.role_id = #{roleId}
+            <if test="deptCheckStrictly">
+              and d.dept_id not in (select d.parent_id from sys_dept d inner join sys_role_dept rd on d.dept_id = rd.dept_id and rd.role_id = #{roleId})
+            </if>
+		order by d.parent_id, d.order_num
+	</select>
+    
+    <select id="selectDeptById" parameterType="Long" resultMap="SysDeptResult">
+		<include refid="selectDeptVo"/>
+		where dept_id = #{deptId}
+	</select>
+
+    <select id="selectDeptByIdForUpdate" parameterType="Long" resultMap="SysDeptResult">
+		<include refid="selectDeptVo"/>
+		where dept_id = #{deptId}
+		for update
+	</select>
+    
+    <select id="checkDeptExistUser" parameterType="Long" resultType="int">
+		select count(1) from sys_user where dept_id = #{deptId} and del_flag = '0'
+	</select>
+	
+	<select id="hasChildByDeptId" parameterType="Long" resultType="int">
+		select count(1) from sys_dept
+		where del_flag = '0' and parent_id = #{deptId} limit 1
+	</select>
+	
+	<select id="selectChildrenDeptById" parameterType="Long" resultMap="SysDeptResult">
+		select * from sys_dept where find_in_set(#{deptId}, ancestors)
+	</select>
+	
+	<select id="selectNormalChildrenDeptById" parameterType="Long" resultType="int">
+		select count(*) from sys_dept where status = 0 and del_flag = '0' and find_in_set(#{deptId}, ancestors)
+	</select>
+	
+	<select id="checkDeptNameUnique" resultMap="SysDeptResult">
+	    <include refid="selectDeptVo"/>
+		where dept_name=#{deptName} and parent_id = #{parentId} and del_flag = '0' limit 1
+	</select>
+    
+    <insert id="insertDept" parameterType="SysDept">
+ 		insert into sys_dept(
+ 			<if test="deptId != null and deptId != 0">dept_id,</if>
+ 			<if test="parentId != null and parentId != 0">parent_id,</if>
+ 			<if test="deptName != null and deptName != ''">dept_name,</if>
+ 			<if test="ancestors != null and ancestors != ''">ancestors,</if>
+ 			<if test="orderNum != null">order_num,</if>
+			<if test="leader != null and leader != ''">leader,</if>
+			<if test="leaderUserId != null and leaderUserId != 0">leader_user_id,</if>
+ 			<if test="phone != null and phone != ''">phone,</if>
+			<if test="email != null and email != ''">email,</if>
+			<if test="status != null">status,</if>
+			<if test="deptType != null and deptType != ''">dept_type,</if>
+			<if test="legalEntityId != null">legal_entity_id,</if>
+			<if test="createBy != null and createBy != ''">create_by,</if>
+ 			create_time
+ 		)values(
+ 			<if test="deptId != null and deptId != 0">#{deptId},</if>
+ 			<if test="parentId != null and parentId != 0">#{parentId},</if>
+ 			<if test="deptName != null and deptName != ''">#{deptName},</if>
+ 			<if test="ancestors != null and ancestors != ''">#{ancestors},</if>
+ 			<if test="orderNum != null">#{orderNum},</if>
+			<if test="leader != null and leader != ''">#{leader},</if>
+			<if test="leaderUserId != null and leaderUserId != 0">#{leaderUserId},</if>
+ 			<if test="phone != null and phone != ''">#{phone},</if>
+			<if test="email != null and email != ''">#{email},</if>
+			<if test="status != null">#{status},</if>
+			<if test="deptType != null and deptType != ''">#{deptType},</if>
+			<if test="legalEntityId != null">#{legalEntityId},</if>
+			<if test="createBy != null and createBy != ''">#{createBy},</if>
+ 			sysdate()
+ 		)
+	</insert>
+	
+	<update id="updateDept" parameterType="SysDept">
+ 		update sys_dept
+ 		<set>
+ 			<if test="parentId != null and parentId != 0">parent_id = #{parentId},</if>
+ 			<if test="deptName != null and deptName != ''">dept_name = #{deptName},</if>
+ 			<if test="ancestors != null and ancestors != ''">ancestors = #{ancestors},</if>
+ 			<if test="orderNum != null">order_num = #{orderNum},</if>
+			leader = #{leader},
+			leader_user_id = #{leaderUserId},
+ 			<if test="phone != null">phone = #{phone},</if>
+			<if test="email != null">email = #{email},</if>
+			<if test="status != null and status != ''">status = #{status},</if>
+			<if test="deptType != null and deptType != ''">dept_type = #{deptType},</if>
+			<if test="legalEntityIdSpecified">legal_entity_id = #{legalEntityId},</if>
+			<if test="updateBy != null and updateBy != ''">update_by = #{updateBy},</if>
+ 			update_time = sysdate()
+ 		</set>
+ 		where dept_id = #{deptId}
+	</update>
+	
+	<update id="updateDeptChildren" parameterType="java.util.List">
+	    update sys_dept set ancestors =
+	    <foreach collection="depts" item="item" index="index"
+	        separator=" " open="case dept_id" close="end">
+	        when #{item.deptId} then #{item.ancestors}
+	    </foreach>
+	    where dept_id in
+	    <foreach collection="depts" item="item" index="index"
+	        separator="," open="(" close=")">
+	        #{item.deptId}
+	    </foreach>
+	</update>
+	 
+	<update id="updateDeptStatusNormal" parameterType="Long">
+ 	    update sys_dept set status = '0' where dept_id in 
+ 	    <foreach collection="array" item="deptId" open="(" separator="," close=")">
+        	#{deptId}
+        </foreach>
+	</update>
+	
+	<update id="updateDeptSort" parameterType="SysDept">
+		update sys_dept set order_num = #{orderNum} where dept_id = #{deptId}
+	</update>
+
+	<select id="selectDeptOrdersForUpdate" resultMap="SysDeptResult">
+		select dept_id, order_num
+		from sys_dept
+		where del_flag = '0'
+		  and dept_id in
+		<foreach collection="deptIds" item="deptId" open="(" separator="," close=")">
+			#{deptId}
+		</foreach>
+		order by dept_id
+		for update
+	</select>
+	
+	<delete id="deleteDeptById" parameterType="Long">
+		update sys_dept set del_flag = '2' where dept_id = #{deptId}
+	</delete>
+
+</mapper>

@@ -1,0 +1,19 @@
+package com.erp.oa.constant;
+
+/** 签约文件不可变证据阶段。 */
+public enum OaSignFileEvidenceType
+{
+    TEMPLATE_SOURCE,
+    RENDERED_SOURCE,
+    REVIEW_PDF,
+    SIGNATURE_SAMPLE,
+    SIGNATURE_IMAGE,
+    SIGNED_PDF,
+    SIGN_CERTIFICATE,
+    COMPANY_SEAL,
+    FINAL_RENDERED_SOURCE,
+    FINAL_REVIEW_PDF,
+    FINAL_SIGNED_PDF,
+    FINAL_PENDING_PDF,
+    FINAL_ARCHIVE_PDF
+}

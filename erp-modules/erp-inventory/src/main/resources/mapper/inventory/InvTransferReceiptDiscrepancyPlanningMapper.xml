@@ -1,0 +1,391 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.inventory.mapper.InvTransferReceiptDiscrepancyPlanningMapper">
+
+    <resultMap id="DiscrepancyFactResult"
+            type="com.erp.inventory.domain.transfer.InvTransferReceiptDiscrepancyReadFact">
+        <id property="discrepancyCaseId" column="discrepancy_case_id"/>
+        <result property="receiptId" column="receipt_id"/>
+        <result property="receiptAllocationId"
+                column="receipt_allocation_id"/>
+        <result property="shipmentId" column="shipment_id"/>
+        <result property="transferId" column="transfer_id"/>
+        <result property="shipmentAllocationId"
+                column="shipment_allocation_id"/>
+        <result property="shipmentDetailId" column="shipment_detail_id"/>
+        <result property="transferDetailId" column="transfer_detail_id"/>
+        <result property="sourceDeptId" column="source_dept_id"/>
+        <result property="targetDeptId" column="target_dept_id"/>
+        <result property="sourceName" column="source_name"/>
+        <result property="targetName" column="target_name"/>
+        <result property="orderNo" column="order_no"/>
+        <result property="shipmentNo" column="shipment_no"/>
+        <result property="receiptNo" column="receipt_no"/>
+        <result property="receiptPlanVersion"
+                column="receipt_plan_version"/>
+        <result property="itemType" column="item_type"/>
+        <result property="itemId" column="item_id"/>
+        <result property="itemCode" column="item_code"/>
+        <result property="itemName" column="item_name"/>
+        <result property="unit" column="unit"/>
+        <result property="discrepancyType" column="discrepancy_type"/>
+        <result property="discrepancyQuantity"
+                column="discrepancy_quantity"/>
+        <result property="sourceCostPrice" column="source_cost_price"/>
+        <result property="discrepancyAmount"
+                column="discrepancy_amount"/>
+        <result property="factFingerprint" column="fact_fingerprint"/>
+        <result property="discrepancyNote" column="discrepancy_note"/>
+        <result property="attachmentRefs" column="attachment_refs"/>
+        <result property="caseStatus" column="case_status"/>
+        <result property="caseVersion" column="case_version"/>
+        <result property="caseCreateBy" column="case_create_by"/>
+        <result property="caseCreateTime" column="case_create_time"/>
+        <association property="sourceConfirmation"
+                javaType="com.erp.inventory.domain.transfer.InvTransferReceiptDiscrepancyReadFact$Confirmation"
+                notNullColumn="source_event_id">
+            <id property="eventId" column="source_event_id"/>
+            <result property="requestId" column="source_request_id"/>
+            <result property="caseVersion"
+                    column="source_case_version"/>
+            <result property="factFingerprint"
+                    column="source_fact_fingerprint"/>
+            <result property="partyRole" column="source_party_role"/>
+            <result property="partyDeptId"
+                    column="source_party_dept_id"/>
+            <result property="decision" column="source_decision"/>
+            <result property="note" column="source_note"/>
+            <result property="operatorUserId"
+                    column="source_operator_user_id"/>
+            <result property="operatorName"
+                    column="source_operator_name"/>
+            <result property="createTime" column="source_create_time"/>
+        </association>
+        <association property="targetConfirmation"
+                javaType="com.erp.inventory.domain.transfer.InvTransferReceiptDiscrepancyReadFact$Confirmation"
+                notNullColumn="target_event_id">
+            <id property="eventId" column="target_event_id"/>
+            <result property="requestId" column="target_request_id"/>
+            <result property="caseVersion"
+                    column="target_case_version"/>
+            <result property="factFingerprint"
+                    column="target_fact_fingerprint"/>
+            <result property="partyRole" column="target_party_role"/>
+            <result property="partyDeptId"
+                    column="target_party_dept_id"/>
+            <result property="decision" column="target_decision"/>
+            <result property="note" column="target_note"/>
+            <result property="operatorUserId"
+                    column="target_operator_user_id"/>
+            <result property="operatorName"
+                    column="target_operator_name"/>
+            <result property="createTime" column="target_create_time"/>
+        </association>
+    </resultMap>
+
+    <resultMap id="StoredAdjudicationResult"
+            type="com.erp.inventory.domain.transfer.InvTransferReceiptDiscrepancyStoredAdjudication">
+        <id property="adjudicationId" column="adjudication_id"/>
+        <result property="requestId" column="request_id"/>
+        <result property="caseId" column="discrepancy_case_id"/>
+        <result property="caseVersionBefore" column="case_version_before"/>
+        <result property="caseVersionAfter" column="case_version_after"/>
+        <result property="factFingerprint" column="fact_fingerprint"/>
+        <result property="sourceConfirmationEventId"
+                column="source_confirmation_event_id"/>
+        <result property="targetConfirmationEventId"
+                column="target_confirmation_event_id"/>
+        <result property="discrepancyType" column="discrepancy_type"/>
+        <result property="discrepancyQuantity"
+                column="discrepancy_quantity"/>
+        <result property="sourceCostPrice" column="source_cost_price"/>
+        <result property="discrepancyAmount" column="discrepancy_amount"/>
+        <result property="decisionFingerprint"
+                column="decision_fingerprint"/>
+        <result property="adjudicationNote" column="adjudication_note"/>
+        <result property="evidenceRefs" column="evidence_refs"/>
+        <result property="requiredPermission" column="required_permission"/>
+        <result property="adjudicatorUserId"
+                column="adjudicator_user_id"/>
+        <result property="adjudicatorName" column="adjudicator_name"/>
+        <result property="planStatus" column="plan_status"/>
+        <result property="createTime" column="create_time"/>
+    </resultMap>
+
+    <resultMap id="StoredAdjudicationActionResult"
+            type="com.erp.inventory.domain.transfer.InvTransferReceiptDiscrepancyStoredAdjudicationAction">
+        <id property="actionId" column="adjudication_action_id"/>
+        <result property="adjudicationId" column="adjudication_id"/>
+        <result property="caseId" column="discrepancy_case_id"/>
+        <result property="sequence" column="action_sequence"/>
+        <result property="actionType" column="action_type"/>
+        <result property="coverageKind" column="coverage_kind"/>
+        <result property="quantity" column="action_quantity"/>
+        <result property="amount" column="action_amount"/>
+        <result property="responsibleParty" column="responsible_party"/>
+        <result property="note" column="action_note"/>
+        <result property="executionStatus" column="execution_status"/>
+    </resultMap>
+
+    <select id="selectCase" resultMap="DiscrepancyFactResult">
+        select c.discrepancy_case_id, c.receipt_id,
+               c.receipt_allocation_id, c.shipment_id, c.transfer_id,
+               c.shipment_allocation_id, ra.shipment_detail_id,
+               ra.transfer_detail_id,
+               coalesce(nullif(o.from_warehouse_id, 0),
+                        o.from_dept_id) as source_dept_id,
+               coalesce(nullif(o.to_warehouse_id, 0),
+                        o.to_dept_id) as target_dept_id,
+               o.from_dept_name as source_name,
+               o.to_dept_name as target_name,
+               o.order_no, s.shipment_no, r.receipt_no,
+               r.receipt_plan_version,
+               ra.item_type, ra.item_id, sd.item_code, sd.item_name,
+               td.unit, c.discrepancy_type, c.discrepancy_quantity,
+               c.source_cost_price, c.discrepancy_amount,
+               c.fact_fingerprint, c.discrepancy_note,
+               c.attachment_refs, c.status as case_status,
+               c.case_version, c.create_by as case_create_by,
+               c.create_time as case_create_time,
+               source_event.confirmation_event_id as source_event_id,
+               source_event.request_id as source_request_id,
+               source_event.case_version as source_case_version,
+               source_event.fact_fingerprint as source_fact_fingerprint,
+               source_event.party_role as source_party_role,
+               source_event.party_dept_id as source_party_dept_id,
+               source_event.decision as source_decision,
+               source_event.confirmation_note as source_note,
+               source_event.operator_user_id as source_operator_user_id,
+               source_event.operator_name as source_operator_name,
+               source_event.create_time as source_create_time,
+               target_event.confirmation_event_id as target_event_id,
+               target_event.request_id as target_request_id,
+               target_event.case_version as target_case_version,
+               target_event.fact_fingerprint as target_fact_fingerprint,
+               target_event.party_role as target_party_role,
+               target_event.party_dept_id as target_party_dept_id,
+               target_event.decision as target_decision,
+               target_event.confirmation_note as target_note,
+               target_event.operator_user_id as target_operator_user_id,
+               target_event.operator_name as target_operator_name,
+               target_event.create_time as target_create_time
+        from inv_transfer_receipt_discrepancy_case c
+        inner join inv_transfer_shipment_receipt_allocation ra
+                on ra.receipt_allocation_id = c.receipt_allocation_id
+               and ra.receipt_id = c.receipt_id
+               and ra.shipment_id = c.shipment_id
+               and ra.shipment_allocation_id = c.shipment_allocation_id
+        inner join inv_transfer_shipment_receipt r
+                on r.receipt_id = c.receipt_id
+               and r.shipment_id = c.shipment_id
+               and r.transfer_id = c.transfer_id
+        inner join inv_transfer_shipment_allocation allocation
+                on allocation.allocation_id = c.shipment_allocation_id
+               and allocation.shipment_id = c.shipment_id
+               and allocation.shipment_detail_id = ra.shipment_detail_id
+               and allocation.transfer_detail_id = ra.transfer_detail_id
+               and allocation.transfer_id = c.transfer_id
+        inner join inv_transfer_shipment_detail sd
+                on sd.shipment_detail_id = ra.shipment_detail_id
+               and sd.shipment_id = c.shipment_id
+               and sd.transfer_id = c.transfer_id
+               and sd.transfer_detail_id = ra.transfer_detail_id
+               and sd.item_type = ra.item_type
+               and sd.item_id = ra.item_id
+        inner join inv_transfer_shipment s
+                on s.shipment_id = c.shipment_id
+               and s.transfer_id = c.transfer_id
+               and s.inventory_write_version = 'V2_DETAIL'
+        inner join inv_transfer_detail td
+                on td.detail_id = ra.transfer_detail_id
+               and td.transfer_id = c.transfer_id
+        inner join inv_transfer_order o
+                on o.transfer_id = c.transfer_id
+        left join inv_transfer_receipt_discrepancy_confirmation_event
+                source_event
+               on source_event.confirmation_event_id = (
+                  select max(source_latest.confirmation_event_id)
+                  from inv_transfer_receipt_discrepancy_confirmation_event
+                       source_latest
+                  where source_latest.discrepancy_case_id =
+                        c.discrepancy_case_id
+                    and source_latest.party_role = 'source'
+               )
+        left join inv_transfer_receipt_discrepancy_confirmation_event
+                target_event
+               on target_event.confirmation_event_id = (
+                  select max(target_latest.confirmation_event_id)
+                  from inv_transfer_receipt_discrepancy_confirmation_event
+                       target_latest
+                  where target_latest.discrepancy_case_id =
+                        c.discrepancy_case_id
+                    and target_latest.party_role = 'target'
+               )
+        where c.discrepancy_case_id = #{caseId}
+          and (#{selectedDeptId} = coalesce(
+                   nullif(o.from_warehouse_id, 0), o.from_dept_id)
+               or #{selectedDeptId} = coalesce(
+                   nullif(o.to_warehouse_id, 0), o.to_dept_id))
+          and c.discrepancy_type in ('damaged', 'shortage')
+          and c.discrepancy_quantity &gt; 0
+          and c.discrepancy_quantity =
+              case when c.discrepancy_type = 'damaged'
+                   then ra.damaged_quantity else ra.shortage_quantity end
+          and c.source_cost_price = ra.cost_price
+          and c.discrepancy_amount = round(
+              c.source_cost_price * c.discrepancy_quantity, 6)
+          and c.discrepancy_note = ra.discrepancy_note
+          and c.attachment_refs = ra.attachment_refs
+    </select>
+
+    <select id="selectCaseForAdjudication"
+            resultMap="DiscrepancyFactResult">
+        select c.discrepancy_case_id, c.receipt_id,
+               c.receipt_allocation_id, c.shipment_id, c.transfer_id,
+               c.shipment_allocation_id, ra.shipment_detail_id,
+               ra.transfer_detail_id,
+               coalesce(nullif(o.from_warehouse_id, 0),
+                        o.from_dept_id) as source_dept_id,
+               coalesce(nullif(o.to_warehouse_id, 0),
+                        o.to_dept_id) as target_dept_id,
+               o.from_dept_name as source_name,
+               o.to_dept_name as target_name,
+               o.order_no, s.shipment_no, r.receipt_no,
+               r.receipt_plan_version,
+               ra.item_type, ra.item_id, sd.item_code, sd.item_name,
+               td.unit, c.discrepancy_type, c.discrepancy_quantity,
+               c.source_cost_price, c.discrepancy_amount,
+               c.fact_fingerprint, c.discrepancy_note,
+               c.attachment_refs, c.status as case_status,
+               c.case_version, c.create_by as case_create_by,
+               c.create_time as case_create_time,
+               source_event.confirmation_event_id as source_event_id,
+               source_event.request_id as source_request_id,
+               source_event.case_version as source_case_version,
+               source_event.fact_fingerprint as source_fact_fingerprint,
+               source_event.party_role as source_party_role,
+               source_event.party_dept_id as source_party_dept_id,
+               source_event.decision as source_decision,
+               source_event.confirmation_note as source_note,
+               source_event.operator_user_id as source_operator_user_id,
+               source_event.operator_name as source_operator_name,
+               source_event.create_time as source_create_time,
+               target_event.confirmation_event_id as target_event_id,
+               target_event.request_id as target_request_id,
+               target_event.case_version as target_case_version,
+               target_event.fact_fingerprint as target_fact_fingerprint,
+               target_event.party_role as target_party_role,
+               target_event.party_dept_id as target_party_dept_id,
+               target_event.decision as target_decision,
+               target_event.confirmation_note as target_note,
+               target_event.operator_user_id as target_operator_user_id,
+               target_event.operator_name as target_operator_name,
+               target_event.create_time as target_create_time
+        from inv_transfer_receipt_discrepancy_case c
+        inner join inv_transfer_shipment_receipt_allocation ra
+                on ra.receipt_allocation_id = c.receipt_allocation_id
+               and ra.receipt_id = c.receipt_id
+               and ra.shipment_id = c.shipment_id
+               and ra.shipment_allocation_id = c.shipment_allocation_id
+        inner join inv_transfer_shipment_receipt r
+                on r.receipt_id = c.receipt_id
+               and r.shipment_id = c.shipment_id
+               and r.transfer_id = c.transfer_id
+        inner join inv_transfer_shipment_allocation allocation
+                on allocation.allocation_id = c.shipment_allocation_id
+               and allocation.shipment_id = c.shipment_id
+               and allocation.shipment_detail_id = ra.shipment_detail_id
+               and allocation.transfer_detail_id = ra.transfer_detail_id
+               and allocation.transfer_id = c.transfer_id
+        inner join inv_transfer_shipment_detail sd
+                on sd.shipment_detail_id = ra.shipment_detail_id
+               and sd.shipment_id = c.shipment_id
+               and sd.transfer_id = c.transfer_id
+               and sd.transfer_detail_id = ra.transfer_detail_id
+               and sd.item_type = ra.item_type
+               and sd.item_id = ra.item_id
+        inner join inv_transfer_shipment s
+                on s.shipment_id = c.shipment_id
+               and s.transfer_id = c.transfer_id
+               and s.inventory_write_version = 'V2_DETAIL'
+        inner join inv_transfer_detail td
+                on td.detail_id = ra.transfer_detail_id
+               and td.transfer_id = c.transfer_id
+        inner join inv_transfer_order o
+                on o.transfer_id = c.transfer_id
+        left join inv_transfer_receipt_discrepancy_confirmation_event
+                source_event
+               on source_event.confirmation_event_id = (
+                  select max(source_latest.confirmation_event_id)
+                  from inv_transfer_receipt_discrepancy_confirmation_event
+                       source_latest
+                  where source_latest.discrepancy_case_id =
+                        c.discrepancy_case_id
+                    and source_latest.party_role = 'source'
+               )
+        left join inv_transfer_receipt_discrepancy_confirmation_event
+                target_event
+               on target_event.confirmation_event_id = (
+                  select max(target_latest.confirmation_event_id)
+                  from inv_transfer_receipt_discrepancy_confirmation_event
+                       target_latest
+                  where target_latest.discrepancy_case_id =
+                        c.discrepancy_case_id
+                    and target_latest.party_role = 'target'
+               )
+        where c.discrepancy_case_id = #{caseId}
+          and (
+              coalesce(nullif(o.from_warehouse_id, 0), o.from_dept_id)
+                  in
+                  <foreach collection="scopeDeptIds" item="deptId"
+                          open="(" separator="," close=")">
+                      #{deptId}
+                  </foreach>
+              or coalesce(nullif(o.to_warehouse_id, 0), o.to_dept_id)
+                  in
+                  <foreach collection="scopeDeptIds" item="deptId"
+                          open="(" separator="," close=")">
+                      #{deptId}
+                  </foreach>
+          )
+          and c.discrepancy_type in ('damaged', 'shortage')
+          and c.discrepancy_quantity &gt; 0
+          and c.discrepancy_quantity =
+              case when c.discrepancy_type = 'damaged'
+                   then ra.damaged_quantity else ra.shortage_quantity end
+          and c.source_cost_price = ra.cost_price
+          and c.discrepancy_amount = round(
+              c.source_cost_price * c.discrepancy_quantity, 6)
+          and c.discrepancy_note = ra.discrepancy_note
+          and c.attachment_refs = ra.attachment_refs
+    </select>
+
+    <select id="selectAdjudicationsByCaseId"
+            resultMap="StoredAdjudicationResult">
+        select adjudication_id, request_id, discrepancy_case_id,
+               case_version_before, case_version_after, fact_fingerprint,
+               source_confirmation_event_id,
+               target_confirmation_event_id, discrepancy_type,
+               discrepancy_quantity, source_cost_price,
+               discrepancy_amount, decision_fingerprint,
+               adjudication_note, evidence_refs, required_permission,
+               adjudicator_user_id, adjudicator_name, plan_status,
+               create_time
+        from inv_transfer_receipt_discrepancy_adjudication
+        where discrepancy_case_id = #{caseId}
+        order by adjudication_id
+    </select>
+
+    <select id="selectAdjudicationActionsByCaseId"
+            resultMap="StoredAdjudicationActionResult">
+        select adjudication_action_id, adjudication_id,
+               discrepancy_case_id, action_sequence, action_type,
+               coverage_kind, action_quantity, action_amount,
+               responsible_party,
+               action_note, execution_status
+        from inv_transfer_receipt_discrepancy_adjudication_action
+        where discrepancy_case_id = #{caseId}
+        order by adjudication_id, action_sequence
+    </select>
+
+</mapper>

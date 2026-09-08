@@ -1,0 +1,242 @@
+{
+  "schemaVersion": 1,
+  "buildToolchain": {
+    "mavenCommand": "./mvnw",
+    "mavenVersion": "3.9.16",
+    "javaMajor": 17,
+    "nodeMajorMin": 22,
+    "nodeMajorMaxExclusive": 25
+  },
+  "artifactMap": [
+    {
+      "component": "gateway",
+      "source": "erp-gateway/target/erp-gateway.jar",
+      "destination": "docker/erp/gateway/jar/erp-gateway.jar",
+      "kind": "jar"
+    },
+    {
+      "component": "auth",
+      "source": "erp-auth/target/erp-auth.jar",
+      "destination": "docker/erp/auth/jar/erp-auth.jar",
+      "kind": "jar"
+    },
+    {
+      "component": "monitor",
+      "source": "erp-visual/erp-monitor/target/erp-visual-monitor.jar",
+      "destination": "docker/erp/visual/monitor/jar/erp-visual-monitor.jar",
+      "kind": "jar"
+    },
+    {
+      "component": "system",
+      "source": "erp-modules/erp-system/target/erp-modules-system.jar",
+      "destination": "docker/erp/modules/system/jar/erp-modules-system.jar",
+      "kind": "jar"
+    },
+    {
+      "component": "file",
+      "source": "erp-modules/erp-file/target/erp-modules-file.jar",
+      "destination": "docker/erp/modules/file/jar/erp-modules-file.jar",
+      "kind": "jar"
+    },
+    {
+      "component": "job",
+      "source": "erp-modules/erp-job/target/erp-modules-job.jar",
+      "destination": "docker/erp/modules/job/jar/erp-modules-job.jar",
+      "kind": "jar"
+    },
+    {
+      "component": "oa",
+      "source": "erp-modules/erp-oa/target/erp-modules-oa.jar",
+      "destination": "docker/erp/modules/oa/jar/erp-modules-oa.jar",
+      "kind": "jar"
+    },
+    {
+      "component": "inventory",
+      "source": "erp-modules/erp-inventory/target/erp-modules-inventory.jar",
+      "destination": "docker/erp/modules/inventory/jar/erp-modules-inventory.jar",
+      "kind": "jar"
+    },
+    {
+      "component": "approval",
+      "source": "erp-modules/erp-approval/target/erp-modules-approval.jar",
+      "destination": "docker/erp/modules/approval/jar/erp-modules-approval.jar",
+      "kind": "jar"
+    }
+  ],
+  "frontend": {
+    "source": "erp-ui/dist",
+    "destination": "docker/nginx/html/dist",
+    "releaseInfo": "release-info.json"
+  },
+  "requiredEnvironment": [
+    {
+      "name": "NACOS_AUTH_TOKEN",
+      "type": "non-placeholder",
+      "secret": true
+    },
+    {
+      "name": "NACOS_AUTH_IDENTITY_KEY",
+      "type": "non-placeholder",
+      "secret": true
+    },
+    {
+      "name": "NACOS_AUTH_IDENTITY_VALUE",
+      "type": "non-placeholder",
+      "secret": true
+    },
+    {
+      "name": "NACOS_DB_USER",
+      "type": "non-empty",
+      "secret": false
+    },
+    {
+      "name": "NACOS_DB_PASSWORD",
+      "type": "non-placeholder",
+      "secret": true
+    },
+    {
+      "name": "NACOS_CLIENT_USERNAME",
+      "type": "non-placeholder",
+      "secret": false
+    },
+    {
+      "name": "NACOS_CLIENT_PASSWORD",
+      "type": "non-placeholder",
+      "secret": true
+    },
+    {
+      "name": "ECS_NACOS_SERVER_ADDR",
+      "type": "nacos-loopback-address",
+      "secret": false
+    },
+    {
+      "name": "MYSQL_ROOT_PASSWORD",
+      "type": "non-placeholder",
+      "secret": true
+    },
+    {
+      "name": "MYSQL_DATABASE",
+      "type": "non-empty",
+      "secret": false
+    },
+    {
+      "name": "MYSQL_USERNAME",
+      "type": "non-empty",
+      "secret": false
+    },
+    {
+      "name": "MYSQL_PASSWORD",
+      "type": "non-placeholder",
+      "secret": true
+    },
+    {
+      "name": "SPRING_PROFILES_ACTIVE",
+      "type": "prod-profile",
+      "secret": false
+    },
+    {
+      "name": "ERP_JWT_SECRET",
+      "type": "non-placeholder",
+      "secret": true
+    },
+    {
+      "name": "REDIS_PASSWORD",
+      "type": "non-placeholder",
+      "secret": true
+    },
+    {
+      "name": "OA_SIGN_EXCEL_IMPORT_ENABLED",
+      "type": "literal-true",
+      "secret": false
+    },
+    {
+      "name": "APP_DATASOURCE_URL",
+      "type": "non-empty",
+      "secret": false
+    },
+    {
+      "name": "ECS_APP_DATASOURCE_URL",
+      "type": "jdbc-mysql-loopback",
+      "secret": false
+    },
+    {
+      "name": "APP_DATASOURCE_USERNAME",
+      "type": "non-empty",
+      "secret": false
+    },
+    {
+      "name": "APP_DATASOURCE_PASSWORD",
+      "type": "non-placeholder",
+      "secret": true
+    },
+    {
+      "name": "ERP_UPLOAD_ROOT",
+      "type": "persistent-common-upload-directory",
+      "secret": false
+    },
+    {
+      "name": "FILE_PATH",
+      "type": "persistent-common-upload-directory",
+      "secret": false
+    },
+    {
+      "name": "SIGN_PACKAGE_STORAGE_ROOT",
+      "type": "common-upload-subdirectory",
+      "secret": false
+    },
+    {
+      "name": "OA_ATTENDANCE_STORAGE_ROOT",
+      "type": "common-upload-subdirectory",
+      "secret": false
+    },
+    {
+      "name": "OA_REIMBURSEMENT_STORAGE_ROOT",
+      "type": "common-upload-subdirectory",
+      "secret": false
+    },
+    {
+      "name": "DRIVE_LOCAL_PATH",
+      "type": "common-upload-subdirectory",
+      "secret": false
+    },
+    {
+      "name": "FILE_DOMAIN",
+      "type": "https-production-url",
+      "secret": false
+    },
+    {
+      "name": "REFERER_ENABLED",
+      "type": "literal-true",
+      "secret": false
+    },
+    {
+      "name": "REFERER_ALLOWED_DOMAINS",
+      "type": "domain-allowlist",
+      "secret": false
+    },
+    {
+      "name": "RELEASE_ID",
+      "type": "release-id",
+      "secret": false
+    },
+    {
+      "name": "GIT_COMMIT",
+      "type": "git-commit",
+      "secret": false
+    },
+    {
+      "name": "BUILD_TIME",
+      "type": "build-time",
+      "secret": false
+    }
+  ],
+  "forbiddenDeploymentDirectories": [
+    "mysql/data",
+    "mysql/logs",
+    "mysql/releases",
+    "mysql/seed",
+    "redis/data",
+    "release",
+    "releases"
+  ]
+}

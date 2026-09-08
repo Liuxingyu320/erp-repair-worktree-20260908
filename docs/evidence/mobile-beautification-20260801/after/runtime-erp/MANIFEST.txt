@@ -1,0 +1,44 @@
+REAL ERP dist runtime captures
+base=http://127.0.0.1:9526
+Note: protected /mobile/* routes typically redirect to /login without session.
+401-390x844.png	189768
+401-vp-320x568.png	77613
+401-vp-354x766.png	149961
+401-vp-375x667.png	126928
+401-vp-390x844.png	189768
+404-390x844.png	189768
+404-vp-320x568.png	77613
+404-vp-354x766.png	149961
+404-vp-375x667.png	126928
+404-vp-390x844.png	189768
+change-password-390x844.png	189768
+complete-profile-390x844.png	189768
+lock-390x844.png	189768
+lock-vp-320x568.png	77613
+lock-vp-354x766.png	149961
+lock-vp-375x667.png	126928
+lock-vp-390x844.png	189768
+login-390x844.png	189768
+login-vp-320x568.png	77613
+login-vp-354x766.png	149961
+login-vp-375x667.png	126928
+login-vp-390x844.png	189768
+mobile-completeness-390x844.png	189768
+mobile-contract-390x844.png	189768
+mobile-customer-390x844.png	189768
+mobile-drive-390x844.png	189768
+mobile-employee-390x844.png	189768
+mobile-health-390x844.png	189768
+mobile-onboarding-create-390x844.png	189768
+mobile-profile-390x844.png	189768
+mobile-reimbursement-390x844.png	189768
+mobile-sign-390x844.png	189768
+mobile-stock-390x844.png	189768
+mobile-store-390x844.png	189768
+mobile-todo-390x844.png	189768
+register-390x844.png	34287
+register-vp-320x568.png	24139
+register-vp-354x766.png	31632
+register-vp-375x667.png	32427
+register-vp-390x844.png	34287
+select-shop-390x844.png	189768

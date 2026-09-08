@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.oa.mapper.OaSignOnboardSendRequestMapper">
+
+    <resultMap id="SendRequestResult" type="com.erp.oa.domain.OaSignOnboardSendRequest">
+        <id property="operationId" column="operation_id"/>
+        <result property="requestId" column="request_id"/>
+        <result property="batchId" column="batch_id"/>
+        <result property="operatorUserId" column="operator_user_id"/>
+        <result property="payloadHash" column="payload_hash"/>
+        <result property="claimToken" column="claim_token"/>
+        <result property="replayCount" column="replay_count"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateTime" column="update_time"/>
+    </resultMap>
+
+    <insert id="claim" parameterType="com.erp.oa.domain.OaSignOnboardSendRequest"
+            useGeneratedKeys="true" keyProperty="operationId">
+        insert into oa_sign_onboard_send_request (
+            request_id, batch_id, operator_user_id, payload_hash, claim_token,
+            replay_count, create_time, update_time
+        ) values (
+            #{requestId}, #{batchId}, #{operatorUserId}, #{payloadHash}, #{claimToken},
+            0, sysdate(), sysdate()
+        )
+        on duplicate key update
+            operation_id = last_insert_id(operation_id),
+            replay_count = replay_count + 1,
+            update_time = sysdate()
+    </insert>
+
+    <select id="selectByRequestId" resultMap="SendRequestResult">
+        select operation_id, request_id, batch_id, operator_user_id, payload_hash,
+               claim_token, replay_count, create_time, update_time
+        from oa_sign_onboard_send_request
+        where request_id = #{requestId}
+        limit 1
+    </select>
+</mapper>

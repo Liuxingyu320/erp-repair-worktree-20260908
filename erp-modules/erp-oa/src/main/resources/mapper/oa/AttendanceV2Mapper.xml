@@ -1,0 +1,962 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.oa.attendance.mapper.AttendanceV2Mapper">
+
+    <select id="selectDatabaseNow" resultType="java.time.LocalDateTime">
+        select current_timestamp
+    </select>
+
+    <resultMap id="shiftResult" type="com.erp.oa.attendance.domain.AttendanceModels$Shift">
+        <id property="shiftId" column="shift_id"/>
+        <result property="shiftCode" column="shift_code"/>
+        <result property="shiftName" column="shift_name"/>
+        <result property="punchMode" column="punch_mode"/>
+        <result property="startTime" column="start_time"/>
+        <result property="endTime" column="end_time"/>
+        <result property="crossDay" column="cross_day"/>
+        <result property="standardMinutes" column="standard_minutes"/>
+        <result property="graceInMinutes" column="grace_in_minutes"/>
+        <result property="graceOutMinutes" column="grace_out_minutes"/>
+        <result property="checkInOpenMinutes" column="check_in_open_minutes"/>
+        <result property="checkInCloseMinutes" column="check_in_close_minutes"/>
+        <result property="checkOutOpenMinutes" column="check_out_open_minutes"/>
+        <result property="checkOutCloseMinutes" column="check_out_close_minutes"/>
+        <result property="photoRequired" column="photo_required"/>
+        <result property="locationRequired" column="location_required"/>
+        <result property="effectiveFrom" column="effective_from"/>
+        <result property="effectiveTo" column="effective_to"/>
+        <result property="status" column="status"/>
+        <result property="version" column="version"/>
+        <result property="rowVersion" column="row_version"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateBy" column="update_by"/>
+        <result property="updateTime" column="update_time"/>
+        <result property="remark" column="remark"/>
+    </resultMap>
+
+    <resultMap id="segmentResult" type="com.erp.oa.attendance.domain.AttendanceModels$ShiftSegment">
+        <id property="segmentId" column="segment_id"/>
+        <result property="shiftId" column="shift_id"/>
+        <result property="segmentType" column="segment_type"/>
+        <result property="segmentOrder" column="segment_order"/>
+        <result property="startMinuteOffset" column="start_minute_offset"/>
+        <result property="endMinuteOffset" column="end_minute_offset"/>
+        <result property="paid" column="paid"/>
+        <result property="createTime" column="create_time"/>
+    </resultMap>
+
+    <select id="selectShifts" resultMap="shiftResult">
+        select * from oa_attendance_shift
+        <where><if test="status != null and status != ''">status = #{status}</if></where>
+        order by shift_code, shift_id
+    </select>
+    <select id="selectShiftById" resultMap="shiftResult">
+        select * from oa_attendance_shift where shift_id = #{shiftId}
+    </select>
+    <select id="selectShiftByIdForUpdate" resultMap="shiftResult">
+        select * from oa_attendance_shift where shift_id = #{shiftId} for update
+    </select>
+    <select id="selectShiftSegments" resultMap="segmentResult">
+        select * from oa_attendance_shift_segment where shift_id = #{shiftId}
+        order by segment_order
+    </select>
+    <select id="countPublishedSchedulesByShift" resultType="int">
+        select count(1) from oa_attendance_schedule
+        where shift_id = #{shiftId} and published_at is not null
+    </select>
+    <insert id="insertShift" parameterType="com.erp.oa.attendance.domain.AttendanceModels$Shift"
+            useGeneratedKeys="true" keyProperty="shiftId">
+        insert into oa_attendance_shift
+        (shift_code, shift_name, punch_mode, start_time, end_time, cross_day,
+         standard_minutes, grace_in_minutes, grace_out_minutes,
+         check_in_open_minutes, check_in_close_minutes,
+         check_out_open_minutes, check_out_close_minutes,
+         photo_required, location_required, effective_from, effective_to,
+         status, version, row_version, create_by, create_time, remark)
+        values
+        (#{shiftCode}, #{shiftName}, coalesce(#{punchMode},'SHIFT_BOUNDARY'),
+         #{startTime}, #{endTime}, #{crossDay},
+         #{standardMinutes}, #{graceInMinutes}, #{graceOutMinutes},
+         #{checkInOpenMinutes}, #{checkInCloseMinutes},
+         #{checkOutOpenMinutes}, #{checkOutCloseMinutes},
+         #{photoRequired}, #{locationRequired}, #{effectiveFrom}, #{effectiveTo},
+         #{status}, 1, 0, #{createBy}, now(), #{remark})
+    </insert>
+    <update id="updateShift" parameterType="com.erp.oa.attendance.domain.AttendanceModels$Shift">
+        update oa_attendance_shift set
+          shift_code=#{shiftCode}, shift_name=#{shiftName}, start_time=#{startTime},
+          punch_mode=coalesce(#{punchMode},punch_mode,'SHIFT_BOUNDARY'),
+          end_time=#{endTime}, cross_day=#{crossDay},
+          standard_minutes=#{standardMinutes}, grace_in_minutes=#{graceInMinutes},
+          grace_out_minutes=#{graceOutMinutes},
+          check_in_open_minutes=#{checkInOpenMinutes},
+          check_in_close_minutes=#{checkInCloseMinutes},
+          check_out_open_minutes=#{checkOutOpenMinutes},
+          check_out_close_minutes=#{checkOutCloseMinutes},
+          photo_required=#{photoRequired}, location_required=#{locationRequired},
+          effective_from=#{effectiveFrom}, effective_to=#{effectiveTo},
+          version=version+1, row_version=row_version+1,
+          update_by=#{updateBy}, update_time=now(), remark=#{remark}
+        where shift_id=#{shiftId} and row_version=#{rowVersion}
+    </update>
+    <update id="updateShiftStatus">
+        update oa_attendance_shift set status=#{status}, row_version=row_version+1,
+          update_by=#{updateBy}, update_time=now()
+        where shift_id=#{shiftId} and row_version=#{rowVersion}
+    </update>
+    <delete id="deleteShift">
+        delete from oa_attendance_shift
+        where shift_id=#{shiftId} and status='DISABLED'
+          and row_version=#{rowVersion}
+          and not exists (
+            select 1 from oa_attendance_schedule s
+            where s.shift_id=#{shiftId}
+          )
+    </delete>
+    <delete id="deleteShiftSegments">
+        delete from oa_attendance_shift_segment where shift_id=#{shiftId}
+    </delete>
+    <insert id="insertShiftSegment" parameterType="com.erp.oa.attendance.domain.AttendanceModels$ShiftSegment"
+            useGeneratedKeys="true" keyProperty="segmentId">
+        insert into oa_attendance_shift_segment
+          (shift_id, segment_type, segment_order, start_minute_offset,
+           end_minute_offset, paid, create_time)
+        values (#{shiftId}, #{segmentType}, #{segmentOrder},
+          #{startMinuteOffset}, #{endMinuteOffset}, #{paid}, now())
+    </insert>
+
+    <resultMap id="siteResult" type="com.erp.oa.attendance.domain.AttendanceModels$Site">
+        <id property="siteId" column="site_id"/>
+        <result property="siteCode" column="site_code"/>
+        <result property="siteName" column="site_name"/>
+        <result property="shopId" column="shop_id"/>
+        <result property="shopName" column="shop_name"/>
+        <result property="address" column="address"/>
+        <result property="longitude" column="longitude"/>
+        <result property="latitude" column="latitude"/>
+        <result property="coordinateSystem" column="coordinate_system"/>
+        <result property="radiusMeters" column="radius_meters"/>
+        <result property="maxAccuracyMeters" column="max_accuracy_meters"/>
+        <result property="status" column="status"/>
+        <result property="rowVersion" column="row_version"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateBy" column="update_by"/>
+        <result property="updateTime" column="update_time"/>
+        <result property="remark" column="remark"/>
+    </resultMap>
+    <select id="selectSites" resultMap="siteResult">
+        select s.*, d.dept_name shop_name from oa_attendance_site s
+        left join sys_dept d on d.dept_id=s.shop_id
+        <where>
+            <if test="shopId != null">and s.shop_id=#{shopId}</if>
+            <if test="status != null and status != ''">and s.status=#{status}</if>
+            <if test="scopeShopIds != null and scopeShopIds.size > 0">
+                and s.shop_id in
+                <foreach collection="scopeShopIds" item="id" open="(" close=")" separator=",">#{id}</foreach>
+            </if>
+        </where>
+        order by s.shop_id, s.site_code
+    </select>
+    <select id="selectSiteById" resultMap="siteResult">
+        select s.*, d.dept_name shop_name from oa_attendance_site s
+        left join sys_dept d on d.dept_id=s.shop_id where s.site_id=#{siteId}
+    </select>
+    <select id="selectSiteByIdForUpdate" resultMap="siteResult">
+        select s.*, null shop_name from oa_attendance_site s
+        where s.site_id=#{siteId} for update
+    </select>
+    <insert id="insertSite" parameterType="com.erp.oa.attendance.domain.AttendanceModels$Site"
+            useGeneratedKeys="true" keyProperty="siteId">
+        insert into oa_attendance_site
+        (site_code,site_name,shop_id,address,longitude,latitude,
+         coordinate_system,radius_meters,max_accuracy_meters,status,row_version,
+         create_by,create_time,remark)
+        values (#{siteCode},#{siteName},#{shopId},#{address},#{longitude},#{latitude},
+         #{coordinateSystem},#{radiusMeters},#{maxAccuracyMeters},#{status},0,
+         #{createBy},now(),#{remark})
+    </insert>
+    <update id="updateSite" parameterType="com.erp.oa.attendance.domain.AttendanceModels$Site">
+        update oa_attendance_site set site_code=#{siteCode},site_name=#{siteName},
+          address=#{address},longitude=#{longitude},latitude=#{latitude},
+          coordinate_system=#{coordinateSystem},radius_meters=#{radiusMeters},
+          max_accuracy_meters=#{maxAccuracyMeters},row_version=row_version+1,
+          update_by=#{updateBy},update_time=now(),remark=#{remark}
+        where site_id=#{siteId} and shop_id=#{shopId} and row_version=#{rowVersion}
+    </update>
+    <update id="updateSiteStatus">
+        update oa_attendance_site set status=#{status},row_version=row_version+1,
+          update_by=#{updateBy},update_time=now()
+        where site_id=#{siteId} and row_version=#{rowVersion}
+    </update>
+    <delete id="deleteSite">
+        delete from oa_attendance_site
+        where site_id=#{siteId} and shop_id=#{shopId} and status='DISABLED'
+          and row_version=#{rowVersion}
+          and not exists (
+            select 1 from oa_attendance_schedule s
+            where s.site_id=#{siteId}
+          )
+    </delete>
+
+    <resultMap id="scheduleResult" type="com.erp.oa.attendance.domain.AttendanceModels$Schedule">
+        <id property="scheduleId" column="schedule_id"/>
+        <result property="scheduleNo" column="schedule_no"/>
+        <result property="userId" column="user_id"/><result property="userName" column="user_name"/>
+        <result property="shopId" column="shop_id"/><result property="shopName" column="shop_name"/>
+        <result property="businessDate" column="business_date"/>
+        <result property="shiftId" column="shift_id"/><result property="siteId" column="site_id"/>
+        <result property="status" column="status"/><result property="shiftVersion" column="shift_version"/>
+        <result property="shiftCodeSnapshot" column="shift_code_snapshot"/>
+        <result property="shiftNameSnapshot" column="shift_name_snapshot"/>
+        <result property="punchModeSnapshot" column="punch_mode_snapshot"/>
+        <result property="startTimeSnapshot" column="start_time_snapshot"/>
+        <result property="endTimeSnapshot" column="end_time_snapshot"/>
+        <result property="crossDaySnapshot" column="cross_day_snapshot"/>
+        <result property="standardMinutesSnapshot" column="standard_minutes_snapshot"/>
+        <result property="graceInMinutesSnapshot" column="grace_in_minutes_snapshot"/>
+        <result property="graceOutMinutesSnapshot" column="grace_out_minutes_snapshot"/>
+        <result property="checkInOpenMinutesSnapshot" column="check_in_open_minutes_snapshot"/>
+        <result property="checkInCloseMinutesSnapshot" column="check_in_close_minutes_snapshot"/>
+        <result property="checkOutOpenMinutesSnapshot" column="check_out_open_minutes_snapshot"/>
+        <result property="checkOutCloseMinutesSnapshot" column="check_out_close_minutes_snapshot"/>
+        <result property="photoRequiredSnapshot" column="photo_required_snapshot"/>
+        <result property="locationRequiredSnapshot" column="location_required_snapshot"/>
+        <result property="siteNameSnapshot" column="site_name_snapshot"/>
+        <result property="addressSnapshot" column="address_snapshot"/>
+        <result property="longitudeSnapshot" column="longitude_snapshot"/>
+        <result property="latitudeSnapshot" column="latitude_snapshot"/>
+        <result property="coordinateSystemSnapshot" column="coordinate_system_snapshot"/>
+        <result property="radiusMetersSnapshot" column="radius_meters_snapshot"/>
+        <result property="maxAccuracyMetersSnapshot" column="max_accuracy_meters_snapshot"/>
+        <result property="publishedBy" column="published_by"/><result property="publishedAt" column="published_at"/>
+        <result property="cancelledBy" column="cancelled_by"/><result property="cancelledAt" column="cancelled_at"/>
+        <result property="changeReason" column="change_reason"/><result property="rowVersion" column="row_version"/>
+        <result property="createBy" column="create_by"/><result property="createTime" column="create_time"/>
+        <result property="updateBy" column="update_by"/><result property="updateTime" column="update_time"/>
+        <result property="remark" column="remark"/>
+    </resultMap>
+    <sql id="scheduleColumns">s.*, d.dept_name shop_name</sql>
+    <sql id="scheduleFrom">from oa_attendance_schedule s left join sys_dept d on d.dept_id=s.shop_id</sql>
+    <select id="selectSchedules" resultMap="scheduleResult">
+        select <include refid="scheduleColumns"/> <include refid="scheduleFrom"/>
+        <where>
+          <if test="shopId != null">and s.shop_id=#{shopId}</if>
+          <if test="dateFrom != null">and s.business_date &gt;= #{dateFrom}</if>
+          <if test="dateTo != null">and s.business_date &lt;= #{dateTo}</if>
+          <if test="userId != null">and s.user_id=#{userId}</if>
+          <if test="scopeShopIds != null and scopeShopIds.size > 0">
+            and s.shop_id in <foreach collection="scopeShopIds" item="id" open="(" close=")" separator=",">#{id}</foreach>
+          </if>
+        </where>
+        order by s.business_date,s.user_name,s.schedule_id
+    </select>
+    <select id="selectPublishedSchedulesForSettlement" resultMap="scheduleResult">
+        select <include refid="scheduleColumns"/> <include refid="scheduleFrom"/>
+        where s.shop_id=#{shopId} and s.status='PUBLISHED'
+          and s.business_date between #{dateFrom} and #{dateTo}
+        order by s.business_date,s.schedule_id
+    </select>
+    <select id="selectScheduleById" resultMap="scheduleResult">
+        select <include refid="scheduleColumns"/> <include refid="scheduleFrom"/> where s.schedule_id=#{scheduleId}
+    </select>
+    <select id="selectScheduleByIdForUpdate" resultMap="scheduleResult">
+        select s.*, null shop_name from oa_attendance_schedule s
+        where s.schedule_id=#{scheduleId} for update
+    </select>
+    <select id="selectShopOrganizationPath" resultType="java.lang.String">
+        select group_concat(path_dept.dept_name
+                 order by find_in_set(path_dept.dept_id,
+                   concat(target_dept.ancestors, ',', target_dept.dept_id))
+                 separator ' / ')
+        from sys_dept target_dept
+        join sys_dept path_dept
+          on path_dept.del_flag='0'
+         and path_dept.status='0'
+         and path_dept.dept_type&lt;&gt;'GROUP'
+         and find_in_set(path_dept.dept_id,
+               concat(target_dept.ancestors, ',', target_dept.dept_id))&gt;0
+        where target_dept.dept_id=#{shopId}
+          and target_dept.del_flag='0'
+          and target_dept.status='0'
+          and target_dept.dept_type='STORE'
+        group by target_dept.dept_id
+    </select>
+    <select id="selectScheduleByUserAndDateForUpdate" resultMap="scheduleResult">
+        select s.*, null shop_name from oa_attendance_schedule s
+        where s.user_id=#{userId} and s.business_date=#{businessDate} for update
+    </select>
+    <select id="selectPublishedScheduleForUser" resultMap="scheduleResult">
+        select <include refid="scheduleColumns"/> <include refid="scheduleFrom"/>
+        where s.user_id=#{userId} and s.status='PUBLISHED'
+          and s.business_date in (#{today},#{yesterday})
+        order by case when s.business_date=#{today} then 0 else 1 end limit 1
+    </select>
+    <select id="selectPublishedScheduleCandidatesForUser" resultMap="scheduleResult">
+        select <include refid="scheduleColumns"/> <include refid="scheduleFrom"/>
+        where s.user_id=#{userId} and s.status='PUBLISHED'
+          and s.business_date in (#{today},#{yesterday})
+        order by s.business_date desc
+    </select>
+    <insert id="insertDraftSchedule" parameterType="com.erp.oa.attendance.domain.AttendanceModels$Schedule"
+            useGeneratedKeys="true" keyProperty="scheduleId">
+        insert into oa_attendance_schedule
+          (schedule_no,user_id,user_name,shop_id,business_date,shift_id,site_id,status,
+           shift_version,shift_code_snapshot,shift_name_snapshot,punch_mode_snapshot,start_time_snapshot,
+           end_time_snapshot,cross_day_snapshot,standard_minutes_snapshot,
+           grace_in_minutes_snapshot,grace_out_minutes_snapshot,
+           check_in_open_minutes_snapshot,check_in_close_minutes_snapshot,
+           check_out_open_minutes_snapshot,check_out_close_minutes_snapshot,
+           photo_required_snapshot,location_required_snapshot,site_name_snapshot,
+           address_snapshot,longitude_snapshot,latitude_snapshot,coordinate_system_snapshot,
+           radius_meters_snapshot,max_accuracy_meters_snapshot,row_version,
+           create_by,create_time,remark)
+        select #{scheduleNo},#{userId},#{userName},#{shopId},#{businessDate},sh.shift_id,#{siteId},'DRAFT',
+          sh.version,sh.shift_code,sh.shift_name,
+          coalesce(sh.punch_mode,'SHIFT_BOUNDARY'),
+          sh.start_time,sh.end_time,sh.cross_day,
+          sh.standard_minutes,sh.grace_in_minutes,sh.grace_out_minutes,
+          sh.check_in_open_minutes,sh.check_in_close_minutes,
+          sh.check_out_open_minutes,sh.check_out_close_minutes,
+          sh.photo_required,sh.location_required,null,null,null,
+          null,null,null,null,
+          0,#{createBy},now(),#{remark}
+        from oa_attendance_shift sh
+        where sh.shift_id=#{shiftId}
+    </insert>
+    <update id="updateDraftSchedule" parameterType="com.erp.oa.attendance.domain.AttendanceModels$Schedule">
+        update oa_attendance_schedule set user_name=#{userName},shop_id=#{shopId},
+          shift_id=#{shiftId},site_id=#{siteId},
+          shift_version=(select version from oa_attendance_shift where shift_id=#{shiftId}),
+          shift_code_snapshot=(select shift_code from oa_attendance_shift where shift_id=#{shiftId}),
+          shift_name_snapshot=(select shift_name from oa_attendance_shift where shift_id=#{shiftId}),
+          punch_mode_snapshot=(select coalesce(punch_mode,'SHIFT_BOUNDARY')
+            from oa_attendance_shift where shift_id=#{shiftId}),
+          start_time_snapshot=(select start_time from oa_attendance_shift where shift_id=#{shiftId}),
+          end_time_snapshot=(select end_time from oa_attendance_shift where shift_id=#{shiftId}),
+          cross_day_snapshot=(select cross_day from oa_attendance_shift where shift_id=#{shiftId}),
+          standard_minutes_snapshot=(select standard_minutes from oa_attendance_shift where shift_id=#{shiftId}),
+          grace_in_minutes_snapshot=(select grace_in_minutes from oa_attendance_shift where shift_id=#{shiftId}),
+          grace_out_minutes_snapshot=(select grace_out_minutes from oa_attendance_shift where shift_id=#{shiftId}),
+          check_in_open_minutes_snapshot=(select check_in_open_minutes from oa_attendance_shift where shift_id=#{shiftId}),
+          check_in_close_minutes_snapshot=(select check_in_close_minutes from oa_attendance_shift where shift_id=#{shiftId}),
+          check_out_open_minutes_snapshot=(select check_out_open_minutes from oa_attendance_shift where shift_id=#{shiftId}),
+          check_out_close_minutes_snapshot=(select check_out_close_minutes from oa_attendance_shift where shift_id=#{shiftId}),
+          photo_required_snapshot=(select photo_required from oa_attendance_shift where shift_id=#{shiftId}),
+          location_required_snapshot=(select location_required from oa_attendance_shift where shift_id=#{shiftId}),
+          site_name_snapshot=null,address_snapshot=null,
+          longitude_snapshot=null,latitude_snapshot=null,
+          coordinate_system_snapshot=null,radius_meters_snapshot=null,
+          max_accuracy_meters_snapshot=null,
+          row_version=row_version+1,
+          update_by=#{updateBy},update_time=now()
+        where schedule_id=#{scheduleId} and status='DRAFT' and row_version=#{rowVersion}
+    </update>
+    <delete id="deleteDraftSchedule">
+        delete from oa_attendance_schedule
+        where schedule_id=#{scheduleId} and shop_id=#{shopId}
+          and status='DRAFT' and row_version=#{rowVersion}
+    </delete>
+    <update id="publishSchedule">
+        update oa_attendance_schedule s
+        join oa_attendance_shift sh on sh.shift_id=s.shift_id
+        join oa_attendance_site st
+          on st.site_id=s.site_id and st.shop_id=s.shop_id
+        set s.status='PUBLISHED',s.shift_version=sh.version,
+          s.shift_code_snapshot=sh.shift_code,s.shift_name_snapshot=sh.shift_name,
+          s.punch_mode_snapshot=coalesce(sh.punch_mode,'SHIFT_BOUNDARY'),
+          s.start_time_snapshot=sh.start_time,s.end_time_snapshot=sh.end_time,
+          s.cross_day_snapshot=sh.cross_day,s.standard_minutes_snapshot=sh.standard_minutes,
+          s.grace_in_minutes_snapshot=sh.grace_in_minutes,s.grace_out_minutes_snapshot=sh.grace_out_minutes,
+          s.check_in_open_minutes_snapshot=sh.check_in_open_minutes,
+          s.check_in_close_minutes_snapshot=sh.check_in_close_minutes,
+          s.check_out_open_minutes_snapshot=sh.check_out_open_minutes,
+          s.check_out_close_minutes_snapshot=sh.check_out_close_minutes,
+          s.photo_required_snapshot=sh.photo_required,s.location_required_snapshot=sh.location_required,
+          s.site_name_snapshot=st.site_name,s.address_snapshot=st.address,
+          s.longitude_snapshot=st.longitude,s.latitude_snapshot=st.latitude,
+          s.coordinate_system_snapshot=st.coordinate_system,
+          s.radius_meters_snapshot=st.radius_meters,
+          s.max_accuracy_meters_snapshot=st.max_accuracy_meters,
+          s.published_by=#{publishedBy},s.published_at=now(),s.row_version=s.row_version+1,
+          s.update_by=#{updateBy},s.update_time=now()
+        where s.schedule_id=#{scheduleId} and s.shop_id=#{shopId} and s.status='DRAFT'
+          and sh.status='ENABLED' and st.status='ENABLED'
+          and (sh.effective_from is null or sh.effective_from &lt;= s.business_date)
+          and (sh.effective_to is null or sh.effective_to &gt;= s.business_date)
+    </update>
+    <delete id="deleteScheduleSegmentSnapshots">
+        delete from oa_attendance_schedule_segment_snapshot
+        where schedule_id=#{scheduleId}
+    </delete>
+    <insert id="insertScheduleSegmentSnapshotsFromShift">
+        insert into oa_attendance_schedule_segment_snapshot
+          (schedule_id,segment_order,segment_type,start_minute_offset,
+           end_minute_offset,paid,create_time)
+        select #{scheduleId},segment_order,segment_type,start_minute_offset,
+          end_minute_offset,paid,now()
+        from oa_attendance_shift_segment
+        where shift_id=#{shiftId}
+        order by segment_order
+    </insert>
+    <select id="selectScheduleSegmentSnapshots"
+            resultType="com.erp.oa.attendance.domain.AttendanceModels$ScheduleSegmentSnapshot">
+        select schedule_segment_snapshot_id scheduleSegmentSnapshotId,
+          schedule_id scheduleId,segment_order segmentOrder,
+          segment_type segmentType,start_minute_offset startMinuteOffset,
+          end_minute_offset endMinuteOffset,paid,create_time createTime
+        from oa_attendance_schedule_segment_snapshot
+        where schedule_id=#{scheduleId}
+        order by segment_order
+        <if test="lockRows">for update</if>
+    </select>
+    <select id="selectScheduleSegmentSnapshotById"
+            resultType="com.erp.oa.attendance.domain.AttendanceModels$ScheduleSegmentSnapshot">
+        select schedule_segment_snapshot_id scheduleSegmentSnapshotId,
+          schedule_id scheduleId,segment_order segmentOrder,
+          segment_type segmentType,start_minute_offset startMinuteOffset,
+          end_minute_offset endMinuteOffset,paid,create_time createTime
+        from oa_attendance_schedule_segment_snapshot
+        where schedule_id=#{scheduleId}
+          and schedule_segment_snapshot_id=#{scheduleSegmentSnapshotId}
+        <if test="lockRows">for update</if>
+    </select>
+    <select id="countActiveEmployeeInShop" resultType="int">
+        select count(distinct u.user_id)
+        from sys_user u join sys_user_profile p on p.user_id=u.user_id
+        join sys_dept target_dept on target_dept.dept_id=#{shopId}
+        where u.user_id=#{userId} and u.status='0' and u.del_flag='0'
+          and p.employee_status in ('试用','正式','在职','待离职')
+          and target_dept.status='0' and target_dept.del_flag='0' and target_dept.dept_type='STORE'
+          and (
+            exists (
+              select 1 from sys_dept employee_dept
+              where employee_dept.dept_id=u.dept_id
+                and employee_dept.status='0' and employee_dept.del_flag='0'
+                and (employee_dept.dept_id=target_dept.dept_id
+                     or find_in_set(target_dept.dept_id,employee_dept.ancestors))
+            )
+            or exists (
+              select 1 from sys_user_shop us
+              where us.user_id=u.user_id
+                and us.dept_id=target_dept.dept_id
+            )
+          )
+    </select>
+    <select id="selectActiveEmployeeNameInShop" resultType="java.lang.String">
+        select u.nick_name
+        from sys_user u join sys_user_profile p on p.user_id=u.user_id
+        join sys_dept target_dept on target_dept.dept_id=#{shopId}
+        where u.user_id=#{userId} and u.status='0' and u.del_flag='0'
+          and p.employee_status in ('试用','正式','在职','待离职')
+          and target_dept.status='0' and target_dept.del_flag='0' and target_dept.dept_type='STORE'
+          and (
+            exists (
+              select 1 from sys_dept employee_dept
+              where employee_dept.dept_id=u.dept_id
+                and employee_dept.status='0' and employee_dept.del_flag='0'
+                and (employee_dept.dept_id=target_dept.dept_id
+                     or find_in_set(target_dept.dept_id,employee_dept.ancestors))
+            )
+            or exists (
+              select 1 from sys_user_shop us
+              where us.user_id=u.user_id
+                and us.dept_id=target_dept.dept_id
+            )
+          )
+        limit 1
+    </select>
+    <select id="selectActiveEmployeeOptions"
+            resultType="com.erp.oa.attendance.domain.AttendanceModels$EmployeeOption">
+        select distinct u.user_id userId, u.nick_name userName,
+               p.employee_no employeeNo
+        from sys_user u join sys_user_profile p on p.user_id=u.user_id
+        join sys_dept target_dept on target_dept.dept_id=#{shopId}
+        where u.status='0' and u.del_flag='0'
+          and p.employee_status in ('试用','正式','在职','待离职')
+          and target_dept.status='0' and target_dept.del_flag='0'
+          and target_dept.dept_type='STORE'
+          and (
+            exists (
+              select 1 from sys_dept employee_dept
+              where employee_dept.dept_id=u.dept_id
+                and employee_dept.status='0' and employee_dept.del_flag='0'
+                and (employee_dept.dept_id=target_dept.dept_id
+                     or find_in_set(target_dept.dept_id,employee_dept.ancestors))
+            )
+            or exists (
+              select 1 from sys_user_shop us
+              where us.user_id=u.user_id
+                and us.dept_id=target_dept.dept_id
+            )
+          )
+          <if test="keyword != null and keyword != ''">
+            and (u.nick_name like concat('%',#{keyword},'%')
+                 or p.employee_no like concat('%',#{keyword},'%'))
+          </if>
+        order by u.nick_name,u.user_id
+        limit 100
+    </select>
+
+    <resultMap id="challengeResult" type="com.erp.oa.attendance.domain.AttendanceModels$Challenge">
+      <id property="challengeId" column="challenge_id"/><result property="challengeToken" column="challenge_token"/>
+      <result property="scheduleId" column="schedule_id"/><result property="userId" column="user_id"/>
+      <result property="shopId" column="shop_id"/><result property="businessDate" column="business_date"/>
+      <result property="punchType" column="punch_type"/><result property="status" column="status"/>
+      <result property="scheduleSegmentSnapshotId" column="schedule_segment_snapshot_id"/>
+      <result property="punchSlotKey" column="punch_slot_key"/>
+      <result property="issuedAt" column="issued_at"/><result property="expiresAt" column="expires_at"/>
+      <result property="consumedAt" column="consumed_at"/><result property="consumedEventId" column="consumed_event_id"/>
+      <result property="rowVersion" column="row_version"/><result property="createTime" column="create_time"/>
+    </resultMap>
+    <insert id="insertChallenge" parameterType="com.erp.oa.attendance.domain.AttendanceModels$Challenge"
+            useGeneratedKeys="true" keyProperty="challengeId">
+      insert into oa_attendance_punch_challenge
+       (challenge_token,schedule_id,user_id,shop_id,business_date,punch_type,
+        schedule_segment_snapshot_id,punch_slot_key,status,
+        issued_at,expires_at,row_version,create_time)
+      values (#{challengeToken},#{scheduleId},#{userId},#{shopId},#{businessDate},
+        #{punchType},#{scheduleSegmentSnapshotId},#{punchSlotKey},'ISSUED',
+        #{issuedAt},#{expiresAt},0,now())
+    </insert>
+    <select id="selectChallengeByTokenForUpdate" resultMap="challengeResult">
+      select * from oa_attendance_punch_challenge where challenge_token=#{challengeToken} for update
+    </select>
+    <select id="selectChallengeByToken" resultMap="challengeResult">
+      select * from oa_attendance_punch_challenge where challenge_token=#{challengeToken}
+    </select>
+    <update id="consumeChallenge">
+      update oa_attendance_punch_challenge
+      set status='CONSUMED',consumed_at=#{consumedAt},consumed_event_id=#{eventId},row_version=row_version+1
+      where challenge_id=#{challengeId} and row_version=#{rowVersion}
+        and status='ISSUED' and consumed_at is null and expires_at &gt;= #{consumedAt}
+    </update>
+
+    <resultMap id="punchResult" type="com.erp.oa.attendance.domain.AttendanceModels$PunchEvent">
+      <id property="punchEventId" column="punch_event_id"/><result property="eventNo" column="event_no"/>
+      <result property="scheduleId" column="schedule_id"/><result property="challengeId" column="challenge_id"/>
+      <result property="userId" column="user_id"/><result property="userName" column="user_name"/>
+      <result property="shopId" column="shop_id"/><result property="businessDate" column="business_date"/>
+      <result property="punchType" column="punch_type"/><result property="serverPunchTime" column="server_punch_time"/>
+      <result property="scheduleSegmentSnapshotId" column="schedule_segment_snapshot_id"/>
+      <result property="punchSlotKey" column="punch_slot_key"/>
+      <result property="clientCaptureTime" column="client_capture_time"/><result property="longitude" column="longitude"/>
+      <result property="latitude" column="latitude"/><result property="accuracyMeters" column="accuracy_meters"/>
+      <result property="distanceMeters" column="distance_meters"/><result property="coordinateSystem" column="coordinate_system"/>
+      <result property="resolvedAddress" column="resolved_address"/><result property="geofenceStatus" column="geofence_status"/>
+      <result property="verificationStatus" column="verification_status"/><result property="rejectionCode" column="rejection_code"/>
+      <result property="rejectionMessage" column="rejection_message"/><result property="clientRequestId" column="client_request_id"/>
+      <result property="clientIp" column="client_ip"/><result property="userAgent" column="user_agent"/>
+      <result property="deviceId" column="device_id"/><result property="appVersion" column="app_version"/>
+      <result property="riskFlags" column="risk_flags"/><result property="createTime" column="create_time"/>
+    </resultMap>
+    <insert id="insertPunchEvent" parameterType="com.erp.oa.attendance.domain.AttendanceModels$PunchEvent"
+            useGeneratedKeys="true" keyProperty="punchEventId">
+      insert into oa_attendance_punch_event
+      (event_no,schedule_id,challenge_id,user_id,user_name,shop_id,business_date,punch_type,
+       schedule_segment_snapshot_id,punch_slot_key,
+       server_punch_time,client_capture_time,longitude,latitude,accuracy_meters,distance_meters,
+       coordinate_system,resolved_address,geofence_status,verification_status,rejection_code,
+       rejection_message,client_request_id,client_ip,user_agent,device_id,app_version,risk_flags,create_time)
+      values (#{eventNo},#{scheduleId},#{challengeId},#{userId},#{userName},#{shopId},#{businessDate},#{punchType},
+       #{scheduleSegmentSnapshotId},#{punchSlotKey},
+       #{serverPunchTime},#{clientCaptureTime},#{longitude},#{latitude},#{accuracyMeters},#{distanceMeters},
+       #{coordinateSystem},#{resolvedAddress},#{geofenceStatus},#{verificationStatus},#{rejectionCode},
+       #{rejectionMessage},#{clientRequestId},#{clientIp},#{userAgent},#{deviceId},#{appVersion},#{riskFlags},now())
+    </insert>
+    <select id="selectLatestPunch" resultMap="punchResult">
+      select * from oa_attendance_punch_event where schedule_id=#{scheduleId} and verification_status='ACCEPTED'
+      order by server_punch_time desc,punch_event_id desc limit 1
+    </select>
+    <select id="selectAcceptedPunches" resultMap="punchResult">
+      select * from oa_attendance_punch_event
+      where schedule_id=#{scheduleId} and verification_status='ACCEPTED'
+      order by server_punch_time,punch_event_id
+    </select>
+    <select id="selectAcceptedPunchBySlot" resultMap="punchResult">
+      select * from oa_attendance_punch_event
+      where schedule_id=#{scheduleId} and punch_slot_key=#{punchSlotKey}
+        and verification_status='ACCEPTED'
+      order by server_punch_time,punch_event_id limit 1
+    </select>
+    <select id="selectPunchByClientRequestForUser" resultMap="punchResult">
+      select * from oa_attendance_punch_event
+      where user_id=#{userId} and client_request_id=#{clientRequestId}
+      limit 1
+      <if test="lockRows">for update</if>
+    </select>
+    <select id="selectEvidenceIdForPunchInScope" resultType="java.lang.Long">
+      select e.evidence_id
+      from oa_attendance_evidence e
+      join oa_attendance_punch_event p on p.punch_event_id=e.punch_event_id
+      where e.punch_event_id=#{punchEventId}
+        and p.schedule_id=#{scheduleId}
+        and p.user_id=#{userId}
+        and p.verification_status='ACCEPTED'
+      limit 1
+    </select>
+    <select id="selectFirstAcceptedPunch" resultMap="punchResult">
+      select * from oa_attendance_punch_event where schedule_id=#{scheduleId} and punch_type=#{punchType}
+       and verification_status='ACCEPTED' order by server_punch_time,punch_event_id limit 1
+    </select>
+    <select id="selectLastAcceptedPunch" resultMap="punchResult">
+      select * from oa_attendance_punch_event where schedule_id=#{scheduleId} and punch_type=#{punchType}
+       and verification_status='ACCEPTED' order by server_punch_time desc,punch_event_id desc limit 1
+    </select>
+
+    <resultMap id="evidenceResult" type="com.erp.oa.attendance.domain.AttendanceModels$Evidence">
+      <id property="evidenceId" column="evidence_id"/><result property="punchEventId" column="punch_event_id"/>
+      <result property="originalName" column="original_name"/><result property="originalStoragePath" column="original_storage_path"/>
+      <result property="watermarkedStoragePath" column="watermarked_storage_path"/><result property="contentType" column="content_type"/>
+      <result property="fileExtension" column="file_extension"/><result property="originalSize" column="original_size"/>
+      <result property="watermarkedSize" column="watermarked_size"/><result property="originalSha256" column="original_sha256"/>
+      <result property="watermarkedSha256" column="watermarked_sha256"/><result property="imageWidth" column="image_width"/>
+      <result property="imageHeight" column="image_height"/><result property="watermarkPayload" column="watermark_payload"/>
+      <result property="capturedAt" column="captured_at"/><result property="uploadedBy" column="uploaded_by"/>
+      <result property="createTime" column="create_time"/>
+    </resultMap>
+    <insert id="insertEvidence" parameterType="com.erp.oa.attendance.domain.AttendanceModels$Evidence"
+            useGeneratedKeys="true" keyProperty="evidenceId">
+      insert into oa_attendance_evidence
+       (punch_event_id,original_name,original_storage_path,watermarked_storage_path,
+        content_type,file_extension,original_size,watermarked_size,original_sha256,
+        watermarked_sha256,image_width,image_height,watermark_payload,captured_at,uploaded_by,create_time)
+      values (#{punchEventId},#{originalName},#{originalStoragePath},#{watermarkedStoragePath},
+        #{contentType},#{fileExtension},#{originalSize},#{watermarkedSize},#{originalSha256},
+        #{watermarkedSha256},#{imageWidth},#{imageHeight},#{watermarkPayload},#{capturedAt},#{uploadedBy},now())
+    </insert>
+    <select id="selectEvidenceById" resultMap="evidenceResult">
+      select * from oa_attendance_evidence where evidence_id=#{evidenceId}
+    </select>
+    <select id="selectPunchByEvidenceId" resultMap="punchResult">
+      select p.* from oa_attendance_punch_event p join oa_attendance_evidence e on e.punch_event_id=p.punch_event_id
+      where e.evidence_id=#{evidenceId}
+    </select>
+
+    <resultMap id="remainingWorkConfirmationResult"
+            type="com.erp.oa.attendance.domain.AttendanceModels$RemainingWorkConfirmation">
+      <id property="confirmationId" column="confirmation_id"/>
+      <result property="confirmationNo" column="confirmation_no"/>
+      <result property="scheduleId" column="schedule_id"/>
+      <result property="userId" column="user_id"/>
+      <result property="userName" column="user_name"/>
+      <result property="shopId" column="shop_id"/>
+      <result property="businessDate" column="business_date"/>
+      <result property="remainingStart" column="remaining_start"/>
+      <result property="remainingEnd" column="remaining_end"/>
+      <result property="decision" column="decision"/>
+      <result property="actualArrivalTime" column="actual_arrival_time"/>
+      <result property="actualDepartureTime" column="actual_departure_time"/>
+      <result property="reason" column="reason"/>
+      <result property="supersedesConfirmationId" column="supersedes_confirmation_id"/>
+      <result property="decidedBy" column="decided_by"/>
+      <result property="decidedByName" column="decided_by_name"/>
+      <result property="decidedAt" column="decided_at"/>
+      <result property="createBy" column="create_by"/>
+      <result property="createTime" column="create_time"/>
+    </resultMap>
+
+    <insert id="insertRemainingWorkConfirmation"
+            parameterType="com.erp.oa.attendance.domain.AttendanceModels$RemainingWorkConfirmation"
+            useGeneratedKeys="true" keyProperty="confirmationId">
+      insert into oa_attendance_remaining_work_confirmation
+       (confirmation_no,schedule_id,user_id,user_name,shop_id,business_date,
+        remaining_start,remaining_end,decision,actual_arrival_time,
+        actual_departure_time,reason,supersedes_confirmation_id,decided_by,
+        decided_by_name,decided_at,create_by,create_time)
+      values
+       (#{confirmationNo},#{scheduleId},#{userId},#{userName},#{shopId},
+        #{businessDate},#{remainingStart},#{remainingEnd},#{decision},
+        #{actualArrivalTime},#{actualDepartureTime},#{reason},
+        #{supersedesConfirmationId},#{decidedBy},#{decidedByName},#{decidedAt},
+        #{createBy},now())
+    </insert>
+
+    <update id="invalidateUnsettledDayResultForRemainingWork">
+      update oa_attendance_day_result
+      set result_status='PENDING',
+          exception_codes='REMAINING_WORK_CONFIRMATION_CHANGED',
+          calculated_at=now(),row_version=row_version+1,
+          update_by=#{updateBy},update_time=now()
+      where schedule_id=#{scheduleId} and settled_at is null
+    </update>
+
+    <select id="selectRemainingWorkConfirmationById"
+            resultMap="remainingWorkConfirmationResult">
+      select * from oa_attendance_remaining_work_confirmation
+      where confirmation_id=#{confirmationId}
+    </select>
+
+    <select id="selectLatestRemainingWorkConfirmation"
+            resultMap="remainingWorkConfirmationResult">
+      select * from oa_attendance_remaining_work_confirmation
+      where schedule_id=#{scheduleId}
+       and remaining_start=#{remainingStart} and remaining_end=#{remainingEnd}
+      order by confirmation_id desc limit 1
+      <if test="lockRows">for update</if>
+    </select>
+
+    <select id="selectRemainingWorkConfirmations"
+            resultMap="remainingWorkConfirmationResult">
+      select * from oa_attendance_remaining_work_confirmation
+      where schedule_id=#{scheduleId}
+      order by remaining_start,remaining_end,confirmation_id
+    </select>
+
+    <select id="selectRemainingWorkConfirmationSources"
+            resultType="com.erp.oa.attendance.domain.AttendanceSettlementModels$RemainingWorkConfirmationSource">
+      select confirmation_id confirmationId,schedule_id scheduleId,
+       user_id userId,shop_id shopId,business_date businessDate,
+       remaining_start remainingStart,remaining_end remainingEnd,decision,
+       actual_arrival_time actualArrivalTime,
+       actual_departure_time actualDepartureTime,
+       supersedes_confirmation_id supersedesConfirmationId,
+       decided_at decidedAt
+      from oa_attendance_remaining_work_confirmation
+      where schedule_id=#{scheduleId}
+      order by remaining_start,remaining_end,confirmation_id
+      <if test="lockRows">for update</if>
+    </select>
+
+    <insert id="insertRemainingWorkAttachment"
+            parameterType="com.erp.oa.attendance.domain.AttendanceModels$RemainingWorkAttachment"
+            useGeneratedKeys="true" keyProperty="attachmentId">
+      insert into oa_attendance_remaining_work_attachment
+       (confirmation_id,original_name,storage_path,content_type,file_extension,
+        file_size,sha256,uploaded_by,create_time)
+      values (#{confirmationId},#{originalName},#{storagePath},#{contentType},
+        #{fileExtension},#{fileSize},#{sha256},#{uploadedBy},now())
+    </insert>
+
+    <select id="selectRemainingWorkAttachmentById"
+            resultType="com.erp.oa.attendance.domain.AttendanceModels$RemainingWorkAttachment">
+      select attachment_id attachmentId,confirmation_id confirmationId,
+       original_name originalName,storage_path storagePath,
+       content_type contentType,file_extension fileExtension,
+       file_size fileSize,sha256,uploaded_by uploadedBy,create_time createTime
+      from oa_attendance_remaining_work_attachment
+      where attachment_id=#{attachmentId}
+    </select>
+
+    <select id="selectRemainingWorkAttachments"
+            resultType="com.erp.oa.attendance.domain.AttendanceModels$RemainingWorkAttachment">
+      select attachment_id attachmentId,confirmation_id confirmationId,
+       original_name originalName,storage_path storagePath,
+       content_type contentType,file_extension fileExtension,
+       file_size fileSize,sha256,uploaded_by uploadedBy,create_time createTime
+      from oa_attendance_remaining_work_attachment
+      where confirmation_id=#{confirmationId}
+      order by attachment_id
+    </select>
+
+    <resultMap id="dayResult" type="com.erp.oa.attendance.domain.AttendanceModels$DayResult">
+      <id property="dayResultId" column="day_result_id"/><result property="scheduleId" column="schedule_id"/>
+      <result property="userId" column="user_id"/><result property="userName" column="user_name"/>
+      <result property="shopId" column="shop_id"/><result property="businessDate" column="business_date"/>
+      <result property="shiftId" column="shift_id"/><result property="scheduledMinutes" column="scheduled_minutes"/>
+      <result property="workedMinutes" column="worked_minutes"/><result property="paidLeaveMinutes" column="paid_leave_minutes"/>
+      <result property="unpaidLeaveMinutes" column="unpaid_leave_minutes"/><result property="absenceMinutes" column="absence_minutes"/>
+      <result property="lateMinutes" column="late_minutes"/><result property="earlyLeaveMinutes" column="early_leave_minutes"/>
+      <result property="rawOvertimeMinutes" column="raw_overtime_minutes"/>
+      <result property="timeCreditUsedMinutes" column="time_credit_used_minutes"/>
+      <result property="netOvertimeMinutes" column="net_overtime_minutes"/>
+      <result property="timeCreditOffsetMinutes" column="time_credit_offset_minutes"/>
+      <result property="netEarlyLeaveMinutes" column="net_early_leave_minutes"/>
+      <result property="resultStatus" column="result_status"/><result property="exceptionCodes" column="exception_codes"/>
+      <result property="firstInEventId" column="first_in_event_id"/><result property="lastOutEventId" column="last_out_event_id"/>
+      <result property="firstInCorrectionRequestId" column="first_in_correction_request_id"/>
+      <result property="lastOutCorrectionRequestId" column="last_out_correction_request_id"/>
+      <result property="calculationVersion" column="calculation_version"/><result property="calculatedAt" column="calculated_at"/>
+      <result property="settledAt" column="settled_at"/><result property="rowVersion" column="row_version"/>
+      <result property="createBy" column="create_by"/><result property="createTime" column="create_time"/>
+      <result property="updateBy" column="update_by"/><result property="updateTime" column="update_time"/>
+      <result property="remark" column="remark"/>
+    </resultMap>
+    <select id="selectDayResultByScheduleId" resultMap="dayResult">
+      select * from oa_attendance_day_result where schedule_id=#{scheduleId}
+    </select>
+    <select id="selectDayResultByScheduleIdForUpdate" resultMap="dayResult">
+      select * from oa_attendance_day_result where schedule_id=#{scheduleId}
+      for update
+    </select>
+    <select id="selectSettlementCorrectionSources"
+            resultType="com.erp.oa.attendance.domain.AttendanceSettlementModels$CorrectionSource">
+      select correction_request_id correctionRequestId,schedule_id scheduleId,
+       user_id userId,shop_id shopId,business_date businessDate,
+       correction_type correctionType,
+       original_punch_event_id originalPunchEventId,
+       target_punch_type targetPunchType,
+       target_schedule_segment_snapshot_id targetScheduleSegmentSnapshotId,
+       target_punch_slot_key targetPunchSlotKey,
+       requested_punch_time requestedPunchTime,
+       status,approved_at approvedAt
+      from oa_attendance_correction_request
+      where schedule_id=#{scheduleId}
+       and status in ('SUBMITTING','PENDING','APPROVED')
+      order by target_punch_type,approved_at,correction_request_id
+      <if test="lockRows">for update</if>
+    </select>
+    <select id="selectBlockingLeaveRequests"
+            resultType="com.erp.oa.attendance.domain.AttendanceSettlementModels$LeaveRequestState">
+      select leave_request_id leaveRequestId,user_id userId,shop_id shopId,
+       start_time startTime,end_time endTime,status
+      from oa_attendance_leave_request
+      where user_id=#{userId} and shop_id=#{shopId}
+       and status in ('SUBMITTING','PENDING')
+       and start_time &lt; #{shiftEnd} and end_time &gt; #{shiftStart}
+      order by leave_request_id
+      <if test="lockRows">for update</if>
+    </select>
+    <select id="selectApprovedLeaveSegments"
+            resultType="com.erp.oa.attendance.domain.AttendanceSettlementModels$LeaveSegmentSource">
+      select s.leave_segment_id leaveSegmentId,
+       s.leave_request_id leaveRequestId,s.start_time startTime,
+       s.end_time endTime,s.total_minutes totalMinutes,
+       s.paid_minutes paidMinutes,s.unpaid_minutes unpaidMinutes
+      from oa_attendance_leave_segment s
+      join oa_attendance_leave_request r
+       on r.leave_request_id=s.leave_request_id
+      where r.user_id=#{userId} and r.shop_id=#{shopId}
+       and r.status='APPROVED' and s.segment_status='ACTIVE'
+       and s.start_time &lt; #{shiftEnd} and s.end_time &gt; #{shiftStart}
+      order by s.start_time,s.leave_segment_id
+      <if test="lockRows">for update</if>
+    </select>
+    <insert id="upsertDayResult" parameterType="com.erp.oa.attendance.domain.AttendanceModels$DayResult"
+            useGeneratedKeys="true" keyProperty="dayResultId">
+      insert into oa_attendance_day_result
+       (schedule_id,user_id,user_name,shop_id,business_date,shift_id,scheduled_minutes,
+        worked_minutes,paid_leave_minutes,unpaid_leave_minutes,absence_minutes,late_minutes,
+        early_leave_minutes,result_status,exception_codes,first_in_event_id,last_out_event_id,
+        first_in_correction_request_id,last_out_correction_request_id,
+        calculation_version,calculated_at,settled_at,row_version,create_by,create_time,update_by,update_time)
+      values (#{scheduleId},#{userId},#{userName},#{shopId},#{businessDate},#{shiftId},#{scheduledMinutes},
+        #{workedMinutes},#{paidLeaveMinutes},#{unpaidLeaveMinutes},#{absenceMinutes},#{lateMinutes},
+        #{earlyLeaveMinutes},#{resultStatus},#{exceptionCodes},#{firstInEventId},#{lastOutEventId},
+        #{firstInCorrectionRequestId},#{lastOutCorrectionRequestId},
+        #{calculationVersion},#{calculatedAt},#{settledAt},0,#{createBy},now(),#{updateBy},now())
+      on duplicate key update user_name=values(user_name),worked_minutes=values(worked_minutes),
+        paid_leave_minutes=values(paid_leave_minutes),unpaid_leave_minutes=values(unpaid_leave_minutes),
+        absence_minutes=values(absence_minutes),late_minutes=values(late_minutes),
+        early_leave_minutes=values(early_leave_minutes),result_status=values(result_status),
+        exception_codes=values(exception_codes),first_in_event_id=values(first_in_event_id),
+        last_out_event_id=values(last_out_event_id),
+        first_in_correction_request_id=values(first_in_correction_request_id),
+        last_out_correction_request_id=values(last_out_correction_request_id),
+        calculation_version=values(calculation_version),
+        calculated_at=values(calculated_at),settled_at=values(settled_at),
+        row_version=row_version+1,update_by=values(update_by),update_time=now()
+    </insert>
+    <select id="selectDayResultsByUserAndRange" resultMap="dayResult">
+      select d.*,
+       greatest(coalesce(d.worked_minutes,0)-coalesce(d.scheduled_minutes,0),0)
+        raw_overtime_minutes,
+       coalesce(tc_source.used_minutes,0) time_credit_used_minutes,
+       greatest(coalesce(d.worked_minutes,0)-coalesce(d.scheduled_minutes,0),0)
+        - coalesce(tc_source.used_minutes,0) net_overtime_minutes,
+       coalesce(tc_target.offset_minutes,0) time_credit_offset_minutes,
+       coalesce(d.early_leave_minutes,0)-coalesce(tc_target.offset_minutes,0)
+        net_early_leave_minutes
+      from oa_attendance_day_result d
+      left join (
+       select source_day_result_id,
+        sum(case when adjustment_action='APPLY' then adjustment_minutes
+         when adjustment_action='REVERSE' then -adjustment_minutes else 0 end)
+         used_minutes
+       from oa_attendance_time_credit_adjustment group by source_day_result_id
+      ) tc_source on tc_source.source_day_result_id=d.day_result_id
+      left join (
+       select target_day_result_id,
+        sum(case when adjustment_action='APPLY' then adjustment_minutes
+         when adjustment_action='REVERSE' then -adjustment_minutes else 0 end)
+         offset_minutes
+       from oa_attendance_time_credit_adjustment group by target_day_result_id
+      ) tc_target on tc_target.target_day_result_id=d.day_result_id
+      where d.user_id=#{userId}
+       and d.business_date between #{dateFrom} and #{dateTo}
+      order by d.business_date
+    </select>
+    <select id="selectDayResultsByShopAndRange" resultMap="dayResult">
+      select d.day_result_id,s.schedule_id,s.user_id,
+       coalesce(d.user_name,s.user_name) user_name,s.shop_id,s.business_date,
+       s.shift_id,coalesce(d.scheduled_minutes,
+         s.standard_minutes_snapshot,0) scheduled_minutes,
+       coalesce(d.worked_minutes,0) worked_minutes,
+       coalesce(d.paid_leave_minutes,0) paid_leave_minutes,
+       coalesce(d.unpaid_leave_minutes,0) unpaid_leave_minutes,
+       coalesce(d.absence_minutes,0) absence_minutes,
+       coalesce(d.late_minutes,0) late_minutes,
+       coalesce(d.early_leave_minutes,0) early_leave_minutes,
+       greatest(coalesce(d.worked_minutes,0)-coalesce(d.scheduled_minutes,
+        s.standard_minutes_snapshot,0),0) raw_overtime_minutes,
+       coalesce(tc_source.used_minutes,0) time_credit_used_minutes,
+       greatest(coalesce(d.worked_minutes,0)-coalesce(d.scheduled_minutes,
+        s.standard_minutes_snapshot,0),0)-coalesce(tc_source.used_minutes,0)
+        net_overtime_minutes,
+       coalesce(tc_target.offset_minutes,0) time_credit_offset_minutes,
+       coalesce(d.early_leave_minutes,0)-coalesce(tc_target.offset_minutes,0)
+        net_early_leave_minutes,
+       case when d.day_result_id is null then 'MISSING_RESULT'
+        else d.result_status end result_status,
+       case when d.day_result_id is null then 'MISSING_DAY_RESULT'
+        else d.exception_codes end exception_codes,
+       d.first_in_event_id,d.last_out_event_id,
+       d.first_in_correction_request_id,d.last_out_correction_request_id,
+       d.calculation_version,d.calculated_at,d.settled_at,d.row_version,
+       d.create_by,d.create_time,d.update_by,d.update_time,d.remark
+      from oa_attendance_schedule s
+      left join oa_attendance_day_result d on d.schedule_id=s.schedule_id
+      left join (
+       select source_day_result_id,
+        sum(case when adjustment_action='APPLY' then adjustment_minutes
+         when adjustment_action='REVERSE' then -adjustment_minutes else 0 end)
+         used_minutes
+       from oa_attendance_time_credit_adjustment group by source_day_result_id
+      ) tc_source on tc_source.source_day_result_id=d.day_result_id
+      left join (
+       select target_day_result_id,
+        sum(case when adjustment_action='APPLY' then adjustment_minutes
+         when adjustment_action='REVERSE' then -adjustment_minutes else 0 end)
+         offset_minutes
+       from oa_attendance_time_credit_adjustment group by target_day_result_id
+      ) tc_target on tc_target.target_day_result_id=d.day_result_id
+      where s.shop_id=#{shopId} and s.status='PUBLISHED'
+       and s.business_date between #{dateFrom} and #{dateTo}
+       <if test="userId != null">and s.user_id=#{userId}</if>
+      order by s.business_date,s.user_name,s.schedule_id
+    </select>
+    <select id="summarizeDayResultsByUserAndRange" resultType="com.erp.oa.attendance.domain.AttendanceModels$MonthlySummary">
+      select #{userId} userId,
+       coalesce(sum(coalesce(d.scheduled_minutes,
+         s.standard_minutes_snapshot,0)),0) scheduledMinutes,
+       coalesce(sum(coalesce(d.worked_minutes,0)),0) workedMinutes,
+       coalesce(sum(coalesce(d.paid_leave_minutes,0)),0) paidLeaveMinutes,
+       coalesce(sum(coalesce(d.unpaid_leave_minutes,0)),0) unpaidLeaveMinutes,
+       coalesce(sum(coalesce(d.late_minutes,0)),0) lateMinutes,
+       coalesce(sum(coalesce(d.early_leave_minutes,0)
+        - coalesce(tc_target.offset_minutes,0)),0) earlyLeaveMinutes,
+       coalesce(sum(coalesce(d.absence_minutes,0)),0) absenceMinutes,
+       coalesce(sum(case when d.day_result_id is null
+         or d.settled_at is null then 1 else 0 end),0) unfinalizedCount
+      from oa_attendance_schedule s
+      left join oa_attendance_day_result d on d.schedule_id=s.schedule_id
+      left join (
+       select target_day_result_id,
+        sum(case when adjustment_action='APPLY' then adjustment_minutes
+         when adjustment_action='REVERSE' then -adjustment_minutes else 0 end)
+         offset_minutes
+       from oa_attendance_time_credit_adjustment group by target_day_result_id
+      ) tc_target on tc_target.target_day_result_id=d.day_result_id
+      where s.user_id=#{userId} and s.status='PUBLISHED'
+       and s.business_date between #{dateFrom} and #{dateTo}
+    </select>
+    <select id="countUnfinalizedDayResults" resultType="int">
+      select count(1) from oa_attendance_schedule s
+      left join oa_attendance_day_result d on d.schedule_id=s.schedule_id
+      where s.shop_id=#{shopId} and s.status='PUBLISHED'
+       and s.business_date between #{dateFrom} and #{dateTo}
+       and (d.day_result_id is null or d.settled_at is null)
+    </select>
+</mapper>

@@ -1,0 +1,67 @@
+{
+  "schemaVersion": 1,
+  "evidenceScope": "PII-free local read-only plan-version snapshot used to verify the production hash algorithm",
+  "replacementTemplate": {
+    "templateId": 92,
+    "templateVersion": "20260721-v7",
+    "templateType": "ONBOARD_LABOR_CONTRACT",
+    "templateName": "劳动合同",
+    "sourceFileUrl": "/profile/sign-template/onboard-20260721-v7/09_ONBOARD_LABOR_CONTRACT.docx",
+    "sourceFileHash": "1226728ec0e703d513efda83dc5578ee4cdd65cb3e7d0e7cb5afee813f466558",
+    "requiredPlaceholders": "employeeName,employeeIdCard,employeePhone,employeeAddress,companyName,companyAddress,companyLegalRepresentative,contractTermSelection,contractTermFixedMark,contractTermOpenEndedMark,contractStartDate,contractEndDate,probationStartDate,probationEndDate,postName,baseSalary,signDate",
+    "employeeVisible": "Y",
+    "readConfirmationRequired": "Y",
+    "employeeSignRequired": "Y",
+    "signaturePositionJson": "{\"mode\":\"APPENDED_CONFIRMATION_PAGE\"}",
+    "companySealPositionJson": "{\"mode\":\"APPENDED_CONFIRMATION_PAGE\"}",
+    "companySealRequired": "Y"
+  },
+  "sourceVersions": [
+    {
+      "versionId": 1000000002,
+      "planId": 49,
+      "planName": "入职-A1-劳动合同-有社保-2至4级",
+      "versionNo": 1,
+      "scenario": "onboard",
+      "shopDeptId": 0,
+      "legalEntityId": null,
+      "legalEntityName": null,
+      "ruleJson": "{\"contractTypeCode\":\"LABOR_CONTRACT\",\"employmentType\":\"劳动合同\",\"jobGradeBand\":\"2-4\",\"postLevel\":\"2-4\",\"routeCode\":\"A1\",\"salaryVersion\":\"B\",\"socialType\":\"有社保\",\"socialTypeCode\":\"SOCIAL_INSURED\"}",
+      "defaultValuesJson": "{}",
+      "signDeadlineDays": 7,
+      "reminderPolicyJson": "{}",
+      "autoSendConditionJson": "{\"enabled\":false}",
+      "sourceVersionHash": "f79d4fb655ae6b4ea186fb13609c0e06cd3bd89a40f0abbac7e91cd4243db0b7",
+      "expectedCandidateHash": "bd07d71829535d12a26f5a4637a5e4f73fe49e0ad1340287fa92959cd0b85396",
+      "templates": [
+        {"templateId":80,"templateVersion":"20260718-v4-draft","templateType":"ONBOARD_COMMITMENT","templateName":"入职承诺书","sourceFileUrl":"/profile/sign-template/onboard-20260718-v4-draft/05_ONBOARD_COMMITMENT.docx","sourceFileHash":"9cc4474fa78b6e9707cb87316d87023ab6b654b31e6488c4bbd857edd47b5816","requiredPlaceholders":"employeeName,employeeIdCard,signDate","sortOrder":10,"employeeVisible":"Y","readConfirmationRequired":"Y","employeeSignRequired":"Y","signaturePositionJson":"{\"mode\":\"APPENDED_CONFIRMATION_PAGE\"}","companySealPositionJson":null,"companySealRequired":"N","matchConditionJson":"{\"employmentType\":\"劳动合同\",\"scenario\":\"onboard\"}"},
+        {"templateId":81,"templateVersion":"20260718-v4-draft","templateType":"ONBOARD_LABOR_CONTRACT","templateName":"劳动合同","sourceFileUrl":"/profile/sign-template/onboard-20260718-v4-draft/09_ONBOARD_LABOR_CONTRACT.docx","sourceFileHash":"fdbe2df12eb3704370126e09f2c26fd7cd09e0a06db1e0fe960f42f9513f2118","requiredPlaceholders":"employeeName,employeeIdCard,employeePhone,employeeAddress,contractStartDate,contractEndDate,probationStartDate,probationEndDate,postName,baseSalary,signDate","sortOrder":20,"employeeVisible":"Y","readConfirmationRequired":"Y","employeeSignRequired":"Y","signaturePositionJson":"{\"mode\":\"APPENDED_CONFIRMATION_PAGE\"}","companySealPositionJson":"{\"mode\":\"APPENDED_CONFIRMATION_PAGE\"}","companySealRequired":"Y","matchConditionJson":"{\"employmentType\":\"劳动合同\",\"scenario\":\"onboard\"}"},
+        {"templateId":82,"templateVersion":"20260718-v4-draft","templateType":"ONBOARD_HANDBOOK_RECEIPT","templateName":"员工手册签收确认书","sourceFileUrl":"/profile/sign-template/onboard-20260718-v4-draft/10_ONBOARD_HANDBOOK_RECEIPT.docx","sourceFileHash":"65675b6182ee5c9cdd6650f94341cfccd4b23e69dfbde87c806cd41aee2f4b66","requiredPlaceholders":"employeeName,employeeIdCard,signDate","sortOrder":30,"employeeVisible":"Y","readConfirmationRequired":"Y","employeeSignRequired":"Y","signaturePositionJson":"{\"mode\":\"APPENDED_CONFIRMATION_PAGE\"}","companySealPositionJson":null,"companySealRequired":"N","matchConditionJson":"{\"employmentType\":\"劳动合同\",\"scenario\":\"onboard\"}"},
+        {"templateId":84,"templateVersion":"20260718-v4-draft","templateType":"ONBOARD_SALARY_CONFIRM","templateName":"薪酬结构确认书（B版）","sourceFileUrl":"/profile/sign-template/onboard-20260718-v4-draft/12_ONBOARD_SALARY_CONFIRM_B.docx","sourceFileHash":"e2ba862e63fc8e41485fc26348e354fc568126247f9676571690a030f3957c1c","requiredPlaceholders":"employeeName,employeeIdCard,baseSalary,postSalary,fieldAllowance,performanceSalary,salaryTotal,signDate","sortOrder":40,"employeeVisible":"Y","readConfirmationRequired":"Y","employeeSignRequired":"Y","signaturePositionJson":"{\"mode\":\"APPENDED_CONFIRMATION_PAGE\"}","companySealPositionJson":null,"companySealRequired":"N","matchConditionJson":"{\"employmentType\":\"劳动合同\",\"salaryVersion\":\"B\",\"scenario\":\"onboard\"}"}
+      ]
+    },
+    {
+      "versionId": 1000000005,
+      "planId": 36,
+      "planName": "入职-A5-劳动合同-无社保-5至6级",
+      "versionNo": 1,
+      "scenario": "onboard",
+      "shopDeptId": 0,
+      "legalEntityId": null,
+      "legalEntityName": null,
+      "ruleJson": "{\"contractTypeCode\":\"LABOR_CONTRACT\",\"employmentType\":\"劳动合同\",\"jobGradeBand\":\"5-6\",\"postLevel\":\"5-6\",\"routeCode\":\"A5\",\"salaryVersion\":\"A\",\"socialType\":\"无社保\",\"socialTypeCode\":\"SOCIAL_UNINSURED\"}",
+      "defaultValuesJson": "{}",
+      "signDeadlineDays": 7,
+      "reminderPolicyJson": "{}",
+      "autoSendConditionJson": "{\"enabled\":false}",
+      "sourceVersionHash": "d115f4088e103587d395a73e09fc4cef93550e19b2b91dc870a6abc3f231e605",
+      "expectedCandidateHash": "eda0fcd21b70b302ca1edd43facb0d5c4b03e7a593b9a5f8a82d5147f0c87d40",
+      "templates": [
+        {"templateId":80,"templateVersion":"20260718-v4-draft","templateType":"ONBOARD_COMMITMENT","templateName":"入职承诺书","sourceFileUrl":"/profile/sign-template/onboard-20260718-v4-draft/05_ONBOARD_COMMITMENT.docx","sourceFileHash":"9cc4474fa78b6e9707cb87316d87023ab6b654b31e6488c4bbd857edd47b5816","requiredPlaceholders":"employeeName,employeeIdCard,signDate","sortOrder":10,"employeeVisible":"Y","readConfirmationRequired":"Y","employeeSignRequired":"Y","signaturePositionJson":"{\"mode\":\"APPENDED_CONFIRMATION_PAGE\"}","companySealPositionJson":null,"companySealRequired":"N","matchConditionJson":"{\"employmentType\":\"劳动合同\",\"scenario\":\"onboard\"}"},
+        {"templateId":81,"templateVersion":"20260718-v4-draft","templateType":"ONBOARD_LABOR_CONTRACT","templateName":"劳动合同","sourceFileUrl":"/profile/sign-template/onboard-20260718-v4-draft/09_ONBOARD_LABOR_CONTRACT.docx","sourceFileHash":"fdbe2df12eb3704370126e09f2c26fd7cd09e0a06db1e0fe960f42f9513f2118","requiredPlaceholders":"employeeName,employeeIdCard,employeePhone,employeeAddress,contractStartDate,contractEndDate,probationStartDate,probationEndDate,postName,baseSalary,signDate","sortOrder":20,"employeeVisible":"Y","readConfirmationRequired":"Y","employeeSignRequired":"Y","signaturePositionJson":"{\"mode\":\"APPENDED_CONFIRMATION_PAGE\"}","companySealPositionJson":"{\"mode\":\"APPENDED_CONFIRMATION_PAGE\"}","companySealRequired":"Y","matchConditionJson":"{\"employmentType\":\"劳动合同\",\"scenario\":\"onboard\"}"},
+        {"templateId":82,"templateVersion":"20260718-v4-draft","templateType":"ONBOARD_HANDBOOK_RECEIPT","templateName":"员工手册签收确认书","sourceFileUrl":"/profile/sign-template/onboard-20260718-v4-draft/10_ONBOARD_HANDBOOK_RECEIPT.docx","sourceFileHash":"65675b6182ee5c9cdd6650f94341cfccd4b23e69dfbde87c806cd41aee2f4b66","requiredPlaceholders":"employeeName,employeeIdCard,signDate","sortOrder":30,"employeeVisible":"Y","readConfirmationRequired":"Y","employeeSignRequired":"Y","signaturePositionJson":"{\"mode\":\"APPENDED_CONFIRMATION_PAGE\"}","companySealPositionJson":null,"companySealRequired":"N","matchConditionJson":"{\"employmentType\":\"劳动合同\",\"scenario\":\"onboard\"}"},
+        {"templateId":83,"templateVersion":"20260718-v4-draft","templateType":"ONBOARD_SALARY_CONFIRM","templateName":"薪酬结构确认书（A版）","sourceFileUrl":"/profile/sign-template/onboard-20260718-v4-draft/11_ONBOARD_SALARY_CONFIRM_A.docx","sourceFileHash":"c3341591b4806fcc5909315040a2e174da0eaa90245169cf74aba735d5ad8551","requiredPlaceholders":"employeeName,employeeIdCard,baseSalary,postSalary,fieldAllowance,performanceSalary,salaryTotal,signDate","sortOrder":40,"employeeVisible":"Y","readConfirmationRequired":"Y","employeeSignRequired":"Y","signaturePositionJson":"{\"mode\":\"APPENDED_CONFIRMATION_PAGE\"}","companySealPositionJson":null,"companySealRequired":"N","matchConditionJson":"{\"employmentType\":\"劳动合同\",\"salaryVersion\":\"A\",\"scenario\":\"onboard\"}"}
+      ]
+    }
+  ]
+}

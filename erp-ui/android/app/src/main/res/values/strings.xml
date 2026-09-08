@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">ERP Mobile</string>
+    <string name="title_activity_main">ERP Mobile</string>
+    <string name="package_name">com.erp.mobile</string>
+    <string name="custom_url_scheme">com.erp.mobile</string>
+</resources>

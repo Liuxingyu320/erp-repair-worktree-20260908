@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.system.mapper.SysSignProfileSupplementAuditMapper">
+
+    <resultMap id="AuditResult" type="com.erp.system.domain.SysSignProfileSupplementAudit">
+        <id property="auditId" column="audit_id"/>
+        <result property="requestId" column="request_id"/>
+        <result property="employeeId" column="employee_id"/>
+        <result property="requestHash" column="request_hash"/>
+        <result property="fieldMask" column="field_mask"/>
+        <result property="beforeHash" column="before_hash"/>
+        <result property="afterHash" column="after_hash"/>
+        <result property="status" column="status"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateTime" column="update_time"/>
+    </resultMap>
+
+    <insert id="insertIfAbsent" parameterType="com.erp.system.domain.SysSignProfileSupplementAudit"
+            useGeneratedKeys="true" keyProperty="auditId">
+        insert into sys_sign_profile_supplement_audit (
+            request_id, employee_id, request_hash, field_mask, status,
+            create_by, create_time, update_time
+        ) values (
+            #{requestId}, #{employeeId}, #{requestHash}, #{fieldMask}, 'PENDING',
+            #{createBy}, sysdate(), sysdate()
+        )
+        on duplicate key update request_id = values(request_id)
+    </insert>
+
+    <select id="selectByRequestIdForUpdate" resultMap="AuditResult">
+        select audit_id, request_id, employee_id, request_hash, field_mask,
+               before_hash, after_hash, status, create_by, create_time, update_time
+        from sys_sign_profile_supplement_audit
+        where request_id = #{requestId}
+        limit 1
+        for update
+    </select>
+
+    <select id="lockActiveEmployee" resultType="Long">
+        select user_id
+        from sys_user
+        where user_id = #{employeeId}
+          and del_flag = '0'
+          and status = '0'
+        for update
+    </select>
+
+    <update id="markCompleted">
+        update sys_sign_profile_supplement_audit
+        set before_hash = #{beforeHash},
+            after_hash = #{afterHash},
+            status = 'COMPLETED',
+            update_time = sysdate()
+        where audit_id = #{auditId}
+          and status = 'PENDING'
+    </update>
+</mapper>

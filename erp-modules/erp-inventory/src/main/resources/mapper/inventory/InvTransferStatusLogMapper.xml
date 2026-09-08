@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.inventory.mapper.InvTransferStatusLogMapper">
+
+    <resultMap type="InvTransferStatusLog" id="InvTransferStatusLogResult">
+        <id property="logId" column="log_id"/>
+        <result property="transferId" column="transfer_id"/>
+        <result property="fromStatus" column="from_status"/>
+        <result property="toStatus" column="to_status"/>
+        <result property="action" column="action"/>
+        <result property="operatorId" column="operator_id"/>
+        <result property="operatorName" column="operator_name"/>
+        <result property="reason" column="reason"/>
+        <result property="createTime" column="create_time"/>
+    </resultMap>
+
+    <insert id="insertLog" parameterType="InvTransferStatusLog" useGeneratedKeys="true" keyProperty="logId">
+        insert into inv_transfer_status_log (
+            transfer_id, from_status, to_status, action,
+            operator_id, operator_name, reason, create_time
+        ) values (
+            #{transferId}, #{fromStatus}, #{toStatus}, #{action},
+            #{operatorId}, #{operatorName}, #{reason}, sysdate()
+        )
+    </insert>
+
+    <select id="selectLogsByTransferId" parameterType="Long" resultMap="InvTransferStatusLogResult">
+        select log_id, transfer_id, from_status, to_status, action,
+               operator_id, operator_name, reason, create_time
+        from inv_transfer_status_log
+        where transfer_id = #{transferId}
+        order by create_time asc, log_id asc
+    </select>
+
+</mapper>

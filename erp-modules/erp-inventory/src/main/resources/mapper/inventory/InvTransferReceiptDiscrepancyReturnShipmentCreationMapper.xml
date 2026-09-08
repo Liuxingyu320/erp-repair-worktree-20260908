@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.inventory.mapper.InvTransferReceiptDiscrepancyReturnShipmentCreationMapper">
+
+    <update id="advanceChildDetail">
+        update inv_transfer_detail
+        set delivered_quantity = #{prepared.deliveredAfter}
+        where detail_id = #{prepared.fact.childTransferDetailId}
+          and transfer_id = #{prepared.fact.childTransferId}
+          and item_type = #{prepared.fact.itemType}
+          and item_id = #{prepared.fact.itemId}
+          and product_id &lt;=&gt; #{prepared.fact.productId}
+          and quantity = #{prepared.fact.requestedQuantity}
+          and coalesce(delivered_quantity, 0) =
+              #{prepared.deliveredBefore}
+          and coalesce(received_quantity, 0) = #{prepared.receivedBefore}
+          and #{prepared.quantity} &gt; 0
+          and #{prepared.deliveredAfter} &lt;= quantity
+    </update>
+
+    <update id="advanceChildOrder">
+        update inv_transfer_order
+        set status = #{prepared.statusAfter},
+            delivered_time = #{prepared.command.occurredAt},
+            update_by = #{prepared.command.actorName},
+            update_time = sysdate(),
+            version = version + 1
+        where transfer_id = #{prepared.fact.childTransferId}
+          and status = #{prepared.statusBefore}
+          and version = #{prepared.orderVersionBefore}
+          and approval_round = #{prepared.fact.reservationRound}
+          and source_business_type = #{prepared.fact.sourceBusinessType}
+          and source_business_id = #{prepared.fact.sourceBusinessId}
+    </update>
+
+</mapper>

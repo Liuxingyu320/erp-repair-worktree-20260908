@@ -1,0 +1,430 @@
+x-java-common-env: &java-common-env
+  SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:?set SPRING_PROFILES_ACTIVE in .env}
+  RELEASE_ID: ${RELEASE_ID:?set RELEASE_ID in .env}
+  GIT_COMMIT: ${GIT_COMMIT:?set GIT_COMMIT in .env}
+  BUILD_TIME: ${BUILD_TIME:?set BUILD_TIME in .env}
+  ERP_JWT_SECRET: ${ERP_JWT_SECRET:?set ERP_JWT_SECRET in .env}
+  DRIVE_ENABLED: ${DRIVE_ENABLED:-false}
+  SPRING_CLOUD_NACOS_SERVER_ADDR: erp-nacos:8848
+  SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR: erp-nacos:8848
+  SPRING_CLOUD_NACOS_CONFIG_SERVER_ADDR: erp-nacos:8848
+  SPRING_CLOUD_NACOS_USERNAME: ${NACOS_CLIENT_USERNAME:?set NACOS_CLIENT_USERNAME in .env}
+  SPRING_CLOUD_NACOS_PASSWORD: ${NACOS_CLIENT_PASSWORD:?set NACOS_CLIENT_PASSWORD in .env}
+  SPRING_CLOUD_NACOS_DISCOVERY_USERNAME: ${NACOS_CLIENT_USERNAME:?set NACOS_CLIENT_USERNAME in .env}
+  SPRING_CLOUD_NACOS_DISCOVERY_PASSWORD: ${NACOS_CLIENT_PASSWORD:?set NACOS_CLIENT_PASSWORD in .env}
+  SPRING_CLOUD_NACOS_CONFIG_USERNAME: ${NACOS_CLIENT_USERNAME:?set NACOS_CLIENT_USERNAME in .env}
+  SPRING_CLOUD_NACOS_CONFIG_PASSWORD: ${NACOS_CLIENT_PASSWORD:?set NACOS_CLIENT_PASSWORD in .env}
+  SPRING_CLOUD_NACOS_DISCOVERY_ENABLED: "true"
+  SPRING_CLOUD_NACOS_CONFIG_ENABLED: "true"
+  SPRING_DATA_REDIS_HOST: erp-redis
+  SPRING_DATA_REDIS_PASSWORD: ${REDIS_PASSWORD:?set REDIS_PASSWORD in .env}
+  SPRING_REDIS_HOST: erp-redis
+  SPRING_REDIS_PASSWORD: ${REDIS_PASSWORD:?set REDIS_PASSWORD in .env}
+  MYSQL_USERNAME: ${APP_DATASOURCE_USERNAME:?set APP_DATASOURCE_USERNAME in .env}
+  MYSQL_PASSWORD: ${APP_DATASOURCE_PASSWORD:?set APP_DATASOURCE_PASSWORD in .env}
+  SPRING_DATASOURCE_DRIVER_CLASS_NAME: com.mysql.cj.jdbc.Driver
+  SPRING_DATASOURCE_URL: ${APP_DATASOURCE_URL:?set APP_DATASOURCE_URL in .env}
+  SPRING_DATASOURCE_USERNAME: ${APP_DATASOURCE_USERNAME:?set APP_DATASOURCE_USERNAME in .env}
+  SPRING_DATASOURCE_PASSWORD: ${APP_DATASOURCE_PASSWORD:?set APP_DATASOURCE_PASSWORD in .env}
+  SPRING_DATASOURCE_DYNAMIC_DATASOURCE_MASTER_DRIVER_CLASS_NAME: com.mysql.cj.jdbc.Driver
+  SPRING_DATASOURCE_DYNAMIC_DATASOURCE_MASTER_URL: ${APP_DATASOURCE_URL:?set APP_DATASOURCE_URL in .env}
+  SPRING_DATASOURCE_DYNAMIC_DATASOURCE_MASTER_USERNAME: ${APP_DATASOURCE_USERNAME:?set APP_DATASOURCE_USERNAME in .env}
+  SPRING_DATASOURCE_DYNAMIC_DATASOURCE_MASTER_PASSWORD: ${APP_DATASOURCE_PASSWORD:?set APP_DATASOURCE_PASSWORD in .env}
+
+services:
+  erp-nacos:
+    container_name: erp-nacos
+    restart: unless-stopped
+    stop_grace_period: 60s
+    image: nacos/nacos-server:v3.0.2
+    build:
+      context: ./nacos
+    environment:
+      - MODE=standalone
+      - NACOS_AUTH_TOKEN=${NACOS_AUTH_TOKEN:?set NACOS_AUTH_TOKEN in .env}
+      - NACOS_AUTH_IDENTITY_KEY=${NACOS_AUTH_IDENTITY_KEY:?set NACOS_AUTH_IDENTITY_KEY in .env}
+      - NACOS_AUTH_IDENTITY_VALUE=${NACOS_AUTH_IDENTITY_VALUE:?set NACOS_AUTH_IDENTITY_VALUE in .env}
+      - NACOS_DB_USER=${NACOS_DB_USER:?set NACOS_DB_USER in .env}
+      - NACOS_DB_PASSWORD=${NACOS_DB_PASSWORD:?set NACOS_DB_PASSWORD in .env}
+    volumes:
+      - ./nacos/logs/:/home/nacos/logs
+      - ./nacos/conf/application.properties:/home/nacos/conf/application.properties
+    ports:
+      - "127.0.0.1:${NACOS_PORT:-8848}:8848"
+      - "127.0.0.1:${NACOS_GRPC_PORT:-9848}:9848"
+      - "127.0.0.1:${NACOS_RAFT_PORT:-9849}:9849"
+    healthcheck:
+      test: ["CMD-SHELL", "bash -ec 'exec 3<>/dev/tcp/127.0.0.1/8848'"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 60s
+    depends_on:
+      erp-mysql:
+        condition: service_healthy
+  erp-mysql:
+    container_name: erp-mysql
+    restart: unless-stopped
+    stop_grace_period: 60s
+    image: mysql:5.7
+    build:
+      context: ./mysql
+      dockerfile: dockerfile
+    ports:
+      - "127.0.0.1:${MYSQL_PORT:-3306}:3306"
+    volumes:
+      - ./mysql/conf:/etc/mysql/conf.d
+      - ./mysql/logs:/logs
+      - ./mysql/data:/var/lib/mysql
+    command: [
+          'mysqld',
+          '--innodb-buffer-pool-size=80M',
+          '--character-set-server=utf8mb4',
+          '--collation-server=utf8mb4_unicode_ci',
+          '--default-time-zone=+8:00',
+          '--lower-case-table-names=1'
+        ]
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE:?set MYSQL_DATABASE in .env}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?set MYSQL_ROOT_PASSWORD in .env}
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p\"$$MYSQL_ROOT_PASSWORD\" --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+  erp-redis:
+    container_name: erp-redis
+    restart: unless-stopped
+    stop_grace_period: 30s
+    image: redis
+    build:
+      context: ./redis
+    ports:
+      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
+    volumes:
+      - ./redis/conf/redis.conf:/home/erp/redis/redis.conf
+      - ./redis/data:/data
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?set REDIS_PASSWORD in .env}
+    command: ["sh", "-c", "redis-server /home/erp/redis/redis.conf --requirepass \"$${REDIS_PASSWORD}\""]
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$$REDIS_PASSWORD\" ping | grep PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 10s
+  erp-nginx:
+    container_name: erp-nginx
+    restart: unless-stopped
+    stop_grace_period: 30s
+    image: nginx
+    build:
+      context: ./nginx
+    ports:
+      - "${NGINX_PORT:-80}:80"
+    volumes:
+      - ./nginx/html/dist:/home/erp/projects/erp-ui
+      - ./nginx/conf/nginx.conf:/etc/nginx/nginx.conf
+      - ./nginx/logs:/var/log/nginx
+      - ./nginx/conf.d:/etc/nginx/conf.d
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/ >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 10s
+    depends_on:
+      erp-gateway:
+        condition: service_healthy
+  erp-gateway:
+    container_name: erp-gateway
+    restart: unless-stopped
+    stop_grace_period: 45s
+    build:
+      context: ./erp/gateway
+      dockerfile: dockerfile
+    ports:
+      - "127.0.0.1:${GATEWAY_PORT:-8080}:8080"
+    environment:
+      <<: *java-common-env
+      SPRING_CONFIG_IMPORT: "nacos:application-prod.yml,nacos:erp-gateway-prod.yml"
+      SPRING_CLOUD_SENTINEL_DATASOURCE_DS1_NACOS_SERVER_ADDR: erp-nacos:8848
+    healthcheck:
+      test: ["CMD-SHELL", "bash -ec 'exec 3<>/dev/tcp/127.0.0.1/8080'"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+    depends_on:
+      erp-nacos:
+        condition: service_healthy
+      erp-redis:
+        condition: service_healthy
+  erp-auth:
+    container_name: erp-auth
+    restart: unless-stopped
+    stop_grace_period: 45s
+    build:
+      context: ./erp/auth
+      dockerfile: dockerfile
+    ports:
+      - "127.0.0.1:${AUTH_PORT:-9200}:9200"
+    environment:
+      <<: *java-common-env
+      SPRING_CONFIG_IMPORT: "nacos:application-prod.yml,nacos:erp-auth-prod.yml"
+    healthcheck:
+      test: ["CMD-SHELL", "bash -ec 'exec 3<>/dev/tcp/127.0.0.1/9200'"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+    depends_on:
+      erp-nacos:
+        condition: service_healthy
+      erp-redis:
+        condition: service_healthy
+      erp-modules-system:
+        condition: service_healthy
+  erp-modules-system:
+    container_name: erp-modules-system
+    restart: unless-stopped
+    stop_grace_period: 45s
+    build:
+      context: ./erp/modules/system
+      dockerfile: dockerfile
+    ports:
+      - "127.0.0.1:${SYSTEM_PORT:-9201}:9201"
+    environment:
+      <<: *java-common-env
+      SPRING_CONFIG_IMPORT: "nacos:application-prod.yml,nacos:erp-system-prod.yml"
+      HR_SIGN_LIFECYCLE_AUTOMATION_ENABLED: ${HR_SIGN_LIFECYCLE_AUTOMATION_ENABLED:-false}
+      PROFILE_COMPLETION_GATE_ENABLED: ${PROFILE_COMPLETION_GATE_ENABLED:-true}
+    healthcheck:
+      test: ["CMD-SHELL", "bash -ec 'exec 3<>/dev/tcp/127.0.0.1/9201'"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+    depends_on:
+      erp-mysql:
+        condition: service_healthy
+      erp-nacos:
+        condition: service_healthy
+      erp-redis:
+        condition: service_healthy
+  erp-modules-job:
+    container_name: erp-modules-job
+    restart: unless-stopped
+    stop_grace_period: 45s
+    build:
+      context: ./erp/modules/job
+      dockerfile: dockerfile
+    ports:
+      - "127.0.0.1:${JOB_PORT:-9203}:9203"
+    environment:
+      <<: *java-common-env
+      SPRING_CONFIG_IMPORT: "nacos:application-prod.yml,nacos:erp-job-prod.yml"
+    healthcheck:
+      test: ["CMD-SHELL", "bash -ec 'exec 3<>/dev/tcp/127.0.0.1/9203'"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+    depends_on:
+      erp-mysql:
+        condition: service_healthy
+      erp-nacos:
+        condition: service_healthy
+      erp-redis:
+        condition: service_healthy
+  erp-modules-oa:
+    container_name: erp-modules-oa
+    restart: unless-stopped
+    stop_grace_period: 60s
+    build:
+      context: ./erp/modules/oa
+      dockerfile: dockerfile
+    environment:
+      <<: *java-common-env
+      SPRING_CONFIG_IMPORT: "nacos:application-prod.yml,nacos:erp-oa-prod.yml"
+      OA_SIGN_EXCEL_IMPORT_ENABLED: ${OA_SIGN_EXCEL_IMPORT_ENABLED:-true}
+      ERP_UPLOAD_ROOT: /data/erp-new-data/uploadPath
+      FILE_PATH: /data/erp-new-data/uploadPath
+      SIGN_PACKAGE_STORAGE_ROOT: /data/erp-new-data/uploadPath/private/sign-package
+      OA_ATTENDANCE_STORAGE_ROOT: /data/erp-new-data/uploadPath/private/attendance
+      OA_REIMBURSEMENT_STORAGE_ROOT: /data/erp-new-data/uploadPath/private/reimbursement
+      DRIVE_LOCAL_PATH: /data/erp-new-data/uploadPath/private/drive
+      OA_ATTENDANCE_ADDRESS_PROVIDER: ${OA_ATTENDANCE_ADDRESS_PROVIDER:-NONE}
+      OA_ATTENDANCE_AMAP_WEB_SERVICE_KEY: ${OA_ATTENDANCE_AMAP_WEB_SERVICE_KEY:-}
+      OA_ATTENDANCE_AMAP_CONNECT_TIMEOUT_MILLIS: ${OA_ATTENDANCE_AMAP_CONNECT_TIMEOUT_MILLIS:-1500}
+      OA_ATTENDANCE_AMAP_READ_TIMEOUT_MILLIS: ${OA_ATTENDANCE_AMAP_READ_TIMEOUT_MILLIS:-2500}
+      OA_ATTENDANCE_AMAP_RADIUS_METERS: ${OA_ATTENDANCE_AMAP_RADIUS_METERS:-100}
+      OA_ATTENDANCE_AMAP_MAX_RESPONSE_BYTES: ${OA_ATTENDANCE_AMAP_MAX_RESPONSE_BYTES:-131072}
+      BAIDU_OCR_API_KEY: ${BAIDU_OCR_API_KEY:-}
+      BAIDU_OCR_SECRET_KEY: ${BAIDU_OCR_SECRET_KEY:-}
+      OA_REIMBURSEMENT_OCR_CLOUD_ENABLED: ${OA_REIMBURSEMENT_OCR_CLOUD_ENABLED:-true}
+      OA_REIMBURSEMENT_OCR_LOCAL_ENABLED: ${OA_REIMBURSEMENT_OCR_LOCAL_ENABLED:-true}
+      SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR: erp-nacos:8848
+      SPRING_CLOUD_NACOS_CONFIG_SERVER_ADDR: erp-nacos:8848
+      SPRING_DATASOURCE_DYNAMIC_DATASOURCE_MASTER_URL: ${APP_DATASOURCE_URL:?set APP_DATASOURCE_URL in .env}
+      SPRING_DATASOURCE_DYNAMIC_DATASOURCE_MASTER_USERNAME: ${APP_DATASOURCE_USERNAME:?set APP_DATASOURCE_USERNAME in .env}
+      SPRING_DATASOURCE_DYNAMIC_DATASOURCE_MASTER_PASSWORD: ${APP_DATASOURCE_PASSWORD:?set APP_DATASOURCE_PASSWORD in .env}
+    volumes:
+      - ${ERP_UPLOAD_ROOT:?set ERP_UPLOAD_ROOT in .env}:/data/erp-new-data/uploadPath
+    healthcheck:
+      test: ["CMD-SHELL", "bash -ec 'exec 3<>/dev/tcp/127.0.0.1/9204'"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+    ports:
+      - "127.0.0.1:${OA_PORT:-9204}:9204"
+    depends_on:
+      erp-mysql:
+        condition: service_healthy
+      erp-nacos:
+        condition: service_healthy
+      erp-redis:
+        condition: service_healthy
+  erp-modules-inventory:
+    container_name: erp-modules-inventory
+    restart: unless-stopped
+    stop_grace_period: 45s
+    build:
+      context: ./erp/modules/inventory
+      dockerfile: dockerfile
+    environment:
+      <<: *java-common-env
+      SPRING_CONFIG_IMPORT: "nacos:application-prod.yml,nacos:erp-inventory-prod.yml"
+      SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR: erp-nacos:8848
+      SPRING_CLOUD_NACOS_DISCOVERY_IP: erp-modules-inventory
+      SPRING_CLOUD_NACOS_CONFIG_SERVER_ADDR: erp-nacos:8848
+      SPRING_DATASOURCE_DYNAMIC_DATASOURCE_MASTER_URL: ${APP_DATASOURCE_URL:?set APP_DATASOURCE_URL in .env}
+      SPRING_DATASOURCE_DYNAMIC_DATASOURCE_MASTER_USERNAME: ${APP_DATASOURCE_USERNAME:?set APP_DATASOURCE_USERNAME in .env}
+      SPRING_DATASOURCE_DYNAMIC_DATASOURCE_MASTER_PASSWORD: ${APP_DATASOURCE_PASSWORD:?set APP_DATASOURCE_PASSWORD in .env}
+    healthcheck:
+      test: ["CMD-SHELL", "bash -ec 'exec 3<>/dev/tcp/127.0.0.1/9205'"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+    ports:
+      - "127.0.0.1:${INVENTORY_PORT:-9205}:9205"
+    depends_on:
+      erp-mysql:
+        condition: service_healthy
+      erp-nacos:
+        condition: service_healthy
+      erp-redis:
+        condition: service_healthy
+  erp-modules-approval:
+    container_name: erp-modules-approval
+    restart: unless-stopped
+    stop_grace_period: 45s
+    build:
+      context: ./erp/modules/approval
+      dockerfile: dockerfile
+    environment:
+      <<: *java-common-env
+      SPRING_CONFIG_IMPORT: "nacos:application-prod.yml,nacos:erp-approval-prod.yml"
+      SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR: erp-nacos:8848
+      SPRING_CLOUD_NACOS_DISCOVERY_IP: erp-modules-approval
+      SPRING_CLOUD_NACOS_CONFIG_SERVER_ADDR: erp-nacos:8848
+      SPRING_DATASOURCE_DYNAMIC_DATASOURCE_MASTER_URL: ${APP_DATASOURCE_URL:?set APP_DATASOURCE_URL in .env}
+      SPRING_DATASOURCE_DYNAMIC_DATASOURCE_MASTER_USERNAME: ${APP_DATASOURCE_USERNAME:?set APP_DATASOURCE_USERNAME in .env}
+      SPRING_DATASOURCE_DYNAMIC_DATASOURCE_MASTER_PASSWORD: ${APP_DATASOURCE_PASSWORD:?set APP_DATASOURCE_PASSWORD in .env}
+    healthcheck:
+      test: ["CMD-SHELL", "bash -ec 'exec 3<>/dev/tcp/127.0.0.1/9206'"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+    ports:
+      - "127.0.0.1:${APPROVAL_PORT:-9206}:9206"
+    depends_on:
+      erp-mysql:
+        condition: service_healthy
+      erp-nacos:
+        condition: service_healthy
+      erp-redis:
+        condition: service_healthy
+  erp-modules-file:
+    container_name: erp-modules-file
+    restart: unless-stopped
+    stop_grace_period: 60s
+    build:
+      context: ./erp/modules/file
+      dockerfile: dockerfile
+    ports:
+      - "127.0.0.1:${FILE_PORT:-9300}:9300"
+    environment:
+      <<: *java-common-env
+      SPRING_CONFIG_IMPORT: "nacos:application-prod.yml,nacos:erp-file-prod.yml"
+      SPRING_DATASOURCE_DYNAMIC_DATASOURCE_MASTER_URL: ${APP_DATASOURCE_URL:?set APP_DATASOURCE_URL in .env}
+      SPRING_DATASOURCE_DYNAMIC_DATASOURCE_MASTER_USERNAME: ${APP_DATASOURCE_USERNAME:?set APP_DATASOURCE_USERNAME in .env}
+      SPRING_DATASOURCE_DYNAMIC_DATASOURCE_MASTER_PASSWORD: ${APP_DATASOURCE_PASSWORD:?set APP_DATASOURCE_PASSWORD in .env}
+      ERP_UPLOAD_ROOT: /data/erp-new-data/uploadPath
+      FILE_PATH: /data/erp-new-data/uploadPath
+      SIGN_PACKAGE_STORAGE_ROOT: /data/erp-new-data/uploadPath/private/sign-package
+      OA_ATTENDANCE_STORAGE_ROOT: /data/erp-new-data/uploadPath/private/attendance
+      OA_REIMBURSEMENT_STORAGE_ROOT: /data/erp-new-data/uploadPath/private/reimbursement
+      FILE_PREFIX: /file
+      FILE_DOMAIN: ${FILE_DOMAIN:?set FILE_DOMAIN in .env}
+      REFERER_ENABLED: ${REFERER_ENABLED:?set REFERER_ENABLED in .env}
+      REFERER_ALLOWED_DOMAINS: ${REFERER_ALLOWED_DOMAINS:?set REFERER_ALLOWED_DOMAINS in .env}
+      DRIVE_STORAGE_TYPE: ${DRIVE_STORAGE_TYPE:-local}
+      DRIVE_LOCAL_PATH: /data/erp-new-data/uploadPath/private/drive
+      DRIVE_MINIO_BUCKET: ${DRIVE_MINIO_BUCKET:-erp-drive-private}
+      DRIVE_MAX_FILE_SIZE: ${DRIVE_MAX_FILE_SIZE:-104857600}
+      DRIVE_MAX_REQUEST_SIZE: ${DRIVE_MAX_REQUEST_SIZE:-115343360}
+      SPRING_SERVLET_MULTIPART_MAX_FILE_SIZE: ${DRIVE_MAX_FILE_SIZE:-104857600}
+      SPRING_SERVLET_MULTIPART_MAX_REQUEST_SIZE: ${DRIVE_MAX_REQUEST_SIZE:-115343360}
+      DRIVE_PERSONAL_QUOTA: ${DRIVE_PERSONAL_QUOTA:-2147483648}
+      DRIVE_DEPARTMENT_QUOTA: ${DRIVE_DEPARTMENT_QUOTA:-21474836480}
+      DRIVE_COMPANY_QUOTA: ${DRIVE_COMPANY_QUOTA:-107374182400}
+      DRIVE_TRASH_RETENTION_DAYS: ${DRIVE_TRASH_RETENTION_DAYS:-30}
+      DRIVE_CLEANUP_CRON: "${DRIVE_CLEANUP_CRON:-0 30 2 * * *}"
+      DRIVE_CLEANUP_ZONE: ${DRIVE_CLEANUP_ZONE:-Asia/Shanghai}
+      MINIO_ENABLED: ${MINIO_ENABLED:-false}
+      MINIO_ENDPOINT: ${MINIO_ENDPOINT:-http://127.0.0.1:9000}
+      MINIO_URL: ${MINIO_ENDPOINT:-http://127.0.0.1:9000}
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-}
+      MINIO_BUCKET_NAME: ${MINIO_BUCKET_NAME:-erp}
+    healthcheck:
+      test: ["CMD-SHELL", "bash -ec 'exec 3<>/dev/tcp/127.0.0.1/9300'"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+    volumes:
+      - ${ERP_UPLOAD_ROOT:?set ERP_UPLOAD_ROOT in .env}:/data/erp-new-data/uploadPath
+    depends_on:
+      erp-mysql:
+        condition: service_healthy
+      erp-nacos:
+        condition: service_healthy
+      erp-redis:
+        condition: service_healthy
+  erp-visual-monitor:
+    container_name: erp-visual-monitor
+    restart: unless-stopped
+    stop_grace_period: 45s
+    build:
+      context: ./erp/visual/monitor
+      dockerfile: dockerfile
+    ports:
+      - "127.0.0.1:${MONITOR_PORT:-9100}:9100"
+    environment:
+      <<: *java-common-env
+      SPRING_CONFIG_IMPORT: "nacos:application-prod.yml,nacos:erp-monitor-prod.yml"
+    healthcheck:
+      test: ["CMD-SHELL", "bash -ec 'exec 3<>/dev/tcp/127.0.0.1/9100'"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+    depends_on:
+      erp-nacos:
+        condition: service_healthy

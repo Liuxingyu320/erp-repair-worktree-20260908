@@ -1,0 +1,160 @@
+{
+  "schemaVersion": 1,
+  "releaseId": "new-business-20260714",
+  "candidateCommit": "cccccccccccccccccccccccccccccccccccccccc",
+  "baselineCommit": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "runId": "performance-20260714-001",
+  "completedAt": "2026-07-14T20:00:00+08:00",
+  "dataHandling": {
+    "syntheticOrAnonymized": true,
+    "containsProductionPersonalData": false,
+    "responseBodiesPersisted": false
+  },
+  "datasets": {
+    "healthCertificates": {
+      "fixtureRows": 10000,
+      "productionReferenceRows": 10000,
+      "referenceCapturedAt": "2026-07-14T18:00:00+08:00",
+      "rowCountEvidence": {
+        "path": "/absolute/workspace/output/new-business-performance/row-counts.txt",
+        "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "status": "passed",
+        "sanitized": true
+      }
+    },
+    "customerServiceCards": {
+      "fixtureRows": 50000,
+      "productionReferenceRows": 50000,
+      "referenceCapturedAt": "2026-07-14T18:00:00+08:00",
+      "rowCountEvidence": {
+        "path": "/absolute/workspace/output/new-business-performance/row-counts.txt",
+        "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "status": "passed",
+        "sanitized": true
+      }
+    },
+    "transferOrders": {
+      "fixtureRows": 100000,
+      "productionReferenceRows": 100000,
+      "referenceCapturedAt": "2026-07-14T18:00:00+08:00",
+      "rowCountEvidence": {
+        "path": "/absolute/workspace/output/new-business-performance/row-counts.txt",
+        "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "status": "passed",
+        "sanitized": true
+      }
+    },
+    "transferDiscrepancies": {
+      "fixtureRows": 20000,
+      "productionReferenceRows": 20000,
+      "referenceCapturedAt": "2026-07-14T18:00:00+08:00",
+      "rowCountEvidence": {
+        "path": "/absolute/workspace/output/new-business-performance/row-counts.txt",
+        "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "status": "passed",
+        "sanitized": true
+      }
+    }
+  },
+  "scenarios": [
+    {
+      "id": "health-certificate-expiry-list",
+      "dataset": "healthCertificates",
+      "endpoint": "GET /system/hr/health-certificate/list",
+      "queryDigestSha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "sampleCountBefore": 50,
+      "sampleCountAfter": 50,
+      "p95BeforeMs": 800,
+      "p95AfterMs": 700,
+      "budgetMs": 1200,
+      "status": "passed",
+      "artifacts": {
+        "explainBefore": { "path": "/absolute/workspace/output/new-business-performance/health-explain-before.txt", "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "status": "passed", "sanitized": true },
+        "explainAfter": { "path": "/absolute/workspace/output/new-business-performance/health-explain-after.txt", "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "status": "passed", "sanitized": true },
+        "slowQueryBefore": { "path": "/absolute/workspace/output/new-business-performance/health-slow-before.txt", "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "status": "passed", "sanitized": true },
+        "slowQueryAfter": { "path": "/absolute/workspace/output/new-business-performance/health-slow-after.txt", "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "status": "passed", "sanitized": true },
+        "loadBefore": { "path": "/absolute/workspace/output/new-business-performance/load-before.json", "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "status": "passed", "sanitized": true },
+        "loadAfter": { "path": "/absolute/workspace/output/new-business-performance/load-after.json", "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "status": "passed", "sanitized": true }
+      },
+      "indexChanges": [],
+      "reviewer": "性能验收人",
+      "completedAt": "2026-07-14T20:00:00+08:00"
+    },
+    {
+      "id": "customer-service-card-search",
+      "dataset": "customerServiceCards",
+      "endpoint": "GET /inventory/customer/service-card/list",
+      "queryDigestSha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "sampleCountBefore": 50,
+      "sampleCountAfter": 50,
+      "p95BeforeMs": 800,
+      "p95AfterMs": 700,
+      "budgetMs": 1200,
+      "status": "passed",
+      "artifacts": {
+        "explainBefore": { "path": "/absolute/workspace/output/new-business-performance/customer-explain-before.txt", "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "status": "passed", "sanitized": true },
+        "explainAfter": { "path": "/absolute/workspace/output/new-business-performance/customer-explain-after.txt", "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "status": "passed", "sanitized": true },
+        "slowQueryBefore": { "path": "/absolute/workspace/output/new-business-performance/customer-slow-before.txt", "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "status": "passed", "sanitized": true },
+        "slowQueryAfter": { "path": "/absolute/workspace/output/new-business-performance/customer-slow-after.txt", "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "status": "passed", "sanitized": true },
+        "loadBefore": { "path": "/absolute/workspace/output/new-business-performance/load-before.json", "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "status": "passed", "sanitized": true },
+        "loadAfter": { "path": "/absolute/workspace/output/new-business-performance/load-after.json", "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "status": "passed", "sanitized": true }
+      },
+      "indexChanges": [],
+      "reviewer": "性能验收人",
+      "completedAt": "2026-07-14T20:00:00+08:00"
+    },
+    {
+      "id": "transfer-workbench",
+      "dataset": "transferOrders",
+      "endpoint": "GET /inventory/transfer/processing",
+      "queryDigestSha256": "4444444444444444444444444444444444444444444444444444444444444444",
+      "sampleCountBefore": 50,
+      "sampleCountAfter": 50,
+      "p95BeforeMs": 1000,
+      "p95AfterMs": 900,
+      "budgetMs": 1500,
+      "status": "passed",
+      "artifacts": {
+        "explainBefore": { "path": "/absolute/workspace/output/new-business-performance/transfer-explain-before.txt", "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "status": "passed", "sanitized": true },
+        "explainAfter": { "path": "/absolute/workspace/output/new-business-performance/transfer-explain-after.txt", "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "status": "passed", "sanitized": true },
+        "slowQueryBefore": { "path": "/absolute/workspace/output/new-business-performance/transfer-slow-before.txt", "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "status": "passed", "sanitized": true },
+        "slowQueryAfter": { "path": "/absolute/workspace/output/new-business-performance/transfer-slow-after.txt", "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "status": "passed", "sanitized": true },
+        "loadBefore": { "path": "/absolute/workspace/output/new-business-performance/load-before.json", "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "status": "passed", "sanitized": true },
+        "loadAfter": { "path": "/absolute/workspace/output/new-business-performance/load-after.json", "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "status": "passed", "sanitized": true }
+      },
+      "indexChanges": [],
+      "reviewer": "性能验收人",
+      "completedAt": "2026-07-14T20:00:00+08:00"
+    },
+    {
+      "id": "transfer-discrepancy-list",
+      "dataset": "transferDiscrepancies",
+      "endpoint": "GET /inventory/transfer/processing",
+      "queryDigestSha256": "5555555555555555555555555555555555555555555555555555555555555555",
+      "sampleCountBefore": 50,
+      "sampleCountAfter": 50,
+      "p95BeforeMs": 800,
+      "p95AfterMs": 700,
+      "budgetMs": 1200,
+      "status": "passed",
+      "artifacts": {
+        "explainBefore": { "path": "/absolute/workspace/output/new-business-performance/discrepancy-explain-before.txt", "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "status": "passed", "sanitized": true },
+        "explainAfter": { "path": "/absolute/workspace/output/new-business-performance/discrepancy-explain-after.txt", "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "status": "passed", "sanitized": true },
+        "slowQueryBefore": { "path": "/absolute/workspace/output/new-business-performance/discrepancy-slow-before.txt", "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "status": "passed", "sanitized": true },
+        "slowQueryAfter": { "path": "/absolute/workspace/output/new-business-performance/discrepancy-slow-after.txt", "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "status": "passed", "sanitized": true },
+        "loadBefore": { "path": "/absolute/workspace/output/new-business-performance/load-before.json", "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "status": "passed", "sanitized": true },
+        "loadAfter": { "path": "/absolute/workspace/output/new-business-performance/load-after.json", "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "status": "passed", "sanitized": true }
+      },
+      "indexChanges": [],
+      "reviewer": "性能验收人",
+      "completedAt": "2026-07-14T20:00:00+08:00"
+    }
+  ],
+  "signoff": {
+    "backendOwner": "后端负责人",
+    "databaseOwner": "数据库负责人",
+    "qaOwner": "QA负责人",
+    "approvedAt": "2026-07-14T20:00:00+08:00",
+    "decision": "approved"
+  }
+}

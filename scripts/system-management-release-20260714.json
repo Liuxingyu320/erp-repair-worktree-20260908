@@ -1,0 +1,150 @@
+{
+  "schemaVersion": 1,
+  "releaseId": "system-management-20260714",
+  "status": "ready",
+  "executionPolicy": "manual-phased",
+  "prerequisiteReleaseIds": [
+    "new-business-20260714"
+  ],
+  "sourceDirectory": "sql",
+  "deployDirectory": "docker/mysql/releases/system-management-20260714",
+  "migrationList": "scripts/system-management-migrations-20260714.list",
+  "migrations": [
+    {
+      "file": "erp_system_management_expand_20260714.sql",
+      "sha256": "5328f78c0d68eeb6563122bf623ebecf603b5b656d0a1083f732cb20d4a3ba4b",
+      "phase": "expand-before-code-cutover",
+      "creates": [
+        "sys_mgmt_config_backup_20260714",
+        "sys_mgmt_menu_backup_20260714",
+        "sys_mgmt_role_menu_backup_20260714",
+        "sys_credential_migration_audit",
+        "sys_security_session_outbox",
+        "sys_user_pii_access_audit"
+      ],
+      "backupTables": [
+        "sys_config",
+        "sys_menu",
+        "sys_role_menu",
+        "sys_user"
+      ]
+    },
+    {
+      "file": "erp_system_management_permissions_20260714.sql",
+      "sha256": "196b7182424ea4e356d1f5bda80f0d2b1a29e80ce9e45e7effb3d72e7e7c88a0",
+      "phase": "permission-cutover-after-code-deploy",
+      "creates": [],
+      "backupTables": [
+        "sys_menu",
+        "sys_role_menu"
+      ]
+    },
+    {
+      "file": "erp_system_management_finalize_20260714.sql",
+      "sha256": "5667b00321079b4fd9f9c893205255eec1f252a94ff8c887b128277799521ba6",
+      "phase": "finalize-after-zero-shared-credential-audit",
+      "creates": [],
+      "backupTables": [
+        "sys_config",
+        "sys_user"
+      ]
+    }
+  ],
+  "build": {
+    "commit": "b408b7054a481fac692878fcdc24e7ea5bc9cc68",
+    "buildTime": "2026-07-17T09:43:01Z",
+    "jdk": "17",
+    "node": "24.14.0",
+    "maven": "3.9.14",
+    "browser": "150.0.0.0",
+    "playwrightCli": "0.1.17"
+  },
+  "artifacts": [
+    {
+      "id": "gateway",
+      "type": "jar",
+      "source": "erp-gateway/target/erp-gateway.jar",
+      "packaged": "docker/erp/gateway/jar/erp-gateway.jar",
+      "sha256": "f78ce4f72b1a2ede260d8f5299c9f74a5a812f15a7ddbc202eced437d0d816bc"
+    },
+    {
+      "id": "auth",
+      "type": "jar",
+      "source": "erp-auth/target/erp-auth.jar",
+      "packaged": "docker/erp/auth/jar/erp-auth.jar",
+      "sha256": "25b875fb1c0c895e366a33fdd09ba2c6708ad3498595134ba75ad866ea3ed657"
+    },
+    {
+      "id": "monitor",
+      "type": "jar",
+      "source": "erp-visual/erp-monitor/target/erp-visual-monitor.jar",
+      "packaged": "docker/erp/visual/monitor/jar/erp-visual-monitor.jar",
+      "sha256": "931f5a48eab3c84a3f2e3a40af2b1c532e8bb590f389daad39eada36f33e9367"
+    },
+    {
+      "id": "system",
+      "type": "jar",
+      "source": "erp-modules/erp-system/target/erp-modules-system.jar",
+      "packaged": "docker/erp/modules/system/jar/erp-modules-system.jar",
+      "sha256": "d379558f8a0f0c3d0eeb318dc0e6197058cebba1082ffcccf631a4f80bb52abe"
+    },
+    {
+      "id": "file",
+      "type": "jar",
+      "source": "erp-modules/erp-file/target/erp-modules-file.jar",
+      "packaged": "docker/erp/modules/file/jar/erp-modules-file.jar",
+      "sha256": "a888949dcdecf025dbe65ec67a4b6c6412481a22eb513559dbac89b59ed19a49"
+    },
+    {
+      "id": "job",
+      "type": "jar",
+      "source": "erp-modules/erp-job/target/erp-modules-job.jar",
+      "packaged": "docker/erp/modules/job/jar/erp-modules-job.jar",
+      "sha256": "8ff0908f1506672c2443e17591c76a8377c456dc90a77736594950aafcc07314"
+    },
+    {
+      "id": "oa",
+      "type": "jar",
+      "source": "erp-modules/erp-oa/target/erp-modules-oa.jar",
+      "packaged": "docker/erp/modules/oa/jar/erp-modules-oa.jar",
+      "sha256": "fa939d9b30e984b9316302939b45c49f1b3a60abc3eb77be8594968108d627f3"
+    },
+    {
+      "id": "inventory",
+      "type": "jar",
+      "source": "erp-modules/erp-inventory/target/erp-modules-inventory.jar",
+      "packaged": "docker/erp/modules/inventory/jar/erp-modules-inventory.jar",
+      "sha256": "702573d6cc55deb35f8939759116787254c2e3bfa19c99ffef4c718d280535af"
+    },
+    {
+      "id": "approval",
+      "type": "jar",
+      "source": "erp-modules/erp-approval/target/erp-modules-approval.jar",
+      "packaged": "docker/erp/modules/approval/jar/erp-modules-approval.jar",
+      "sha256": "8cca7fa958f38398e06fe7712206b1dc4c2ec239c19663f30b5b92f7f620a9cd"
+    },
+    {
+      "id": "frontend",
+      "type": "directory",
+      "source": "erp-ui/dist",
+      "packaged": "docker/nginx/html/dist",
+      "sha256": "63f017653a601596cff19f0fc2a7abc9e6c479bf2467be6d769f10c2c5c9c15c"
+    }
+  ],
+  "criticalClasses": [
+    "com.erp.system.controller.SysConfigController",
+    "com.erp.system.controller.SysOperlogController",
+    "com.erp.system.controller.SysUserController",
+    "com.erp.system.domain.vo.SysOperLogListVo",
+    "com.erp.system.domain.vo.SysOperLogDetailVo",
+    "com.erp.system.domain.vo.SysOperLogExportVo",
+    "com.erp.system.service.support.TemporaryPasswordGenerator",
+    "com.erp.system.service.support.UserSessionInvalidationService",
+    "com.erp.system.service.support.SystemBuildInfoProvider",
+    "com.erp.system.domain.vo.SysUserListVo",
+    "com.erp.system.domain.vo.SysUserPiiExportVo",
+    "com.erp.system.domain.vo.SysBuildInfoVo",
+    "com.erp.system.controller.SysLegalEntityController"
+  ],
+  "artifactSha256Required": true
+}

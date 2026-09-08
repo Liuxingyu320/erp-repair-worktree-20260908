@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.oa.mapper.OaSignFileCleanupMapper">
+
+    <resultMap id="OaSignFileCleanupResult" type="com.erp.oa.domain.OaSignFileCleanup">
+        <id property="cleanupId" column="cleanup_id"/>
+        <result property="taskId" column="task_id"/>
+        <result property="packageId" column="package_id"/>
+        <result property="fileReferencesJson" column="file_references_json"/>
+        <result property="status" column="status"/>
+        <result property="retryCount" column="retry_count"/>
+        <result property="nextRetryTime" column="next_retry_time"/>
+        <result property="processingToken" column="processing_token"/>
+        <result property="leaseExpiresTime" column="lease_expires_time"/>
+        <result property="lastError" column="last_error"/>
+        <result property="version" column="version"/>
+        <result property="createdTime" column="created_time"/>
+        <result property="updatedTime" column="updated_time"/>
+    </resultMap>
+
+    <sql id="baseColumns">
+        cleanup_id, task_id, package_id, file_references_json, status,
+        retry_count, next_retry_time, processing_token, lease_expires_time,
+        last_error, version, created_time, updated_time
+    </sql>
+
+    <insert id="insertCleanup"
+            parameterType="com.erp.oa.domain.OaSignFileCleanup"
+            useGeneratedKeys="true" keyProperty="cleanupId">
+        insert into oa_sign_file_cleanup (
+            task_id, package_id, file_references_json, status, retry_count,
+            next_retry_time, last_error, version, created_time, updated_time
+        ) values (
+            #{taskId}, #{packageId}, #{fileReferencesJson}, #{status}, #{retryCount},
+            #{nextRetryTime}, #{lastError}, #{version}, sysdate(), sysdate()
+        )
+    </insert>
+
+    <select id="selectById" resultMap="OaSignFileCleanupResult">
+        select <include refid="baseColumns"/>
+        from oa_sign_file_cleanup
+        where cleanup_id = #{cleanupId}
+        limit 1
+    </select>
+
+    <select id="selectDue" resultMap="OaSignFileCleanupResult">
+        select <include refid="baseColumns"/>
+        from oa_sign_file_cleanup
+        where (
+                status in ('PENDING', 'RETRY')
+                and (next_retry_time is null or next_retry_time &lt;= #{dueTime})
+              )
+           or (
+                status = 'PROCESSING'
+                and lease_expires_time &lt;= #{dueTime}
+              )
+        order by coalesce(next_retry_time, created_time), cleanup_id
+        limit #{limit}
+    </select>
+
+    <update id="claimForProcessing">
+        update oa_sign_file_cleanup
+        set status = 'PROCESSING',
+            processing_token = #{processingToken},
+            lease_expires_time = #{leaseExpiresTime},
+            version = version + 1,
+            updated_time = sysdate()
+        where cleanup_id = #{cleanupId}
+          and version = #{version}
+          and (
+                (
+                    status in ('PENDING', 'RETRY')
+                    and (next_retry_time is null or next_retry_time &lt;= #{dueTime})
+                )
+                or (
+                    status = 'PROCESSING'
+                    and lease_expires_time &lt;= #{dueTime}
+                )
+              )
+    </update>
+
+    <update id="markCompleted">
+        update oa_sign_file_cleanup
+        set status = 'COMPLETED',
+            next_retry_time = null,
+            processing_token = null,
+            lease_expires_time = null,
+            last_error = null,
+            version = version + 1,
+            updated_time = sysdate()
+        where cleanup_id = #{cleanupId}
+          and status = 'PROCESSING'
+          and version = #{version}
+          and processing_token = #{processingToken}
+    </update>
+
+    <update id="markRetry">
+        update oa_sign_file_cleanup
+        set status = 'RETRY',
+            retry_count = #{retryCount},
+            next_retry_time = #{nextRetryTime},
+            processing_token = null,
+            lease_expires_time = null,
+            last_error = #{lastError},
+            version = version + 1,
+            updated_time = sysdate()
+        where cleanup_id = #{cleanupId}
+          and status = 'PROCESSING'
+          and version = #{version}
+          and processing_token = #{processingToken}
+    </update>
+</mapper>

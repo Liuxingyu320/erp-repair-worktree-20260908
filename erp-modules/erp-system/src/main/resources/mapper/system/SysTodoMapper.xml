@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.system.mapper.SysTodoMapper">
+
+    <select id="selectAllActiveHrDeptIds" resultType="Long">
+        select dept_id
+        from sys_dept
+        where del_flag = '0'
+          and status = '0'
+          and dept_type in ('GROUP', 'COMPANY', 'STORE', 'WAREHOUSE')
+        order by dept_id
+    </select>
+
+    <select id="selectScopedTodoCandidates" resultType="com.erp.system.domain.vo.SysTodoCandidateRow">
+        select p.*,
+               d.dept_name as dept_name,
+               d.dept_type as dept_type,
+               d.leader as dept_leader,
+               d.status as dept_status,
+               u.nick_name as employee_name,
+               u.phonenumber as phone_number,
+               u.email as employee_email,
+               u.sex as employee_sex,
+               u.remark as employee_remark,
+               upc.post_names,
+               u.status as linked_account_status,
+               u.del_flag as linked_account_del_flag,
+               u.user_name as linked_account_user_name
+               , hc.certificate_id as health_certificate_id
+               , hc.expires_on as health_certificate_expires_on
+        from sys_user_profile p
+             inner join sys_dept d on d.dept_id = p.dept_id
+             left join sys_user u on u.user_id = p.user_id
+             left join hr_employee_health_certificate hc on hc.user_id = p.user_id
+                  and hc.current_flag = 'Y' and hc.review_status = 'APPROVED'
+                  and hc.del_flag = '0'
+             left join (
+                 select sup.user_id,
+                        group_concat(distinct sp.post_name order by sp.post_sort, sp.post_name separator '、') as post_names
+                 from sys_user_post sup
+                      inner join sys_post sp on sp.post_id = sup.post_id
+                 where sp.status = '0'
+                 group by sup.user_id
+             ) upc on upc.user_id = p.user_id
+        where p.dept_id is not null
+          and d.del_flag = '0'
+          and d.status = '0'
+          and d.dept_type in ('STORE', 'WAREHOUSE')
+        <choose>
+            <when test="enabledTypes != null and enabledTypes.size() > 0">
+                and 1 = 1
+            </when>
+            <otherwise>
+                and 1 = 0
+            </otherwise>
+        </choose>
+        <choose>
+            <when test="currentScopeDeptIds != null and currentScopeDeptIds.size() > 0">
+                and exists (
+                    select 1
+                    from sys_dept root
+                    where root.dept_id in
+                    <foreach collection="currentScopeDeptIds" item="deptId" open="(" separator="," close=")">
+                        #{deptId}
+                    </foreach>
+                      and (p.dept_id = root.dept_id or find_in_set(root.dept_id, d.ancestors))
+                )
+            </when>
+            <otherwise>and 1 = 0</otherwise>
+        </choose>
+        order by p.dept_id, p.profile_id
+    </select>
+
+    <select id="selectHealthCertificateTodoCandidates"
+            resultType="com.erp.system.domain.vo.SysHealthCertificateTodoCandidate">
+        select c.certificate_id,
+               c.user_id,
+               u.dept_id as dept_id,
+               d.dept_name,
+               d.dept_type,
+               p.employee_no,
+               u.nick_name as employee_name,
+               c.certificate_no,
+               c.review_status,
+               c.rejection_reason,
+               c.create_time,
+               c.update_time
+        from hr_employee_health_certificate c
+             inner join sys_user u on u.user_id = c.user_id
+                  and u.del_flag = '0' and u.status = '0'
+             left join sys_user_profile p on p.user_id = c.user_id
+             left join sys_dept d on d.dept_id = u.dept_id
+        where c.del_flag = '0'
+        <trim prefix="and (" suffix=")" prefixOverrides="or">
+            <if test="enabledTypes != null and enabledTypes.contains('HR_HEALTH_CERT_REVIEW')">
+                or (c.review_status = 'PENDING_REVIEW'
+                    and d.del_flag = '0' and d.status = '0'
+                    and d.dept_type in ('STORE', 'WAREHOUSE')
+                    <choose>
+                        <when test="authorizedScopeDeptIds != null and authorizedScopeDeptIds.size() > 0">
+                            and exists (
+                                select 1 from sys_dept root
+                                where root.dept_id in
+                                <foreach collection="authorizedScopeDeptIds" item="deptId"
+                                        open="(" separator="," close=")">
+                                    #{deptId}
+                                </foreach>
+                                  and (u.dept_id = root.dept_id
+                                       or find_in_set(root.dept_id, d.ancestors))
+                            )
+                        </when>
+                        <otherwise>and 1 = 0</otherwise>
+                    </choose>
+                )
+            </if>
+            <if test="enabledTypes != null and enabledTypes.contains('HR_HEALTH_CERT_RETURNED')">
+                or (c.review_status in ('REJECTED', 'RETURNED')
+                    and c.user_id = #{userId})
+            </if>
+        </trim>
+        order by c.create_time, c.certificate_id
+    </select>
+
+</mapper>

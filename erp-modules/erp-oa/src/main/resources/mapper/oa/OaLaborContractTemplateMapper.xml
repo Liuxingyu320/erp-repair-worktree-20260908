@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.oa.mapper.OaLaborContractTemplateMapper">
+
+    <resultMap id="OaLaborContractTemplateResult" type="OaLaborContractTemplate">
+        <id property="templateId" column="template_id"/>
+        <result property="templateName" column="template_name"/>
+        <result property="socialType" column="social_type"/>
+        <result property="templateVersion" column="template_version"/>
+        <result property="templateFileUrl" column="template_file_url"/>
+        <result property="status" column="status"/>
+        <result property="builtIn" column="built_in"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateBy" column="update_by"/>
+        <result property="updateTime" column="update_time"/>
+        <result property="remark" column="remark"/>
+    </resultMap>
+
+    <insert id="insertOaLaborContractTemplate" parameterType="OaLaborContractTemplate" useGeneratedKeys="true" keyProperty="templateId">
+        insert into oa_labor_contract_template (
+            template_name, social_type, template_version, template_file_url,
+            status, built_in, create_by, create_time, remark
+        ) values (
+            #{templateName}, #{socialType}, #{templateVersion}, #{templateFileUrl},
+            #{status}, #{builtIn}, #{createBy}, sysdate(), #{remark}
+        )
+    </insert>
+
+    <update id="updateOaLaborContractTemplate" parameterType="OaLaborContractTemplate">
+        update oa_labor_contract_template
+        <set>
+            <if test="templateName != null and templateName != ''">template_name = #{templateName},</if>
+            <if test="socialType != null and socialType != ''">social_type = #{socialType},</if>
+            <if test="templateVersion != null">template_version = #{templateVersion},</if>
+            <if test="templateFileUrl != null and templateFileUrl != ''">template_file_url = #{templateFileUrl},</if>
+            <if test="status != null and status != ''">status = #{status},</if>
+            <if test="builtIn != null and builtIn != ''">built_in = #{builtIn},</if>
+            <if test="updateBy != null and updateBy != ''">update_by = #{updateBy},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            update_time = sysdate()
+        </set>
+        where template_id = #{templateId}
+    </update>
+
+    <select id="selectOaLaborContractTemplateById" resultMap="OaLaborContractTemplateResult">
+        select template_id, template_name, social_type, template_version, template_file_url,
+               status, built_in, create_by, create_time, update_by, update_time, remark
+        from oa_labor_contract_template
+        where template_id = #{templateId}
+    </select>
+
+    <select id="selectOaLaborContractTemplateList" parameterType="OaLaborContractTemplate" resultMap="OaLaborContractTemplateResult">
+        select template_id, template_name, social_type, template_version, template_file_url,
+               status, built_in, create_by, create_time, update_by, update_time, remark
+        from oa_labor_contract_template
+        <where>
+            <if test="templateName != null and templateName != ''">
+                and template_name like concat('%', #{templateName}, '%')
+            </if>
+            <if test="socialType != null and socialType != ''">
+                and social_type = #{socialType}
+            </if>
+            <if test="status != null and status != ''">
+                and status = #{status}
+            </if>
+        </where>
+        order by template_id desc
+    </select>
+</mapper>

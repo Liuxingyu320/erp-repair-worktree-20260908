@@ -1,0 +1,131 @@
+{
+  "schemaVersion": 1,
+  "releaseId": "mobile-frontend-optimization-20260728",
+  "status": "conditional-ready",
+  "executionPolicy": "manual-phased-canary-no-auto-deploy",
+  "sourceCommit": "b408b7054a481fac692878fcdc24e7ea5bc9cc68",
+  "sourceFileList": "scripts/mobile-frontend-optimization-release-files-20260728.list",
+  "runbook": "docs/mobile-frontend-optimization-canary-runbook-20260728.md",
+  "configExample": "scripts/mobile-session-canary.env.example",
+  "configValidator": "scripts/verify-mobile-session-canary-config.sh",
+  "sourceValidator": "scripts/verify-mobile-frontend-optimization-release.sh",
+  "artifactPolicy": {
+    "sourceScopeVerified": true,
+    "candidateArtifactRequiredBeforeDeploy": true,
+    "candidateArtifactSha256": null,
+    "dirtyWorktreeMayBePackaged": false,
+    "productionDeploymentAuthorized": false
+  },
+  "packages": [
+    {
+      "id": "A",
+      "name": "supplier-scope",
+      "order": 1,
+      "deployUnits": [
+        "inventory"
+      ],
+      "rollback": "Revert only the supplier related-scope hunks and its contract test."
+    },
+    {
+      "id": "B",
+      "name": "dependency-security",
+      "order": 2,
+      "deployUnits": [
+        "frontend-build-toolchain"
+      ],
+      "rollback": "Restore package metadata, lock, compatibility patch, and dependency test atomically."
+    },
+    {
+      "id": "C",
+      "name": "onboarding-owner-selector",
+      "order": 3,
+      "deployUnits": [
+        "system",
+        "frontend"
+      ],
+      "rollback": "Rollback owner-options API, service/mapper contract, picker UI, and tests as one unit."
+    },
+    {
+      "id": "D",
+      "name": "first-screen-performance",
+      "order": 4,
+      "deployUnits": [
+        "frontend"
+      ],
+      "rollback": "Rollback lazy imports, push split, and matching budget rules together; retain unrelated request security."
+    },
+    {
+      "id": "E",
+      "name": "httponly-401-session",
+      "order": 5,
+      "deployUnits": [
+        "common-security",
+        "auth",
+        "gateway",
+        "frontend"
+      ],
+      "rollback": "Keep or restore backend dual first, switch Web back to bearer, then validate Native Bearer and clear invalid Cookies."
+    }
+  ],
+  "sharedFiles": [
+    "erp-ui/src/utils/request.js",
+    "erp-ui/src/store/modules/user.js",
+    "erp-ui/src/services/pushRegistration.js",
+    "erp-ui/src/plugins/download.js",
+    "erp-ui/test/mobilePushRegistration.test.js",
+    "erp-ui/package.json",
+    "erp-ui/package-lock.json",
+    "erp-ui/.env.development",
+    "erp-ui/.env.staging",
+    "erp-ui/.env.production",
+    "erp-common/erp-common-security/src/main/java/com/erp/common/security/config/WebMvcConfig.java",
+    "erp-modules/erp-system/src/main/java/com/erp/system/service/impl/HrOnboardingServiceImpl.java",
+    "erp-modules/erp-system/src/main/resources/mapper/system/HrOnboardingMapper.xml",
+    "erp-ui/src/views/mobile/hr/onboarding/form.vue"
+  ],
+  "rollout": [
+    "Verify the exact source scope and create immutable artifacts from a clean commit.",
+    "Deploy A supplier scope and complete organization-boundary read-only checks.",
+    "Deploy B dependency security and rebuild the frontend from a clean install.",
+    "Deploy C owner selector backend before frontend and complete multi-role UAT.",
+    "Deploy D performance frontend and enforce bundle budgets.",
+    "Deploy E Auth and Gateway in dual mode while Web remains bearer.",
+    "Canary Web cookie mode at 5%, 25%, 50%, then 100% only after every observation gate passes.",
+    "Keep the backend in dual mode while Native Bearer clients exist."
+  ],
+  "rollback": [
+    "Freeze canary expansion and preserve evidence.",
+    "Keep or restore Auth and Gateway dual mode.",
+    "Switch Web traffic or artifact back to bearer.",
+    "Validate login, refresh, logout, CSRF metrics, and Native authentication.",
+    "Rollback D, C, B, and A in reverse order only when their own stop condition is met.",
+    "Never overwrite shared files wholesale; apply package-specific hunks."
+  ],
+  "hardGates": [
+    "clean immutable source commit",
+    "artifact SHA-256 recorded",
+    "HTTPS public origin",
+    "exact non-wildcard allowed origins",
+    "Auth and Gateway effective config snapshots match",
+    "Secure HttpOnly session Cookie",
+    "CSRF double-submit and Origin enforcement",
+    "multi-account and cross-organization UAT",
+    "Native Bearer compatibility",
+    "rollback artifact and monitoring ready",
+    "change approval and named release owner"
+  ],
+  "excludedPaths": [
+    "erp-ui/dist-dev-check/",
+    "erp-ui/dist/",
+    "erp-ui/android/",
+    "erp-ui/ios/",
+    "tmp/",
+    "target/",
+    "node_modules/"
+  ],
+  "verificationEvidence": [
+    "output/mobile-page-audit-20260727/阶段1-变更收口与冲突审计-20260728.md",
+    "output/mobile-page-audit-20260727/阶段2-综合回归与真机尺寸验收-20260728.md",
+    "output/mobile-page-audit-20260727/阶段3-HttpOnly会话与安全验收-20260728.md"
+  ]
+}

@@ -1,0 +1,39 @@
+// base color (warm neutral + deep tea green)
+$blue: #334155;
+$light-blue: #0b6b53;
+$red: #dc2626;
+$pink: #ec4899;
+$green: #147a50;
+$tiffany: #06b6d4;
+$yellow: #d97706;
+$panGreen: #147a50;
+
+// 默认菜单主题风格
+$base-menu-color: #d6e2dc;
+$base-menu-color-active: #ffffff;
+$base-menu-background: #123a2f;
+$base-logo-title-color: #ffffff;
+
+$base-menu-light-color: rgba(23, 33, 29, 0.74);
+$base-menu-light-background: #ffffff;
+$base-logo-light-title-color: #17211d;
+
+$base-sub-menu-background: #0f3128;
+$base-sub-menu-hover: rgba(214, 226, 220, 0.14);
+
+$base-sidebar-width: 200px;
+
+// the :export directive is the magic sauce for webpack
+// https://www.bluematador.com/blog/how-to-share-variables-between-js-and-sass
+:export {
+  menuColor: $base-menu-color;
+  menuLightColor: $base-menu-light-color;
+  menuColorActive: $base-menu-color-active;
+  menuBackground: $base-menu-background;
+  menuLightBackground: $base-menu-light-background;
+  subMenuBackground: $base-sub-menu-background;
+  subMenuHover: $base-sub-menu-hover;
+  sideBarWidth: $base-sidebar-width;
+  logoTitleColor: $base-logo-title-color;
+  logoLightTitleColor: $base-logo-light-title-color
+}

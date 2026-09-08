@@ -1,0 +1,141 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.inventory.mapper.InvMobileMapper">
+
+    <sql id="ScopeByProductDept">
+        <choose>
+            <when test="params.scopeDeptIds != null and params.scopeDeptIds.size() > 0">
+                and p.shop_dept_id in
+                <foreach collection="params.scopeDeptIds" item="deptId" open="(" close=")" separator=",">#{deptId}</foreach>
+            </when>
+            <otherwise>and 1 = 0</otherwise>
+        </choose>
+    </sql>
+
+    <sql id="ScopeByCustomerDept">
+        <choose>
+            <when test="params.scopeDeptIds != null and params.scopeDeptIds.size() > 0">
+                and c.shop_dept_id in
+                <foreach collection="params.scopeDeptIds" item="deptId" open="(" close=")" separator=",">#{deptId}</foreach>
+            </when>
+            <otherwise>and 1 = 0</otherwise>
+        </choose>
+    </sql>
+
+    <sql id="ScopeBySupplierDept">
+        <choose>
+            <when test="params.scopeDeptIds != null and params.scopeDeptIds.size() > 0">
+                and s.shop_dept_id in
+                <foreach collection="params.scopeDeptIds" item="deptId" open="(" close=")" separator=",">#{deptId}</foreach>
+            </when>
+            <otherwise>and 1 = 0</otherwise>
+        </choose>
+    </sql>
+
+    <select id="selectProductOptions" resultType="com.erp.inventory.domain.vo.MobileOption">
+        select p.product_id as value,
+               p.product_name as label,
+               p.product_code as code,
+               concat_ws(' · ', p.product_code, p.spec, p.unit) as meta,
+               p.status as status,
+               'product' as type
+        from inv_product p
+        where p.del_flag = '0'
+          and p.status = '0'
+        <include refid="ScopeByProductDept"/>
+        <if test="keyword != null and keyword != ''">
+          and (
+              p.product_name like concat('%', #{keyword}, '%')
+              or p.product_code like concat('%', #{keyword}, '%')
+              or p.sku like concat('%', #{keyword}, '%')
+          )
+        </if>
+        order by p.product_name asc, p.product_id desc
+        limit #{limit}
+    </select>
+
+    <select id="selectCustomerOptions" resultType="com.erp.inventory.domain.vo.MobileOption">
+        select c.customer_id as value,
+               c.customer_name as label,
+               c.customer_code as code,
+               concat_ws(' · ', c.customer_code, c.contact_person, c.contact_phone) as meta,
+               c.status as status,
+               'customer' as type
+        from inv_customer c
+        where c.status = '0'
+        <include refid="ScopeByCustomerDept"/>
+        <if test="keyword != null and keyword != ''">
+          and (
+              c.customer_name like concat('%', #{keyword}, '%')
+              or c.customer_code like concat('%', #{keyword}, '%')
+              or c.contact_phone like concat('%', #{keyword}, '%')
+          )
+        </if>
+        order by c.customer_name asc, c.customer_id desc
+        limit #{limit}
+    </select>
+
+    <select id="selectSupplierOptions" resultType="com.erp.inventory.domain.vo.MobileOption">
+        select s.supplier_id as value,
+               s.supplier_name as label,
+               s.supplier_code as code,
+               concat_ws(' · ', s.supplier_code, s.contact_person, s.contact_phone) as meta,
+               s.status as status,
+               'supplier' as type
+        from inv_supplier s
+        where s.status = '0'
+          and (s.cooperation_status is null or s.cooperation_status = '0')
+        <include refid="ScopeBySupplierDept"/>
+        <if test="keyword != null and keyword != ''">
+          and (
+              s.supplier_name like concat('%', #{keyword}, '%')
+              or s.supplier_code like concat('%', #{keyword}, '%')
+              or s.contact_phone like concat('%', #{keyword}, '%')
+          )
+        </if>
+        order by s.supplier_name asc, s.supplier_id desc
+        limit #{limit}
+    </select>
+
+    <sql id="ScopeByTransferAnyDept">
+        <choose>
+            <when test="params.scopeDeptIds != null and params.scopeDeptIds.size() > 0">
+                and (
+                    o.from_dept_id in
+                    <foreach collection="params.scopeDeptIds" item="deptId" open="(" close=")" separator=",">#{deptId}</foreach>
+                    or o.to_dept_id in
+                    <foreach collection="params.scopeDeptIds" item="deptId" open="(" close=")" separator=",">#{deptId}</foreach>
+                )
+            </when>
+            <otherwise>and 1 = 0</otherwise>
+        </choose>
+    </sql>
+
+    <select id="selectPendingTransferApprovalTasks" resultType="com.erp.inventory.domain.vo.MobileTransferApprovalTodo">
+        select t.task_id as taskId,
+               o.transfer_id as transferId,
+               o.order_no as orderNo,
+               o.from_dept_id as fromDeptId,
+               o.from_dept_name as fromDeptName,
+               o.to_dept_id as toDeptId,
+               o.to_dept_name as toDeptName,
+               t.node_name as nodeName,
+               o.status as status,
+               o.total_quantity as totalQuantity,
+               o.total_amount as totalAmount,
+               o.transfer_type as transferType,
+               o.submitted_time as submittedTime,
+               o.create_time as createTime
+        from inv_transfer_approval_task t
+             inner join inv_transfer_order o on o.transfer_id = t.transfer_id
+             inner join inv_transfer_approval_instance i on i.instance_id = t.instance_id
+                and i.transfer_id = o.transfer_id
+                and i.status = 'running'
+        where t.status = 'pending'
+          and t.node_order = i.current_node_order
+          and o.status = 'submitted'
+          and find_in_set(#{candidateUserId}, t.candidate_user_ids)
+        <include refid="ScopeByTransferAnyDept"/>
+        order by o.submitted_time desc, o.create_time desc, t.task_id desc
+    </select>
+</mapper>

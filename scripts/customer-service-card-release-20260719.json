@@ -1,0 +1,271 @@
+{
+  "schemaVersion": 1,
+  "releaseId": "customer-service-card-code-only-20260719",
+  "status": "candidate",
+  "deploymentMode": "code-only",
+  "executionPolicy": "manual-phased",
+  "sourceFileList": "scripts/customer-service-card-release-files-20260719.list",
+  "sourceFileCount": 32,
+  "migrationCount": 0,
+  "migrations": [],
+  "featureFlagMutationCount": 0,
+  "featureFlags": [],
+  "databaseMutationCount": 0,
+  "databaseMutations": [],
+  "schemaPrerequisites": {
+    "inv_customer_service_profile": [
+      "customer_id",
+      "photo_node_id",
+      "tea_preferences",
+      "preference_tags",
+      "brewing_service_preferences",
+      "cautions",
+      "budget_min",
+      "budget_max",
+      "last_visit_date",
+      "version",
+      "create_by",
+      "create_time",
+      "update_by",
+      "update_time"
+    ],
+    "inv_customer_service_record": [
+      "record_id",
+      "customer_id",
+      "service_date",
+      "service_user_id",
+      "service_user_name",
+      "party_size",
+      "tea_served",
+      "preference_snapshot",
+      "caution_snapshot",
+      "service_note",
+      "consumption_amount",
+      "shop_dept_id",
+      "request_key",
+      "source_client",
+      "create_by",
+      "create_time"
+    ],
+    "inv_customer_service_change_log": [
+      "log_id",
+      "customer_id",
+      "request_key",
+      "change_type",
+      "changed_fields",
+      "before_summary",
+      "after_summary",
+      "operator_user_id",
+      "operator_name",
+      "shop_dept_id",
+      "source_client",
+      "create_time"
+    ]
+  },
+  "requiredPermissions": [
+    "inv:customer:option",
+    "inv:customerCard:list",
+    "inv:customerCard:query",
+    "inv:customerCard:add",
+    "inv:customerCard:edit",
+    "inv:customerCard:record:add",
+    "inv:customerCard:archive",
+    "inv:customerCard:audit"
+  ],
+  "runtimeArtifacts": [
+    "docker/erp/auth/dockerfile",
+    "docker/erp/auth/jar/erp-auth.jar",
+    "docker/erp/gateway/dockerfile",
+    "docker/erp/gateway/jar/erp-gateway.jar",
+    "docker/erp/modules/approval/dockerfile",
+    "docker/erp/modules/approval/jar/erp-modules-approval.jar",
+    "docker/erp/modules/file/dockerfile",
+    "docker/erp/modules/file/jar/erp-modules-file.jar",
+    "docker/erp/modules/inventory/dockerfile",
+    "docker/erp/modules/inventory/jar/erp-modules-inventory.jar",
+    "docker/erp/modules/job/dockerfile",
+    "docker/erp/modules/job/jar/erp-modules-job.jar",
+    "docker/erp/modules/oa/dockerfile",
+    "docker/erp/modules/oa/jar/erp-modules-oa.jar",
+    "docker/erp/modules/system/dockerfile",
+    "docker/erp/modules/system/jar/erp-modules-system.jar",
+    "docker/erp/visual/monitor/dockerfile",
+    "docker/erp/visual/monitor/jar/erp-visual-monitor.jar",
+    "docker/nginx/conf/nginx.conf",
+    "docker/nginx/conf/nginx.host.conf",
+    "docker/nginx/dockerfile",
+    "docker/nginx/html/dist/index.html",
+    "docker/nginx/html/dist/release-info.json",
+    "docker/release/customer-service-card-release-20260719.json",
+    "docker/run-erp-service.sh"
+  ],
+  "buildAssemblyPolicy": {
+    "source": "clean candidate Maven target outputs and freshly built erp-ui/dist assembled directly in a mktemp stage",
+    "dockerCopyScriptAllowed": false,
+    "reuseExistingPackagedJarOrDistAllowed": false,
+    "copyExistingDockerErpTreeAllowed": false,
+    "copyExistingDockerNginxTreeAllowed": false,
+    "expectedCommitEnvironmentVariable": "CUSTOMER_CARD_EXPECTED_COMMIT",
+    "expectedCommitRequiredForArchiveVerification": true,
+    "jarBuildCommitMustMatchCandidate": true,
+    "requiredFreshJarCount": 10,
+    "requiredServiceDockerfileCount": 10,
+    "frontendReleaseInfoCommitMustMatchCandidate": true,
+    "archiveFilesMustBeNonEmpty": true
+  },
+  "packagePolicy": {
+    "archiveRoot": "docker",
+    "forbiddenExtensions": [
+      ".sql"
+    ],
+    "forbiddenPathSegments": [
+      "mysql",
+      "history",
+      "upload",
+      "uploads",
+      "uploadPath",
+      "log",
+      "logs",
+      "cache",
+      "caches",
+      "key",
+      "keys",
+      "secret",
+      "secrets"
+    ],
+    "forbiddenEnvironmentFiles": true,
+    "forbiddenNameFragments": [
+      "new-business-release",
+      "new-business-manifest"
+    ],
+    "containsHistoricalMigrationBundle": false
+  },
+  "configurationKeys": {
+    "enabled": "feature.inventory.customer-service-card.enabled",
+    "allowedShops": "feature.inventory.customer-service-card.allowed-shop-dept-ids"
+  },
+  "configurationMutationPolicy": {
+    "duringCodeDeployment": "forbidden",
+    "approvedChannel": "system-parameter-management",
+    "directSql": "forbidden",
+    "auditRequired": true,
+    "sessionRefreshRequired": true
+  },
+  "configurationUiContract": {
+    "validatorEvidenceFile": "erp-ui/src/views/system/config/index.vue",
+    "validatorEvidenceIncludedInRelease": false,
+    "serviceValidatorEvidenceFile": "erp-modules/erp-system/src/main/java/com/erp/system/service/impl/SysConfigServiceImpl.java",
+    "serviceValidatorEvidenceIncludedInRelease": false,
+    "valueLengthEvidenceFile": "erp-modules/erp-system/src/main/java/com/erp/system/domain/SysConfig.java",
+    "valueLengthEvidenceIncludedInRelease": false,
+    "configValueBlankOrNullAllowed": false,
+    "missingAllowlistKeyOrderedSteps": [
+      "verify global enabled is explicitly false",
+      "require approval for one first-pilot active STORE ID; stop if absent",
+      "create allowedShops through the system parameter UI with exactly that approved ID",
+      "verify the successful parameter operation log",
+      "run disabled preflight"
+    ],
+    "disabledPreflightAllowsNonEmptyAllowlist": true,
+    "globalFalseStillBlocksWrites": true,
+    "rollbackOrderedSteps": [
+      "set global enabled false through the system parameter UI",
+      "verify the successful parameter operation log",
+      "invalidate rollout sessions and require re-login",
+      "retain the last approved explicit valid allowlist",
+      "roll back code",
+      "run disabled preflight and postcheck"
+    ],
+    "rollbackAllowlistBlankOrNullAllowed": false,
+    "rollbackAllowlistPlaceholderAllowed": false
+  },
+  "operationalLimits": {
+    "parameterAuditWindowMaximumMinutes": 1440,
+    "systemConfigValueMaximumCharacters": 500,
+    "fullRolloutOverlengthAction": "stop all-store rollout; keep approved single-store or two-store operation and design an approved grouping scheme"
+  },
+  "hunkIsolation": {
+    "erp-ui/src/views/mobile/feature/mobileFormPayloads.js": "include only customer-card source.requestKey reuse; exclude the unrelated normalizeLineItems/OE hunk",
+    "erp-ui/src/views/mobile/components/MobileWorkbenchShell.vue": "include only the customer entry permission replacement inv:customer:list -> inv:customerCard:list; exclude the unrelated progressive-redesign CSS hunk",
+    "erp-common/erp-common-security/src/main/java/com/erp/common/security/aspect/IdempotentSubmitAspect.java": "include only releaseOnSuccess/releaseQuietly; exclude SignScopeHeaderUtils and signing-path scope changes unless a separately approved production baseline proves they are already deployed",
+    "erp-common/erp-common-security/src/test/java/com/erp/common/security/aspect/IdempotentSubmitAspectTest.java": "include only successful in-flight release coverage and annotation helper support; exclude signing-scope tests"
+  },
+  "idempotencyContract": {
+    "redisRole": "short-lived in-flight guard only",
+    "releaseOnSuccessDefault": false,
+    "customerWriteEndpointsReleaseOnSuccess": true,
+    "durableKeyRequired": true,
+    "durableKeyMaxLength": 128,
+    "durableReplay": "database unique constraints and existing-result lookup",
+    "mobileQuickCreate": "generate once when opening the quick-create form and reuse after failed retries"
+  },
+  "rolloutSemantics": {
+    "globalEnabledTrue": "legacy customer financial APIs return FEATURE_REPLACED for every store",
+    "allowlistedStore": "customer service card write capability is true",
+    "nonAllowlistedStore": "customer service card remains read-only and writes return FEATURE_DISABLED_FOR_SHOP"
+  },
+  "allowlistParsingContract": {
+    "wholeValueTrimmed": true,
+    "preserveTrailingEmptyTokens": true,
+    "tokenEdgesTrimmedOnly": true,
+    "wildcardAllowed": false,
+    "emptyTokenAllowed": false,
+    "embeddedWhitespaceAllowed": false,
+    "leadingZeroAllowed": false,
+    "positiveLongIdsOnly": true,
+    "maximumIdInclusive": "9223372036854775807",
+    "overflowFailsClosed": true,
+    "remoteValidationInputs": [
+      "allowlist config value in preflight",
+      "allowlist config value in postcheck",
+      "CUSTOMER_CARD_EXPECTED_SHOPS",
+      "CUSTOMER_CARD_PILOT_SHOP_ID",
+      "CUSTOMER_CARD_NONPILOT_SHOP_ID"
+    ],
+    "canonicalization": "validated decimal strings sorted lexicographically; numeric sort is forbidden"
+  },
+  "dataScopePreflightContract": {
+    "customerMarker": "invalid_customer_store_scope",
+    "customerStoreRequirements": [
+      "shop_dept_id is non-null and positive",
+      "referenced sys_dept exists",
+      "dept_type is STORE",
+      "status is 0",
+      "del_flag is 0"
+    ],
+    "recordCrossStoreComparison": "NOT (service_record.shop_dept_id <=> customer.shop_dept_id)",
+    "changeLogCrossStoreComparison": "NOT (change_log.shop_dept_id <=> customer.shop_dept_id)"
+  },
+  "paginationContract": {
+    "controllerRole": "parse CustomerCardPage only; never import or call PageHelper",
+    "serviceOwnsPageHelper": true,
+    "pageNumMinimum": 1,
+    "pageSizeMinimum": 1,
+    "pageSizeMaximum": 100,
+    "cardListOrder": [
+      "requireStoreContext",
+      "setScopedShopDeptId",
+      "startPage",
+      "selectCardList"
+    ],
+    "auditListOrder": [
+      "requireStoreContext",
+      "setScopedShopDeptId",
+      "assertScopedCardWhenFiltered",
+      "startPage",
+      "selectAuditList"
+    ]
+  },
+  "rolloutPhases": [
+    "disabled-code-deploy",
+    "single-store",
+    "two-store",
+    "all-current-stores"
+  ],
+  "externalGates": {
+    "productionReadOnlyPreflight": "pending",
+    "singleStoreUat": "pending",
+    "twoStoreObservation": "pending",
+    "allStoreApproval": "pending"
+  }
+}

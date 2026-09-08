@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.oa.mapper.OaSalaryRecordMapper">
+
+    <resultMap id="OaSalaryRecordResult" type="OaSalaryRecord">
+        <id property="salaryId" column="salary_id"/>
+        <result property="userId" column="user_id"/>
+        <result property="userName" column="user_name"/>
+        <result property="nickName" column="nick_name"/>
+        <result property="deptId" column="dept_id"/>
+        <result property="deptName" column="dept_name"/>
+        <result property="shopDeptId" column="shop_dept_id"/>
+        <result property="shopDeptName" column="shop_dept_name"/>
+        <result property="salaryMonth" column="salary_month"/>
+        <result property="workDays" column="work_days"/>
+        <result property="leaveDays" column="leave_days"/>
+        <result property="absentDays" column="absent_days"/>
+        <result property="scheduledMinutes" column="scheduled_minutes"/>
+        <result property="workedMinutes" column="worked_minutes"/>
+        <result property="paidLeaveMinutes" column="paid_leave_minutes"/>
+        <result property="unpaidLeaveMinutes" column="unpaid_leave_minutes"/>
+        <result property="absenceMinutes" column="absence_minutes"/>
+        <result property="attendanceSourceVersion" column="attendance_source_version"/>
+        <result property="lateTotalMinutes" column="late_total_minutes"/>
+        <result property="earlyTotalMinutes" column="early_total_minutes"/>
+        <result property="overtimeHours" column="overtime_hours"/>
+        <result property="baseSalary" column="base_salary"/>
+        <result property="attendanceDeduction" column="attendance_deduction"/>
+        <result property="lateDeduction" column="late_deduction"/>
+        <result property="earlyDeduction" column="early_deduction"/>
+        <result property="absentDeduction" column="absent_deduction"/>
+        <result property="overtimePay" column="overtime_pay"/>
+        <result property="otherBonus" column="other_bonus"/>
+        <result property="otherDeduction" column="other_deduction"/>
+        <result property="totalSalary" column="total_salary"/>
+        <result property="status" column="status"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateBy" column="update_by"/>
+        <result property="updateTime" column="update_time"/>
+        <result property="remark" column="remark"/>
+    </resultMap>
+
+    <sql id="baseColumns">
+        r.salary_id, r.user_id, r.user_name, u.nick_name as nick_name,
+        r.dept_id, dept.dept_name as dept_name,
+        r.shop_dept_id, shop_dept.dept_name as shop_dept_name, r.salary_month,
+        r.work_days, r.leave_days, r.absent_days,
+        r.scheduled_minutes, r.worked_minutes, r.paid_leave_minutes,
+        r.unpaid_leave_minutes, r.absence_minutes, r.attendance_source_version,
+        r.late_total_minutes, r.early_total_minutes, r.overtime_hours,
+        r.base_salary, r.attendance_deduction, r.late_deduction, r.early_deduction, r.absent_deduction,
+        r.overtime_pay, r.other_bonus, r.other_deduction, r.total_salary, r.status,
+        r.create_by, r.create_time, r.update_by, r.update_time, r.remark
+    </sql>
+
+    <sql id="fromWithReadableNames">
+        from oa_salary_record r
+        left join sys_user u on u.user_id = r.user_id
+        left join sys_dept dept on dept.dept_id = r.dept_id
+        left join sys_dept shop_dept on shop_dept.dept_id = r.shop_dept_id
+    </sql>
+
+    <insert id="insertOaSalaryRecord" parameterType="OaSalaryRecord" useGeneratedKeys="true" keyProperty="salaryId">
+        insert into oa_salary_record (
+            user_id, user_name, dept_id, shop_dept_id, salary_month,
+            work_days, leave_days, absent_days, scheduled_minutes,
+            worked_minutes, paid_leave_minutes, unpaid_leave_minutes,
+            absence_minutes, attendance_source_version,
+            late_total_minutes, early_total_minutes, overtime_hours,
+            base_salary, attendance_deduction, late_deduction, early_deduction, absent_deduction,
+            overtime_pay, other_bonus, other_deduction, total_salary, status,
+            create_by, create_time, remark
+        ) values (
+            #{userId}, #{userName}, #{deptId}, #{shopDeptId}, #{salaryMonth},
+            #{workDays}, #{leaveDays}, #{absentDays}, #{scheduledMinutes},
+            #{workedMinutes}, #{paidLeaveMinutes}, #{unpaidLeaveMinutes},
+            #{absenceMinutes}, #{attendanceSourceVersion},
+            #{lateTotalMinutes}, #{earlyTotalMinutes}, #{overtimeHours},
+            #{baseSalary}, #{attendanceDeduction}, #{lateDeduction}, #{earlyDeduction}, #{absentDeduction},
+            #{overtimePay}, #{otherBonus}, #{otherDeduction}, #{totalSalary}, #{status},
+            #{createBy}, sysdate(), #{remark}
+        )
+    </insert>
+
+    <update id="updateOaSalaryRecord" parameterType="OaSalaryRecord">
+        update oa_salary_record
+        <set>
+            <if test="otherBonus != null">other_bonus = #{otherBonus},</if>
+            <if test="otherDeduction != null">other_deduction = #{otherDeduction},</if>
+            <if test="totalSalary != null">total_salary = #{totalSalary},</if>
+            <if test="status != null and status != ''">status = #{status},</if>
+            <if test="updateBy != null and updateBy != ''">update_by = #{updateBy},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            update_time = sysdate()
+        </set>
+        where salary_id = #{salaryId}
+    </update>
+
+    <select id="selectOaSalaryRecordById" resultMap="OaSalaryRecordResult">
+        select <include refid="baseColumns"/> <include refid="fromWithReadableNames"/> where r.salary_id = #{salaryId}
+    </select>
+
+    <select id="selectOaSalaryRecordList" parameterType="OaSalaryRecord" resultMap="OaSalaryRecordResult">
+        select <include refid="baseColumns"/> <include refid="fromWithReadableNames"/>
+        <where>
+            <if test="userId != null">and r.user_id = #{userId}</if>
+            <if test="userName != null and userName != ''">and r.user_name like concat('%', #{userName}, '%')</if>
+            <if test="salaryMonth != null and salaryMonth != ''">and r.salary_month = #{salaryMonth}</if>
+            <if test="status != null and status != ''">and r.status = #{status}</if>
+            <if test="shopDeptId != null">and r.shop_dept_id = #{shopDeptId}</if>
+            <if test="params.scopeDeptIds != null and params.scopeDeptIds.size() > 0">
+                and r.shop_dept_id in
+                <foreach collection="params.scopeDeptIds" item="scopeDeptId" open="(" close=")" separator=",">
+                    #{scopeDeptId}
+                </foreach>
+            </if>
+        </where>
+        order by r.salary_month desc, r.user_id asc
+    </select>
+
+    <select id="selectByUserIdAndMonth" resultMap="OaSalaryRecordResult">
+        select <include refid="baseColumns"/> <include refid="fromWithReadableNames"/>
+        where r.user_id = #{param1} and r.salary_month = #{param2}
+    </select>
+
+    <delete id="deleteByShopDeptIdAndMonth">
+        delete from oa_salary_record where shop_dept_id = #{param1} and salary_month = #{param2}
+    </delete>
+
+</mapper>

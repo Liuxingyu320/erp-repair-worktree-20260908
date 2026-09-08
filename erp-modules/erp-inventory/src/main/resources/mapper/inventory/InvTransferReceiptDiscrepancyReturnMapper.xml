@@ -1,0 +1,696 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.inventory.mapper.InvTransferReceiptDiscrepancyReturnMapper">
+
+    <resultMap id="ReturnFactResult"
+            type="com.erp.inventory.domain.transfer.InvTransferReceiptDiscrepancyReturnFact">
+        <id property="caseId" column="discrepancy_case_id"/>
+        <result property="caseVersionBefore" column="case_version_before"/>
+        <result property="adjudicationId" column="adjudication_id"/>
+        <result property="actionId" column="adjudication_action_id"/>
+        <result property="actionVersionBefore"
+                column="action_version_before"/>
+        <result property="discrepancyType" column="discrepancy_type"/>
+        <result property="actionType" column="action_type"/>
+        <result property="parentTransferId" column="parent_transfer_id"/>
+        <result property="parentTransferType"
+                column="parent_transfer_type"/>
+        <result property="fromDeptId" column="from_dept_id"/>
+        <result property="fromWarehouseId" column="from_warehouse_id"/>
+        <result property="toDeptId" column="to_dept_id"/>
+        <result property="toWarehouseId" column="to_warehouse_id"/>
+        <result property="receiptId" column="receipt_id"/>
+        <result property="receiptAllocationId"
+                column="receipt_allocation_id"/>
+        <result property="shipmentId" column="shipment_id"/>
+        <result property="shipmentAllocationId"
+                column="shipment_allocation_id"/>
+        <result property="targetWarehouseId" column="target_warehouse_id"/>
+        <result property="itemType" column="item_type"/>
+        <result property="itemId" column="item_id"/>
+        <result property="productId" column="product_id"/>
+        <result property="trackingPolicy" column="tracking_policy"/>
+        <result property="damagedQuantity" column="damaged_quantity"/>
+        <result property="quantity" column="action_quantity"/>
+        <result property="sourceCostPrice" column="source_cost_price"/>
+        <result property="amount" column="action_amount"/>
+        <result property="quarantineBalanceId"
+                column="quarantine_balance_id"/>
+        <result property="quarantineLotId" column="quarantine_lot_id"/>
+        <result property="quarantineLocationId"
+                column="quarantine_location_id"/>
+        <result property="decisionFingerprint"
+                column="decision_fingerprint"/>
+    </resultMap>
+
+    <resultMap id="DetailResult"
+            type="com.erp.inventory.domain.InvTransferDetail">
+        <id property="detailId" column="detail_id"/>
+        <result property="transferId" column="transfer_id"/>
+        <result property="itemType" column="item_type"/>
+        <result property="itemId" column="item_id"/>
+        <result property="itemCode" column="item_code"/>
+        <result property="itemName" column="item_name"/>
+        <result property="productId" column="product_id"/>
+        <result property="productName" column="product_name"/>
+        <result property="productCode" column="product_code"/>
+        <result property="quantity" column="quantity"/>
+        <result property="deliveredQuantity" column="delivered_quantity"/>
+        <result property="receivedQuantity" column="received_quantity"/>
+        <result property="costPrice" column="cost_price"/>
+        <result property="amount" column="amount"/>
+        <result property="unit" column="unit"/>
+        <result property="spec" column="spec"/>
+        <result property="grade" column="grade"/>
+        <result property="sortOrder" column="sort_order"/>
+        <result property="goodsCondition" column="goods_condition"/>
+        <result property="conditionNote" column="condition_note"/>
+        <result property="lotId" column="lot_id"/>
+        <result property="sourceLocationId" column="source_location_id"/>
+    </resultMap>
+
+    <resultMap id="StockResult"
+            type="com.erp.inventory.domain.transfer.InvTransferReceiptTargetStock">
+        <id property="stockId" column="stock_id"/>
+        <result property="itemType" column="item_type"/>
+        <result property="itemId" column="item_id"/>
+        <result property="productId" column="product_id"/>
+        <result property="shopDeptId" column="shop_dept_id"/>
+        <result property="warehouseId" column="warehouse_id"/>
+        <result property="currentQuantity" column="current_quantity"/>
+        <result property="lockedQuantity" column="locked_quantity"/>
+        <result property="availableQuantity" column="available_quantity"/>
+        <result property="quarantineQuantity"
+                column="quarantine_quantity"/>
+        <result property="costPrice" column="cost_price"/>
+        <result property="totalCost" column="total_cost"/>
+        <result property="version" column="version"/>
+    </resultMap>
+
+    <resultMap id="LotResult"
+            type="com.erp.inventory.domain.transfer.InvTransferReceiptTargetLot">
+        <id property="lotId" column="lot_id"/>
+        <result property="lotNo" column="lot_no"/>
+        <result property="itemType" column="item_type"/>
+        <result property="itemId" column="item_id"/>
+        <result property="productId" column="product_id"/>
+        <result property="warehouseId" column="warehouse_id"/>
+        <result property="sourceLotId" column="source_lot_id"/>
+        <result property="receiptDisposition"
+                column="receipt_disposition"/>
+        <result property="qcStatus" column="qc_status"/>
+        <result property="lotStatus" column="lot_status"/>
+    </resultMap>
+
+    <resultMap id="LocationResult"
+            type="com.erp.inventory.domain.transfer.InvTransferReceiptLocationCandidate">
+        <id property="locationId" column="location_id"/>
+        <result property="warehouseId" column="warehouse_id"/>
+        <result property="locationCode" column="location_code"/>
+        <result property="locationName" column="location_name"/>
+        <result property="locationType" column="location_type"/>
+        <result property="sortOrder" column="sort_order"/>
+        <result property="status" column="status"/>
+        <result property="virtualFlag" column="is_virtual"/>
+    </resultMap>
+
+    <resultMap id="BalanceResult"
+            type="com.erp.inventory.domain.transfer.InvTransferReceiptTargetBalance">
+        <id property="balanceId" column="balance_id"/>
+        <result property="itemType" column="item_type"/>
+        <result property="itemId" column="item_id"/>
+        <result property="productId" column="product_id"/>
+        <result property="warehouseId" column="warehouse_id"/>
+        <result property="lotId" column="lot_id"/>
+        <result property="locationId" column="location_id"/>
+        <result property="currentQuantity" column="current_quantity"/>
+        <result property="lockedQuantity" column="locked_quantity"/>
+        <result property="availableQuantity" column="available_quantity"/>
+        <result property="quarantineQuantity"
+                column="quarantine_quantity"/>
+        <result property="costPrice" column="cost_price"/>
+        <result property="totalCost" column="total_cost"/>
+        <result property="version" column="version"/>
+    </resultMap>
+
+    <resultMap id="SerialResult"
+            type="com.erp.inventory.domain.transfer.InvTransferReceiptDiscrepancyReturnSerialFact">
+        <id property="receiptSerialId" column="receipt_serial_id"/>
+        <result property="receiptId" column="receipt_id"/>
+        <result property="receiptAllocationId" column="receipt_allocation_id"/>
+        <result property="shipmentId" column="shipment_id"/>
+        <result property="shipmentAllocationId"
+                column="shipment_allocation_id"/>
+        <result property="serialId" column="serial_id"/>
+        <result property="serialNoSnapshot" column="serial_no_snapshot"/>
+        <result property="currentSerialNo" column="current_serial_no"/>
+        <result property="disposition" column="disposition"/>
+        <result property="itemType" column="item_type"/>
+        <result property="itemId" column="item_id"/>
+        <result property="currentWarehouseId" column="current_warehouse_id"/>
+        <result property="currentBalanceId" column="current_balance_id"/>
+        <result property="currentLotId" column="current_lot_id"/>
+        <result property="currentLocationId" column="current_location_id"/>
+        <result property="receiptStatusAfter" column="receipt_status_after"/>
+        <result property="currentStatus" column="current_status"/>
+    </resultMap>
+
+    <resultMap id="CreatedChildResult"
+            type="com.erp.inventory.domain.transfer.InvTransferReceiptDiscrepancyAdjudicationAsyncWorkflowChildFact">
+        <id property="transferId" column="transfer_id"/>
+        <result property="transferType" column="transfer_type"/>
+        <result property="sourceBusinessType"
+                column="source_business_type"/>
+        <result property="sourceBusinessId" column="source_business_id"/>
+        <result property="sourceLocationDeptId"
+                column="source_location_dept_id"/>
+        <result property="targetLocationDeptId"
+                column="target_location_dept_id"/>
+        <result property="status" column="status"/>
+        <result property="detailCount" column="detail_count"/>
+        <result property="itemType" column="item_type"/>
+        <result property="itemId" column="item_id"/>
+        <result property="productId" column="product_id"/>
+        <result property="requestedQuantity" column="requested_quantity"/>
+        <result property="deliveredQuantity" column="delivered_quantity"/>
+        <result property="reservationKind" column="reservation_kind"/>
+        <result property="reservationCount" column="reservation_count"/>
+        <result property="reservedQuantity" column="reserved_quantity"/>
+        <result property="reservationStatus" column="reservation_status"/>
+        <result property="consumedQuantity" column="consumed_quantity"/>
+        <result property="releasedQuantity" column="released_quantity"/>
+        <result property="v2ShipmentCount" column="v2_shipment_count"/>
+        <result property="legacyShipmentCount"
+                column="legacy_shipment_count"/>
+        <result property="receiptCount" column="receipt_count"/>
+        <result property="openDiscrepancyCount"
+                column="open_discrepancy_count"/>
+    </resultMap>
+
+    <select id="selectSourceForUpdate" resultMap="ReturnFactResult">
+        select c.discrepancy_case_id,
+               c.case_version as case_version_before,
+               a.adjudication_id, x.adjudication_action_id,
+               x.execution_version as action_version_before,
+               c.discrepancy_type, x.action_type,
+               parent.transfer_id as parent_transfer_id,
+               parent.transfer_type as parent_transfer_type,
+               parent.from_dept_id, parent.from_warehouse_id,
+               parent.to_dept_id, parent.to_warehouse_id,
+               c.receipt_id, ra.receipt_allocation_id, c.shipment_id,
+               sa.allocation_id as shipment_allocation_id,
+               receipt.target_warehouse_id, ra.item_type, ra.item_id,
+               ra.product_id, ra.tracking_policy, ra.damaged_quantity,
+               x.action_quantity, a.source_cost_price, x.action_amount,
+               ra.damaged_target_balance_id as quarantine_balance_id,
+               ra.damaged_target_lot_id as quarantine_lot_id,
+               ra.quarantine_location_id, a.decision_fingerprint
+        from inv_transfer_receipt_discrepancy_case c
+        inner join inv_transfer_receipt_discrepancy_adjudication a
+                on a.discrepancy_case_id = c.discrepancy_case_id
+               and a.adjudication_id = #{adjudicationId}
+        inner join
+            inv_transfer_receipt_discrepancy_adjudication_action x
+                on x.discrepancy_case_id = c.discrepancy_case_id
+               and x.adjudication_id = a.adjudication_id
+               and x.adjudication_action_id = #{actionId}
+        inner join inv_transfer_shipment_receipt receipt
+                on receipt.receipt_id = c.receipt_id
+               and receipt.shipment_id = c.shipment_id
+               and receipt.transfer_id = c.transfer_id
+        inner join inv_transfer_shipment_receipt_allocation ra
+                on ra.receipt_allocation_id = c.receipt_allocation_id
+               and ra.receipt_id = c.receipt_id
+               and ra.shipment_id = c.shipment_id
+               and ra.shipment_allocation_id = c.shipment_allocation_id
+        inner join inv_transfer_shipment_allocation sa
+                on sa.allocation_id = c.shipment_allocation_id
+               and sa.shipment_id = c.shipment_id
+               and sa.transfer_id = c.transfer_id
+               and sa.allocation_id = ra.shipment_allocation_id
+        inner join inv_transfer_order parent
+                on parent.transfer_id = c.transfer_id
+        where c.discrepancy_case_id = #{caseId}
+          and c.case_version = #{caseVersion}
+          and c.discrepancy_type = 'damaged'
+          and c.discrepancy_quantity = ra.damaged_quantity
+          and c.source_cost_price = ra.cost_price
+          and c.discrepancy_amount = ra.damaged_cost
+          and c.discrepancy_amount = round(
+              c.discrepancy_quantity * c.source_cost_price, 6)
+          and a.case_version_after &lt;= c.case_version
+          and a.discrepancy_type = c.discrepancy_type
+          and a.discrepancy_quantity = c.discrepancy_quantity
+          and a.source_cost_price = c.source_cost_price
+          and a.discrepancy_amount = c.discrepancy_amount
+          and a.plan_status in (
+              'adjudication_planned', 'adjudication_executing')
+          and c.status = a.plan_status
+          and x.action_type = 'return_to_source'
+          and x.coverage_kind = 'resolution'
+          and x.action_quantity &gt; 0
+          and x.action_quantity &lt;= c.discrepancy_quantity
+          and x.action_amount = round(
+              x.action_quantity * c.source_cost_price, 6)
+          and x.action_amount &lt;= c.discrepancy_amount
+          and x.execution_status = 'pending'
+          and x.execution_version = #{actionVersion}
+          and x.execution_effect_reference is null
+          and ra.item_type in ('product', 'oe', 'gift')
+          and ra.item_id &gt; 0
+          and ra.tracking_policy in ('lot', 'serial')
+          and ra.damaged_quantity &gt; 0
+          and ra.damaged_target_balance_id is not null
+          and ra.damaged_target_lot_id is not null
+          and ra.quarantine_location_id is not null
+          and sa.transfer_detail_id = ra.transfer_detail_id
+          and sa.cost_price = ra.cost_price
+          and parent.transfer_type in (
+              'warehouse', 'store_return', 'cross_store')
+          and receipt.target_warehouse_id = coalesce(
+              nullif(parent.to_warehouse_id, 0), parent.to_dept_id)
+          and not exists (
+              select 1
+              from inv_transfer_receipt_discrepancy_adjudication_workflow_link link
+              where link.adjudication_action_id = x.adjudication_action_id
+          )
+          and not exists (
+              select 1
+              from inv_transfer_quarantine_reservation prior
+              where prior.adjudication_action_id =
+                  x.adjudication_action_id
+          )
+        for update
+    </select>
+
+    <select id="selectCreatedDraftDetailForUpdate"
+            resultMap="DetailResult">
+        select detail.detail_id, detail.transfer_id, detail.item_type,
+               detail.item_id, detail.item_code, detail.item_name,
+               detail.product_id, detail.product_name,
+               detail.product_code, detail.quantity,
+               detail.delivered_quantity, detail.received_quantity,
+               detail.cost_price, detail.amount, detail.unit, detail.spec,
+               detail.grade, detail.sort_order, detail.goods_condition,
+               detail.condition_note, detail.lot_id,
+               detail.source_location_id
+        from inv_transfer_order child
+        inner join inv_transfer_detail detail
+                on detail.transfer_id = child.transfer_id
+        where child.transfer_id = #{childTransferId}
+          and child.source_business_type =
+              'transfer_discrepancy_return'
+          and child.source_business_id = #{actionId}
+          and child.status = 'draft'
+          and (select count(1)
+               from inv_transfer_detail all_detail
+               where all_detail.transfer_id = child.transfer_id) = 1
+        for update
+    </select>
+
+    <select id="selectDisposedQuantity" resultType="java.math.BigDecimal">
+        select
+            coalesce((
+                select sum(loss.loss_quantity)
+                from inv_transfer_receipt_discrepancy_damage_loss_ledger loss
+                where loss.receipt_allocation_id = #{receiptAllocationId}
+            ), 0.0000)
+            + coalesce((
+                select sum(reservation.reserved_quantity)
+                from inv_transfer_quarantine_reservation reservation
+                where reservation.receipt_allocation_id =
+                    #{receiptAllocationId}
+            ), 0.0000)
+    </select>
+
+    <select id="selectStockForUpdate" resultMap="StockResult">
+        select stock_id, item_type, item_id, product_id, shop_dept_id,
+               warehouse_id, current_quantity, locked_quantity,
+               available_quantity, quarantine_quantity, cost_price,
+               total_cost, version
+        from inv_stock
+        where shop_dept_id = #{fact.targetWarehouseId}
+          and warehouse_id = #{fact.targetWarehouseId}
+          and item_type = #{fact.itemType}
+          and item_id = #{fact.itemId}
+        for update
+    </select>
+
+    <select id="selectLotForUpdate" resultMap="LotResult">
+        select lot_id, lot_no, item_type, item_id, product_id,
+               warehouse_id, source_lot_id, receipt_disposition,
+               qc_status, lot_status
+        from inv_inventory_lot
+        where lot_id = #{fact.quarantineLotId}
+        for update
+    </select>
+
+    <select id="selectLocationForUpdate" resultMap="LocationResult">
+        select location_id, warehouse_id, location_code, location_name,
+               location_type, sort_order, status, is_virtual
+        from inv_warehouse_location
+        where location_id = #{fact.quarantineLocationId}
+        for update
+    </select>
+
+    <select id="selectBalanceForUpdate" resultMap="BalanceResult">
+        select balance_id, item_type, item_id, product_id, warehouse_id,
+               lot_id, location_id, current_quantity, locked_quantity,
+               available_quantity, quarantine_quantity, cost_price,
+               total_cost, version
+        from inv_stock_balance_detail
+        where balance_id = #{fact.quarantineBalanceId}
+        for update
+    </select>
+
+    <select id="selectEligibleSerialsForUpdate" resultMap="SerialResult">
+        select rs.receipt_serial_id, rs.receipt_id,
+               rs.receipt_allocation_id, rs.shipment_id,
+               rs.shipment_allocation_id, rs.serial_id,
+               rs.serial_no_snapshot,
+               serial.serial_no as current_serial_no,
+               rs.disposition, serial.item_type, serial.item_id,
+               serial.warehouse_id as current_warehouse_id,
+               serial.balance_id as current_balance_id,
+               serial.lot_id as current_lot_id,
+               serial.location_id as current_location_id,
+               rs.status_after as receipt_status_after,
+               serial.serial_status as current_status
+        from inv_transfer_shipment_receipt_serial rs
+        inner join inv_inventory_serial serial
+                on serial.serial_id = rs.serial_id
+               and serial.item_type = #{fact.itemType}
+               and serial.item_id = #{fact.itemId}
+        where rs.receipt_allocation_id = #{fact.receiptAllocationId}
+          and rs.receipt_id = #{fact.receiptId}
+          and rs.shipment_id = #{fact.shipmentId}
+          and rs.shipment_allocation_id = #{fact.shipmentAllocationId}
+          and rs.disposition = 'damaged'
+          and rs.status_after = 'quarantine'
+          and serial.warehouse_id = #{fact.targetWarehouseId}
+          and serial.balance_id = #{fact.quarantineBalanceId}
+          and serial.lot_id = #{fact.quarantineLotId}
+          and serial.location_id = #{fact.quarantineLocationId}
+          and serial.serial_status = 'quarantine'
+          and not exists (
+              select 1
+              from inv_transfer_receipt_discrepancy_damage_loss_serial used
+              where used.receipt_serial_id = rs.receipt_serial_id
+                 or used.serial_id = rs.serial_id
+          )
+          and not exists (
+              select 1
+              from inv_transfer_quarantine_reservation_serial reserved
+              where reserved.receipt_serial_id = rs.receipt_serial_id
+                 or reserved.serial_id = rs.serial_id
+          )
+        order by rs.receipt_serial_id, serial.serial_id
+        for update
+    </select>
+
+    <update id="reserveStock">
+        update inv_stock
+        set locked_quantity = #{reservation.stock.lockedAfter},
+            quarantine_quantity =
+                #{reservation.stock.quarantineAfter},
+            version = #{reservation.stockVersionAfter},
+            update_by = #{reservation.source.executorName},
+            update_time = sysdate()
+        where stock_id = #{reservation.stockId}
+          and shop_dept_id = #{reservation.fact.targetWarehouseId}
+          and warehouse_id = #{reservation.fact.targetWarehouseId}
+          and item_type = #{reservation.source.itemType}
+          and item_id = #{reservation.source.itemId}
+          and version = #{reservation.stockVersionBefore}
+          and current_quantity = #{reservation.stock.currentBefore}
+          and available_quantity = #{reservation.stock.availableBefore}
+          and locked_quantity = #{reservation.stock.lockedBefore}
+          and quarantine_quantity =
+              #{reservation.stock.quarantineBefore}
+          and cost_price = #{reservation.stockCostPrice}
+          and total_cost = #{reservation.stockTotalCost}
+          and current_quantity = available_quantity + locked_quantity
+              + quarantine_quantity
+          and #{reservation.stock.currentAfter} = current_quantity
+          and #{reservation.stock.availableAfter} = available_quantity
+          and #{reservation.stock.lockedAfter} = locked_quantity
+              + #{reservation.source.quantity}
+          and #{reservation.stock.quarantineAfter} = quarantine_quantity
+              - #{reservation.source.quantity}
+          and #{reservation.stockVersionAfter} = version + 1
+          and quarantine_quantity &gt;= #{reservation.source.quantity}
+    </update>
+
+    <update id="reserveBalance">
+        update inv_stock_balance_detail
+        set locked_quantity = #{reservation.balance.lockedAfter},
+            quarantine_quantity =
+                #{reservation.balance.quarantineAfter},
+            version = #{reservation.balanceVersionAfter},
+            update_by = #{reservation.source.executorName},
+            update_time = sysdate()
+        where balance_id = #{reservation.balanceId}
+          and warehouse_id = #{reservation.fact.targetWarehouseId}
+          and item_type = #{reservation.source.itemType}
+          and item_id = #{reservation.source.itemId}
+          and lot_id = #{reservation.fact.quarantineLotId}
+          and location_id = #{reservation.fact.quarantineLocationId}
+          and version = #{reservation.balanceVersionBefore}
+          and current_quantity = #{reservation.balance.currentBefore}
+          and available_quantity =
+              #{reservation.balance.availableBefore}
+          and available_quantity = 0
+          and locked_quantity = #{reservation.balance.lockedBefore}
+          and quarantine_quantity =
+              #{reservation.balance.quarantineBefore}
+          and cost_price = #{reservation.balanceCostPrice}
+          and cost_price = #{reservation.source.sourceCostPrice}
+          and total_cost = #{reservation.balanceTotalCost}
+          and current_quantity = available_quantity + locked_quantity
+              + quarantine_quantity
+          and #{reservation.balance.currentAfter} = current_quantity
+          and #{reservation.balance.availableAfter} = available_quantity
+          and #{reservation.balance.lockedAfter} = locked_quantity
+              + #{reservation.source.quantity}
+          and #{reservation.balance.quarantineAfter} = quarantine_quantity
+              - #{reservation.source.quantity}
+          and #{reservation.balanceVersionAfter} = version + 1
+          and quarantine_quantity &gt;= #{reservation.source.quantity}
+    </update>
+
+    <update id="reserveSerial">
+        update inv_inventory_serial
+        set serial_status = #{serial.statusAfter},
+            update_by = #{reservation.source.executorName},
+            update_time = sysdate(),
+            remark = concat('adjudication return reservation action=',
+                    #{reservation.source.actionId})
+        where serial_id = #{serial.serialId}
+          and serial_no = #{serial.serialNo}
+          and item_type = #{reservation.source.itemType}
+          and item_id = #{reservation.source.itemId}
+          and warehouse_id = #{reservation.fact.targetWarehouseId}
+          and balance_id = #{reservation.fact.quarantineBalanceId}
+          and lot_id = #{reservation.fact.quarantineLotId}
+          and location_id = #{reservation.fact.quarantineLocationId}
+          and serial_status = #{serial.statusBefore}
+          and #{serial.statusAfter} = 'quarantine_reserved'
+    </update>
+
+    <insert id="insertReservation" useGeneratedKeys="true"
+            keyProperty="generatedId.value">
+        insert into inv_transfer_quarantine_reservation (
+            request_id, discrepancy_case_id, adjudication_id,
+            adjudication_action_id, action_version_before,
+            child_transfer_id, child_transfer_detail_id,
+            reservation_round, receipt_id, receipt_allocation_id,
+            shipment_id, shipment_allocation_id, stock_id,
+            quarantine_balance_id, quarantine_lot_id,
+            quarantine_location_id, item_type, item_id, product_id,
+            tracking_policy, reserved_quantity, consumed_quantity,
+            released_quantity, source_cost_price, reserved_amount,
+            disposed_quantity_before, disposed_quantity_after,
+            stock_version_before, stock_version_after,
+            balance_version_before, balance_version_after,
+            decision_fingerprint, status, version, operator_user_id,
+            operator_name, create_by, create_time, update_by, update_time
+        ) values (
+            #{reservation.source.requestId}, #{reservation.source.caseId},
+            #{reservation.source.adjudicationId},
+            #{reservation.source.actionId},
+            #{reservation.source.actionVersionBefore},
+            #{reservation.childTransferId},
+            #{reservation.childDetailId},
+            #{reservation.reservationRound},
+            #{reservation.fact.receiptId},
+            #{reservation.fact.receiptAllocationId},
+            #{reservation.fact.shipmentId},
+            #{reservation.fact.shipmentAllocationId},
+            #{reservation.stockId}, #{reservation.balanceId},
+            #{reservation.fact.quarantineLotId},
+            #{reservation.fact.quarantineLocationId},
+            #{reservation.source.itemType}, #{reservation.source.itemId},
+            #{reservation.source.productId},
+            #{reservation.source.trackingPolicy},
+            #{reservation.source.quantity}, 0.0000, 0.0000,
+            #{reservation.source.sourceCostPrice},
+            #{reservation.source.amount},
+            #{reservation.disposedQuantityBefore},
+            #{reservation.disposedQuantityAfter},
+            #{reservation.stockVersionBefore},
+            #{reservation.stockVersionAfter},
+            #{reservation.balanceVersionBefore},
+            #{reservation.balanceVersionAfter},
+            #{reservation.source.decisionFingerprint}, 'ACTIVE', 0,
+            #{reservation.source.executorUserId},
+            #{reservation.source.executorName},
+            #{reservation.source.executorName},
+            #{reservation.source.createdAt},
+            #{reservation.source.executorName},
+            #{reservation.source.createdAt}
+        )
+    </insert>
+
+    <insert id="insertReservationSerial">
+        insert into inv_transfer_quarantine_reservation_serial (
+            quarantine_reservation_id, request_id,
+            adjudication_action_id, receipt_serial_id, serial_id,
+            serial_no_snapshot, warehouse_id, balance_id, lot_id,
+            location_id, status_before, status_after, create_by,
+            create_time
+        )
+        select #{reservationId}, #{reservation.source.requestId},
+               #{reservation.source.actionId}, rs.receipt_serial_id,
+               rs.serial_id, rs.serial_no_snapshot,
+               #{reservation.fact.targetWarehouseId},
+               #{reservation.fact.quarantineBalanceId},
+               #{reservation.fact.quarantineLotId},
+               #{reservation.fact.quarantineLocationId},
+               #{serial.statusBefore}, #{serial.statusAfter},
+               #{reservation.source.executorName},
+               #{reservation.source.createdAt}
+        from inv_transfer_quarantine_reservation owner
+        inner join inv_transfer_shipment_receipt_serial rs
+                on rs.receipt_serial_id = #{serial.receiptSerialId}
+               and rs.serial_id = #{serial.serialId}
+               and rs.serial_no_snapshot = #{serial.serialNo}
+               and rs.receipt_id = #{reservation.fact.receiptId}
+               and rs.receipt_allocation_id =
+                   #{reservation.fact.receiptAllocationId}
+               and rs.shipment_id = #{reservation.fact.shipmentId}
+               and rs.shipment_allocation_id =
+                   #{reservation.fact.shipmentAllocationId}
+               and rs.disposition = 'damaged'
+               and rs.status_after = 'quarantine'
+        inner join inv_inventory_serial current_serial
+                on current_serial.serial_id = rs.serial_id
+               and current_serial.serial_no = rs.serial_no_snapshot
+               and current_serial.item_type =
+                   #{reservation.source.itemType}
+               and current_serial.item_id = #{reservation.source.itemId}
+               and current_serial.warehouse_id =
+                   #{reservation.fact.targetWarehouseId}
+               and current_serial.balance_id =
+                   #{reservation.fact.quarantineBalanceId}
+               and current_serial.lot_id =
+                   #{reservation.fact.quarantineLotId}
+               and current_serial.location_id =
+                   #{reservation.fact.quarantineLocationId}
+               and current_serial.serial_status = #{serial.statusAfter}
+        where owner.quarantine_reservation_id = #{reservationId}
+          and owner.request_id = #{reservation.source.requestId}
+          and owner.adjudication_action_id =
+              #{reservation.source.actionId}
+          and #{serial.statusBefore} = 'quarantine'
+          and #{serial.statusAfter} = 'quarantine_reserved'
+          and not exists (
+              select 1
+              from inv_transfer_quarantine_reservation_serial prior
+              where prior.receipt_serial_id = #{serial.receiptSerialId}
+                 or prior.serial_id = #{serial.serialId}
+          )
+    </insert>
+
+    <select id="selectCreatedChildForUpdate"
+            resultMap="CreatedChildResult">
+        select child.transfer_id, child.transfer_type,
+               child.source_business_type, child.source_business_id,
+               coalesce(nullif(child.from_warehouse_id, 0),
+                        child.from_dept_id) as source_location_dept_id,
+               coalesce(nullif(child.to_warehouse_id, 0),
+                        child.to_dept_id) as target_location_dept_id,
+               child.status,
+               (select count(1)
+                from inv_transfer_detail all_detail
+                where all_detail.transfer_id = child.transfer_id)
+                   as detail_count,
+               detail.item_type, detail.item_id, detail.product_id,
+               detail.quantity as requested_quantity,
+               detail.delivered_quantity,
+               'quarantine_detail' as reservation_kind,
+               (select count(1)
+                from inv_transfer_quarantine_reservation all_reservation
+                where all_reservation.child_transfer_id = child.transfer_id
+                  and all_reservation.reservation_round =
+                      child.approval_round) as reservation_count,
+               (select coalesce(sum(all_reservation.reserved_quantity), 0)
+                from inv_transfer_quarantine_reservation all_reservation
+                where all_reservation.child_transfer_id = child.transfer_id
+                  and all_reservation.reservation_round =
+                      child.approval_round) as reserved_quantity,
+               reservation.status as reservation_status,
+               reservation.consumed_quantity,
+               reservation.released_quantity,
+               (select count(1)
+                from inv_transfer_shipment v2_shipment
+                where v2_shipment.transfer_id = child.transfer_id
+                  and v2_shipment.inventory_write_version = 'V2_DETAIL')
+                   as v2_shipment_count,
+               (select count(1)
+                from inv_transfer_shipment legacy_shipment
+                where legacy_shipment.transfer_id = child.transfer_id
+                  and coalesce(legacy_shipment.inventory_write_version,
+                               'LEGACY') &lt;&gt; 'V2_DETAIL')
+                   as legacy_shipment_count,
+               (select count(1)
+                from inv_transfer_shipment_receipt receipt
+                where receipt.transfer_id = child.transfer_id)
+                   as receipt_count,
+               (select count(1)
+                from inv_transfer_receipt_discrepancy_case discrepancy
+                where discrepancy.transfer_id = child.transfer_id
+                  and discrepancy.status &lt;&gt; 'resolved')
+                   as open_discrepancy_count
+        from inv_transfer_order child
+        inner join inv_transfer_detail detail
+                on detail.detail_id = (
+                    select min(first_detail.detail_id)
+                    from inv_transfer_detail first_detail
+                    where first_detail.transfer_id = child.transfer_id)
+        inner join inv_transfer_quarantine_reservation reservation
+                on reservation.quarantine_reservation_id = (
+                    select min(first_reservation.quarantine_reservation_id)
+                    from inv_transfer_quarantine_reservation first_reservation
+                    where first_reservation.child_transfer_id =
+                        child.transfer_id
+                      and first_reservation.reservation_round =
+                          child.approval_round)
+        where child.transfer_id = #{childTransferId}
+          and child.source_business_type =
+              'transfer_discrepancy_return'
+          and child.source_business_id = #{actionId}
+          and child.approval_round &gt; 0
+          and reservation.adjudication_action_id = #{actionId}
+          and reservation.child_transfer_detail_id = detail.detail_id
+          and reservation.item_type = detail.item_type
+          and reservation.item_id = detail.item_id
+          and reservation.quarantine_balance_id &gt; 0
+          and reservation.quarantine_lot_id &gt; 0
+          and reservation.quarantine_location_id &gt; 0
+          and reservation.status = 'ACTIVE'
+          and reservation.consumed_quantity = 0
+          and reservation.released_quantity = 0
+        for update
+    </select>
+
+</mapper>

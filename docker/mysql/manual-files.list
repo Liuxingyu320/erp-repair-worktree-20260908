@@ -1,0 +1,3 @@
+# SQL assets retained in docker/mysql/db but never executed automatically.
+# Every entry is reviewed separately from bootstrap-files.list.
+tea_management_import_20260608.sql

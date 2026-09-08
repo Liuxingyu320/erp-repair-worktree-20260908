@@ -1,0 +1,7 @@
+FROM eclipse-temurin:17-jre-jammy
+MAINTAINER erp
+VOLUME /home/erp
+RUN mkdir -p /home/erp
+WORKDIR /home/erp
+COPY ./jar/erp-modules-inventory.jar /home/erp/erp-modules-inventory.jar
+ENTRYPOINT ["java","-jar","erp-modules-inventory.jar"]

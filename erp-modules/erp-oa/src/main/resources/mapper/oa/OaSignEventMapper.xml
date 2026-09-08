@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.oa.mapper.OaSignEventMapper">
+
+    <resultMap id="OaSignEventResult" type="OaSignEvent">
+        <id property="eventId" column="event_id"/>
+        <result property="packageId" column="package_id"/>
+        <result property="documentId" column="document_id"/>
+        <result property="eventType" column="event_type"/>
+        <result property="operatorUserId" column="operator_user_id"/>
+        <result property="operatorName" column="operator_name"/>
+        <result property="operatorDisplayName" column="operator_display_name"/>
+        <result property="operatorRole" column="operator_role"/>
+        <result property="ipAddress" column="ip_address"/>
+        <result property="userAgent" column="user_agent"/>
+        <result property="eventPayload" column="event_payload"/>
+        <result property="documentHash" column="document_hash"/>
+        <result property="prevEventHash" column="prev_event_hash"/>
+        <result property="eventHash" column="event_hash"/>
+        <result property="requestId" column="request_id"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="remark" column="remark"/>
+    </resultMap>
+
+    <insert id="insertOaSignEvent" parameterType="OaSignEvent" useGeneratedKeys="true" keyProperty="eventId">
+        insert into oa_sign_event (
+            package_id, document_id, event_type, operator_user_id, operator_name,
+            operator_role, ip_address, user_agent, event_payload, document_hash,
+            prev_event_hash, event_hash, request_id, create_by, create_time, remark
+        ) values (
+            #{packageId}, #{documentId}, #{eventType}, #{operatorUserId}, #{operatorName},
+            #{operatorRole}, #{ipAddress}, #{userAgent}, #{eventPayload}, #{documentHash},
+            #{prevEventHash}, #{eventHash}, #{requestId}, #{createBy}, #{createTime}, #{remark}
+        )
+    </insert>
+
+    <select id="selectEventsByPackageId" resultMap="OaSignEventResult">
+        select e.event_id, e.package_id, e.document_id, e.event_type, e.operator_user_id, e.operator_name,
+               case when e.operator_role = 'SYSTEM' then '系统'
+                    else coalesce(nullif(u.nick_name, ''), e.operator_name) end as operator_display_name,
+               e.operator_role, e.ip_address, e.user_agent, e.event_payload, e.document_hash,
+               e.prev_event_hash, e.event_hash, e.request_id, e.create_by, e.create_time, e.remark
+        from oa_sign_event e
+        left join sys_user u on u.user_id = e.operator_user_id
+        where e.package_id = #{packageId}
+        order by e.event_id asc
+    </select>
+
+    <select id="selectLatestEventHashByPackageId" resultType="String">
+        select event_hash
+        from oa_sign_event
+        where package_id = #{packageId}
+        order by event_id desc
+        limit 1
+    </select>
+
+    <select id="selectEventByTypeAndRequestId" resultMap="OaSignEventResult">
+        select event_id, package_id, document_id, event_type, operator_user_id, operator_name,
+               operator_role, ip_address, user_agent, event_payload, document_hash,
+               prev_event_hash, event_hash, request_id, create_by, create_time, remark
+        from oa_sign_event
+        where event_type = #{eventType}
+          and request_id = #{requestId}
+        limit 1
+    </select>
+
+    <delete id="deleteEventsByPackageId">
+        delete from oa_sign_event where package_id = #{packageId}
+    </delete>
+</mapper>

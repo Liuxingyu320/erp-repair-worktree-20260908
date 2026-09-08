@@ -1,0 +1,544 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.oa.attendance.correction.AttendanceCorrectionMapper">
+
+    <select id="selectActiveEmployeeNameInShop" resultType="java.lang.String">
+        select u.nick_name
+        from sys_user u
+        join sys_user_profile p on p.user_id = u.user_id
+        join sys_dept target_dept on target_dept.dept_id = #{shopId}
+        where u.user_id = #{userId} and u.status = '0' and u.del_flag = '0'
+          and p.employee_status in ('试用', '正式', '在职', '待离职')
+          and target_dept.status = '0' and target_dept.del_flag = '0'
+          and target_dept.dept_type = 'STORE'
+          and (
+            exists (
+              select 1 from sys_dept employee_dept
+              where employee_dept.dept_id = u.dept_id
+                and employee_dept.status = '0'
+                and employee_dept.del_flag = '0'
+                and (employee_dept.dept_id = target_dept.dept_id
+                     or find_in_set(target_dept.dept_id,
+                                    employee_dept.ancestors))
+            )
+            or exists (
+              select 1 from sys_user_shop us
+              where us.user_id = u.user_id
+                and us.dept_id = target_dept.dept_id
+            )
+          )
+        limit 1
+    </select>
+
+    <select id="selectScheduleRef"
+            resultType="com.erp.oa.attendance.correction.AttendanceCorrectionModels$ScheduleRef">
+        select schedule_id scheduleId, user_id userId, user_name userName,
+               shop_id shopId, business_date businessDate, status,
+               shift_name_snapshot shiftNameSnapshot,
+               punch_mode_snapshot punchModeSnapshot,
+               start_time_snapshot startTimeSnapshot,
+               end_time_snapshot endTimeSnapshot,
+               cross_day_snapshot crossDaySnapshot,
+               check_in_open_minutes_snapshot checkInOpenMinutesSnapshot,
+               check_in_close_minutes_snapshot checkInCloseMinutesSnapshot,
+               check_out_open_minutes_snapshot checkOutOpenMinutesSnapshot,
+               check_out_close_minutes_snapshot checkOutCloseMinutesSnapshot
+        from oa_attendance_schedule
+        where schedule_id = #{scheduleId}
+    </select>
+
+    <select id="selectScheduleRefForUpdate"
+            resultType="com.erp.oa.attendance.correction.AttendanceCorrectionModels$ScheduleRef">
+        select schedule_id scheduleId, user_id userId, user_name userName,
+               shop_id shopId, business_date businessDate, status,
+               shift_name_snapshot shiftNameSnapshot,
+               punch_mode_snapshot punchModeSnapshot,
+               start_time_snapshot startTimeSnapshot,
+               end_time_snapshot endTimeSnapshot,
+               cross_day_snapshot crossDaySnapshot,
+               check_in_open_minutes_snapshot checkInOpenMinutesSnapshot,
+               check_in_close_minutes_snapshot checkInCloseMinutesSnapshot,
+               check_out_open_minutes_snapshot checkOutOpenMinutesSnapshot,
+               check_out_close_minutes_snapshot checkOutCloseMinutesSnapshot
+        from oa_attendance_schedule
+        where schedule_id = #{scheduleId}
+        for update
+    </select>
+
+    <select id="selectOwnedScheduleRefs"
+            resultType="com.erp.oa.attendance.correction.AttendanceCorrectionModels$ScheduleRef">
+        select schedule_id scheduleId, user_id userId, user_name userName,
+               shop_id shopId, business_date businessDate, status,
+               shift_name_snapshot shiftNameSnapshot,
+               punch_mode_snapshot punchModeSnapshot,
+               start_time_snapshot startTimeSnapshot,
+               end_time_snapshot endTimeSnapshot,
+               cross_day_snapshot crossDaySnapshot,
+               check_in_open_minutes_snapshot checkInOpenMinutesSnapshot,
+               check_in_close_minutes_snapshot checkInCloseMinutesSnapshot,
+               check_out_open_minutes_snapshot checkOutOpenMinutesSnapshot,
+               check_out_close_minutes_snapshot checkOutCloseMinutesSnapshot
+        from oa_attendance_schedule
+        where user_id = #{userId} and shop_id = #{shopId}
+          and business_date between #{dateFrom} and #{dateTo}
+          and status in ('PUBLISHED', 'CHANGED')
+        order by business_date desc, schedule_id desc
+    </select>
+
+    <select id="selectScheduleSegmentRef"
+            resultType="com.erp.oa.attendance.correction.AttendanceCorrectionModels$ScheduleSegmentRef">
+        select schedule_segment_snapshot_id scheduleSegmentSnapshotId,
+               schedule_id scheduleId, segment_order segmentOrder,
+               segment_type segmentType,
+               start_minute_offset startMinuteOffset,
+               end_minute_offset endMinuteOffset
+        from oa_attendance_schedule_segment_snapshot
+        where schedule_id = #{scheduleId}
+          and schedule_segment_snapshot_id = #{scheduleSegmentSnapshotId}
+    </select>
+
+    <select id="selectScheduleSegmentRefs"
+            resultType="com.erp.oa.attendance.correction.AttendanceCorrectionModels$ScheduleSegmentRef">
+        select schedule_segment_snapshot_id scheduleSegmentSnapshotId,
+               schedule_id scheduleId, segment_order segmentOrder,
+               segment_type segmentType,
+               start_minute_offset startMinuteOffset,
+               end_minute_offset endMinuteOffset
+        from oa_attendance_schedule_segment_snapshot
+        where schedule_id = #{scheduleId}
+        order by segment_order, schedule_segment_snapshot_id
+    </select>
+
+    <select id="selectPunchEventRef"
+            resultType="com.erp.oa.attendance.correction.AttendanceCorrectionModels$PunchEventRef">
+        select e.punch_event_id punchEventId, e.schedule_id scheduleId,
+               e.user_id userId, e.shop_id shopId,
+               e.business_date businessDate, e.punch_type punchType,
+               e.schedule_segment_snapshot_id scheduleSegmentSnapshotId,
+               e.punch_slot_key punchSlotKey,
+               ss.segment_order segmentOrder,
+               e.server_punch_time serverPunchTime,
+               e.verification_status verificationStatus
+        from oa_attendance_punch_event e
+        left join oa_attendance_schedule_segment_snapshot ss
+          on ss.schedule_segment_snapshot_id = e.schedule_segment_snapshot_id
+         and ss.schedule_id = e.schedule_id
+        where e.punch_event_id = #{punchEventId}
+    </select>
+
+    <select id="selectSchedulePunchEvents"
+            resultType="com.erp.oa.attendance.correction.AttendanceCorrectionModels$PunchEventRef">
+        select e.punch_event_id punchEventId, e.schedule_id scheduleId,
+               e.user_id userId, e.shop_id shopId,
+               e.business_date businessDate, e.punch_type punchType,
+               e.schedule_segment_snapshot_id scheduleSegmentSnapshotId,
+               e.punch_slot_key punchSlotKey,
+               ss.segment_order segmentOrder,
+               e.server_punch_time serverPunchTime,
+               e.verification_status verificationStatus
+        from oa_attendance_punch_event e
+        left join oa_attendance_schedule_segment_snapshot ss
+          on ss.schedule_segment_snapshot_id = e.schedule_segment_snapshot_id
+         and ss.schedule_id = e.schedule_id
+        where e.schedule_id = #{scheduleId} and e.user_id = #{userId}
+          and e.verification_status = 'ACCEPTED'
+        order by e.server_punch_time, e.punch_event_id
+    </select>
+
+    <select id="countAcceptedPunchEvents" resultType="int">
+        select count(*)
+        from oa_attendance_punch_event
+        where schedule_id = #{scheduleId} and user_id = #{userId}
+          and punch_type = #{punchType}
+          and verification_status = 'ACCEPTED'
+    </select>
+
+    <select id="countAcceptedPunchEventsForSlot" resultType="int">
+        select count(*)
+        from oa_attendance_punch_event
+        where schedule_id = #{scheduleId} and user_id = #{userId}
+          and punch_slot_key = #{punchSlotKey}
+          and verification_status = 'ACCEPTED'
+    </select>
+
+    <select id="selectApprovedLeaveSegmentsForSchedule"
+            resultType="com.erp.oa.attendance.domain.AttendanceSettlementModels$LeaveSegmentSource">
+        select ls.leave_segment_id leaveSegmentId,
+               ls.leave_request_id leaveRequestId,
+               ls.start_time startTime, ls.end_time endTime,
+               ls.total_minutes totalMinutes,
+               ls.paid_minutes paidMinutes,
+               ls.unpaid_minutes unpaidMinutes
+        from oa_attendance_leave_segment ls
+        join oa_attendance_leave_request lr
+          on lr.leave_request_id = ls.leave_request_id
+        join oa_attendance_schedule sch
+          on sch.schedule_id = #{scheduleId}
+         and sch.user_id = lr.user_id
+         and sch.shop_id = lr.shop_id
+        where sch.status in ('PUBLISHED', 'CHANGED')
+          and ls.segment_status = 'ACTIVE'
+          and lr.user_id = #{userId} and lr.shop_id = #{shopId}
+          and lr.status = 'APPROVED'
+          and ls.start_time &lt; timestamp(
+                case when sch.cross_day_snapshot = 1
+                     then date_add(sch.business_date, interval 1 day)
+                     else sch.business_date end,
+                sch.end_time_snapshot)
+          and ls.end_time &gt; timestamp(
+                sch.business_date, sch.start_time_snapshot)
+        order by ls.start_time, ls.leave_segment_id
+    </select>
+
+    <resultMap id="correctionRequestResult"
+            type="com.erp.oa.attendance.correction.AttendanceCorrectionModels$CorrectionRequest">
+        <id property="correctionRequestId" column="correction_request_id"/>
+        <result property="correctionRequestNo" column="correction_request_no"/>
+        <result property="clientRequestId" column="client_request_id"/>
+        <result property="clientRequestFingerprint"
+                column="client_request_fingerprint"/>
+        <result property="userId" column="user_id"/>
+        <result property="userName" column="user_name"/>
+        <result property="shopId" column="shop_id"/>
+        <result property="scheduleId" column="schedule_id"/>
+        <result property="businessDate" column="business_date"/>
+        <result property="correctionType" column="correction_type"/>
+        <result property="targetPunchType" column="target_punch_type"/>
+        <result property="targetScheduleSegmentSnapshotId"
+                column="target_schedule_segment_snapshot_id"/>
+        <result property="targetPunchSlotKey" column="target_punch_slot_key"/>
+        <result property="originalPunchEventId" column="original_punch_event_id"/>
+        <result property="originalPunchTime" column="original_punch_time"/>
+        <result property="originalPunchType" column="original_punch_type"/>
+        <result property="requestedPunchTime" column="requested_punch_time"/>
+        <result property="reason" column="reason"/>
+        <result property="attachmentRefs" column="attachment_refs"/>
+        <result property="status" column="status"/>
+        <result property="businessRound" column="business_round"/>
+        <result property="approvalInstanceId" column="approval_instance_id"/>
+        <result property="rowVersion" column="row_version"/>
+        <result property="lastApprovalEventKey" column="last_approval_event_key"/>
+        <result property="submittedAt" column="submitted_at"/>
+        <result property="approvedAt" column="approved_at"/>
+        <result property="rejectedAt" column="rejected_at"/>
+        <result property="cancelledAt" column="cancelled_at"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateBy" column="update_by"/>
+        <result property="updateTime" column="update_time"/>
+        <result property="remark" column="remark"/>
+    </resultMap>
+
+    <sql id="correctionRequestSelect">
+        select r.correction_request_id, r.correction_request_no,
+               r.client_request_id, r.client_request_fingerprint, r.user_id,
+               r.user_name, r.shop_id, r.schedule_id, r.business_date,
+               r.correction_type, r.target_punch_type,
+               r.target_schedule_segment_snapshot_id,
+               r.target_punch_slot_key,
+               r.original_punch_event_id,
+               e.server_punch_time original_punch_time,
+               e.punch_type original_punch_type,
+               r.requested_punch_time, r.reason, r.attachment_refs,
+               r.status, r.business_round, r.approval_instance_id,
+               r.row_version, r.last_approval_event_key, r.submitted_at,
+               r.approved_at, r.rejected_at, r.cancelled_at, r.create_by,
+               r.create_time, r.update_by, r.update_time, r.remark
+        from oa_attendance_correction_request r
+        left join oa_attendance_punch_event e
+          on e.punch_event_id = r.original_punch_event_id
+    </sql>
+
+    <insert id="insertCorrectionRequest"
+            parameterType="com.erp.oa.attendance.correction.AttendanceCorrectionModels$CorrectionRequest"
+            useGeneratedKeys="true" keyProperty="correctionRequestId">
+        insert into oa_attendance_correction_request (
+            correction_request_no, client_request_id,
+            client_request_fingerprint, user_id, user_name, shop_id, schedule_id,
+            business_date, correction_type, target_punch_type,
+            target_schedule_segment_snapshot_id, target_punch_slot_key,
+            original_punch_event_id, requested_punch_time, reason,
+            attachment_refs, status, business_round, approval_instance_id,
+            row_version, last_approval_event_key, create_by, create_time,
+            remark
+        ) values (
+            #{correctionRequestNo}, #{clientRequestId},
+            #{clientRequestFingerprint}, #{userId}, #{userName}, #{shopId},
+            #{scheduleId}, #{businessDate}, #{correctionType},
+            #{targetPunchType}, #{targetScheduleSegmentSnapshotId},
+            #{targetPunchSlotKey}, #{originalPunchEventId},
+            #{requestedPunchTime}, #{reason}, null, 'DRAFT', 0, null, 0,
+            null, #{createBy}, now(), #{remark}
+        )
+    </insert>
+
+    <update id="updateCorrectionDraft"
+            parameterType="com.erp.oa.attendance.correction.AttendanceCorrectionModels$CorrectionRequest">
+        update oa_attendance_correction_request
+        set schedule_id = #{scheduleId}, business_date = #{businessDate},
+            correction_type = #{correctionType},
+            target_punch_type = #{targetPunchType},
+            target_schedule_segment_snapshot_id =
+                #{targetScheduleSegmentSnapshotId},
+            target_punch_slot_key = #{targetPunchSlotKey},
+            original_punch_event_id = #{originalPunchEventId},
+            requested_punch_time = #{requestedPunchTime}, reason = #{reason},
+            attachment_refs = null, row_version = row_version + 1,
+            update_by = #{updateBy}, update_time = now()
+        where correction_request_id = #{correctionRequestId}
+          and user_id = #{userId} and shop_id = #{shopId}
+          and status in ('DRAFT', 'RETURNED')
+          and row_version = #{rowVersion}
+    </update>
+
+    <select id="selectCorrectionRequestById" resultMap="correctionRequestResult">
+        <include refid="correctionRequestSelect"/>
+        where r.correction_request_id = #{correctionRequestId}
+    </select>
+
+    <select id="selectCorrectionRequestByIdForUpdate" resultMap="correctionRequestResult">
+        <include refid="correctionRequestSelect"/>
+        where r.correction_request_id = #{correctionRequestId}
+        for update
+    </select>
+
+    <select id="selectCorrectionRequestByClientRequestId"
+            resultMap="correctionRequestResult">
+        <include refid="correctionRequestSelect"/>
+        where r.user_id = #{userId} and r.shop_id = #{shopId}
+          and r.client_request_id = #{clientRequestId}
+        limit 1
+    </select>
+
+    <select id="selectCorrectionRequestByClientRequestIdForUpdate"
+            resultMap="correctionRequestResult">
+        <include refid="correctionRequestSelect"/>
+        where r.user_id = #{userId} and r.shop_id = #{shopId}
+          and r.client_request_id = #{clientRequestId}
+        limit 1
+        for update
+    </select>
+
+    <select id="selectCorrectionRequestsByUser" resultMap="correctionRequestResult">
+        <include refid="correctionRequestSelect"/>
+        where r.user_id = #{userId} and r.shop_id = #{shopId}
+        <if test="status != null and status != ''">and r.status = #{status}</if>
+        <if test="dateFrom != null">and r.business_date &gt;= #{dateFrom}</if>
+        <if test="dateTo != null">and r.business_date &lt;= #{dateTo}</if>
+        order by r.business_date desc, r.correction_request_id desc
+    </select>
+
+    <select id="selectCorrectionRequestsByShop" resultMap="correctionRequestResult">
+        <include refid="correctionRequestSelect"/>
+        where r.shop_id = #{shopId}
+        <if test="userId != null">and r.user_id = #{userId}</if>
+        <if test="status != null and status != ''">and r.status = #{status}</if>
+        <if test="dateFrom != null">and r.business_date &gt;= #{dateFrom}</if>
+        <if test="dateTo != null">and r.business_date &lt;= #{dateTo}</if>
+        order by r.business_date desc, r.correction_request_id desc
+    </select>
+
+    <select id="countActiveCorrection" resultType="int">
+        select count(*)
+        from oa_attendance_correction_request
+        where user_id = #{userId} and schedule_id = #{scheduleId}
+          and target_punch_type = #{targetPunchType}
+          and correction_request_id != coalesce(#{excludeId}, -1)
+          and status in ('DRAFT', 'SUBMITTING', 'PENDING', 'APPROVED', 'RETURNED')
+    </select>
+
+    <select id="countActiveCorrectionForSlot" resultType="int">
+        select count(*)
+        from oa_attendance_correction_request
+        where user_id = #{userId} and schedule_id = #{scheduleId}
+          and target_punch_slot_key = #{targetPunchSlotKey}
+          and correction_request_id != coalesce(#{excludeId}, -1)
+          and status in ('DRAFT', 'SUBMITTING', 'PENDING', 'APPROVED', 'RETURNED')
+    </select>
+
+    <select id="countActiveCorrectionForOriginalEvent" resultType="int">
+        select count(*)
+        from oa_attendance_correction_request
+        where user_id = #{userId}
+          and original_punch_event_id = #{originalPunchEventId}
+          and correction_request_id != coalesce(#{excludeId}, -1)
+          and status in ('DRAFT', 'SUBMITTING', 'PENDING', 'APPROVED', 'RETURNED')
+    </select>
+
+    <update id="markCorrectionSubmitting">
+        update oa_attendance_correction_request
+        set status = 'SUBMITTING', business_round = #{businessRound},
+            approval_instance_id = null, last_approval_event_key = null,
+            submitted_at = now(), row_version = row_version + 1,
+            update_by = #{updateBy}, update_time = now()
+        where correction_request_id = #{correctionRequestId}
+          and status = #{expectedStatus} and row_version = #{expectedVersion}
+    </update>
+
+    <update id="invalidateDayResultForCorrection">
+        update oa_attendance_day_result d
+        join oa_attendance_correction_request c
+          on c.correction_request_id = #{correctionRequestId}
+         and c.schedule_id = d.schedule_id
+        set d.settled_at = null,
+            d.result_status = 'PENDING',
+            d.exception_codes = 'CORRECTION_REQUEST_REVIEW_REQUIRED',
+            d.row_version = d.row_version + 1,
+            d.calculated_at = now(),
+            d.update_by = #{updateBy}, d.update_time = now()
+    </update>
+
+    <update id="finalizeCorrectionApprovalStart">
+        update oa_attendance_correction_request
+        set status = 'PENDING', approval_instance_id = #{instanceId},
+            row_version = row_version + 1, update_by = #{updateBy},
+            update_time = now()
+        where correction_request_id = #{correctionRequestId}
+          and status = 'SUBMITTING'
+          and business_round = #{businessRound}
+          and row_version = #{expectedVersion}
+          and approval_instance_id is null
+    </update>
+
+    <resultMap id="outboxResult"
+            type="com.erp.oa.attendance.correction.AttendanceCorrectionModels$ApprovalOutbox">
+        <id property="outboxId" column="outbox_id"/>
+        <result property="correctionRequestId" column="correction_request_id"/>
+        <result property="businessRound" column="business_round"/>
+        <result property="idempotencyKey" column="idempotency_key"/>
+        <result property="requestJson" column="request_json"/>
+        <result property="status" column="status"/>
+        <result property="attemptCount" column="attempt_count"/>
+        <result property="nextRetryAt" column="next_retry_at"/>
+        <result property="claimToken" column="claim_token"/>
+        <result property="claimedAt" column="claimed_at"/>
+        <result property="lastHttpStatus" column="last_http_status"/>
+        <result property="lastErrorCode" column="last_error_code"/>
+        <result property="lastError" column="last_error"/>
+        <result property="remoteInstanceId" column="remote_instance_id"/>
+        <result property="remoteStatus" column="remote_status"/>
+        <result property="remoteBusinessRound" column="remote_business_round"/>
+        <result property="requestRowVersion" column="request_row_version"/>
+        <result property="rowVersion" column="row_version"/>
+        <result property="remoteSucceededAt" column="remote_succeeded_at"/>
+        <result property="completedAt" column="completed_at"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateTime" column="update_time"/>
+    </resultMap>
+
+    <sql id="outboxColumns">
+        outbox_id, correction_request_id, business_round, idempotency_key,
+        request_json, status, attempt_count, next_retry_at, claim_token,
+        claimed_at, last_http_status, last_error_code, last_error,
+        remote_instance_id, remote_status, remote_business_round,
+        request_row_version, row_version, remote_succeeded_at, completed_at,
+        create_by, create_time, update_time
+    </sql>
+
+    <insert id="insertApprovalOutbox"
+            parameterType="com.erp.oa.attendance.correction.AttendanceCorrectionModels$ApprovalOutbox"
+            useGeneratedKeys="true" keyProperty="outboxId">
+        insert ignore into oa_attendance_correction_approval_start_outbox (
+            correction_request_id, business_round, idempotency_key,
+            request_json, status, attempt_count, next_retry_at,
+            request_row_version, row_version, create_by, create_time,
+            update_time
+        ) values (
+            #{correctionRequestId}, #{businessRound}, #{idempotencyKey},
+            #{requestJson}, #{status}, 0, null, #{requestRowVersion}, 0,
+            #{createBy}, now(), now()
+        )
+    </insert>
+
+    <select id="selectApprovalOutboxById" resultMap="outboxResult">
+        select <include refid="outboxColumns"/>
+        from oa_attendance_correction_approval_start_outbox
+        where outbox_id = #{outboxId}
+    </select>
+
+    <select id="selectApprovalOutboxByIdForUpdate" resultMap="outboxResult">
+        select <include refid="outboxColumns"/>
+        from oa_attendance_correction_approval_start_outbox
+        where outbox_id = #{outboxId}
+        for update
+    </select>
+
+    <select id="selectApprovalOutboxByRound" resultMap="outboxResult">
+        select <include refid="outboxColumns"/>
+        from oa_attendance_correction_approval_start_outbox
+        where correction_request_id = #{correctionRequestId}
+          and business_round = #{businessRound}
+        limit 1
+    </select>
+
+    <select id="selectDueApprovalOutboxes" resultMap="outboxResult">
+        select <include refid="outboxColumns"/>
+        from oa_attendance_correction_approval_start_outbox
+        where (status in ('PENDING', 'RETRY')
+               and (next_retry_at is null or next_retry_at &lt;= #{dueAt}))
+           or status = 'REMOTE_SUCCEEDED'
+           or (status = 'PROCESSING' and claimed_at &lt;= #{staleClaimedBefore})
+        order by case status when 'REMOTE_SUCCEEDED' then 0
+                     when 'PROCESSING' then 1 when 'RETRY' then 2 else 3 end,
+                 coalesce(next_retry_at, create_time), outbox_id
+        limit #{limit}
+    </select>
+
+    <update id="claimApprovalOutbox">
+        update oa_attendance_correction_approval_start_outbox
+        set status = 'PROCESSING', attempt_count = attempt_count + 1,
+            next_retry_at = null, claim_token = #{claimToken},
+            claimed_at = now(), row_version = row_version + 1,
+            update_time = now()
+        where outbox_id = #{outboxId} and status = #{expectedStatus}
+          and row_version = #{expectedVersion}
+    </update>
+
+    <update id="markApprovalRemoteSucceeded">
+        update oa_attendance_correction_approval_start_outbox
+        set status = 'REMOTE_SUCCEEDED',
+            remote_instance_id = #{remoteInstanceId},
+            remote_status = #{remoteStatus},
+            remote_business_round = #{remoteBusinessRound},
+            remote_succeeded_at = now(), last_http_status = #{lastHttpStatus},
+            last_error_code = null, last_error = null,
+            claim_token = null, claimed_at = null,
+            row_version = row_version + 1, update_time = now()
+        where outbox_id = #{outboxId} and status = #{expectedStatus}
+          and row_version = #{expectedVersion}
+    </update>
+
+    <update id="markApprovalRetry">
+        update oa_attendance_correction_approval_start_outbox
+        set status = 'RETRY', next_retry_at = #{nextRetryAt},
+            last_http_status = #{lastHttpStatus},
+            last_error_code = #{lastErrorCode}, last_error = #{lastError},
+            claim_token = null, claimed_at = null,
+            row_version = row_version + 1, update_time = now()
+        where outbox_id = #{outboxId} and status = #{expectedStatus}
+          and row_version = #{expectedVersion}
+    </update>
+
+    <update id="markApprovalFailed">
+        update oa_attendance_correction_approval_start_outbox
+        set status = 'FAILED', next_retry_at = null,
+            last_http_status = #{lastHttpStatus},
+            last_error_code = #{lastErrorCode}, last_error = #{lastError},
+            claim_token = null, claimed_at = null,
+            row_version = row_version + 1, update_time = now()
+        where outbox_id = #{outboxId} and status = #{expectedStatus}
+          and row_version = #{expectedVersion}
+    </update>
+
+    <update id="markApprovalCompleted">
+        update oa_attendance_correction_approval_start_outbox
+        set status = 'COMPLETED', completed_at = now(), next_retry_at = null,
+            last_error_code = null, last_error = null,
+            claim_token = null, claimed_at = null,
+            row_version = row_version + 1, update_time = now()
+        where outbox_id = #{outboxId} and status = #{expectedStatus}
+          and row_version = #{expectedVersion}
+    </update>
+</mapper>

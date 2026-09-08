@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.system.mapper.HrOnboardSalaryArchiveMapper">
+    <select id="lockSource" resultType="com.erp.system.domain.HrOnboardSalarySource">
+        select r.row_id rowId, r.batch_id batchId, r.employee_id employeeId,
+               r.version, r.status, r.match_type matchType, r.task_id taskId,
+               r.source_event_version sourceEventVersion,
+               r.snapshot_json snapshotJson, b.shop_dept_id shopDeptId,
+               b.file_sha256 fileSha256,
+               b.created_by_user_id ownerUserId
+        from oa_sign_onboard_import_row r
+        join oa_sign_onboard_import_batch b on b.batch_id = r.batch_id
+        where r.batch_id = #{batchId} and r.row_id = #{rowId}
+        for update
+    </select>
+    <select id="lockTasks" resultType="com.erp.system.domain.HrOnboardSalaryTaskOwner">
+        select task_id taskId, employee_id employeeId, assigned_hr_user_id assignedHrUserId,
+               scenario, source_type sourceType, source_business_id sourceBusinessId,
+               source_event_version sourceEventVersion
+        from oa_sign_task
+        where task_id = #{taskId}
+           or (employee_id = #{employeeId} and upper(trim(scenario)) = 'ONBOARD'
+               and upper(trim(source_type)) = 'MANUAL_SIGN_EXCEL_IMPORT'
+               and trim(source_business_id) = cast(#{rowId} as char)
+               and trim(source_event_version) = cast(#{sourceEventVersion} as char))
+        order by task_id for update
+    </select>
+    <select id="latest" resultType="com.erp.system.domain.HrEmployeeSalaryImportAudit">
+        select employee_id employeeId, source_row_id sourceRowId,
+               source_version sourceVersion, salary_json salaryJson
+        from sys_employee_salary_import_audit
+        where employee_id = #{employeeId}
+        order by audit_id desc limit 1
+    </select>
+    <update id="updateSalary">
+        update sys_user_profile
+        set base_salary = #{salary.baseSalary},
+            post_salary = #{salary.postSalary},
+            field_allowance = #{salary.fieldAllowance},
+            performance_salary = #{salary.performanceSalary},
+            salary_total = #{salary.salaryTotal},
+            update_by = #{operator}, update_time = sysdate()
+        where user_id = #{employeeId}
+    </update>
+    <insert id="insertAudit">
+        insert into sys_employee_salary_import_audit
+            (employee_id, source_batch_id, source_row_id, source_version,
+             source_file_sha256, before_json, salary_json, operator_user_id,
+             operator_name, create_time)
+        values (#{source.employeeId}, #{source.batchId}, #{source.rowId},
+                #{source.version}, #{source.fileSha256}, #{beforeJson},
+                #{salaryJson}, #{operatorId}, #{operator}, sysdate())
+    </insert>
+</mapper>

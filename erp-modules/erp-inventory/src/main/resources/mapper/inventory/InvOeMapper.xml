@@ -1,0 +1,178 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.inventory.mapper.InvOeMapper">
+
+    <resultMap type="InvOeItem" id="InvOeResult">
+        <id property="oeItemId" column="oe_item_id"/>
+        <result property="oeItemCode" column="oe_item_code"/>
+        <result property="categoryId" column="category_id"/>
+        <result property="categoryName" column="category_name"/>
+        <result property="oeTypeName" column="oe_type_name"/>
+        <result property="oeItemName" column="oe_item_name"/>
+        <result property="itemDescription" column="item_description"/>
+        <result property="orderUnit" column="order_unit"/>
+        <result property="costPrice" column="cost_price"/>
+        <result property="supplierName" column="supplier_name"/>
+        <result property="supplierPhone" column="supplier_phone"/>
+        <result property="imageUrl" column="image_url"/>
+        <result property="purchaseReferenceUrl" column="purchase_reference_url"/>
+        <result property="purchaseReferenceNote" column="purchase_reference_note"/>
+        <result property="purchaseReferenceUpdatedBy" column="purchase_reference_updated_by"/>
+        <result property="purchaseReferenceUpdatedTime" column="purchase_reference_updated_time"/>
+        <result property="purchaseReferenceStatus" column="purchase_reference_status"/>
+        <result property="status" column="status"/>
+        <result property="delFlag" column="del_flag"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateBy" column="update_by"/>
+        <result property="updateTime" column="update_time"/>
+        <result property="remark" column="remark"/>
+    </resultMap>
+
+    <sql id="purchaseReferenceStatusExpression">
+        case
+            when not exists (
+                select 1 from oa_fixed_asset_config fc
+                where fc.oe_item_id = i.oe_item_id and fc.status = '0'
+            ) then 'NOT_FIXED_ASSET'
+            when nullif(trim(i.oe_item_code), '') is not null
+                and nullif(trim(i.oe_item_name), '') is not null
+                and nullif(trim(i.item_description), '') is not null
+                and nullif(trim(i.order_unit), '') is not null
+                and nullif(trim(i.image_url), '') is not null
+                and nullif(trim(i.purchase_reference_url), '') is not null
+                and lower(i.purchase_reference_url) like 'https://%'
+                and nullif(trim(i.purchase_reference_note), '') is not null
+            then 'COMPLETE'
+            else 'INCOMPLETE'
+        end
+    </sql>
+
+    <sql id="selectInvOeVo">
+        select i.oe_item_id, i.oe_item_code, i.category_id, c.category_name,
+               i.oe_type_name, i.oe_item_name, i.item_description, i.order_unit,
+               i.cost_price, i.supplier_name, i.supplier_phone, i.image_url,
+               i.purchase_reference_url, i.purchase_reference_note,
+               i.purchase_reference_updated_by, i.purchase_reference_updated_time,
+               <include refid="purchaseReferenceStatusExpression"/> as purchase_reference_status,
+               i.status, i.del_flag, i.create_by, i.create_time,
+               i.update_by, i.update_time, i.remark
+        from inv_oe_item i
+        left join inv_oe_category c on c.category_id = i.category_id and c.del_flag = '0'
+    </sql>
+
+    <select id="selectInvOeList" parameterType="InvOeItem" resultMap="InvOeResult">
+        <include refid="selectInvOeVo"/>
+        where i.del_flag = '0'
+        <if test="keyword != null and keyword != ''">
+            and (
+                i.oe_item_name like concat('%', #{keyword}, '%')
+                or i.oe_item_code like concat('%', #{keyword}, '%')
+                or i.oe_type_name like concat('%', #{keyword}, '%')
+                or i.supplier_name like concat('%', #{keyword}, '%')
+            )
+        </if>
+        <if test="oeItemName != null and oeItemName != ''">and i.oe_item_name like concat('%', #{oeItemName}, '%')</if>
+        <if test="oeItemCode != null and oeItemCode != ''">and i.oe_item_code = #{oeItemCode}</if>
+        <if test="oeTypeName != null and oeTypeName != ''">and i.oe_type_name like concat('%', #{oeTypeName}, '%')</if>
+        <if test="supplierName != null and supplierName != ''">and i.supplier_name like concat('%', #{supplierName}, '%')</if>
+        <if test="categoryId != null">and (i.category_id = #{categoryId} or find_in_set(#{categoryId}, c.ancestors))</if>
+        <if test="status != null and status != ''">and i.status = #{status}</if>
+        <if test="purchaseReferenceStatus != null and purchaseReferenceStatus != ''">
+            and <include refid="purchaseReferenceStatusExpression"/> = #{purchaseReferenceStatus}
+        </if>
+        order by i.create_time desc, i.oe_item_id desc
+    </select>
+
+    <select id="selectInvOeById" parameterType="Long" resultMap="InvOeResult">
+        <include refid="selectInvOeVo"/>
+        where i.oe_item_id = #{oeItemId} and i.del_flag = '0'
+    </select>
+
+    <select id="selectInvOeByCode" resultMap="InvOeResult">
+        <include refid="selectInvOeVo"/>
+        where i.del_flag = '0' and i.oe_item_code = #{oeItemCode}
+        limit 1
+    </select>
+
+    <select id="selectInvOeByNaturalKey" resultMap="InvOeResult">
+        <include refid="selectInvOeVo"/>
+        where i.del_flag = '0'
+          and i.category_id = #{categoryId}
+          and ifnull(i.oe_type_name, '') = ifnull(#{oeTypeName}, '')
+          and i.oe_item_name = #{oeItemName}
+          and ifnull(i.item_description, '') = ifnull(#{itemDescription}, '')
+        limit 1
+    </select>
+
+    <select id="countOeCode" resultType="int">
+        select count(1)
+        from inv_oe_item
+        where del_flag = '0'
+          and oe_item_code = #{oeItemCode}
+        <if test="excludeOeItemId != null">and oe_item_id != #{excludeOeItemId}</if>
+    </select>
+
+    <select id="countFixedAssetConfigByOeItemId" resultType="int">
+        select count(1)
+        from oa_fixed_asset_config
+        where oe_item_id = #{oeItemId}
+    </select>
+
+    <select id="countActiveFixedAssetConfigByOeItemId" resultType="int">
+        select count(1)
+        from oa_fixed_asset_config
+        where oe_item_id = #{oeItemId}
+          and status = '0'
+    </select>
+
+    <insert id="insertInvOe" parameterType="InvOeItem" useGeneratedKeys="true" keyProperty="oeItemId">
+        insert into inv_oe_item (
+            oe_item_code, category_id, oe_type_name, oe_item_name, item_description,
+            order_unit, cost_price, supplier_name, supplier_phone, image_url,
+            purchase_reference_url, purchase_reference_note,
+            purchase_reference_updated_by, purchase_reference_updated_time,
+            status, del_flag, create_by, create_time, remark
+        ) values (
+            #{oeItemCode}, #{categoryId}, #{oeTypeName}, #{oeItemName}, #{itemDescription},
+            #{orderUnit}, #{costPrice}, #{supplierName}, #{supplierPhone}, #{imageUrl},
+            #{purchaseReferenceUrl}, #{purchaseReferenceNote},
+            #{purchaseReferenceUpdatedBy}, #{purchaseReferenceUpdatedTime},
+            #{status}, '0', #{createBy}, sysdate(), #{remark}
+        )
+    </insert>
+
+    <update id="updateInvOe" parameterType="InvOeItem">
+        update inv_oe_item
+        <set>
+            <if test="oeItemCode != null">oe_item_code = #{oeItemCode},</if>
+            <if test="categoryId != null">category_id = #{categoryId},</if>
+            <if test="oeTypeName != null">oe_type_name = #{oeTypeName},</if>
+            <if test="oeItemName != null">oe_item_name = #{oeItemName},</if>
+            <if test="itemDescription != null">item_description = #{itemDescription},</if>
+            <if test="orderUnit != null">order_unit = #{orderUnit},</if>
+            <if test="costPrice != null">cost_price = #{costPrice},</if>
+            <if test="supplierName != null">supplier_name = #{supplierName},</if>
+            <if test="supplierPhone != null">supplier_phone = #{supplierPhone},</if>
+            <if test="imageUrl != null">image_url = #{imageUrl},</if>
+            <if test="purchaseReferenceTouched != null and purchaseReferenceTouched">
+                purchase_reference_url = #{purchaseReferenceUrl},
+                purchase_reference_note = #{purchaseReferenceNote},
+                purchase_reference_updated_by = #{purchaseReferenceUpdatedBy},
+                purchase_reference_updated_time = #{purchaseReferenceUpdatedTime},
+            </if>
+            <if test="status != null">status = #{status},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            update_by = #{updateBy}, update_time = sysdate()
+        </set>
+        where oe_item_id = #{oeItemId}
+    </update>
+
+    <update id="deleteInvOeByIds" parameterType="Long">
+        update inv_oe_item set del_flag = '2' where oe_item_id in
+        <foreach collection="array" item="oeItemId" open="(" close=")" separator=",">
+            #{oeItemId}
+        </foreach>
+    </update>
+
+</mapper>

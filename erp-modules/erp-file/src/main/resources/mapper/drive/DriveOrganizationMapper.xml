@@ -1,0 +1,167 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.file.drive.mapper.DriveOrganizationMapper">
+
+    <resultMap id="TypeRuleResult" type="com.erp.file.drive.domain.DriveOrganizationTypeRule">
+        <id property="deptType" column="dept_type" />
+        <result property="autoEnable" column="auto_enable" />
+        <result property="requireActiveMember" column="require_active_member" />
+        <result property="defaultQuotaBytes" column="default_quota_bytes" />
+        <result property="status" column="status" />
+        <result property="version" column="version" />
+        <result property="createBy" column="create_by" />
+        <result property="createTime" column="create_time" />
+        <result property="updateBy" column="update_by" />
+        <result property="updateTime" column="update_time" />
+        <result property="remark" column="remark" />
+    </resultMap>
+
+    <resultMap id="ConfigResult" type="com.erp.file.drive.domain.DriveOrganizationSpaceConfig">
+        <id property="configId" column="config_id" />
+        <result property="deptId" column="dept_id" />
+        <result property="enabled" column="enabled" />
+        <result property="quotaBytes" column="quota_bytes" />
+        <result property="treeBudgetBytes" column="tree_budget_bytes" />
+        <result property="memberWriteMode" column="member_write_mode" />
+        <result property="lifecycleStatus" column="lifecycle_status" />
+        <result property="configSource" column="config_source" />
+        <result property="version" column="version" />
+        <result property="createBy" column="create_by" />
+        <result property="createTime" column="create_time" />
+        <result property="updateBy" column="update_by" />
+        <result property="updateTime" column="update_time" />
+        <result property="remark" column="remark" />
+    </resultMap>
+
+    <sql id="TypeRuleColumns">
+        dept_type, auto_enable, require_active_member, default_quota_bytes,
+        status, version, create_by, create_time, update_by, update_time, remark
+    </sql>
+
+    <sql id="ConfigColumns">
+        config_id, dept_id, enabled, quota_bytes, tree_budget_bytes,
+        member_write_mode, lifecycle_status, config_source, version,
+        create_by, create_time, update_by, update_time, remark
+    </sql>
+
+    <select id="selectOrganization" resultType="com.erp.file.drive.domain.DriveOrganization">
+        select d.dept_id as deptId,
+               d.parent_id as parentId,
+               d.ancestors as ancestors,
+               d.dept_name as deptName,
+               d.dept_type as deptType,
+               d.status as status,
+               d.del_flag as delFlag,
+               (select count(*) from sys_user u
+                where u.dept_id = d.dept_id and u.status = '0' and u.del_flag = '0') as activeMemberCount
+        from sys_dept d
+        where d.dept_id = #{deptId}
+    </select>
+
+    <select id="selectAllOrganizations" resultType="com.erp.file.drive.domain.DriveOrganization">
+        select d.dept_id as deptId,
+               d.parent_id as parentId,
+               d.ancestors as ancestors,
+               d.dept_name as deptName,
+               d.dept_type as deptType,
+               d.status as status,
+               d.del_flag as delFlag,
+               (select count(*) from sys_user u
+                where u.dept_id = d.dept_id and u.status = '0' and u.del_flag = '0') as activeMemberCount
+        from sys_dept d
+        order by d.parent_id, d.order_num, d.dept_id
+    </select>
+
+    <select id="selectRoleScopes" resultType="com.erp.file.drive.domain.DriveRoleScope">
+        select r.role_id as roleId,
+               r.data_scope as dataScope,
+               rd.dept_id as deptId
+        from sys_user_role ur
+        join sys_role r
+          on r.role_id = ur.role_id
+         and r.status = '0'
+         and r.del_flag = '0'
+        left join sys_role_dept rd
+          on rd.role_id = r.role_id
+         and r.data_scope = '2'
+        where ur.user_id = #{userId}
+        order by r.role_id, rd.dept_id
+    </select>
+
+    <select id="selectTypeRule" resultMap="TypeRuleResult">
+        select <include refid="TypeRuleColumns" />
+        from drive_org_type_rule
+        where dept_type = #{deptType}
+    </select>
+
+    <select id="selectTypeRules" resultMap="TypeRuleResult">
+        select <include refid="TypeRuleColumns" />
+        from drive_org_type_rule
+        order by field(dept_type, 'GROUP', 'COMPANY', 'STORE', 'WAREHOUSE'), dept_type
+    </select>
+
+    <update id="updateTypeRule">
+        update drive_org_type_rule
+        set auto_enable = #{autoEnable},
+            require_active_member = #{requireActiveMember},
+            default_quota_bytes = #{defaultQuotaBytes},
+            status = #{status},
+            version = version + 1,
+            update_by = #{updateBy},
+            update_time = #{updateTime},
+            remark = #{remark}
+        where dept_type = #{deptType}
+          and version = #{version}
+    </update>
+
+    <select id="selectConfig" resultMap="ConfigResult">
+        select <include refid="ConfigColumns" />
+        from drive_org_space_config
+        where dept_id = #{deptId}
+    </select>
+
+    <select id="selectConfigForUpdate" resultMap="ConfigResult">
+        select <include refid="ConfigColumns" />
+        from drive_org_space_config
+        where dept_id = #{deptId}
+        for update
+    </select>
+
+    <select id="selectConfigs" resultMap="ConfigResult">
+        select <include refid="ConfigColumns" />
+        from drive_org_space_config
+        order by dept_id
+    </select>
+
+    <insert id="insertConfig" useGeneratedKeys="true" keyProperty="configId">
+        insert into drive_org_space_config (
+            dept_id, enabled, quota_bytes, tree_budget_bytes, member_write_mode,
+            lifecycle_status, config_source, version, create_by, create_time,
+            update_by, update_time, remark
+        ) values (
+            #{deptId}, #{enabled}, #{quotaBytes}, #{treeBudgetBytes}, #{memberWriteMode},
+            #{lifecycleStatus}, #{configSource}, #{version}, #{createBy}, #{createTime},
+            #{updateBy}, #{updateTime}, #{remark}
+        )
+    </insert>
+
+    <update id="updateConfig">
+        update drive_org_space_config
+        set enabled = #{enabled},
+            quota_bytes = #{quotaBytes},
+            tree_budget_bytes = #{treeBudgetBytes},
+            member_write_mode = #{memberWriteMode},
+            lifecycle_status = #{lifecycleStatus},
+            config_source = #{configSource},
+            version = version + 1,
+            update_by = #{updateBy},
+            update_time = #{updateTime},
+            remark = #{remark}
+        where dept_id = #{deptId}
+          and version = #{version}
+    </update>
+
+</mapper>
+

@@ -1,0 +1,229 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.inventory.mapper.InvTransferReceiptDiscrepancyReturnShipmentPlanningMapper">
+
+    <resultMap id="LifecycleFactResult"
+            type="com.erp.inventory.domain.transfer.InvTransferReceiptDiscrepancyReturnReservationLifecycleFact">
+        <id property="reservationId"
+                column="quarantine_reservation_id"/>
+        <result property="reservationRequestId" column="request_id"/>
+        <result property="actionId" column="adjudication_action_id"/>
+        <result property="childTransferId" column="child_transfer_id"/>
+        <result property="childTransferDetailId"
+                column="child_transfer_detail_id"/>
+        <result property="reservationRound" column="reservation_round"/>
+        <result property="receiptAllocationId"
+                column="receipt_allocation_id"/>
+        <result property="shipmentAllocationId"
+                column="shipment_allocation_id"/>
+        <result property="stockId" column="stock_id"/>
+        <result property="balanceId" column="quarantine_balance_id"/>
+        <result property="lotId" column="quarantine_lot_id"/>
+        <result property="locationId" column="quarantine_location_id"/>
+        <result property="itemType" column="item_type"/>
+        <result property="itemId" column="item_id"/>
+        <result property="productId" column="product_id"/>
+        <result property="trackingPolicy" column="tracking_policy"/>
+        <result property="reservedQuantity" column="reserved_quantity"/>
+        <result property="consumedQuantity" column="consumed_quantity"/>
+        <result property="releasedQuantity" column="released_quantity"/>
+        <result property="sourceCostPrice" column="source_cost_price"/>
+        <result property="reservedAmount" column="reserved_amount"/>
+        <result property="decisionFingerprint"
+                column="decision_fingerprint"/>
+        <result property="status" column="reservation_status"/>
+        <result property="version" column="reservation_version"/>
+        <result property="childStatus" column="child_status"/>
+        <result property="approvalRound" column="approval_round"/>
+        <result property="sourceWarehouseId" column="source_warehouse_id"/>
+        <result property="sourceBusinessType"
+                column="source_business_type"/>
+        <result property="sourceBusinessId" column="source_business_id"/>
+        <result property="requestedQuantity" column="requested_quantity"/>
+        <result property="deliveredQuantity" column="delivered_quantity"/>
+        <result property="workflowId" column="workflow_id"/>
+        <result property="workflowType" column="workflow_type"/>
+        <result property="inventorySource" column="inventory_source"/>
+        <result property="workflowFingerprint"
+                column="workflow_fingerprint"/>
+    </resultMap>
+
+    <resultMap id="StockResult"
+            type="com.erp.inventory.domain.transfer.InvTransferReceiptTargetStock">
+        <id property="stockId" column="stock_id"/>
+        <result property="itemType" column="item_type"/>
+        <result property="itemId" column="item_id"/>
+        <result property="productId" column="product_id"/>
+        <result property="shopDeptId" column="shop_dept_id"/>
+        <result property="warehouseId" column="warehouse_id"/>
+        <result property="currentQuantity" column="current_quantity"/>
+        <result property="lockedQuantity" column="locked_quantity"/>
+        <result property="availableQuantity" column="available_quantity"/>
+        <result property="quarantineQuantity"
+                column="quarantine_quantity"/>
+        <result property="costPrice" column="cost_price"/>
+        <result property="totalCost" column="total_cost"/>
+        <result property="version" column="version"/>
+    </resultMap>
+
+    <resultMap id="BalanceResult"
+            type="com.erp.inventory.domain.transfer.InvTransferReceiptTargetBalance">
+        <id property="balanceId" column="balance_id"/>
+        <result property="itemType" column="item_type"/>
+        <result property="itemId" column="item_id"/>
+        <result property="productId" column="product_id"/>
+        <result property="warehouseId" column="warehouse_id"/>
+        <result property="lotId" column="lot_id"/>
+        <result property="locationId" column="location_id"/>
+        <result property="currentQuantity" column="current_quantity"/>
+        <result property="lockedQuantity" column="locked_quantity"/>
+        <result property="availableQuantity" column="available_quantity"/>
+        <result property="quarantineQuantity"
+                column="quarantine_quantity"/>
+        <result property="costPrice" column="cost_price"/>
+        <result property="totalCost" column="total_cost"/>
+        <result property="version" column="version"/>
+    </resultMap>
+
+    <resultMap id="SerialResult"
+            type="com.erp.inventory.domain.transfer.InvTransferReceiptDiscrepancyReturnReservationSerialLifecycleFact">
+        <id property="bindingId"
+                column="quarantine_reservation_serial_id"/>
+        <result property="reservationId"
+                column="quarantine_reservation_id"/>
+        <result property="receiptSerialId" column="receipt_serial_id"/>
+        <result property="serialId" column="serial_id"/>
+        <result property="serialNoSnapshot" column="serial_no_snapshot"/>
+        <result property="warehouseId" column="warehouse_id"/>
+        <result property="balanceId" column="balance_id"/>
+        <result property="lotId" column="lot_id"/>
+        <result property="locationId" column="location_id"/>
+        <result property="lifecycleStatus" column="lifecycle_status"/>
+        <result property="version" column="binding_version"/>
+        <result property="currentSerialNo" column="current_serial_no"/>
+        <result property="currentSerialStatus"
+                column="current_serial_status"/>
+        <result property="currentWarehouseId"
+                column="current_warehouse_id"/>
+        <result property="currentBalanceId" column="current_balance_id"/>
+        <result property="currentLotId" column="current_lot_id"/>
+        <result property="currentLocationId"
+                column="current_location_id"/>
+    </resultMap>
+
+    <select id="selectReservation" resultMap="LifecycleFactResult">
+        select reservation.quarantine_reservation_id,
+               reservation.request_id,
+               reservation.adjudication_action_id,
+               reservation.child_transfer_id,
+               reservation.child_transfer_detail_id,
+               reservation.reservation_round,
+               reservation.receipt_allocation_id,
+               reservation.shipment_allocation_id,
+               reservation.stock_id,
+               reservation.quarantine_balance_id,
+               reservation.quarantine_lot_id,
+               reservation.quarantine_location_id,
+               reservation.item_type, reservation.item_id,
+               reservation.product_id, reservation.tracking_policy,
+               reservation.reserved_quantity,
+               reservation.consumed_quantity,
+               reservation.released_quantity,
+               reservation.source_cost_price,
+               reservation.reserved_amount,
+               reservation.decision_fingerprint,
+               reservation.status as reservation_status,
+               reservation.version as reservation_version,
+               child.status as child_status, child.approval_round,
+               coalesce(nullif(child.from_warehouse_id, 0),
+                        child.from_dept_id) as source_warehouse_id,
+               child.source_business_type, child.source_business_id,
+               detail.quantity as requested_quantity,
+               detail.delivered_quantity,
+               workflow.workflow_id, workflow.workflow_type,
+               workflow.inventory_source,
+               workflow.workflow_fingerprint
+        from inv_transfer_quarantine_reservation reservation
+        inner join inv_transfer_order child
+                on child.transfer_id = reservation.child_transfer_id
+               and child.transfer_id = #{childTransferId}
+               and child.approval_round = reservation.reservation_round
+        inner join inv_transfer_detail detail
+                on detail.detail_id =
+                    reservation.child_transfer_detail_id
+               and detail.transfer_id = child.transfer_id
+        inner join
+            inv_transfer_receipt_discrepancy_adjudication_workflow_link
+                workflow
+                on workflow.adjudication_action_id =
+                    reservation.adjudication_action_id
+               and workflow.child_transfer_id = child.transfer_id
+               and workflow.source_business_type =
+                    child.source_business_type
+               and workflow.source_business_id = child.source_business_id
+        where reservation.child_transfer_id = #{childTransferId}
+          and child.source_business_type =
+              'transfer_discrepancy_return'
+          and child.source_business_id =
+              reservation.adjudication_action_id
+          and workflow.workflow_type = 'return'
+          and workflow.inventory_source = 'quarantine_detail'
+          and workflow.quarantine_balance_id =
+              reservation.quarantine_balance_id
+          and workflow.quarantine_lot_id =
+              reservation.quarantine_lot_id
+          and workflow.quarantine_location_id =
+              reservation.quarantine_location_id
+          and (select count(1)
+               from inv_transfer_detail all_detail
+               where all_detail.transfer_id = child.transfer_id) = 1
+    </select>
+
+    <select id="selectStock" resultMap="StockResult">
+        select stock_id, item_type, item_id, product_id, shop_dept_id,
+               warehouse_id, current_quantity, locked_quantity,
+               available_quantity, quarantine_quantity, cost_price,
+               total_cost, version
+        from inv_stock
+        where stock_id = #{fact.stockId}
+          and item_type = #{fact.itemType}
+          and item_id = #{fact.itemId}
+    </select>
+
+    <select id="selectBalance" resultMap="BalanceResult">
+        select balance_id, item_type, item_id, product_id, warehouse_id,
+               lot_id, location_id, current_quantity, locked_quantity,
+               available_quantity, quarantine_quantity, cost_price,
+               total_cost, version
+        from inv_stock_balance_detail
+        where balance_id = #{fact.balanceId}
+          and item_type = #{fact.itemType}
+          and item_id = #{fact.itemId}
+          and lot_id = #{fact.lotId}
+          and location_id = #{fact.locationId}
+    </select>
+
+    <select id="selectActiveSerials" resultMap="SerialResult">
+        select binding.quarantine_reservation_serial_id,
+               binding.quarantine_reservation_id,
+               binding.receipt_serial_id, binding.serial_id,
+               binding.serial_no_snapshot, binding.warehouse_id,
+               binding.balance_id, binding.lot_id, binding.location_id,
+               binding.lifecycle_status,
+               binding.version as binding_version,
+               serial.serial_no as current_serial_no,
+               serial.serial_status as current_serial_status,
+               serial.warehouse_id as current_warehouse_id,
+               serial.balance_id as current_balance_id,
+               serial.lot_id as current_lot_id,
+               serial.location_id as current_location_id
+        from inv_transfer_quarantine_reservation_serial binding
+        inner join inv_inventory_serial serial
+                on serial.serial_id = binding.serial_id
+               and serial.serial_no = binding.serial_no_snapshot
+        where binding.quarantine_reservation_id = #{fact.reservationId}
+          and binding.lifecycle_status = 'ACTIVE'
+        order by binding.receipt_serial_id, binding.serial_id
+    </select>
+
+</mapper>

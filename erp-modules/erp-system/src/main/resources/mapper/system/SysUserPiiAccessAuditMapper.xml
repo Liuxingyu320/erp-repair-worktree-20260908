@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.system.mapper.SysUserPiiAccessAuditMapper">
+    <insert id="insertPiiAccessAudit" parameterType="com.erp.system.domain.SysUserPiiAccessAudit">
+        insert into sys_user_pii_access_audit
+            (viewer_user_id, target_user_id, reason_code, action_code, result_code,
+             changed_fields, row_count, dataset_digest, created_at)
+        values
+            (#{viewerUserId}, #{targetUserId}, #{reasonCode}, #{actionCode}, #{resultCode},
+             #{changedFields}, #{rowCount}, #{datasetDigest}, sysdate())
+    </insert>
+</mapper>

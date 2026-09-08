@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.inventory.mapper.InvTransferReceiptDiscrepancyConfirmationMapper">
+
+    <resultMap id="StoredEventResult"
+            type="com.erp.inventory.domain.transfer.InvTransferReceiptDiscrepancyConfirmationStoredEvent">
+        <id property="eventId" column="confirmation_event_id"/>
+        <result property="requestId" column="request_id"/>
+        <result property="caseId" column="discrepancy_case_id"/>
+        <result property="caseVersion" column="case_version"/>
+        <result property="factFingerprint" column="fact_fingerprint"/>
+        <result property="partyRole" column="party_role"/>
+        <result property="partyDeptId" column="party_dept_id"/>
+        <result property="decision" column="decision"/>
+        <result property="note" column="confirmation_note"/>
+        <result property="operatorUserId" column="operator_user_id"/>
+        <result property="operatorName" column="operator_name"/>
+        <result property="createTime" column="create_time"/>
+    </resultMap>
+
+    <select id="selectCaseIdForUpdate" resultType="java.lang.Long">
+        select discrepancy_case_id
+        from inv_transfer_receipt_discrepancy_case
+        where discrepancy_case_id = #{caseId}
+        for update
+    </select>
+
+    <select id="selectByRequestIdForUpdate"
+            resultMap="StoredEventResult">
+        select confirmation_event_id, request_id, discrepancy_case_id,
+               case_version, fact_fingerprint, party_role, party_dept_id,
+               decision, confirmation_note, operator_user_id,
+               operator_name, create_time
+        from inv_transfer_receipt_discrepancy_confirmation_event
+        where request_id = #{requestId}
+        for update
+    </select>
+
+    <insert id="insertConfirmationEvent" useGeneratedKeys="true"
+            keyProperty="generatedId.value">
+        insert into inv_transfer_receipt_discrepancy_confirmation_event (
+            request_id, discrepancy_case_id, case_version,
+            fact_fingerprint, party_role, party_dept_id, decision,
+            confirmation_note, operator_user_id, operator_name,
+            create_by, create_time
+        )
+        select #{confirmation.requestId}, c.discrepancy_case_id,
+               c.case_version, c.fact_fingerprint,
+               #{confirmation.partyRole}, #{confirmation.partyDeptId},
+               #{confirmation.decision}, #{confirmation.note},
+               #{confirmation.operatorUserId},
+               #{confirmation.operatorName},
+               #{confirmation.operatorName}, #{confirmation.createdAt}
+        from inv_transfer_receipt_discrepancy_case c
+        inner join inv_transfer_shipment_receipt r
+                on r.receipt_id = c.receipt_id
+               and r.shipment_id = c.shipment_id
+               and r.transfer_id = c.transfer_id
+        inner join inv_transfer_order o
+                on o.transfer_id = c.transfer_id
+        where c.discrepancy_case_id = #{confirmation.caseId}
+          and c.case_version = #{confirmation.caseVersion}
+          and c.fact_fingerprint = #{confirmation.factFingerprint}
+          and c.status = 'awaiting_confirmation'
+          and length(#{confirmation.requestId}) between 1 and 128
+          and #{confirmation.decision} in ('confirmed', 'disputed')
+          and (#{confirmation.note} is null
+               or length(#{confirmation.note}) between 1 and 500)
+          and (#{confirmation.decision} = 'confirmed'
+               or length(trim(#{confirmation.note})) between 1 and 500)
+          and length(#{confirmation.operatorName}) between 1 and 64
+          and #{confirmation.operatorUserId} &gt; 0
+          and #{confirmation.partyDeptId} &gt; 0
+          and (
+              (#{confirmation.partyRole} = 'source'
+               and #{confirmation.partyDeptId} = coalesce(
+                   nullif(o.from_warehouse_id, 0), o.from_dept_id))
+              or
+              (#{confirmation.partyRole} = 'target'
+               and #{confirmation.partyDeptId} = coalesce(
+                   nullif(o.to_warehouse_id, 0), o.to_dept_id))
+          )
+          and coalesce(nullif(o.from_warehouse_id, 0), o.from_dept_id)
+              &lt;&gt; coalesce(nullif(o.to_warehouse_id, 0), o.to_dept_id)
+          and not exists (
+              select 1
+              from inv_transfer_receipt_discrepancy_confirmation_event prior
+              where prior.request_id = #{confirmation.requestId}
+          )
+    </insert>
+
+</mapper>

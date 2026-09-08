@@ -1,0 +1,50 @@
+// Shared Vue transition classes. Durations and easing come from motion.scss.
+
+/* Neutral fade for occasional state changes. */
+.fade-enter-active {
+  transition: opacity var(--motion-duration-base) var(--motion-ease-enter);
+}
+
+.fade-leave-active {
+  transition: opacity var(--motion-duration-fast) var(--motion-ease-exit);
+}
+
+.fade-enter,
+.fade-leave-to {
+  opacity: 0;
+}
+
+/* Subtle materialization for low-frequency iframe and overlay content. */
+.fade-transform--move,
+.fade-transform-enter-active {
+  transition:
+    opacity var(--motion-duration-base) var(--motion-ease-enter),
+    transform var(--motion-duration-base) var(--motion-ease-enter),
+    filter var(--motion-duration-base) var(--motion-ease-enter);
+}
+
+.fade-transform-leave-active {
+  transition:
+    opacity var(--motion-duration-fast) var(--motion-ease-exit),
+    transform var(--motion-duration-fast) var(--motion-ease-exit),
+    filter var(--motion-duration-fast) var(--motion-ease-exit);
+}
+
+.fade-transform-enter {
+  opacity: 0;
+  transform: translateY(var(--motion-distance-enter));
+  filter: blur(var(--motion-enter-blur));
+}
+
+.fade-transform-leave-to {
+  opacity: 0;
+  transform: translateY(calc(0px - var(--motion-distance-exit)));
+  filter: blur(var(--motion-exit-blur));
+}
+
+/* Breadcrumbs are high-frequency navigation and intentionally update instantly. */
+.breadcrumb-enter-active,
+.breadcrumb-leave-active,
+.breadcrumb-move {
+  transition: none;
+}

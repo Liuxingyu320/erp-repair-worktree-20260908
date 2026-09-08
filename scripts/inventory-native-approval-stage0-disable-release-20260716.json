@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "releaseId": "inventory-native-approval-stage0-disable-20260716",
+  "baselineCommit": "b694659dd2c1",
+  "migrationList": "scripts/inventory-native-approval-stage0-disable-migrations-20260716.list",
+  "migrationCount": 1,
+  "sourceDirectory": "sql",
+  "deployDirectory": "docker/mysql/releases/inventory-native-approval-stage0-disable-20260716",
+  "executionPolicy": "automatic",
+  "featureFlags": [
+    "feature.inventory.stock-check-native-approval.enabled",
+    "feature.inventory.transfer-native-approval.enabled"
+  ],
+  "migrations": [
+    {
+      "file": "erp_inventory_native_approval_stage0_disable_20260716.sql",
+      "sha256": "a692d6eaf6c75ff2c4e77947099f8321d6464c9d789efe0b7cca7df5ce67a594",
+      "creates": [],
+      "backupTables": [
+        "sys_config"
+      ]
+    }
+  ],
+  "integrationTests": [
+    "scripts/test_unified_approval_cutover_safety.py"
+  ],
+  "artifactSha256Required": true
+}

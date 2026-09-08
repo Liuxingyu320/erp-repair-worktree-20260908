@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.inventory.mapper.InvStockCheckApprovalTaskMapper">
+    <resultMap type="InvStockCheckApprovalTask" id="TaskResult">
+        <id property="taskId" column="task_id"/>
+        <result property="instanceId" column="instance_id"/>
+        <result property="checkId" column="check_id"/>
+        <result property="roundNo" column="round_no"/>
+        <result property="candidateUserIds" column="candidate_user_ids"/>
+        <result property="candidateUserNames" column="candidate_user_names"/>
+        <result property="status" column="status"/>
+        <result property="action" column="action"/>
+        <result property="approverUserId" column="approver_user_id"/>
+        <result property="approverName" column="approver_name"/>
+        <result property="approvalComment" column="approval_comment"/>
+        <result property="approvalTime" column="approval_time"/>
+        <result property="selfApproved" column="self_approved"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateBy" column="update_by"/>
+        <result property="updateTime" column="update_time"/>
+    </resultMap>
+
+    <sql id="taskColumns">
+        task_id, instance_id, check_id, round_no, candidate_user_ids,
+        candidate_user_names, status, action, approver_user_id, approver_name,
+        approval_comment, approval_time, self_approved,
+        create_by, create_time, update_by, update_time
+    </sql>
+
+    <select id="selectByInstanceIdForUpdate" resultMap="TaskResult">
+        select <include refid="taskColumns"/>
+        from inv_stock_check_approval_task
+        where instance_id = #{instanceId}
+        order by task_id desc limit 1
+        for update
+    </select>
+
+    <select id="selectByInstanceId" resultMap="TaskResult">
+        select <include refid="taskColumns"/>
+        from inv_stock_check_approval_task
+        where instance_id = #{instanceId}
+        order by task_id asc
+    </select>
+
+    <insert id="insertTask" parameterType="InvStockCheckApprovalTask"
+            useGeneratedKeys="true" keyProperty="taskId">
+        insert into inv_stock_check_approval_task (
+            instance_id, check_id, round_no, candidate_user_ids, candidate_user_names,
+            status, action, self_approved, create_by, create_time
+        ) values (
+            #{instanceId}, #{checkId}, #{roundNo}, #{candidateUserIds}, #{candidateUserNames},
+            #{status}, #{action}, #{selfApproved}, #{createBy}, sysdate()
+        )
+    </insert>
+
+    <update id="updateTask" parameterType="InvStockCheckApprovalTask">
+        update inv_stock_check_approval_task
+        <set>
+            <if test="status != null">status = #{status},</if>
+            <if test="action != null">action = #{action},</if>
+            <if test="approverUserId != null">approver_user_id = #{approverUserId},</if>
+            <if test="approverName != null">approver_name = #{approverName},</if>
+            <if test="approvalComment != null">approval_comment = #{approvalComment},</if>
+            <if test="approvalTime != null">approval_time = #{approvalTime},</if>
+            <if test="selfApproved != null">self_approved = #{selfApproved},</if>
+            update_by = #{updateBy}, update_time = sysdate()
+        </set>
+        where task_id = #{taskId}
+    </update>
+</mapper>

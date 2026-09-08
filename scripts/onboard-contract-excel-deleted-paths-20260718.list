@@ -1,0 +1,12 @@
+# 如果目标源码基线曾应用 20260717 旧入口，必须显式移除以下路径。
+# 生产必须从干净候选提交构建完整 JAR/dist，不允许增量 class 覆盖。
+erp-modules/erp-oa/src/main/java/com/erp/oa/domain/dto/OaExistingEmployeeOnboardInitiateRequest.java
+erp-modules/erp-oa/src/main/java/com/erp/oa/domain/dto/OaExistingEmployeeOnboardPreviewRequest.java
+erp-modules/erp-oa/src/main/java/com/erp/oa/domain/vo/OaExistingEmployeeOnboardInitiateItem.java
+erp-modules/erp-oa/src/main/java/com/erp/oa/domain/vo/OaExistingEmployeeOnboardInitiateResult.java
+erp-modules/erp-oa/src/main/java/com/erp/oa/domain/vo/OaExistingEmployeeOnboardPreviewRow.java
+erp-modules/erp-oa/src/main/java/com/erp/oa/service/impl/OaExistingEmployeeOnboardService.java
+erp-modules/erp-oa/src/test/java/com/erp/oa/controller/OaExistingEmployeeOnboardControllerTest.java
+erp-modules/erp-oa/src/test/java/com/erp/oa/mapper/OaExistingEmployeeOnboardMapperBindingTest.java
+erp-modules/erp-oa/src/test/java/com/erp/oa/service/impl/OaExistingEmployeeOnboardServiceTest.java
+erp-ui/src/views/hr/components/HrOnboardContractBatchDialog.vue

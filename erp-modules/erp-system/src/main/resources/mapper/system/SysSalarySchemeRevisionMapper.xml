@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.system.mapper.SysSalarySchemeRevisionMapper">
+    <resultMap id="RevisionResult" type="SysSalarySchemeRevision">
+        <id property="revisionId" column="revision_id" />
+        <result property="schemeId" column="scheme_id" />
+        <result property="version" column="version" />
+        <result property="changeType" column="change_type" />
+        <result property="changeReason" column="change_reason" />
+        <result property="snapshotJson" column="snapshot_json" />
+        <result property="createBy" column="create_by" />
+        <result property="createTime" column="create_time" />
+    </resultMap>
+
+    <insert id="insertRevision" parameterType="SysSalarySchemeRevision" useGeneratedKeys="true" keyProperty="revisionId">
+        insert into sys_salary_scheme_revision
+            (scheme_id, version, change_type, change_reason, snapshot_json, create_by, create_time)
+        values
+            (#{schemeId}, #{version}, #{changeType}, #{changeReason}, #{snapshotJson}, #{createBy}, sysdate())
+    </insert>
+
+    <select id="selectRevisionById" parameterType="Long" resultMap="RevisionResult">
+        select revision_id, scheme_id, version, change_type, change_reason, snapshot_json, create_by, create_time
+        from sys_salary_scheme_revision
+        where revision_id = #{revisionId}
+    </select>
+
+    <select id="selectRevisionsBySchemeId" parameterType="Long" resultMap="RevisionResult">
+        select revision_id, scheme_id, version, change_type, change_reason, snapshot_json, create_by, create_time
+        from sys_salary_scheme_revision
+        where scheme_id = #{schemeId}
+        order by version desc, revision_id desc
+    </select>
+</mapper>

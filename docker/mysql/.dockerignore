@@ -1,0 +1,10 @@
+# Never send historical databases or runtime volumes to the image builder.
+seed/
+data/
+logs/
+
+# Release/manual operator bundles are not image bootstrap inputs.
+releases/
+manual/
+
+.DS_Store

@@ -1,0 +1,9 @@
+# contract-signing-consistency-20260720 forward-only migration order.
+erp_oa_sign_salary_social_mapping_20260719.sql
+erp_system_sign_candidate_phone_index_20260719.sql
+erp_oa_sign_company_salary_policy_20260720.sql
+erp_oa_sign_dual_sequence_evidence_20260720.sql
+erp_oa_sign_onboard_send_idempotency_20260720.sql
+erp_oa_sign_task_batch_finalize_20260720.sql
+erp_oa_sign_file_cleanup_20260720.sql
+erp_oa_sign_task_hard_delete_idempotency_20260720.sql

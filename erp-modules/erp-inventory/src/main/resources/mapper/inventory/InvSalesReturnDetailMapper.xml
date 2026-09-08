@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.inventory.mapper.InvSalesReturnDetailMapper">
+
+    <resultMap type="InvSalesReturnDetail" id="InvSalesReturnDetailResult">
+        <id property="detailId" column="detail_id"/>
+        <result property="returnId" column="return_id"/>
+        <result property="salesDetailId" column="sales_detail_id"/>
+        <result property="productId" column="product_id"/>
+        <result property="productName" column="product_name"/>
+        <result property="sku" column="sku"/>
+        <result property="spec" column="spec"/>
+        <result property="unit" column="unit"/>
+        <result property="quantity" column="quantity"/>
+        <result property="unitPrice" column="unit_price"/>
+        <result property="amount" column="amount"/>
+        <result property="returnedQuantity" column="returned_quantity"/>
+    </resultMap>
+
+    <select id="selectInvSalesReturnDetailByReturnId" parameterType="Long" resultMap="InvSalesReturnDetailResult">
+        select detail_id, return_id, sales_detail_id, product_id, product_name, sku, spec, unit,
+               quantity, unit_price, amount, returned_quantity
+        from inv_sales_return_detail
+        where return_id = #{returnId}
+    </select>
+
+    <select id="selectInvSalesReturnDetailByReturnIdForUpdate" parameterType="Long" resultMap="InvSalesReturnDetailResult">
+        select detail_id, return_id, sales_detail_id, product_id, product_name, sku, spec, unit,
+               quantity, unit_price, amount, returned_quantity
+        from inv_sales_return_detail
+        where return_id = #{returnId} for update
+    </select>
+
+    <insert id="insertInvSalesReturnDetail" parameterType="InvSalesReturnDetail" useGeneratedKeys="true" keyProperty="detailId">
+        insert into inv_sales_return_detail (
+            return_id, sales_detail_id, product_id, product_name, sku, spec, unit,
+            quantity, unit_price, amount, returned_quantity
+        ) values (
+            #{returnId}, #{salesDetailId}, #{productId}, #{productName}, #{sku}, #{spec}, #{unit},
+            #{quantity}, #{unitPrice}, #{amount}, 0
+        )
+    </insert>
+
+    <insert id="batchInsertInvSalesReturnDetail" parameterType="java.util.List">
+        insert into inv_sales_return_detail (
+            return_id, sales_detail_id, product_id, product_name, sku, spec, unit,
+            quantity, unit_price, amount, returned_quantity
+        ) values
+        <foreach collection="list" item="item" separator=",">
+            (#{item.returnId}, #{item.salesDetailId}, #{item.productId}, #{item.productName}, #{item.sku}, #{item.spec}, #{item.unit},
+             #{item.quantity}, #{item.unitPrice}, #{item.amount}, 0)
+        </foreach>
+    </insert>
+
+    <update id="updateInvSalesReturnDetail" parameterType="InvSalesReturnDetail">
+        update inv_sales_return_detail
+        set returned_quantity = #{returnedQuantity}
+        where detail_id = #{detailId}
+    </update>
+
+    <delete id="deleteInvSalesReturnDetailByReturnId" parameterType="Long">
+        delete from inv_sales_return_detail where return_id = #{returnId}
+    </delete>
+
+    <select id="sumHistoricalReturnQuantity" resultType="java.math.BigDecimal">
+        select coalesce(sum(d.quantity), 0)
+        from inv_sales_return_detail d
+        inner join inv_sales_return r on r.return_id = d.return_id
+        where r.sales_order_id = #{salesOrderId}
+          and d.product_id = #{productId}
+          and r.status in ('submitted', 'returned')
+        <if test="excludeReturnId != null">
+          and r.return_id != #{excludeReturnId}
+        </if>
+    </select>
+
+    <select id="sumHistoricalReturnQuantityBySalesDetailId" resultType="java.math.BigDecimal">
+        select coalesce(sum(d.quantity), 0)
+        from inv_sales_return_detail d
+        inner join inv_sales_return r on r.return_id = d.return_id
+        where r.sales_order_id = #{salesOrderId}
+          and d.sales_detail_id = #{salesDetailId}
+          and r.status in ('submitted', 'returned')
+        <if test="excludeReturnId != null">
+          and r.return_id != #{excludeReturnId}
+        </if>
+    </select>
+
+</mapper>

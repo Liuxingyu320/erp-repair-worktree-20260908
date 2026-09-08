@@ -1,0 +1,93 @@
+{
+  "schemaVersion": 1,
+  "releaseId": "mobile-reimbursement-drive-20260731",
+  "status": "development",
+  "executionPolicy": "manual-clean-candidate-no-auto-deploy",
+  "sourceFileList": "scripts/mobile-reimbursement-drive-release-files-20260731.list",
+  "sourceFileCount": 109,
+  "sourceValidator": "scripts/verify-mobile-reimbursement-drive-release.sh",
+  "productionDeploymentAuthorized": false,
+  "migration": {
+    "canonical": "sql/erp_oa_reimbursement_20260730.sql",
+    "copies": [
+      "docker/mysql/db/erp_oa_reimbursement_20260730.sql",
+      "erp-modules/erp-oa/src/main/resources/db/migration/erp_oa_reimbursement_20260730.sql"
+    ],
+    "prerequisites": [
+      "sql/erp_hr_dept_leader_identity_20260713.sql",
+      "sql/erp_unified_approval_schema_20260716.sql",
+      "sql/erp_unified_approval_seed_20260716.sql"
+    ],
+    "freshDatabaseRehearsalRequired": true
+  },
+  "packages": [
+    {
+      "id": "A",
+      "name": "reimbursement-schema-and-oa-runtime",
+      "deployUnits": ["mysql", "oa"]
+    },
+    {
+      "id": "B",
+      "name": "approval-callback-and-permission-runtime",
+      "deployUnits": ["approval", "oa"]
+    },
+    {
+      "id": "C",
+      "name": "mobile-reimbursement-and-cloud-drive",
+      "deployUnits": ["frontend"]
+    }
+  ],
+  "sharedFiles": [
+    "docker/.env.example",
+    "docker/docker-compose.yml",
+    "docker/docker-compose.ecs-host.yml",
+    "docker/mysql/bootstrap-files.list",
+    "erp-modules/erp-oa/src/main/java/com/erp/oa/service/BusinessFeatureGate.java",
+    "erp-modules/erp-oa/src/main/resources/bootstrap.yml",
+    "erp-modules/erp-oa/src/main/java/com/erp/oa/controller/OaApprovalCallbackController.java",
+    "erp-modules/erp-approval/src/main/java/com/erp/approval/candidate/PermissionHolderCandidateResolver.java",
+    "erp-modules/erp-approval/src/main/java/com/erp/approval/constant/ApprovalBusinessCodes.java",
+    "erp-modules/erp-approval/src/main/java/com/erp/approval/controller/ApprovalInternalController.java",
+    "erp-modules/erp-approval/src/main/java/com/erp/approval/domain/vo/ApprovalTodoRow.java",
+    "erp-modules/erp-approval/src/main/java/com/erp/approval/mapper/ApprovalRuntimeMapper.java",
+    "erp-modules/erp-approval/src/main/java/com/erp/approval/service/ApprovalMonitorService.java",
+    "erp-modules/erp-approval/src/main/java/com/erp/approval/service/ApprovalPermissionPolicy.java",
+    "erp-modules/erp-approval/src/main/java/com/erp/approval/service/ApprovalTaskService.java",
+    "erp-modules/erp-approval/src/main/java/com/erp/approval/service/ApprovalTodoService.java",
+    "erp-modules/erp-approval/src/main/resources/mapper/approval/ApprovalRuntimeMapper.xml",
+    "erp-modules/erp-inventory/src/test/java/com/erp/inventory/integration/NewBusinessMigrationsMySqlIT.java",
+    "erp-modules/erp-inventory/src/test/resources/new-business-it-baseline.sql",
+    "scripts/verify-new-business-it-contract.sh",
+    "erp-ui/src/utils/todoBusinessFocus.js",
+    "erp-ui/src/utils/todoRouteResolver.js",
+    "erp-ui/src/views/mobile/mobileNavigation.js",
+    "erp-ui/src/views/mobile/mobileRouteDefinitions.js"
+  ],
+  "hunkIsolation": {
+    "docker/.env.example": "Only reimbursement OCR variables belong to package A; retain unrelated database, signing and retired-generator changes only through their own release.",
+    "docker/docker-compose.yml": "Only OA reimbursement OCR environment wiring belongs to package A.",
+    "docker/docker-compose.ecs-host.yml": "Only OA reimbursement OCR environment wiring belongs to package A.",
+    "docker/mysql/bootstrap-files.list": "Package A adds erp_oa_reimbursement_20260730.sql at the reviewed dependency position; all other migration-order changes remain independently owned.",
+    "erp-modules/erp-oa/src/main/resources/bootstrap.yml": "Package A includes multipart and oa.reimbursement settings only; signing and datasource changes remain independently owned.",
+    "erp-modules/erp-inventory/src/test/java/com/erp/inventory/integration/NewBusinessMigrationsMySqlIT.java": "Package A adds the reimbursement migration replay and operational-scope assertions; retain unrelated new-business database checks.",
+    "erp-modules/erp-inventory/src/test/resources/new-business-it-baseline.sql": "Package A adds the base sys_dept leader field required before replaying the existing leader-identity migration.",
+    "scripts/verify-new-business-it-contract.sh": "Package A adds reimbursement migration coverage tokens to the existing fail-closed MySQL integration contract.",
+    "erp-ui/src/views/mobile/mobileRouteDefinitions.js": "Package C includes the reimbursement route definition only; preserve all unrelated route work.",
+    "erp-ui/src/views/mobile/mobileNavigation.js": "Package C includes the reimbursement navigation entry only; preserve all unrelated navigation work."
+  },
+  "hardGatesBeforeCandidate": [
+    "every explicit release file is tracked in the Git index",
+    "three reimbursement migration copies are byte-identical",
+    "fresh MySQL 5.7 migration rehearsal succeeds",
+    "frontend full Node test suite and staging production build succeed",
+    "OA and approval reimbursement tests succeed in a reactor build",
+    "mobile browser UAT covers draft, invoice, submit, approval, export, trash and restore",
+    "clean immutable candidate commit and artifact SHA-256 are recorded"
+  ],
+  "forbidden": [
+    "real OCR credentials",
+    "generated dist or target output",
+    "automatic production deployment",
+    "whole-file overwrite of shared files"
+  ]
+}

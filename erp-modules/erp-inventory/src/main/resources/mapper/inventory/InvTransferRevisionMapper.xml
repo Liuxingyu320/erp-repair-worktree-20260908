@@ -1,0 +1,139 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.inventory.mapper.InvTransferRevisionMapper">
+
+    <resultMap type="InvTransferRevision" id="InvTransferRevisionResult">
+        <id property="revisionId" column="revision_id"/>
+        <result property="transferId" column="transfer_id"/>
+        <result property="revisionNo" column="revision_no"/>
+        <result property="parentRevisionId" column="parent_revision_id"/>
+        <result property="approvalRound" column="approval_round"/>
+        <result property="approvalInstanceId" column="approval_instance_id"/>
+        <result property="status" column="status"/>
+        <result property="headerSnapshot" column="header_snapshot"/>
+        <result property="detailSnapshot" column="detail_snapshot"/>
+        <result property="snapshotHash" column="snapshot_hash"/>
+        <result property="decisionAction" column="decision_action"/>
+        <result property="decisionReason" column="decision_reason"/>
+        <result property="decisionUserId" column="decision_user_id"/>
+        <result property="decisionUsername" column="decision_username"/>
+        <result property="decisionTime" column="decision_time"/>
+        <result property="sealedTime" column="sealed_time"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateBy" column="update_by"/>
+        <result property="updateTime" column="update_time"/>
+    </resultMap>
+
+    <sql id="revisionColumns">
+        revision_id, transfer_id, revision_no, parent_revision_id,
+        approval_round, approval_instance_id, status, header_snapshot,
+        detail_snapshot, snapshot_hash, decision_action, decision_reason,
+        decision_user_id, decision_username, decision_time, sealed_time,
+        create_by, create_time, update_by, update_time
+    </sql>
+
+    <select id="selectLatestByTransferIdForUpdate"
+            resultMap="InvTransferRevisionResult">
+        select <include refid="revisionColumns"/>
+        from inv_transfer_revision
+        where transfer_id = #{transferId}
+        order by revision_no desc
+        limit 1
+        for update
+    </select>
+
+    <select id="selectByTransferRoundForUpdate"
+            resultMap="InvTransferRevisionResult">
+        select <include refid="revisionColumns"/>
+        from inv_transfer_revision
+        where transfer_id = #{transferId}
+          and approval_round = #{approvalRound}
+        limit 1
+        for update
+    </select>
+
+    <select id="selectByTransferId" resultMap="InvTransferRevisionResult">
+        select <include refid="revisionColumns"/>
+        from inv_transfer_revision
+        where transfer_id = #{transferId}
+        order by revision_no asc
+    </select>
+
+    <insert id="insertRevision" parameterType="InvTransferRevision"
+            useGeneratedKeys="true" keyProperty="revisionId">
+        insert into inv_transfer_revision (
+            transfer_id, revision_no, parent_revision_id, approval_round,
+            approval_instance_id, status, header_snapshot, detail_snapshot,
+            snapshot_hash, decision_action, decision_reason,
+            decision_user_id, decision_username, decision_time, sealed_time,
+            create_by, create_time, update_by, update_time
+        ) values (
+            #{transferId}, #{revisionNo}, #{parentRevisionId},
+            #{approvalRound}, #{approvalInstanceId}, #{status},
+            #{headerSnapshot}, #{detailSnapshot}, #{snapshotHash},
+            #{decisionAction}, #{decisionReason}, #{decisionUserId},
+            #{decisionUsername}, #{decisionTime}, #{sealedTime},
+            #{createBy}, sysdate(), #{updateBy}, sysdate()
+        )
+    </insert>
+
+    <update id="updateDraftSnapshot">
+        update inv_transfer_revision
+        set header_snapshot = #{headerSnapshot},
+            detail_snapshot = #{detailSnapshot},
+            snapshot_hash = #{snapshotHash},
+            update_by = #{username}, update_time = sysdate()
+        where revision_id = #{revisionId}
+          and status = 'DRAFT'
+    </update>
+
+    <update id="sealDraft">
+        update inv_transfer_revision
+        set approval_round = #{approvalRound},
+            approval_instance_id = #{approvalInstanceId},
+            status = #{targetStatus},
+            header_snapshot = #{headerSnapshot},
+            detail_snapshot = #{detailSnapshot},
+            snapshot_hash = #{snapshotHash},
+            decision_action = #{decisionAction},
+            decision_user_id = #{decisionUserId},
+            decision_username = #{decisionUsername},
+            decision_time = case when #{decisionAction} is null
+                                 then null else sysdate() end,
+            sealed_time = sysdate(),
+            update_by = #{username}, update_time = sysdate()
+        where revision_id = #{revisionId}
+          and status = 'DRAFT'
+    </update>
+
+    <update id="transitionRevision">
+        update inv_transfer_revision
+        set status = #{targetStatus},
+            approval_instance_id = coalesce(approval_instance_id,
+                #{approvalInstanceId}),
+            decision_action = #{decisionAction},
+            decision_reason = #{decisionReason},
+            decision_user_id = #{decisionUserId},
+            decision_username = #{decisionUsername},
+            decision_time = sysdate(),
+            sealed_time = coalesce(sealed_time, sysdate()),
+            update_by = #{username}, update_time = sysdate()
+        where revision_id = #{revisionId}
+          and status = #{expectedStatus}
+    </update>
+
+    <select id="countSealedByTransferId" resultType="int">
+        select count(1)
+        from inv_transfer_revision
+        where transfer_id = #{transferId}
+          and status &lt;&gt; 'DRAFT'
+    </select>
+
+    <delete id="deleteDraftByTransferId">
+        delete from inv_transfer_revision
+        where transfer_id = #{transferId}
+          and status = 'DRAFT'
+    </delete>
+
+</mapper>

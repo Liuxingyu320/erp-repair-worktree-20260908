@@ -1,0 +1,92 @@
+{
+  "version": 1,
+  "conflicts": {
+    "4040": {
+      "parent_id": [4000, 4308],
+      "path": ["stock", "store-stock"],
+      "route_name": ["InventoryStock", "StoreStock"]
+    },
+    "4101": { "parent_id": [4000, 4460] },
+    "4102": { "parent_id": [4000, 4460] },
+    "4103": { "parent_id": [4000, 4460] },
+    "4104": { "parent_id": [4000, 4460] },
+    "4105": { "parent_id": [4000, 4460] },
+    "4106": { "parent_id": [4000, 4460] },
+    "4107": { "parent_id": [4000, 4460] },
+    "4108": { "parent_id": [4000, 4460] },
+    "4109": { "parent_id": [4000, 4460] },
+    "4300": {
+      "parent_id": [4000, 4308],
+      "path": ["stock-check", "stockCheck"],
+      "route_name": ["", "WarehouseStockCheck"]
+    },
+    "4401": { "parent_id": [4000, 4465] },
+    "4402": { "parent_id": [4000, 4465] },
+    "4403": { "parent_id": [4000, 4465] },
+    "4450": { "path": ["stock", "warehouse-stock"] },
+    "4470": {
+      "parent_id": [4000, 4308],
+      "route_name": ["InventoryReport", "WarehouseInventoryReport"]
+    },
+    "4520": {
+      "component": ["inventory/oe/category/index", "oa/signPackage/index"],
+      "parent_id": [3000, 4308],
+      "path": ["oe-category", "sign-package"],
+      "perms": ["inv:oeCategory:list", "oa:signPackage:list"],
+      "route_name": ["InventoryOeCategory", "OaSignPackage"]
+    },
+    "4521": { "perms": ["inv:oeCategory:tree", "oa:signPackage:query"] },
+    "4522": { "perms": ["inv:oeCategory:query", "oa:signPackage:add"] },
+    "4523": { "perms": ["inv:oeCategory:add", "oa:signPackage:send"] },
+    "4524": { "perms": ["inv:oeCategory:edit", "oa:signPackage:void"] },
+    "4525": {
+      "component": [null, "inventory/oe/index"],
+      "menu_type": ["C", "F"],
+      "parent_id": [4308, 4520],
+      "path": ["", "oe"],
+      "perms": ["inv:oe:list", "oa:signPackage:template"],
+      "route_name": ["", "InventoryOe"]
+    },
+    "4526": { "perms": ["inv:oeCategory:remove", "oa:signPackage:sign"] },
+    "4600": {
+      "component": [null, "oa/signTask/index"],
+      "menu_type": ["C", "M"],
+      "parent_id": [0, 3000],
+      "path": ["hr", "sign-task"],
+      "perms": ["", "oa:signTask:list"],
+      "route_name": ["Hr", "OaSignTask"]
+    },
+    "4601": {
+      "component": [null, "hr/employee/index"],
+      "menu_type": ["C", "F"],
+      "path": ["", "employee"],
+      "perms": ["hr:employee:list", "oa:signTask:query"],
+      "route_name": ["", "HrEmployee"]
+    },
+    "4602": {
+      "component": [null, "hr/onboarding/index"],
+      "menu_type": ["C", "F"],
+      "path": ["", "onboarding"],
+      "perms": ["hr:onboarding:list", "oa:signTask:revalidate"],
+      "route_name": ["", "HrOnboarding"]
+    },
+    "4603": {
+      "component": [null, "hr/completeness/index"],
+      "menu_type": ["C", "F"],
+      "path": ["", "completeness"],
+      "perms": ["hr:completeness:list", "oa:signTask:confirm"],
+      "route_name": ["", "HrCompleteness"]
+    },
+    "4604": {
+      "component": [null, "hr/importExport/index"],
+      "menu_type": ["C", "F"],
+      "path": ["", "import-export"],
+      "perms": ["hr:import:preview", "oa:signTask:send"],
+      "route_name": ["", "HrImportExport"]
+    },
+    "4611": {
+      "parent_id": [4600, 4601],
+      "perms": ["hr:employee:query", "oa:signPackage:template"]
+    }
+  }
+}

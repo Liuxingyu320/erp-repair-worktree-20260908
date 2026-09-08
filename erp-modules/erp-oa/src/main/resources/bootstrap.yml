@@ -1,0 +1,174 @@
+# Tomcat
+server:
+  port: 9204
+
+# Spring
+spring:
+  servlet:
+    multipart:
+      max-file-size: ${OA_MULTIPART_MAX_FILE_SIZE:10MB}
+      max-request-size: ${OA_MULTIPART_MAX_REQUEST_SIZE:11MB}
+  application:
+    name: erp-oa
+  profiles:
+    active: dev
+  cloud:
+    nacos:
+      discovery:
+        server-addr: 127.0.0.1:8848
+      config:
+        server-addr: 127.0.0.1:8848
+  config:
+    file-extension: yml
+    import:
+      - optional:nacos:application-${spring.profiles.active}.${spring.config.file-extension}
+      - optional:nacos:${spring.application.name}-${spring.profiles.active}.${spring.config.file-extension}
+
+mybatis:
+  typeAliasesPackage: com.erp.oa
+  mapperLocations: classpath:mapper/**/*.xml
+
+sign-package:
+  storage:
+    root-path: ${SIGN_PACKAGE_STORAGE_ROOT:${file.path:./uploadPath}/private/sign-package}
+    temp-path: ${SIGN_PACKAGE_TEMP_ROOT:${java.io.tmpdir}/erp-sign-package}
+    public-prefix: ${SIGN_PACKAGE_PUBLIC_PREFIX:/profile/private/sign-package}
+  pdf:
+    converter-command: ${SIGN_PACKAGE_PDF_CONVERTER_COMMAND:libreoffice}
+    timeout-seconds: ${SIGN_PACKAGE_PDF_TIMEOUT_SECONDS:60}
+
+# Expiry is a business-state scheduler. Keep it opt-in until lifecycle migrations and
+# production UAT have passed; production Nacos may explicitly override this property.
+oa:
+  attendance-v2:
+    storage-root: ${OA_ATTENDANCE_STORAGE_ROOT:${file.path:./uploadPath}/private/attendance}
+    temp-root: ${OA_ATTENDANCE_TEMP_ROOT:${java.io.tmpdir}/erp-attendance}
+    max-photo-bytes: ${OA_ATTENDANCE_MAX_PHOTO_BYTES:5242880}
+    challenge-ttl-seconds: ${OA_ATTENDANCE_CHALLENGE_TTL_SECONDS:180}
+    min-image-width: ${OA_ATTENDANCE_MIN_IMAGE_WIDTH:320}
+    min-image-height: ${OA_ATTENDANCE_MIN_IMAGE_HEIGHT:240}
+    max-image-pixels: ${OA_ATTENDANCE_MAX_IMAGE_PIXELS:40000000}
+    max-location-accuracy-meters: ${OA_ATTENDANCE_MAX_LOCATION_ACCURACY_METERS:100}
+    address:
+      provider: ${OA_ATTENDANCE_ADDRESS_PROVIDER:NONE}
+      amap-web-service-key: ${OA_ATTENDANCE_AMAP_WEB_SERVICE_KEY:}
+      connect-timeout-millis: ${OA_ATTENDANCE_AMAP_CONNECT_TIMEOUT_MILLIS:1500}
+      read-timeout-millis: ${OA_ATTENDANCE_AMAP_READ_TIMEOUT_MILLIS:2500}
+      radius-meters: ${OA_ATTENDANCE_AMAP_RADIUS_METERS:100}
+      max-response-bytes: ${OA_ATTENDANCE_AMAP_MAX_RESPONSE_BYTES:131072}
+  reimbursement:
+    storage-root: ${OA_REIMBURSEMENT_STORAGE_ROOT:${file.path:./uploadPath}/private/reimbursement}
+    temp-root: ${OA_REIMBURSEMENT_TEMP_ROOT:${java.io.tmpdir}/erp-reimbursement}
+    max-invoice-bytes: ${OA_REIMBURSEMENT_MAX_INVOICE_BYTES:10485760}
+    max-invoices-per-claim: ${OA_REIMBURSEMENT_MAX_INVOICES_PER_CLAIM:20}
+    max-claims-per-export: ${OA_REIMBURSEMENT_MAX_CLAIMS_PER_EXPORT:200}
+    ocr:
+      auto-recognize: ${OA_REIMBURSEMENT_OCR_AUTO_RECOGNIZE:true}
+      cloud:
+        enabled: ${OA_REIMBURSEMENT_OCR_CLOUD_ENABLED:true}
+        provider: ${OA_REIMBURSEMENT_OCR_CLOUD_PROVIDER:baidu}
+        api-key: ${BAIDU_OCR_API_KEY:}
+        secret-key: ${BAIDU_OCR_SECRET_KEY:}
+        token-url: ${BAIDU_OCR_TOKEN_URL:https://aip.baidubce.com/oauth/2.0/token}
+        recognize-url: ${BAIDU_OCR_RECOGNIZE_URL:https://aip.baidubce.com/rest/2.0/ocr/v1/vat_invoice}
+        timeout-seconds: ${OA_REIMBURSEMENT_OCR_CLOUD_TIMEOUT_SECONDS:25}
+        max-encoded-bytes: ${OA_REIMBURSEMENT_OCR_CLOUD_MAX_ENCODED_BYTES:8388608}
+      local:
+        enabled: ${OA_REIMBURSEMENT_OCR_LOCAL_ENABLED:true}
+        command: ${OA_REIMBURSEMENT_OCR_LOCAL_COMMAND:auto}
+        languages: ${OA_REIMBURSEMENT_OCR_LOCAL_LANGUAGES:chi_sim+eng}
+        timeout-seconds: ${OA_REIMBURSEMENT_OCR_LOCAL_TIMEOUT_SECONDS:30}
+        render-dpi: ${OA_REIMBURSEMENT_OCR_LOCAL_RENDER_DPI:250}
+  sign:
+    expiry:
+      enabled: ${OA_SIGN_EXPIRY_ENABLED:false}
+      fixed-delay-ms: ${OA_SIGN_EXPIRY_FIXED_DELAY_MS:60000}
+    reminder:
+      enabled: ${OA_SIGN_REMINDER_ENABLED:false}
+      fixed-delay-ms: ${OA_SIGN_REMINDER_FIXED_DELAY_MS:60000}
+    emergency-create:
+      enabled: ${OA_SIGN_EMERGENCY_CREATE_ENABLED:false}
+    excel-import:
+      enabled: ${OA_SIGN_EXCEL_IMPORT_ENABLED:true}
+
+---
+# 本地无 Nacos 启动配置：--spring.profiles.active=local
+server:
+  port: 9204
+
+sign-package:
+  pdf:
+    converter-command: ${SIGN_PACKAGE_PDF_CONVERTER_COMMAND:/Applications/LibreOffice.app/Contents/MacOS/soffice}
+
+spring:
+  config:
+    activate:
+      on-profile: local
+  data:
+    redis:
+      host: 127.0.0.1
+      port: 6379
+      password: ${REDIS_PASSWORD:}
+  cloud:
+    nacos:
+      discovery:
+        enabled: false
+      config:
+        enabled: false
+    discovery:
+      client:
+        simple:
+          instances:
+            erp-oa:
+              - uri: http://127.0.0.1:9204
+            erp-system:
+              - uri: http://127.0.0.1:9201
+            erp-inventory:
+              - uri: http://127.0.0.1:9205
+            erp-approval:
+              - uri: http://127.0.0.1:9206
+  datasource:
+    druid:
+      stat-view-servlet:
+        enabled: ${DRUID_MONITOR_ENABLED:false}
+        loginUsername: ${DRUID_MONITOR_USERNAME:}
+        loginPassword: ${DRUID_MONITOR_PASSWORD:}
+    dynamic:
+      druid:
+        initial-size: 5
+        min-idle: 5
+        maxActive: 20
+        maxWait: 60000
+        connectTimeout: 30000
+        socketTimeout: 60000
+        timeBetweenEvictionRunsMillis: 60000
+        minEvictableIdleTimeMillis: 300000
+        validationQuery: SELECT 1 FROM DUAL
+        testWhileIdle: true
+        testOnBorrow: false
+        testOnReturn: false
+        poolPreparedStatements: true
+        maxPoolPreparedStatementPerConnectionSize: 20
+        filters: stat,slf4j
+        connectionProperties: druid.stat.mergeSql\=true;druid.stat.slowSqlMillis\=5000
+      datasource:
+        master:
+          driver-class-name: com.mysql.cj.jdbc.Driver
+          url: jdbc:mysql://127.0.0.1:3306/${MYSQL_DATABASE:BossERP_NEW}?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&useSSL=false&serverTimezone=Asia/Shanghai
+          username: ${MYSQL_USERNAME:root}
+          password: ${MYSQL_PASSWORD:}
+
+mybatis:
+  typeAliasesPackage: com.erp.oa
+  mapperLocations: classpath:mapper/**/*.xml
+
+springdoc:
+  gatewayUrl: http://localhost:8080/${spring.application.name}
+  api-docs:
+    enabled: ${SPRINGDOC_API_DOCS_ENABLED:false}
+  info:
+    title: 'OA模块接口文档'
+    description: 'OA模块接口描述'
+    contact:
+      name: ERP
+      url: https://erp.vip

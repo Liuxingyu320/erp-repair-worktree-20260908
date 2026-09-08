@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.approval.mapper.ApprovalTemplateMapper">
+
+    <resultMap id="ApprovalTemplateResult" type="ApprovalTemplate">
+        <id property="templateId" column="template_id"/>
+        <result property="businessCode" column="business_code"/>
+        <result property="templateName" column="template_name"/>
+        <result property="businessSource" column="business_source"/>
+        <result property="engineMode" column="engine_mode"/>
+        <result property="definitionMode" column="definition_mode"/>
+        <result property="legacyAdapterCode" column="legacy_adapter_code"/>
+        <result property="callbackService" column="callback_service"/>
+        <result property="templateStatus" column="template_status"/>
+        <result property="lockVersion" column="lock_version"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateBy" column="update_by"/>
+        <result property="updateTime" column="update_time"/>
+        <result property="remark" column="remark"/>
+    </resultMap>
+
+    <sql id="templateColumns">
+        template_id, business_code, template_name, business_source,
+        engine_mode, definition_mode, legacy_adapter_code, callback_service,
+        template_status, lock_version, create_by, create_time,
+        update_by, update_time, remark
+    </sql>
+
+    <select id="selectTemplateList" parameterType="ApprovalTemplate"
+            resultMap="ApprovalTemplateResult">
+        select <include refid="templateColumns"/>
+        from approval_template
+        <where>
+            <if test="businessCode != null and businessCode != ''">
+                and business_code = #{businessCode}
+            </if>
+            <if test="templateName != null and templateName != ''">
+                and template_name like concat('%', #{templateName}, '%')
+            </if>
+            <if test="businessSource != null and businessSource != ''">
+                and business_source = #{businessSource}
+            </if>
+            <if test="engineMode != null and engineMode != ''">
+                and engine_mode = #{engineMode}
+            </if>
+            <if test="templateStatus != null and templateStatus != ''">
+                and template_status = #{templateStatus}
+            </if>
+        </where>
+        order by business_source, template_id
+    </select>
+
+    <select id="selectTemplateById" parameterType="Long"
+            resultMap="ApprovalTemplateResult">
+        select <include refid="templateColumns"/>
+        from approval_template
+        where template_id = #{templateId}
+    </select>
+
+    <select id="selectTemplateByIdForUpdate" parameterType="Long"
+            resultMap="ApprovalTemplateResult">
+        select <include refid="templateColumns"/>
+        from approval_template
+        where template_id = #{templateId}
+        for update
+    </select>
+
+    <select id="selectTemplateByBusinessCode" parameterType="String"
+            resultMap="ApprovalTemplateResult">
+        select <include refid="templateColumns"/>
+        from approval_template
+        where business_code = #{businessCode}
+    </select>
+
+    <insert id="insertTemplate" parameterType="ApprovalTemplate"
+            useGeneratedKeys="true" keyProperty="templateId">
+        insert into approval_template (
+            business_code, template_name, business_source, engine_mode,
+            definition_mode, legacy_adapter_code, callback_service,
+            template_status, lock_version, create_by, create_time, remark
+        ) values (
+            #{businessCode}, #{templateName}, #{businessSource}, #{engineMode},
+            #{definitionMode}, #{legacyAdapterCode}, #{callbackService},
+            #{templateStatus}, 0, #{createBy}, sysdate(), #{remark}
+        )
+    </insert>
+
+    <update id="updateTemplateWithLock">
+        update approval_template
+        set template_name = #{template.templateName},
+            engine_mode = #{template.engineMode},
+            definition_mode = #{template.definitionMode},
+            legacy_adapter_code = #{template.legacyAdapterCode},
+            callback_service = #{template.callbackService},
+            template_status = #{template.templateStatus},
+            lock_version = lock_version + 1,
+            update_by = #{template.updateBy},
+            update_time = sysdate(),
+            remark = #{template.remark}
+        where template_id = #{template.templateId}
+          and lock_version = #{expectedVersion}
+    </update>
+
+</mapper>

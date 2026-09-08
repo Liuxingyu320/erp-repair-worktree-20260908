@@ -1,0 +1,406 @@
+{
+  "schemaVersion": 1,
+  "releaseId": "contract-signing-release-a-20260716",
+  "runId": "contract-sign-uat-001",
+  "candidateCommit": "0000000000000000000000000000000000000000",
+  "database": "erp_uat_contract_signing_20260716",
+  "expectedEnvironmentId": "contract-signing-uat-a",
+  "databaseEngine": { "vendor": "mysql", "version": "5.7.REPLACE_WITH_PATCH" },
+  "databaseFingerprintSha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "migrationBundleSha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "trustedSignerPublicKeySha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "productionDataCopied": false,
+  "baseUrl": "https://erp-contract-uat.example.test",
+  "apiBaseUrl": "https://erp-contract-uat.example.test/prod-api",
+  "environmentIdentityProbe": {
+    "id": "contract-signing-environment-identity",
+    "actor": "technicalEvidenceReviewer",
+    "method": "GET",
+    "path": "/uat/contract-signing/environment-identity"
+  },
+  "actors": {
+    "dedicatedHrOrgA": {
+      "kind": "HR",
+      "isAdministrator": false,
+      "organizations": ["orgA"],
+      "expectedRoleKeys": ["sign_single_hr"],
+      "expectedPermissions": [
+        "oa:signTask:list", "oa:signTask:query", "oa:signTask:revalidate",
+        "oa:signTask:send", "oa:signTask:retry", "oa:signTask:cancel",
+        "oa:signTask:remind", "oa:signTask:resolveRefusal", "oa:signTask:resolveExpiry",
+        "oa:signPackage:list", "oa:signPackage:query", "oa:signPackage:add",
+        "oa:signPackage:send", "oa:signPackage:void", "oa:signPackage:template",
+        "oa:signCompany:list", "oa:signSeal:list"
+      ],
+      "storageState": "/secure/erp-contract-uat/dedicated-hr-org-a.json"
+    },
+    "dedicatedHrOrgB": {
+      "kind": "HR",
+      "isAdministrator": false,
+      "organizations": ["orgB"],
+      "expectedRoleKeys": ["sign_single_hr"],
+      "expectedPermissions": [
+        "oa:signTask:list", "oa:signTask:query", "oa:signTask:revalidate",
+        "oa:signTask:send", "oa:signTask:retry", "oa:signTask:cancel",
+        "oa:signTask:remind", "oa:signTask:resolveRefusal", "oa:signTask:resolveExpiry",
+        "oa:signPackage:list", "oa:signPackage:query", "oa:signPackage:add",
+        "oa:signPackage:send", "oa:signPackage:void", "oa:signPackage:template",
+        "oa:signCompany:list", "oa:signSeal:list"
+      ],
+      "storageState": "/secure/erp-contract-uat/dedicated-hr-org-b.json"
+    },
+    "technicalEvidenceReviewer": {
+      "kind": "TECHNICAL_EVIDENCE",
+      "isAdministrator": false,
+      "organizations": ["orgA", "orgB"],
+      "expectedRoleKeys": ["sign_technical_evidence_reviewer"],
+      "expectedPermissions": ["oa:signTask:technicalEvidence"],
+      "storageState": "/secure/erp-contract-uat/technical-evidence-reviewer.json"
+    },
+    "legacyPackageOnly": {
+      "kind": "LEGACY_PACKAGE_ONLY",
+      "isAdministrator": false,
+      "organizations": ["orgA"],
+      "expectedRoleKeys": ["legacy_sign_package_only"],
+      "expectedPermissions": [
+        "oa:signPackage:list", "oa:signPackage:query", "oa:signPackage:add",
+        "oa:signPackage:send", "oa:signPackage:void", "oa:signPackage:template",
+        "oa:signPackage:sign"
+      ],
+      "expectedMenuIds": [3000, 4520, 4521, 4522, 4523, 4524, 4525, 4526],
+      "forbiddenMenuIds": [9650],
+      "storageState": "/secure/erp-contract-uat/legacy-package-only.json"
+    },
+    "employeeOnboard": {
+      "kind": "EMPLOYEE", "isAdministrator": false, "organizations": ["orgA"],
+      "expectedRoleKeys": ["employee"], "expectedPermissions": [],
+      "storageState": "/secure/erp-contract-uat/employee-onboard.json"
+    },
+    "employeeRegularize": {
+      "kind": "EMPLOYEE", "isAdministrator": false, "organizations": ["orgA"],
+      "expectedRoleKeys": ["employee"], "expectedPermissions": [],
+      "storageState": "/secure/erp-contract-uat/employee-regularize.json"
+    },
+    "employeeTransfer": {
+      "kind": "EMPLOYEE", "isAdministrator": false, "organizations": ["orgB"],
+      "expectedRoleKeys": ["employee"], "expectedPermissions": [],
+      "storageState": "/secure/erp-contract-uat/employee-transfer.json"
+    },
+    "employeeRenewal": {
+      "kind": "EMPLOYEE", "isAdministrator": false, "organizations": ["orgA"],
+      "expectedRoleKeys": ["employee"], "expectedPermissions": [],
+      "storageState": "/secure/erp-contract-uat/employee-renewal.json"
+    },
+    "employeeOffboard": {
+      "kind": "EMPLOYEE", "isAdministrator": false, "organizations": ["orgB"],
+      "expectedRoleKeys": ["employee"], "expectedPermissions": [],
+      "storageState": "/secure/erp-contract-uat/employee-offboard.json"
+    }
+  },
+  "legacyMenuBoundary": {
+    "actor": "legacyPackageOnly",
+    "oaRootMenuId": 3000,
+    "requiredMenuIds": [4520, 4521, 4522, 4523, 4524, 4525, 4526],
+    "forbiddenMenuIds": [9650],
+    "packageRoute": "sign-package",
+    "packageComponent": "oa/signPackage/index",
+    "taskRoute": "sign-task",
+    "packageBrowserPath": "/oa/sign-package",
+    "taskBrowserPath": "/oa/sign-task"
+  },
+  "organizations": {
+    "orgA": {
+      "organizationId": "910001",
+      "deptId": "911001",
+      "legalEntities": [
+        {
+          "legalEntityId": "912001",
+          "candidateContractTypes": ["LABOR", "SERVICE"],
+          "seal": {
+            "sealId": "913001", "status": "ACTIVE", "validUntil": "2099-12-31",
+            "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+          }
+        }
+      ]
+    },
+    "orgB": {
+      "organizationId": "920001",
+      "deptId": "921001",
+      "legalEntities": [
+        {
+          "legalEntityId": "922001",
+          "candidateContractTypes": ["LABOR", "SERVICE"],
+          "seal": {
+            "sealId": "923001", "status": "ACTIVE", "validUntil": "2099-12-31",
+            "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+          }
+        }
+      ]
+    }
+  },
+  "employees": {
+    "employeeOnboard": { "employeeId": "930001", "userId": "931001", "organization": "orgA", "dataClass": "SYNTHETIC_UAT" },
+    "employeeRegularize": { "employeeId": "930002", "userId": "931002", "organization": "orgA", "dataClass": "SYNTHETIC_UAT" },
+    "employeeTransfer": { "employeeId": "930003", "userId": "931003", "organization": "orgB", "dataClass": "SYNTHETIC_UAT" },
+    "employeeRenewal": { "employeeId": "930004", "userId": "931004", "organization": "orgA", "dataClass": "SYNTHETIC_UAT" },
+    "employeeOffboard": { "employeeId": "930005", "userId": "931005", "organization": "orgB", "dataClass": "SYNTHETIC_UAT" }
+  },
+  "scenarios": {
+    "ONBOARD": {
+      "organization": "orgA", "employee": "employeeOnboard", "contractType": "LABOR",
+      "planVersionId": "940001", "taskId": "941001", "packageId": "942001",
+      "planVersionSha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "templateHashes": ["0000000000000000000000000000000000000000000000000000000000000000"],
+      "approvalRef": "LEGAL-APPROVAL-REPLACE-ME-ONBOARD"
+    },
+    "REGULARIZE": {
+      "organization": "orgA", "employee": "employeeRegularize", "contractType": "SERVICE",
+      "planVersionId": "940002", "taskId": "941002", "packageId": "942002",
+      "planVersionSha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "templateHashes": ["0000000000000000000000000000000000000000000000000000000000000000"],
+      "approvalRef": "LEGAL-APPROVAL-REPLACE-ME-REGULARIZE"
+    },
+    "TRANSFER": {
+      "organization": "orgB", "employee": "employeeTransfer", "contractType": "LABOR",
+      "planVersionId": "940003", "taskId": "941003", "packageId": "942003",
+      "planVersionSha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "templateHashes": ["0000000000000000000000000000000000000000000000000000000000000000"],
+      "approvalRef": "LEGAL-APPROVAL-REPLACE-ME-TRANSFER"
+    },
+    "RENEWAL": {
+      "organization": "orgA", "employee": "employeeRenewal", "contractType": "SERVICE",
+      "planVersionId": "940004", "taskId": "941004", "packageId": "942004",
+      "planVersionSha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "templateHashes": ["0000000000000000000000000000000000000000000000000000000000000000"],
+      "approvalRef": "LEGAL-APPROVAL-REPLACE-ME-RENEWAL"
+    },
+    "OFFBOARD": {
+      "organization": "orgB", "employee": "employeeOffboard", "contractType": "LABOR",
+      "planVersionId": "940005", "taskId": "941005", "packageId": "942005",
+      "planVersionSha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "templateHashes": ["0000000000000000000000000000000000000000000000000000000000000000"],
+      "approvalRef": "LEGAL-APPROVAL-REPLACE-ME-OFFBOARD"
+    }
+  },
+  "contractCoverage": [
+    { "organization": "orgA", "legalEntityId": "912001", "contractType": "LABOR", "planVersionId": "940001", "templateSha256": "0000000000000000000000000000000000000000000000000000000000000000", "approvalRef": "LEGAL-APPROVAL-REPLACE-ME-A-LABOR" },
+    { "organization": "orgA", "legalEntityId": "912001", "contractType": "SERVICE", "planVersionId": "940004", "templateSha256": "0000000000000000000000000000000000000000000000000000000000000000", "approvalRef": "LEGAL-APPROVAL-REPLACE-ME-A-SERVICE" },
+    { "organization": "orgB", "legalEntityId": "922001", "contractType": "LABOR", "planVersionId": "940003", "templateSha256": "0000000000000000000000000000000000000000000000000000000000000000", "approvalRef": "LEGAL-APPROVAL-REPLACE-ME-B-LABOR" },
+    { "organization": "orgB", "legalEntityId": "922001", "contractType": "SERVICE", "planVersionId": "940005", "templateSha256": "0000000000000000000000000000000000000000000000000000000000000000", "approvalRef": "LEGAL-APPROVAL-REPLACE-ME-B-SERVICE" }
+  ],
+  "faultFixtures": {
+    "refusedTaskId": "950001",
+    "expiredTaskId": "950002",
+    "expiredDocumentVersion": "uat-expired-version-001",
+    "expiredExpectedVersion": 4,
+    "replacementPlanVersionId": "940004",
+    "notificationTaskId": "950003",
+    "notificationBusinessKey": "SIGN_SENT:950003:uat-v1",
+    "duplicateNotificationTaskId": "950004",
+    "duplicateNotificationBusinessKey": "SIGN_SENT:950004:uat-v1",
+    "completedPackageId": "942001",
+    "completedDocumentId": "952001",
+    "completedFinalFileSha256": "0000000000000000000000000000000000000000000000000000000000000000"
+  },
+  "browserJourneys": [
+    {
+      "id": "onboard-hr-desktop", "scenario": "ONBOARD", "mode": "HR_DESKTOP",
+      "actor": "dedicatedHrOrgA", "organization": "orgA", "viewport": { "width": 1440, "height": 900 },
+      "path": "/oa/sign-task?taskId=${scenarios.ONBOARD.taskId}",
+      "checks": ["task-generated", "data-validated", "sent", "company-and-seal-ready", "finalized", "download-and-verify", "console-clean"]
+    },
+    {
+      "id": "onboard-employee-mobile", "scenario": "ONBOARD", "mode": "EMPLOYEE_MOBILE",
+      "actor": "employeeOnboard", "organization": "orgA", "viewport": { "width": 390, "height": 844 },
+      "path": "/mobile/sign-package?packageId=${scenarios.ONBOARD.packageId}",
+      "checks": ["documents-loaded", "read-each-document", "initial-signature", "final-documents-read", "final-confirmed", "focus-returned", "load-failure-explained", "deep-link-recovered", "console-clean"]
+    },
+    {
+      "id": "regularize-hr-desktop", "scenario": "REGULARIZE", "mode": "HR_DESKTOP",
+      "actor": "dedicatedHrOrgA", "organization": "orgA", "viewport": { "width": 1440, "height": 900 },
+      "path": "/oa/sign-task?taskId=${scenarios.REGULARIZE.taskId}",
+      "checks": ["task-generated", "data-validated", "sent", "company-and-seal-ready", "finalized", "download-and-verify", "console-clean"]
+    },
+    {
+      "id": "regularize-employee-mobile", "scenario": "REGULARIZE", "mode": "EMPLOYEE_MOBILE",
+      "actor": "employeeRegularize", "organization": "orgA", "viewport": { "width": 390, "height": 844 },
+      "path": "/mobile/sign-package?packageId=${scenarios.REGULARIZE.packageId}",
+      "checks": ["documents-loaded", "read-each-document", "initial-signature", "final-documents-read", "final-confirmed", "focus-returned", "load-failure-explained", "deep-link-recovered", "console-clean"]
+    },
+    {
+      "id": "transfer-hr-desktop", "scenario": "TRANSFER", "mode": "HR_DESKTOP",
+      "actor": "dedicatedHrOrgB", "organization": "orgB", "viewport": { "width": 1440, "height": 900 },
+      "path": "/oa/sign-task?taskId=${scenarios.TRANSFER.taskId}",
+      "checks": ["task-generated", "data-validated", "sent", "company-and-seal-ready", "finalized", "download-and-verify", "console-clean"]
+    },
+    {
+      "id": "transfer-employee-mobile", "scenario": "TRANSFER", "mode": "EMPLOYEE_MOBILE",
+      "actor": "employeeTransfer", "organization": "orgB", "viewport": { "width": 390, "height": 844 },
+      "path": "/mobile/sign-package?packageId=${scenarios.TRANSFER.packageId}",
+      "checks": ["documents-loaded", "read-each-document", "initial-signature", "final-documents-read", "final-confirmed", "focus-returned", "load-failure-explained", "deep-link-recovered", "console-clean"]
+    },
+    {
+      "id": "renewal-hr-desktop", "scenario": "RENEWAL", "mode": "HR_DESKTOP",
+      "actor": "dedicatedHrOrgA", "organization": "orgA", "viewport": { "width": 1440, "height": 900 },
+      "path": "/oa/sign-task?taskId=${scenarios.RENEWAL.taskId}",
+      "checks": ["task-generated", "data-validated", "sent", "company-and-seal-ready", "finalized", "download-and-verify", "console-clean"]
+    },
+    {
+      "id": "renewal-employee-mobile", "scenario": "RENEWAL", "mode": "EMPLOYEE_MOBILE",
+      "actor": "employeeRenewal", "organization": "orgA", "viewport": { "width": 390, "height": 844 },
+      "path": "/mobile/sign-package?packageId=${scenarios.RENEWAL.packageId}",
+      "checks": ["documents-loaded", "read-each-document", "initial-signature", "final-documents-read", "final-confirmed", "focus-returned", "load-failure-explained", "deep-link-recovered", "console-clean"]
+    },
+    {
+      "id": "offboard-hr-desktop", "scenario": "OFFBOARD", "mode": "HR_DESKTOP",
+      "actor": "dedicatedHrOrgB", "organization": "orgB", "viewport": { "width": 1440, "height": 900 },
+      "path": "/oa/sign-task?taskId=${scenarios.OFFBOARD.taskId}",
+      "checks": ["task-generated", "data-validated", "sent", "company-and-seal-ready", "finalized", "download-and-verify", "console-clean"]
+    },
+    {
+      "id": "offboard-employee-mobile", "scenario": "OFFBOARD", "mode": "EMPLOYEE_MOBILE",
+      "actor": "employeeOffboard", "organization": "orgB", "viewport": { "width": 390, "height": 844 },
+      "path": "/mobile/sign-package?packageId=${scenarios.OFFBOARD.packageId}",
+      "checks": ["documents-loaded", "read-each-document", "initial-signature", "final-documents-read", "final-confirmed", "focus-returned", "load-failure-explained", "deep-link-recovered", "console-clean"]
+    }
+  ],
+  "apiProbes": [
+    {
+      "id": "permissions-hr-org-a", "case": "permissions-dedicated-hr",
+      "actor": "dedicatedHrOrgA", "organization": "orgA", "method": "GET",
+      "path": "/signTask/list?pageNum=1&pageSize=20", "expect": "success",
+      "requiredKeys": ["rows"], "forbiddenKeys": ["confirmationToken"]
+    },
+    {
+      "id": "permissions-hr-org-b", "case": "permissions-dedicated-hr",
+      "actor": "dedicatedHrOrgB", "organization": "orgB", "method": "GET",
+      "path": "/signTask/list?pageNum=1&pageSize=20", "expect": "success", "requiredKeys": ["rows"]
+    },
+    {
+      "id": "legacy-package-route-preserved", "case": "legacy-package-route-preserved",
+      "actor": "legacyPackageOnly", "organization": "orgA", "method": "GET",
+      "path": "/signPackage/list?pageNum=1&pageSize=20", "expect": "success",
+      "requiredKeys": ["rows"]
+    },
+    {
+      "id": "legacy-task-center-denied", "case": "legacy-task-center-denied",
+      "actor": "legacyPackageOnly", "organization": "orgA", "method": "GET",
+      "path": "/signTask/list?pageNum=1&pageSize=20", "expect": "failure",
+      "allowedHttpStatuses": [403], "allowedAppCodes": [403],
+      "messageIncludes": ["无权", "禁止", "未授权"]
+    },
+    {
+      "id": "cross-organization-denied", "case": "cross-organization-denied",
+      "actor": "dedicatedHrOrgA", "organization": "orgB", "scenario": "TRANSFER", "method": "GET",
+      "path": "/signTask/${scenarios.TRANSFER.taskId}", "expect": "failure",
+      "allowedHttpStatuses": [403], "allowedAppCodes": [403, 500], "messageIncludes": ["无权", "越权", "数据范围"]
+    },
+    {
+      "id": "success-onboard", "case": "success-chain-state", "scenario": "ONBOARD",
+      "actor": "dedicatedHrOrgA", "organization": "orgA", "method": "GET",
+      "path": "/signTask/${scenarios.ONBOARD.taskId}", "expect": "success", "expectedValues": { "data.task.status": "SIGNED" }
+    },
+    {
+      "id": "success-regularize", "case": "success-chain-state", "scenario": "REGULARIZE",
+      "actor": "dedicatedHrOrgA", "organization": "orgA", "method": "GET",
+      "path": "/signTask/${scenarios.REGULARIZE.taskId}", "expect": "success", "expectedValues": { "data.task.status": "SIGNED" }
+    },
+    {
+      "id": "success-transfer", "case": "success-chain-state", "scenario": "TRANSFER",
+      "actor": "dedicatedHrOrgB", "organization": "orgB", "method": "GET",
+      "path": "/signTask/${scenarios.TRANSFER.taskId}", "expect": "success", "expectedValues": { "data.task.status": "SIGNED" }
+    },
+    {
+      "id": "success-renewal", "case": "success-chain-state", "scenario": "RENEWAL",
+      "actor": "dedicatedHrOrgA", "organization": "orgA", "method": "GET",
+      "path": "/signTask/${scenarios.RENEWAL.taskId}", "expect": "success", "expectedValues": { "data.task.status": "SIGNED" }
+    },
+    {
+      "id": "success-offboard", "case": "success-chain-state", "scenario": "OFFBOARD",
+      "actor": "dedicatedHrOrgB", "organization": "orgB", "method": "GET",
+      "path": "/signTask/${scenarios.OFFBOARD.taskId}", "expect": "success", "expectedValues": { "data.task.status": "SIGNED" }
+    },
+    {
+      "id": "refusal-terminal", "case": "refusal-terminal", "actor": "dedicatedHrOrgA", "organization": "orgA",
+      "method": "GET", "path": "/signTask/${faultFixtures.refusedTaskId}", "expect": "success",
+      "expectedValues": { "data.task.status": "REFUSED", "data.task.resolutionStatus": "OPEN" }
+    },
+    {
+      "id": "expiry-terminal", "case": "expiry-terminal", "actor": "dedicatedHrOrgA", "organization": "orgA",
+      "method": "GET", "path": "/signTask/${faultFixtures.expiredTaskId}", "expect": "success",
+      "expectedValues": { "data.task.status": "EXPIRED", "data.task.resolutionStatus": "OPEN" }
+    },
+    {
+      "id": "replacement-version", "case": "replacement-version", "actor": "dedicatedHrOrgA", "organization": "orgA",
+      "method": "POST", "path": "/signTask/${faultFixtures.expiredTaskId}/resolve", "expect": "success",
+      "writePurpose": "Create the approved replacement task for the expired UAT fixture",
+      "body": {
+        "requestId": "contract-uat-reissue-001", "action": "REISSUE",
+        "documentVersion": "${faultFixtures.expiredDocumentVersion}",
+        "reasonCode": "UAT_REISSUE", "reasonDetail": "Isolated UAT replacement verification",
+        "expectedVersion": "${faultFixtures.expiredExpectedVersion}",
+        "replacementPlanVersionId": "${faultFixtures.replacementPlanVersionId}"
+      },
+      "requiredKeys": ["code", "data"]
+    },
+    {
+      "id": "notification-failure", "case": "notification-failure", "actor": "dedicatedHrOrgA", "organization": "orgA",
+      "method": "GET", "path": "/signTask/${faultFixtures.notificationTaskId}", "expect": "success",
+      "expectedValues": { "data.latestNotificationStatus": "DEAD" }, "requiredKeys": ["latestNotificationBusinessKey"]
+    },
+    {
+      "id": "notification-recovery", "case": "notification-recovery", "actor": "dedicatedHrOrgA", "organization": "orgA",
+      "method": "POST", "path": "/signTask/${faultFixtures.notificationTaskId}/notification/retry", "expect": "success",
+      "writePurpose": "Requeue the deliberately failed UAT notification after dependency recovery",
+      "body": { "requestId": "contract-uat-notify-retry-001", "businessKey": "${faultFixtures.notificationBusinessKey}" },
+      "requiredKeys": ["code"]
+    },
+    {
+      "id": "duplicate-request", "case": "duplicate-request", "actor": "dedicatedHrOrgA", "organization": "orgA",
+      "method": "POST", "path": "/signTask/${faultFixtures.duplicateNotificationTaskId}/notification/retry", "expect": "success",
+      "writePurpose": "Prove repeated request ids do not create duplicate notification rows",
+      "parallelBodies": [
+        { "requestId": "contract-uat-duplicate-001", "businessKey": "${faultFixtures.duplicateNotificationBusinessKey}" },
+        { "requestId": "contract-uat-duplicate-001", "businessKey": "${faultFixtures.duplicateNotificationBusinessKey}" }
+      ],
+      "minSuccess": 1, "maxSuccess": 2,
+      "parallelFailureAllowedHttpStatuses": [409, 429],
+      "parallelFailureAllowedAppCodes": [500],
+      "parallelFailureMessageIncludes": ["重复", "请勿重复", "处理中"],
+      "parallelSuccessIdentityPath": "data.notificationId",
+      "postconditionProbe": {
+        "id": "duplicate-notification-postcondition",
+        "actor": "dedicatedHrOrgA",
+        "organization": "orgA",
+        "method": "GET",
+        "path": "/uat/contract-signing/notifications/by-business-key?businessKey=${faultFixtures.duplicateNotificationBusinessKey}",
+        "countPath": "data.count",
+        "identityPath": "data.notificationId"
+      }
+    },
+    {
+      "id": "file-verification", "case": "file-verification", "actor": "dedicatedHrOrgA", "organization": "orgA",
+      "method": "GET",
+      "path": "/signPackage/${faultFixtures.completedPackageId}/documents/${faultFixtures.completedDocumentId}/final-file",
+      "accept": "application/pdf", "expect": "success", "contentTypeIncludes": "pdf",
+      "expectedBodySha256": "${faultFixtures.completedFinalFileSha256}"
+    }
+  ],
+  "faultCases": [
+    { "id": "cross-organization-denied", "executionMode": "API", "writeRequired": false },
+    { "id": "wrong-legal-entity", "executionMode": "API_AND_BROWSER", "writeRequired": true },
+    { "id": "expired-seal", "executionMode": "FAULT_INJECTION", "writeRequired": true },
+    { "id": "seal-hash-mismatch", "executionMode": "FAULT_INJECTION", "writeRequired": true },
+    { "id": "template-coordinate-out-of-bounds", "executionMode": "FAULT_INJECTION", "writeRequired": true },
+    { "id": "file-missing", "executionMode": "FAULT_INJECTION", "writeRequired": true },
+    { "id": "file-tampered", "executionMode": "FAULT_INJECTION", "writeRequired": true },
+    { "id": "duplicate-request", "executionMode": "API", "writeRequired": true },
+    { "id": "network-timeout-replay", "executionMode": "FAULT_INJECTION", "writeRequired": true, "recoveryRequired": true },
+    { "id": "notification-unavailable", "executionMode": "FAULT_INJECTION", "writeRequired": true, "recoveryRequired": true },
+    { "id": "notification-recovery", "executionMode": "API", "writeRequired": true, "recoveryRequired": true },
+    { "id": "concurrent-expiry-scan", "executionMode": "FAULT_INJECTION", "writeRequired": true },
+    { "id": "refusal", "executionMode": "API_AND_BROWSER", "writeRequired": true },
+    { "id": "expiry", "executionMode": "FAULT_INJECTION", "writeRequired": true },
+    { "id": "replacement-version", "executionMode": "API_AND_BROWSER", "writeRequired": true }
+  ]
+}

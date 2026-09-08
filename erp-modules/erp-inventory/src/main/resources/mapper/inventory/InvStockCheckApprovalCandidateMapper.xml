@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.inventory.mapper.InvStockCheckApprovalCandidateMapper">
+    <select id="selectOperationsDirectorCandidates" resultType="map">
+        select distinct u.user_id as userId, u.user_name as userName
+        from sys_user u
+        join sys_user_post up on up.user_id = u.user_id
+        join sys_post p on p.post_id = up.post_id
+        join sys_user_role ur on ur.user_id = u.user_id
+        join sys_role r on r.role_id = ur.role_id
+        join sys_role_menu rm on rm.role_id = r.role_id
+        join sys_menu m on m.menu_id = rm.menu_id
+        join sys_user_shop us on us.user_id = u.user_id
+        join sys_dept scope_dept on scope_dept.dept_id = us.dept_id
+        join sys_dept target_dept on target_dept.dept_id = #{deptId}
+        where u.del_flag = '0' and u.status = '0'
+          and p.status = '0' and p.post_code = 'yyzj'
+          and r.del_flag = '0' and r.status = '0'
+          and m.status = '0' and m.perms = 'inv:stockCheck:approve'
+          and scope_dept.del_flag = '0' and scope_dept.status = '0'
+          and scope_dept.dept_type in ('GROUP', 'COMPANY', 'STORE', 'WAREHOUSE')
+          and target_dept.del_flag = '0' and target_dept.status = '0'
+          and target_dept.dept_type in ('STORE', 'WAREHOUSE')
+          and target_dept.dept_id = #{deptId}
+          and (
+              target_dept.dept_id = scope_dept.dept_id
+              or find_in_set(scope_dept.dept_id, target_dept.ancestors)
+          )
+        order by u.user_id
+    </select>
+</mapper>

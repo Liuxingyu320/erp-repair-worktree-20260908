@@ -1,0 +1,276 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xmlns="http://maven.apache.org/POM/4.0.0"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <parent>
+        <groupId>com.erp</groupId>
+        <artifactId>erp-modules</artifactId>
+        <version>3.6.8</version>
+    </parent>
+    <modelVersion>4.0.0</modelVersion>
+	
+    <artifactId>erp-modules-system</artifactId>
+
+    <description>
+        erp-modules-system系统模块
+    </description>
+	
+    <dependencies>
+    	
+    	<!-- SpringCloud Alibaba Nacos -->
+        <dependency>
+            <groupId>com.alibaba.cloud</groupId>
+            <artifactId>spring-cloud-starter-alibaba-nacos-discovery</artifactId>
+        </dependency>
+        
+        <!-- SpringCloud Alibaba Nacos Config -->
+        <dependency>
+            <groupId>com.alibaba.cloud</groupId>
+            <artifactId>spring-cloud-starter-alibaba-nacos-config</artifactId>
+        </dependency>
+        
+    	<!-- SpringCloud Alibaba Sentinel -->
+        <dependency>
+            <groupId>com.alibaba.cloud</groupId>
+            <artifactId>spring-cloud-starter-alibaba-sentinel</artifactId>
+        </dependency>
+        
+    	<!-- SpringBoot Actuator -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+        
+        <!-- Mysql Connector -->
+        <dependency>
+            <groupId>com.mysql</groupId>
+            <artifactId>mysql-connector-j</artifactId>
+        </dependency>
+        
+        <!-- ERP Common DataSource -->
+        <dependency>
+            <groupId>com.erp</groupId>
+            <artifactId>erp-common-datasource</artifactId>
+        </dependency>
+        
+        <!-- ERP Common DataScope -->
+        <dependency>
+            <groupId>com.erp</groupId>
+            <artifactId>erp-common-datascope</artifactId>
+        </dependency>
+        
+        <!-- ERP Common Log -->
+        <dependency>
+            <groupId>com.erp</groupId>
+            <artifactId>erp-common-log</artifactId>
+        </dependency>
+        
+        <!-- ERP Common Swagger -->
+        <dependency>
+            <groupId>com.erp</groupId>
+            <artifactId>erp-common-swagger</artifactId>
+        </dependency>
+
+        <!-- ERP Api OA -->
+        <dependency>
+            <groupId>com.erp</groupId>
+            <artifactId>erp-api-oa</artifactId>
+            <version>${erp.version}</version>
+        </dependency>
+
+        <!-- ERP Api Approval -->
+        <dependency>
+            <groupId>com.erp</groupId>
+            <artifactId>erp-api-approval</artifactId>
+        </dependency>
+
+        <!-- Firebase Admin SDK: Android FCM via Application Default Credentials -->
+        <dependency>
+            <groupId>com.google.firebase</groupId>
+            <artifactId>firebase-admin</artifactId>
+            <version>9.9.0</version>
+            <exclusions>
+                <!-- This service only uses FCM; keep Firestore and Storage clients out of its runtime image. -->
+                <exclusion>
+                    <groupId>com.google.cloud</groupId>
+                    <artifactId>google-cloud-firestore</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>com.google.cloud</groupId>
+                    <artifactId>google-cloud-storage</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+
+        <!-- Pushy: iOS APNs HTTP/2 client with token authentication -->
+        <dependency>
+            <groupId>com.eatthepath</groupId>
+            <artifactId>pushy</artifactId>
+            <version>0.15.6</version>
+        </dependency>
+
+        <!-- OWASP HTML sanitizer for notice rich text -->
+        <dependency>
+            <groupId>com.googlecode.owasp-java-html-sanitizer</groupId>
+            <artifactId>owasp-java-html-sanitizer</artifactId>
+        </dependency>
+
+        <!-- Test -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>testcontainers-junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>testcontainers-mysql</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <finalName>${project.artifactId}</finalName>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>repackage</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+
+    <profiles>
+        <!--
+          Fail-closed migration integration suite for CI and release gates:
+          mvn -pl erp-modules/erp-system -am -Phr-onboarding-migration-it -DskipTests verify
+          Container-backed tests use the *IT suffix and are excluded from the
+          default fast test lifecycle. The new-business-mysql-it profile is the
+          fail-closed release gate when Docker-backed verification is required.
+        -->
+        <profile>
+            <id>native-mysql-it</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-surefire-plugin</artifactId>
+                        <version>3.5.4</version>
+                        <configuration>
+                            <skipTests>true</skipTests>
+                        </configuration>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-failsafe-plugin</artifactId>
+                        <version>3.5.4</version>
+                        <configuration>
+                            <failIfNoTests>true</failIfNoTests>
+                            <!-- The packaged artifact is a Spring Boot fat JAR; tests need raw classes. -->
+                            <classesDirectory>${project.build.outputDirectory}</classesDirectory>
+                            <forkCount>1</forkCount>
+                            <reuseForks>true</reuseForks>
+                            <includes>
+                                <include>**/HrEmployeeTransferTransactionIT.java</include>
+                                <include>**/HrOffboardingTransactionIT.java</include>
+                                <include>**/HrOnboardingTransactionIT.java</include>
+                                <include>**/HrSignEventOutboxNativeMySqlIT.java</include>
+                            </includes>
+                        </configuration>
+                        <executions>
+                            <execution>
+                                <goals>
+                                    <goal>integration-test</goal>
+                                    <goal>verify</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+
+        <!--
+          Session governance suites run only against an explicitly configured native
+          non-production Redis database. The wrapper proves execution and forbids KEYS.
+        -->
+        <profile>
+            <id>native-redis-it</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-surefire-plugin</artifactId>
+                        <version>3.5.4</version>
+                        <configuration>
+                            <skipTests>true</skipTests>
+                        </configuration>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-failsafe-plugin</artifactId>
+                        <version>3.5.4</version>
+                        <configuration>
+                            <failIfNoTests>true</failIfNoTests>
+                            <classesDirectory>${project.build.outputDirectory}</classesDirectory>
+                            <forkCount>1</forkCount>
+                            <reuseForks>true</reuseForks>
+                            <includes>
+                                <include>**/TokenServiceRedisIT.java</include>
+                                <include>**/SysUserOnlineControllerRedisIT.java</include>
+                            </includes>
+                        </configuration>
+                        <executions>
+                            <execution>
+                                <goals>
+                                    <goal>integration-test</goal>
+                                    <goal>verify</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+
+        <!-- Native MySQL migration-only gate; EXPECTED_MYSQL_VERSION_PREFIX is mandatory. -->
+        <profile>
+            <id>hr-onboarding-migration-it</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.codehaus.mojo</groupId>
+                        <artifactId>exec-maven-plugin</artifactId>
+                        <version>3.5.0</version>
+                        <executions>
+                            <execution>
+                                <id>verify-hr-onboarding-migration</id>
+                                <phase>integration-test</phase>
+                                <goals>
+                                    <goal>exec</goal>
+                                </goals>
+                                <configuration>
+                                    <executable>bash</executable>
+                                    <arguments>
+                                        <argument>${project.basedir}/../../scripts/verify-hr-onboarding-migration.sh</argument>
+                                    </arguments>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
+   
+</project>

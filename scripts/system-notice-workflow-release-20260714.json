@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "releaseId": "system-notice-workflow-20260714",
+  "status": "development",
+  "executionPolicy": "automatic",
+  "prerequisiteReleaseIds": [
+    "system-management-ux-v2-20260714"
+  ],
+  "sourceDirectory": "sql",
+  "deployDirectory": "docker/mysql/releases/system-notice-workflow-20260714",
+  "migrationList": "scripts/system-notice-workflow-migrations-20260714.list",
+  "migrations": [
+    {
+      "file": "erp_system_notice_workflow_20260714.sql",
+      "sha256": "f3373cfd6018d8fc6e791e5fbf644268feabdc7ce72e3f3ccfb0261b863b1a6c",
+      "phase": "notice-workflow-expand-before-code-cutover",
+      "creates": [
+        "sys_notice_audience",
+        "sys_notice_recipient"
+      ],
+      "backupTables": [
+        "sys_config",
+        "sys_menu",
+        "sys_notice",
+        "sys_notice_read",
+        "sys_role_menu",
+        "sys_user"
+      ]
+    }
+  ],
+  "rollback": {
+    "file": "erp_system_notice_workflow_rollback_20260714.sql",
+    "sha256": "829c043dbf2ef275f46a62be2d27cf45891083b484efb265a6a8695efd607112",
+    "policy": "guarded-before-new-workflow-data-disable-flag-otherwise"
+  },
+  "featureFlag": {
+    "key": "feature.system.notice-workflow.enabled",
+    "default": false,
+    "enableAfter": "migration verification, explicit publish-permission assignment and browser smoke gate"
+  }
+}

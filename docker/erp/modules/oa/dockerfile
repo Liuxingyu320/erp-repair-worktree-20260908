@@ -1,0 +1,18 @@
+FROM eclipse-temurin:17-jre-jammy
+MAINTAINER erp
+ENV LANG=C.UTF-8
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        fontconfig \
+        fonts-noto-cjk \
+        libreoffice-calc \
+        libreoffice-writer \
+        tesseract-ocr \
+        tesseract-ocr-chi-sim \
+    && fc-cache -f \
+    && rm -rf /var/lib/apt/lists/*
+VOLUME /home/erp
+RUN mkdir -p /home/erp
+WORKDIR /home/erp
+COPY ./jar/erp-modules-oa.jar /home/erp/erp-modules-oa.jar
+ENTRYPOINT ["java","-jar","erp-modules-oa.jar"]

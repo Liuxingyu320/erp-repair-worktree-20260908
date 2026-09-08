@@ -1,0 +1,160 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.inventory.mapper.InvSupplierMapper">
+
+    <resultMap type="InvSupplier" id="InvSupplierResult">
+        <id property="supplierId" column="supplier_id"/>
+        <result property="supplierName" column="supplier_name"/>
+        <result property="supplierCode" column="supplier_code"/>
+        <result property="contactPerson" column="contact_person"/>
+        <result property="contactPhone" column="contact_phone"/>
+        <result property="contactEmail" column="contact_email"/>
+        <result property="address" column="address"/>
+        <result property="settlementMethod" column="settlement_method"/>
+        <result property="cooperationStatus" column="cooperation_status"/>
+        <result property="shopDeptId" column="shop_dept_id"/>
+        <result property="shopDeptName" column="shop_dept_name"/>
+        <result property="status" column="status"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateBy" column="update_by"/>
+        <result property="updateTime" column="update_time"/>
+        <result property="remark" column="remark"/>
+    </resultMap>
+
+    <sql id="selectInvSupplierVo">
+        select s.supplier_id, s.supplier_name, s.supplier_code, s.contact_person, s.contact_phone,
+               s.contact_email, s.address, s.settlement_method, s.cooperation_status,
+               s.shop_dept_id, shop_dept.dept_name as shop_dept_name, s.status,
+               s.create_by, s.create_time, s.update_by, s.update_time, s.remark
+        from inv_supplier s
+        left join sys_dept shop_dept on shop_dept.dept_id = s.shop_dept_id
+    </sql>
+
+    <select id="selectInvSupplierList" parameterType="InvSupplier" resultMap="InvSupplierResult">
+        <include refid="selectInvSupplierVo"/>
+        where 1=1
+        <if test="supplierName != null and supplierName != ''">and s.supplier_name like concat('%', #{supplierName}, '%')</if>
+        <if test="supplierCode != null and supplierCode != ''">and s.supplier_code = #{supplierCode}</if>
+        <if test="contactPhone != null and contactPhone != ''">and s.contact_phone like concat('%', #{contactPhone}, '%')</if>
+        <if test="cooperationStatus != null and cooperationStatus != ''">and s.cooperation_status = #{cooperationStatus}</if>
+        <if test="shopDeptId != null">and s.shop_dept_id = #{shopDeptId}</if>
+        <if test="status != null and status != ''">and s.status = #{status}</if>
+        <if test="params.scopeDeptIds != null">and s.shop_dept_id in <foreach collection="params.scopeDeptIds" item="deptId" open="(" close=")" separator=",">#{deptId}</foreach></if>
+        ${params.dataScope}
+        order by s.create_time desc
+    </select>
+
+    <select id="selectInvSupplierById" parameterType="Long" resultMap="InvSupplierResult">
+        <include refid="selectInvSupplierVo"/>
+        where s.supplier_id = #{supplierId}
+    </select>
+
+    <select id="selectInvSupplierByNameAndShop" resultMap="InvSupplierResult">
+        <include refid="selectInvSupplierVo"/>
+        where s.supplier_name = #{supplierName}
+          and s.status = '0'
+          and s.cooperation_status = '0'
+        <if test="shopDeptId != null">and s.shop_dept_id = #{shopDeptId}</if>
+        order by s.supplier_id desc
+        limit 1
+    </select>
+
+    <select id="selectActiveSupplierByNameInDeptChain" resultMap="InvSupplierResult">
+        select s.supplier_id, s.supplier_name, s.supplier_code, s.contact_person, s.contact_phone,
+               s.contact_email, s.address, s.settlement_method, s.cooperation_status,
+               s.shop_dept_id, s.status, s.create_by, s.create_time, s.update_by, s.update_time, s.remark
+        from inv_supplier s
+             inner join sys_dept current_dept on current_dept.dept_id = #{deptId}
+             left join sys_dept supplier_dept on supplier_dept.dept_id = s.shop_dept_id
+        where s.supplier_name = #{supplierName}
+          and s.status = '0'
+          and s.cooperation_status = '0'
+          and (
+                s.shop_dept_id = current_dept.dept_id
+                or find_in_set(s.shop_dept_id, current_dept.ancestors)
+              )
+          and (supplier_dept.dept_id is null or (supplier_dept.del_flag = '0' and supplier_dept.status = '0'))
+        order by case when s.shop_dept_id = current_dept.dept_id then 0 else 1 end,
+                 length(coalesce(supplier_dept.ancestors, '')) desc,
+                 s.supplier_id desc
+        limit 1
+    </select>
+
+    <select id="countDuplicateSupplierName" resultType="int">
+        select count(1)
+        from inv_supplier
+        where shop_dept_id = #{shopDeptId}
+          and supplier_name = #{supplierName}
+        <if test="excludeSupplierId != null">and supplier_id != #{excludeSupplierId}</if>
+    </select>
+
+    <select id="countDuplicateSupplierCode" resultType="int">
+        select count(1)
+        from inv_supplier
+        where shop_dept_id = #{shopDeptId}
+          and supplier_code = #{supplierCode}
+        <if test="excludeSupplierId != null">and supplier_id != #{excludeSupplierId}</if>
+    </select>
+
+    <select id="countSupplierReferences" resultType="int">
+        select (
+            (select count(1)
+             from inv_product p
+             where p.del_flag = '0'
+               and p.supplier_name = #{supplierName}
+               and p.shop_dept_id in
+               <foreach collection="scopeDeptIds" item="deptId" open="(" close=")" separator=",">#{deptId}</foreach>)
+            +
+            (select count(1)
+             from inv_purchase_order o
+             where (o.supplier_id = #{supplierId} or o.supplier_name = #{supplierName})
+               and o.shop_dept_id in
+               <foreach collection="scopeDeptIds" item="deptId" open="(" close=")" separator=",">#{deptId}</foreach>)
+            +
+            (select count(1)
+             from inv_purchase_return r
+             where r.supplier_name = #{supplierName}
+               and r.shop_dept_id in
+               <foreach collection="scopeDeptIds" item="deptId" open="(" close=")" separator=",">#{deptId}</foreach>)
+        ) as reference_count
+    </select>
+
+    <insert id="insertInvSupplier" parameterType="InvSupplier" useGeneratedKeys="true" keyProperty="supplierId">
+        insert into inv_supplier (
+            supplier_name, supplier_code, contact_person, contact_phone, contact_email,
+            address, settlement_method, cooperation_status,
+            shop_dept_id, status, create_by, create_time, remark
+        ) values (
+            #{supplierName}, #{supplierCode}, #{contactPerson}, #{contactPhone}, #{contactEmail},
+            #{address}, #{settlementMethod}, #{cooperationStatus},
+            #{shopDeptId}, #{status}, #{createBy}, sysdate(), #{remark}
+        )
+    </insert>
+
+    <update id="updateInvSupplier" parameterType="InvSupplier">
+        update inv_supplier
+        <set>
+            <if test="supplierName != null and supplierName != ''">supplier_name = #{supplierName},</if>
+            <if test="supplierCode != null">supplier_code = #{supplierCode},</if>
+            <if test="contactPerson != null">contact_person = #{contactPerson},</if>
+            <if test="contactPhone != null">contact_phone = #{contactPhone},</if>
+            <if test="contactEmail != null">contact_email = #{contactEmail},</if>
+            <if test="address != null">address = #{address},</if>
+            <if test="settlementMethod != null">settlement_method = #{settlementMethod},</if>
+            <if test="cooperationStatus != null">cooperation_status = #{cooperationStatus},</if>
+            <if test="status != null">status = #{status},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            update_by = #{updateBy}, update_time = sysdate()
+        </set>
+        where supplier_id = #{supplierId}
+    </update>
+
+    <delete id="deleteInvSupplierByIds" parameterType="Long">
+        delete from inv_supplier where supplier_id in
+        <foreach collection="array" item="supplierId" open="(" close=")" separator=",">
+            #{supplierId}
+        </foreach>
+    </delete>
+
+</mapper>

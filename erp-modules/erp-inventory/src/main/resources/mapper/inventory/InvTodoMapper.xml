@@ -1,0 +1,1058 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.inventory.mapper.InvTodoMapper">
+
+    <resultMap id="TodoItemResult" type="com.erp.common.core.domain.todo.TodoItem">
+        <result property="source" column="source"/>
+        <result property="type" column="type"/>
+        <result property="category" column="category"/>
+        <result property="businessId" column="business_id"/>
+        <result property="businessNo" column="business_no"/>
+        <result property="title" column="title"/>
+        <result property="summary" column="summary"/>
+        <result property="status" column="status"/>
+        <result property="priority" column="priority"/>
+        <result property="createdTime" column="created_time"/>
+        <result property="waitingSeconds" column="waiting_seconds"/>
+        <result property="deptId" column="dept_id"/>
+        <result property="deptName" column="dept_name"/>
+        <result property="deptType" column="dept_type"/>
+        <result property="scopeMode" column="scope_mode"/>
+        <result property="routeType" column="route_type"/>
+        <result property="requiredPermission" column="required_permission"/>
+    </resultMap>
+
+    <sql id="ActionableScopeMode">'actionable'</sql>
+
+    <!-- Direct ownership crosses the selected organization but never the user's authorized scope. -->
+    <sql id="DirectOwnerAuthorizedOrganizationScope">
+        <choose>
+            <when test="authorizedScopeDeptIds != null and authorizedScopeDeptIds.size() > 0">
+                and ${scopeColumn} in
+                <foreach collection="authorizedScopeDeptIds" item="deptId" open="(" close=")" separator=",">
+                    #{deptId}
+                </foreach>
+            </when>
+            <otherwise>and 1 = 0</otherwise>
+        </choose>
+    </sql>
+
+    <!-- Shared role queues are actionable only inside the currently selected organization. -->
+    <sql id="SharedCurrentOrganizationScope">
+        <choose>
+            <when test="currentScopeDeptIds != null and currentScopeDeptIds.size() > 0">
+                and ${scopeColumn} in
+                <foreach collection="currentScopeDeptIds" item="deptId" open="(" close=")" separator=",">
+                    #{deptId}
+                </foreach>
+            </when>
+            <otherwise>and 1 = 0</otherwise>
+        </choose>
+    </sql>
+
+    <sql id="InventoryTodoUnion">
+        select cast(null as char(16)) collate utf8mb4_general_ci as source,
+               cast(null as char(64)) collate utf8mb4_general_ci as type,
+               cast(null as char(16)) collate utf8mb4_general_ci as category,
+               cast(null as signed) as business_id,
+               cast(null as char(128)) collate utf8mb4_general_ci as business_no,
+               cast(null as char(255)) collate utf8mb4_general_ci as title,
+               cast(null as char(500)) collate utf8mb4_general_ci as summary,
+               cast(null as char(32)) collate utf8mb4_general_ci as status,
+               cast(null as char(16)) collate utf8mb4_general_ci as priority,
+               cast(null as datetime) as created_time,
+               cast(null as signed) as waiting_seconds,
+               cast(null as signed) as dept_id,
+               cast(null as char(128)) collate utf8mb4_general_ci as dept_name,
+               cast(null as char(32)) collate utf8mb4_general_ci as dept_type,
+               cast(null as char(32)) collate utf8mb4_general_ci as scope_mode,
+               cast(null as char(32)) collate utf8mb4_general_ci as route_type,
+               cast(null as char(128)) collate utf8mb4_general_ci as required_permission,
+               cast(1 as signed) as count_value
+        from dual
+        where 1 = 0
+
+        <if test="enabledTypes != null and enabledTypes.contains('INV_TRANSFER_APPROVAL')">
+            union all
+            select 'inventory' as source,
+                   'INV_TRANSFER_APPROVAL' as type,
+                   'approval' as category,
+                   o.transfer_id as business_id,
+                   o.order_no as business_no,
+                   concat(case o.transfer_type
+                              when 'warehouse' then '门店要货待审批'
+                              when 'store_return' then '门店返仓待审批'
+                              when 'cross_store' then '异店调货待审批'
+                              else '调拨待审批'
+                          end, '：', o.order_no) collate utf8mb4_general_ci as title,
+                   concat_ws(' → ', o.from_dept_name, o.to_dept_name) collate utf8mb4_general_ci as summary,
+                   o.status as status,
+                   case
+                       when timestampdiff(second,
+                               coalesce(t.create_time, i.create_time, o.submitted_time,
+                                        o.create_time, current_timestamp),
+                               current_timestamp) >= #{approvalUrgentHours} * 3600
+                           then 'urgent'
+                       else 'important'
+                   end as priority,
+                   coalesce(t.create_time, i.create_time, o.submitted_time,
+                            o.create_time, current_timestamp) as created_time,
+                   greatest(timestampdiff(second,
+                           coalesce(t.create_time, i.create_time, o.submitted_time,
+                                    o.create_time, current_timestamp),
+                           current_timestamp), 0) as waiting_seconds,
+                   context_dept.dept_id as dept_id,
+                   context_dept.dept_name collate utf8mb4_general_ci as dept_name,
+                   context_dept.dept_type collate utf8mb4_general_ci as dept_type,
+                   <include refid="ActionableScopeMode"/> as scope_mode,
+                   'approve' as route_type,
+                   'inv:transfer:approve' as required_permission,
+                   1 as count_value
+            from inv_transfer_order o
+                 inner join inv_transfer_approval_instance i
+                    on i.instance_id = coalesce(
+                        o.approval_instance_id,
+                        (select max(fallback_i.instance_id)
+                           from inv_transfer_approval_instance fallback_i
+                          where fallback_i.transfer_id = o.transfer_id
+                            and fallback_i.status = 'running')
+                    )
+                   and i.transfer_id = o.transfer_id
+                   and i.status = 'running'
+                 inner join inv_transfer_approval_task t
+                    on t.instance_id = i.instance_id
+                   and t.transfer_id = o.transfer_id
+                   and t.status = 'pending'
+                   and t.node_order = i.current_node_order
+                 inner join sys_dept context_dept
+                    on context_dept.dept_id = (
+                        select min(visible_dept.dept_id)
+                        from sys_dept visible_dept
+                        where visible_dept.dept_id in (
+                            o.from_dept_id, o.to_dept_id,
+                            o.from_warehouse_id, o.to_warehouse_id
+                        )
+                        <include refid="DirectOwnerAuthorizedOrganizationScope">
+                            <property name="scopeColumn" value="visible_dept.dept_id"/>
+                        </include>
+                    )
+            where o.status = 'submitted'
+              and coalesce(o.approval_engine, 'LEGACY') = 'LEGACY'
+              and find_in_set(#{userId}, t.candidate_user_ids)
+              and (
+                  coalesce(i.allow_self_approve, '0') = '1'
+                  or coalesce(o.create_by, '') &lt;&gt; coalesce(#{username}, '')
+              )
+        </if>
+
+        <if test="enabledTypes != null and enabledTypes.contains('INV_STOCK_CHECK_APPROVAL')">
+            union all
+            select 'inventory' as source,
+                   'INV_STOCK_CHECK_APPROVAL' as type,
+                   'approval' as category,
+                   s.check_id as business_id,
+                   s.check_no as business_no,
+                   concat('盘点审批：', s.check_no) collate utf8mb4_general_ci as title,
+                   concat('差异数量：', coalesce(ai.total_abs_diff_quantity, 0)) collate utf8mb4_general_ci as summary,
+                   s.status as status,
+                   case
+                       when timestampdiff(second,
+                               coalesce(at.create_time, ai.submitted_time, ai.create_time,
+                                        s.submitted_time, s.create_time, current_timestamp),
+                               current_timestamp) >= #{approvalUrgentHours} * 3600
+                           then 'urgent'
+                       else 'important'
+                   end as priority,
+                   coalesce(at.create_time, ai.submitted_time, ai.create_time,
+                            s.submitted_time, s.create_time, current_timestamp) as created_time,
+                   greatest(timestampdiff(second,
+                           coalesce(at.create_time, ai.submitted_time, ai.create_time,
+                                    s.submitted_time, s.create_time, current_timestamp),
+                           current_timestamp), 0) as waiting_seconds,
+                   context_dept.dept_id as dept_id,
+                   context_dept.dept_name collate utf8mb4_general_ci as dept_name,
+                   context_dept.dept_type collate utf8mb4_general_ci as dept_type,
+                   <include refid="ActionableScopeMode"/> as scope_mode,
+                   'approve' as route_type,
+                   'inv:stockCheck:approve' as required_permission,
+                   1 as count_value
+            from inv_stock_check s
+                 inner join inv_stock_check_approval_instance ai
+                    on ai.instance_id = coalesce(
+                        s.approval_instance_id,
+                        (select fallback_ai.instance_id
+                           from inv_stock_check_approval_instance fallback_ai
+                          where fallback_ai.check_id = s.check_id
+                            and fallback_ai.status = 'running'
+                          order by fallback_ai.round_no desc,
+                                   fallback_ai.instance_id desc
+                          limit 1)
+                    )
+                   and ai.check_id = s.check_id
+                   and ai.status = 'running'
+                 inner join inv_stock_check_approval_task at
+                    on at.instance_id = ai.instance_id
+                   and at.check_id = s.check_id
+                   and at.status = 'pending'
+                 inner join sys_dept context_dept on context_dept.dept_id = s.shop_dept_id
+            where s.status = 'pending_approval'
+              and coalesce(s.approval_engine, 'LEGACY') = 'LEGACY'
+              and find_in_set(#{userId}, at.candidate_user_ids)
+              and exists (
+                  select 1
+                  from sys_user u
+                       inner join sys_user_post up on up.user_id = u.user_id
+                       inner join sys_post p on p.post_id = up.post_id
+                       inner join sys_user_role ur on ur.user_id = u.user_id
+                       inner join sys_role r on r.role_id = ur.role_id
+                       inner join sys_role_menu rm on rm.role_id = r.role_id
+                       inner join sys_menu m on m.menu_id = rm.menu_id
+                       inner join sys_user_shop us on us.user_id = u.user_id
+                       inner join sys_dept scope_dept on scope_dept.dept_id = us.dept_id
+                       inner join sys_dept target_dept on target_dept.dept_id = s.shop_dept_id
+                  where u.user_id = #{userId}
+                    and u.del_flag = '0'
+                    and u.status = '0'
+                    and p.status = '0'
+                    and p.post_code = 'yyzj'
+                    and r.del_flag = '0'
+                    and r.status = '0'
+                    and m.status = '0'
+                    and m.perms = 'inv:stockCheck:approve'
+                    and scope_dept.del_flag = '0'
+                    and scope_dept.status = '0'
+                    and scope_dept.dept_type in ('GROUP', 'COMPANY', 'STORE', 'WAREHOUSE')
+                    and target_dept.del_flag = '0'
+                    and target_dept.status = '0'
+                    and target_dept.dept_type in ('STORE', 'WAREHOUSE')
+                    and (
+                        target_dept.dept_id = scope_dept.dept_id
+                        or find_in_set(scope_dept.dept_id, target_dept.ancestors)
+                    )
+              )
+              <include refid="DirectOwnerAuthorizedOrganizationScope">
+                  <property name="scopeColumn" value="s.shop_dept_id"/>
+              </include>
+        </if>
+
+        <if test="enabledTypes != null and enabledTypes.contains('INV_PURCHASE_QC')">
+            union all
+            select 'inventory' as source,
+                   'INV_PURCHASE_QC' as type,
+                   'execution' as category,
+                   o.order_id as business_id,
+                   o.order_no as business_no,
+                   concat('采购质检：', o.order_title) collate utf8mb4_general_ci as title,
+                   concat_ws(' · ', o.supplier_name, context_dept.dept_name,
+                       case when pending_inbound.purchase_order_id is null
+                            then '待检记录缺失，请联系管理员'
+                            else null end) collate utf8mb4_general_ci as summary,
+                   o.qc_status as status,
+                   'normal' as priority,
+                   coalesce(pending_inbound.created_time, o.update_time, o.create_time, current_timestamp) as created_time,
+                   greatest(timestampdiff(second,
+                           coalesce(pending_inbound.created_time, o.update_time, o.create_time, current_timestamp),
+                           current_timestamp), 0) as waiting_seconds,
+                   context_dept.dept_id as dept_id,
+                   context_dept.dept_name collate utf8mb4_general_ci as dept_name,
+                   context_dept.dept_type collate utf8mb4_general_ci as dept_type,
+                   <include refid="ActionableScopeMode"/> as scope_mode,
+                   'quality_check' as route_type,
+                   'inv:purchase:qc' as required_permission,
+                   1 as count_value
+            from inv_purchase_order o
+                 left join (
+                     select inbound.purchase_order_id,
+                            coalesce(inbound.warehouse_id, inbound.shop_dept_id) as context_dept_id,
+                            min(inbound.create_time) as created_time
+                     from inv_inbound_record inbound
+                     where inbound.qc_result = 'pending'
+                     group by inbound.purchase_order_id,
+                              coalesce(inbound.warehouse_id, inbound.shop_dept_id)
+                 ) pending_inbound on pending_inbound.purchase_order_id = o.order_id
+                 inner join sys_dept context_dept
+                    on context_dept.dept_id = coalesce(pending_inbound.context_dept_id, o.shop_dept_id)
+            where o.status = 'submitted'
+              and o.qc_status = 'pending'
+              <include refid="SharedCurrentOrganizationScope">
+                  <property name="scopeColumn" value="context_dept.dept_id"/>
+              </include>
+        </if>
+
+        <if test="enabledTypes != null and enabledTypes.contains('INV_PURCHASE_RECEIVE')">
+            union all
+            select 'inventory' as source,
+                   'INV_PURCHASE_RECEIVE' as type,
+                   'execution' as category,
+                   o.order_id as business_id,
+                   o.order_no as business_no,
+                   concat('采购收货：', o.order_title) collate utf8mb4_general_ci as title,
+                   concat('待收数量：', detail_summary.remaining_quantity) collate utf8mb4_general_ci as summary,
+                   o.status as status,
+                   'normal' as priority,
+                   coalesce(o.update_time, o.create_time, current_timestamp) as created_time,
+                   greatest(timestampdiff(second,
+                           coalesce(o.update_time, o.create_time, current_timestamp),
+                           current_timestamp), 0) as waiting_seconds,
+                   context_dept.dept_id as dept_id,
+                   context_dept.dept_name collate utf8mb4_general_ci as dept_name,
+                   context_dept.dept_type collate utf8mb4_general_ci as dept_type,
+                   <include refid="ActionableScopeMode"/> as scope_mode,
+                   'receive' as route_type,
+                   'inv:purchase:receive' as required_permission,
+                   1 as count_value
+            from inv_purchase_order o
+                 inner join (
+                     select d.order_id,
+                            sum(coalesce(d.quantity, 0) - coalesce(d.received_quantity, 0)) as remaining_quantity
+                     from inv_purchase_detail d
+                     group by d.order_id
+                 ) detail_summary on detail_summary.order_id = o.order_id
+                 inner join sys_dept context_dept on context_dept.dept_id = o.shop_dept_id
+            where o.status = 'submitted'
+              and detail_summary.remaining_quantity &gt; 0
+              and coalesce(o.qc_status, '') &lt;&gt; 'pending'
+              <include refid="SharedCurrentOrganizationScope">
+                  <property name="scopeColumn" value="o.shop_dept_id"/>
+              </include>
+        </if>
+
+        <if test="enabledTypes != null and enabledTypes.contains('INV_SALES_NOTICE_CREATE')">
+            union all
+            select 'inventory' as source,
+                   'INV_SALES_NOTICE_CREATE' as type,
+                   'execution' as category,
+                   o.order_id as business_id,
+                   o.order_no as business_no,
+                   concat('创建发货通知：', o.order_title) collate utf8mb4_general_ci as title,
+                   concat('待通知数量：', detail_summary.remaining_quantity) collate utf8mb4_general_ci as summary,
+                   o.status as status,
+                   'normal' as priority,
+                   coalesce(o.update_time, o.create_time, current_timestamp) as created_time,
+                   greatest(timestampdiff(second,
+                           coalesce(o.update_time, o.create_time, current_timestamp),
+                           current_timestamp), 0) as waiting_seconds,
+                   context_dept.dept_id as dept_id,
+                   context_dept.dept_name collate utf8mb4_general_ci as dept_name,
+                   context_dept.dept_type collate utf8mb4_general_ci as dept_type,
+                   <include refid="ActionableScopeMode"/> as scope_mode,
+                   'create_notice' as route_type,
+                   'inv:deliveryNotice:add' as required_permission,
+                   1 as count_value
+            from inv_sales_order o
+                 inner join (
+                     select d.order_id,
+                            sum(coalesce(d.quantity, 0) - coalesce(d.delivered_quantity, 0)) as remaining_quantity
+                     from inv_sales_detail d
+                     group by d.order_id
+                 ) detail_summary on detail_summary.order_id = o.order_id
+                 inner join sys_dept context_dept on context_dept.dept_id = o.shop_dept_id
+            where o.status = 'submitted'
+              and detail_summary.remaining_quantity &gt; 0
+              and not exists (
+                  select 1
+                  from inv_delivery_notice active_notice
+                  where active_notice.sales_order_id = o.order_id
+                    and active_notice.status in ('pending', 'delivering')
+              )
+              <include refid="SharedCurrentOrganizationScope">
+                  <property name="scopeColumn" value="o.shop_dept_id"/>
+              </include>
+        </if>
+
+        <if test="enabledTypes != null and enabledTypes.contains('INV_DELIVERY_EXECUTE')">
+            union all
+            select 'inventory' as source,
+                   'INV_DELIVERY_EXECUTE' as type,
+                   'execution' as category,
+                   n.notice_id as business_id,
+                   n.notice_no as business_no,
+                   concat('执行发货：', n.notice_no) collate utf8mb4_general_ci as title,
+                   concat('待发数量：', detail_summary.remaining_quantity) collate utf8mb4_general_ci as summary,
+                   n.status as status,
+                   'normal' as priority,
+                   coalesce(n.update_time, n.create_time, current_timestamp) as created_time,
+                   greatest(timestampdiff(second,
+                           coalesce(n.update_time, n.create_time, current_timestamp),
+                           current_timestamp), 0) as waiting_seconds,
+                   context_dept.dept_id as dept_id,
+                   context_dept.dept_name collate utf8mb4_general_ci as dept_name,
+                   context_dept.dept_type collate utf8mb4_general_ci as dept_type,
+                   <include refid="ActionableScopeMode"/> as scope_mode,
+                   'deliver' as route_type,
+                   'inv:deliveryNotice:deliver' as required_permission,
+                   1 as count_value
+            from inv_delivery_notice n
+                 inner join (
+                     select nd.notice_id,
+                            sum(coalesce(nd.notice_qty, 0) - coalesce(nd.delivered_qty, 0)) as remaining_quantity
+                     from inv_delivery_notice_detail nd
+                     group by nd.notice_id
+                 ) detail_summary on detail_summary.notice_id = n.notice_id
+                 inner join sys_dept context_dept
+                    on context_dept.dept_id = (
+                        select min(scoped_sd.warehouse_id)
+                        from inv_delivery_notice_detail scoped_nd
+                             inner join inv_sales_detail scoped_sd
+                                on scoped_sd.detail_id = scoped_nd.sales_detail_id
+                        where scoped_nd.notice_id = n.notice_id
+                          and scoped_sd.warehouse_id is not null
+                          and coalesce(scoped_nd.notice_qty, 0)
+                                - coalesce(scoped_nd.delivered_qty, 0) &gt; 0
+                          <include refid="SharedCurrentOrganizationScope">
+                              <property name="scopeColumn" value="scoped_sd.warehouse_id"/>
+                          </include>
+                    )
+            where n.status in ('pending', 'delivering')
+              and detail_summary.remaining_quantity &gt; 0
+              <include refid="SharedCurrentOrganizationScope">
+                  <property name="scopeColumn" value="context_dept.dept_id"/>
+              </include>
+        </if>
+
+        <if test="enabledTypes != null and enabledTypes.contains('INV_TRANSFER_SOURCE_CONFIRM')">
+            union all
+            select 'inventory' as source,
+                   'INV_TRANSFER_SOURCE_CONFIRM' as type,
+                   'execution' as category,
+                   o.transfer_id as business_id,
+                   o.order_no as business_no,
+                   concat('异店调货待调出店确认：', o.order_no)
+                       collate utf8mb4_general_ci as title,
+                   concat_ws(' → ', o.from_dept_name, o.to_dept_name)
+                       collate utf8mb4_general_ci as summary,
+                   o.status as status,
+                   'important' as priority,
+                   coalesce(o.approved_time, o.update_time, o.create_time,
+                            current_timestamp) as created_time,
+                   greatest(timestampdiff(second,
+                           coalesce(o.approved_time, o.update_time,
+                                    o.create_time, current_timestamp),
+                           current_timestamp), 0) as waiting_seconds,
+                   context_dept.dept_id as dept_id,
+                   context_dept.dept_name collate utf8mb4_general_ci as dept_name,
+                   context_dept.dept_type collate utf8mb4_general_ci as dept_type,
+                   <include refid="ActionableScopeMode"/> as scope_mode,
+                   'source_confirm' as route_type,
+                   'inv:transfer:deliver' as required_permission,
+                   1 as count_value
+            from inv_transfer_order o
+                 inner join sys_dept context_dept
+                    on context_dept.dept_id = coalesce(
+                        o.from_warehouse_id, o.from_dept_id)
+            where o.transfer_type = 'cross_store'
+              and coalesce(o.source_business_type, '') &lt;&gt; 'sales_delivery'
+              and o.status = 'approved'
+              and coalesce(o.source_confirm_status, 'PENDING') = 'PENDING'
+              <include refid="SharedCurrentOrganizationScope">
+                  <property name="scopeColumn" value="context_dept.dept_id"/>
+              </include>
+        </if>
+
+        <if test="enabledTypes != null and enabledTypes.contains('INV_TRANSFER_DELIVER')">
+            union all
+            select 'inventory' as source,
+                   'INV_TRANSFER_DELIVER' as type,
+                   'execution' as category,
+                   o.transfer_id as business_id,
+                   o.order_no as business_no,
+                   concat(case o.transfer_type
+                              when 'warehouse' then '门店要货待发货'
+                              when 'store_return' then '门店返仓待发货'
+                              when 'cross_store' then '异店调货待发货'
+                              else '调拨待发货'
+                          end, '：', o.order_no) collate utf8mb4_general_ci as title,
+                   concat_ws(' → ', o.from_dept_name, o.to_dept_name) collate utf8mb4_general_ci as summary,
+                   o.status as status,
+                   'normal' as priority,
+                   coalesce(o.update_time, o.create_time, current_timestamp) as created_time,
+                   greatest(timestampdiff(second,
+                           coalesce(o.update_time, o.create_time, current_timestamp),
+                           current_timestamp), 0) as waiting_seconds,
+                   context_dept.dept_id as dept_id,
+                   context_dept.dept_name collate utf8mb4_general_ci as dept_name,
+                   context_dept.dept_type collate utf8mb4_general_ci as dept_type,
+                   <include refid="ActionableScopeMode"/> as scope_mode,
+                   'deliver' as route_type,
+                   'inv:transfer:deliver' as required_permission,
+                   1 as count_value
+            from inv_transfer_order o
+                 inner join sys_dept context_dept
+                    on context_dept.dept_id = (
+                        select min(visible_dept.dept_id)
+                        from sys_dept visible_dept
+                        where visible_dept.dept_id in (o.from_dept_id, o.from_warehouse_id)
+                        <include refid="SharedCurrentOrganizationScope">
+                            <property name="scopeColumn" value="visible_dept.dept_id"/>
+                        </include>
+                    )
+            where o.status in ('approved', 'reserved', 'partial_delivered')
+              and (
+                  o.transfer_type &lt;&gt; 'cross_store'
+                  or coalesce(o.source_business_type, '') = 'sales_delivery'
+                  or o.source_confirm_status in ('CONFIRMED', 'PARTIAL')
+              )
+        </if>
+
+        <if test="enabledTypes != null and enabledTypes.contains('INV_TRANSFER_RECEIVE')">
+            union all
+            select 'inventory' as source,
+                   'INV_TRANSFER_RECEIVE' as type,
+                   'execution' as category,
+                   sh.shipment_id as business_id,
+                   concat_ws(' / ', o.order_no, sh.shipment_no) as business_no,
+                   concat(case o.transfer_type
+                              when 'warehouse' then '门店要货待收货'
+                              when 'store_return' then '门店返仓待收货'
+                              when 'cross_store' then '异店调货待收货'
+                              else '调拨待收货'
+                          end, '：', sh.shipment_no) collate utf8mb4_general_ci as title,
+                   concat_ws(' → ', o.from_dept_name, o.to_dept_name) collate utf8mb4_general_ci as summary,
+                   sh.status as status,
+                   'normal' as priority,
+                   coalesce(sh.create_time, sh.shipped_time, current_timestamp) as created_time,
+                   greatest(timestampdiff(second,
+                           coalesce(sh.create_time, sh.shipped_time, current_timestamp),
+                           current_timestamp), 0) as waiting_seconds,
+                   context_dept.dept_id as dept_id,
+                   context_dept.dept_name collate utf8mb4_general_ci as dept_name,
+                   context_dept.dept_type collate utf8mb4_general_ci as dept_type,
+                   <include refid="ActionableScopeMode"/> as scope_mode,
+                   'receive_shipment' as route_type,
+                   'inv:transfer:receive' as required_permission,
+                   1 as count_value
+            from inv_transfer_shipment sh
+                 inner join inv_transfer_order o on o.transfer_id = sh.transfer_id
+                 inner join sys_dept context_dept
+                    on context_dept.dept_id = (
+                        select min(visible_dept.dept_id)
+                        from sys_dept visible_dept
+                        where visible_dept.dept_id in (o.to_warehouse_id, o.to_dept_id)
+                        <include refid="SharedCurrentOrganizationScope">
+                            <property name="scopeColumn" value="visible_dept.dept_id"/>
+                        </include>
+                    )
+            where sh.status = 'pending_receive'
+        </if>
+
+        <if test="enabledTypes != null and enabledTypes.contains('INV_TRANSFER_DISCREPANCY')">
+            union all
+            select 'inventory' as source,
+                   'INV_TRANSFER_DISCREPANCY' as type,
+                   'execution' as category,
+                   o.transfer_id as business_id,
+                   o.order_no as business_no,
+                   concat(case o.transfer_type
+                              when 'warehouse' then '门店要货差异待处理'
+                              when 'store_return' then '门店返仓差异待处理'
+                              when 'cross_store' then '异店调货差异待处理'
+                              else '调拨差异待处理'
+                          end, '：', o.order_no) collate utf8mb4_general_ci as title,
+                   concat('短少 ', discrepancy.shortage_quantity,
+                          ' / 拒收 ', discrepancy.rejected_quantity,
+                          ' / 残损 ', discrepancy.damaged_quantity) collate utf8mb4_general_ci as summary,
+                   o.status as status,
+                   'important' as priority,
+                   coalesce(discrepancy.create_time, o.update_time, o.create_time, current_timestamp) as created_time,
+                   greatest(timestampdiff(second,
+                           coalesce(discrepancy.create_time, o.update_time, o.create_time, current_timestamp),
+                           current_timestamp), 0) as waiting_seconds,
+                   context_dept.dept_id as dept_id,
+                   context_dept.dept_name collate utf8mb4_general_ci as dept_name,
+                   context_dept.dept_type collate utf8mb4_general_ci as dept_type,
+                   <include refid="ActionableScopeMode"/> as scope_mode,
+                   'handle_discrepancy' as route_type,
+                   'inv:transfer:discrepancy:handle' as required_permission,
+                   1 as count_value
+            from inv_transfer_order o
+                 inner join (
+                     select d.transfer_id,
+                            min(d.create_time) as create_time,
+                            sum(coalesce(d.shortage_quantity, 0)) as shortage_quantity,
+                            sum(coalesce(d.rejected_quantity, 0)) as rejected_quantity,
+                            sum(coalesce(d.damaged_quantity, 0)) as damaged_quantity
+                     from inv_transfer_discrepancy d
+                     where d.status in ('OPEN', 'PENDING_QC')
+                     group by d.transfer_id
+                 ) discrepancy on discrepancy.transfer_id = o.transfer_id
+                 inner join sys_dept context_dept
+                    on context_dept.dept_id = (
+                        select min(visible_dept.dept_id)
+                        from sys_dept visible_dept
+                        where visible_dept.dept_id in (o.to_warehouse_id, o.to_dept_id)
+                        <include refid="SharedCurrentOrganizationScope">
+                            <property name="scopeColumn" value="visible_dept.dept_id"/>
+                        </include>
+                    )
+            where o.status = 'discrepancy'
+        </if>
+
+        <if test="enabledTypes != null and enabledTypes.contains('INV_PURCHASE_RETURN_CONFIRM')">
+            union all
+            select 'inventory' as source,
+                   'INV_PURCHASE_RETURN_CONFIRM' as type,
+                   'execution' as category,
+                   r.return_id as business_id,
+                   r.return_no as business_no,
+                   concat('确认采购退货：', r.return_title) collate utf8mb4_general_ci as title,
+                   concat_ws(' · ', r.purchase_order_no, r.supplier_name) collate utf8mb4_general_ci as summary,
+                   r.status as status,
+                   'important' as priority,
+                   coalesce(r.update_time, r.create_time, current_timestamp) as created_time,
+                   greatest(timestampdiff(second,
+                           coalesce(r.update_time, r.create_time, current_timestamp),
+                           current_timestamp), 0) as waiting_seconds,
+                   context_dept.dept_id as dept_id,
+                   context_dept.dept_name collate utf8mb4_general_ci as dept_name,
+                   context_dept.dept_type collate utf8mb4_general_ci as dept_type,
+                   <include refid="ActionableScopeMode"/> as scope_mode,
+                   'confirm_return' as route_type,
+                   'inv:purchaseReturn:confirm' as required_permission,
+                   1 as count_value
+            from inv_purchase_return r
+                 inner join sys_dept context_dept on context_dept.dept_id = r.shop_dept_id
+            where r.status = 'submitted'
+              and exists (
+                  select 1
+                  from inv_purchase_return_detail rd
+                  where rd.return_id = r.return_id
+                    and coalesce(rd.quantity, 0) - coalesce(rd.returned_quantity, 0) &gt; 0
+              )
+              <include refid="SharedCurrentOrganizationScope">
+                  <property name="scopeColumn" value="r.shop_dept_id"/>
+              </include>
+        </if>
+
+        <if test="enabledTypes != null and enabledTypes.contains('INV_SALES_RETURN_CONFIRM')">
+            union all
+            select 'inventory' as source,
+                   'INV_SALES_RETURN_CONFIRM' as type,
+                   'execution' as category,
+                   r.return_id as business_id,
+                   r.return_no as business_no,
+                   concat('确认销售退货：', r.return_title) collate utf8mb4_general_ci as title,
+                   concat_ws(' · ', r.sales_order_no, r.customer_name) collate utf8mb4_general_ci as summary,
+                   r.status as status,
+                   'important' as priority,
+                   coalesce(r.update_time, r.create_time, current_timestamp) as created_time,
+                   greatest(timestampdiff(second,
+                           coalesce(r.update_time, r.create_time, current_timestamp),
+                           current_timestamp), 0) as waiting_seconds,
+                   context_dept.dept_id as dept_id,
+                   context_dept.dept_name collate utf8mb4_general_ci as dept_name,
+                   context_dept.dept_type collate utf8mb4_general_ci as dept_type,
+                   <include refid="ActionableScopeMode"/> as scope_mode,
+                   'confirm_return' as route_type,
+                   'inv:salesReturn:confirm' as required_permission,
+                   1 as count_value
+            from inv_sales_return r
+                 inner join sys_dept context_dept on context_dept.dept_id = r.shop_dept_id
+            where r.status = 'submitted'
+              and exists (
+                  select 1
+                  from inv_sales_return_detail rd
+                  where rd.return_id = r.return_id
+                    and coalesce(rd.quantity, 0) - coalesce(rd.returned_quantity, 0) &gt; 0
+              )
+              <include refid="SharedCurrentOrganizationScope">
+                  <property name="scopeColumn" value="r.shop_dept_id"/>
+              </include>
+        </if>
+
+        <if test="enabledTypes != null and enabledTypes.contains('INV_TRANSFER_RETURNED')">
+            union all
+            select 'inventory' as source,
+                   'INV_TRANSFER_RETURNED' as type,
+                   'returned' as category,
+                   o.transfer_id as business_id,
+                   o.order_no as business_no,
+                   concat(case o.transfer_type
+                              when 'warehouse' then '门店要货已退回'
+                              when 'store_return' then '门店返仓已退回'
+                              when 'cross_store' then '异店调货已退回'
+                              else '调拨已退回'
+                          end, '：', o.order_no) collate utf8mb4_general_ci as title,
+                   coalesce(nullif(rejected_instance.remark, ''), '审批驳回，请修改后重新提交') collate utf8mb4_general_ci as summary,
+                   o.status as status,
+                   'important' as priority,
+                   coalesce(rejected_instance.update_time, rejected_instance.create_time,
+                            o.update_time, o.create_time, current_timestamp) as created_time,
+                   greatest(timestampdiff(second,
+                           coalesce(rejected_instance.update_time, rejected_instance.create_time,
+                                    o.update_time, o.create_time, current_timestamp),
+                           current_timestamp), 0) as waiting_seconds,
+                   context_dept.dept_id as dept_id,
+                   context_dept.dept_name collate utf8mb4_general_ci as dept_name,
+                   context_dept.dept_type collate utf8mb4_general_ci as dept_type,
+                   <include refid="ActionableScopeMode"/> as scope_mode,
+                   'revise' as route_type,
+                   <!-- Task3 service-owned add/edit OR permission; the fact layer leaves it null. -->
+                   cast(null as char) as required_permission,
+                   1 as count_value
+            from inv_transfer_order o
+                 inner join inv_transfer_approval_instance rejected_instance
+                    on rejected_instance.instance_id = coalesce(
+                        o.approval_instance_id,
+                        (select max(fallback_i.instance_id)
+                           from inv_transfer_approval_instance fallback_i
+                          where fallback_i.transfer_id = o.transfer_id)
+                    )
+                   and rejected_instance.transfer_id = o.transfer_id
+                   and rejected_instance.status = 'rejected'
+                 inner join sys_dept context_dept
+                    on context_dept.dept_id = case
+                        when o.transfer_type = 'store_return'
+                             or o.source_business_type = 'oe_replenishment'
+                            then coalesce(o.from_dept_id, o.from_warehouse_id)
+                        else coalesce(o.to_dept_id, o.to_warehouse_id)
+                    end
+            where o.status = 'draft'
+              and coalesce(o.approval_engine, 'LEGACY') = 'LEGACY'
+              and o.create_by = #{username}
+              and not exists (
+                  select 1
+                  from inv_transfer_approval_instance newer_instance
+                  where newer_instance.transfer_id = o.transfer_id
+                    and newer_instance.instance_id &gt; rejected_instance.instance_id
+              )
+              <include refid="DirectOwnerAuthorizedOrganizationScope">
+                  <property name="scopeColumn" value="context_dept.dept_id"/>
+              </include>
+
+            union all
+            select 'inventory' as source,
+                   'INV_TRANSFER_RETURNED' as type,
+                   'returned' as category,
+                   o.transfer_id as business_id,
+                   o.order_no as business_no,
+                   concat(case o.transfer_type
+                              when 'warehouse' then '门店要货已退回'
+                              when 'store_return' then '门店返仓已退回'
+                              when 'cross_store' then '异店调货已退回'
+                              else '调拨已退回'
+                          end, '：', o.order_no) collate utf8mb4_general_ci as title,
+                   coalesce(nullif(return_log.reason, ''),
+                            '审批退回，请修改后重新提交') collate utf8mb4_general_ci as summary,
+                   o.status as status,
+                   'important' as priority,
+                   coalesce(return_log.create_time, o.update_time,
+                            o.create_time, current_timestamp) as created_time,
+                   greatest(timestampdiff(second,
+                           coalesce(return_log.create_time, o.update_time,
+                                    o.create_time, current_timestamp),
+                           current_timestamp), 0) as waiting_seconds,
+                   context_dept.dept_id as dept_id,
+                   context_dept.dept_name collate utf8mb4_general_ci as dept_name,
+                   context_dept.dept_type collate utf8mb4_general_ci as dept_type,
+                   <include refid="ActionableScopeMode"/> as scope_mode,
+                   'revise' as route_type,
+                   cast(null as char) as required_permission,
+                   1 as count_value
+            from inv_transfer_order o
+                 left join inv_transfer_status_log return_log
+                    on return_log.log_id = (
+                        select max(candidate_log.log_id)
+                        from inv_transfer_status_log candidate_log
+                        where candidate_log.transfer_id = o.transfer_id
+                          and candidate_log.action = 'return'
+                    )
+                 inner join sys_dept context_dept
+                    on context_dept.dept_id = case
+                        when o.transfer_type = 'store_return'
+                             or o.source_business_type = 'oe_replenishment'
+                            then coalesce(o.from_dept_id, o.from_warehouse_id)
+                        else coalesce(o.to_dept_id, o.to_warehouse_id)
+                    end
+            where o.status = 'draft'
+              and upper(coalesce(o.approval_engine, '')) = 'NATIVE'
+              and right(o.last_approval_event_key, 7) = ':RETURN'
+              and o.create_by = #{username}
+              <include refid="DirectOwnerAuthorizedOrganizationScope">
+                  <property name="scopeColumn" value="context_dept.dept_id"/>
+              </include>
+        </if>
+
+        <if test="enabledTypes != null and enabledTypes.contains('INV_TRANSFER_SOURCE_RESELECT')">
+            union all
+            select 'inventory' as source,
+                   'INV_TRANSFER_SOURCE_RESELECT' as type,
+                   'returned' as category,
+                   o.transfer_id as business_id,
+                   o.order_no as business_no,
+                   concat('异店调货待重选调出店：', o.order_no)
+                       collate utf8mb4_general_ci as title,
+                   coalesce(nullif(o.remark, ''),
+                            '调出店未全量确认，请重新选择其他调出店')
+                       collate utf8mb4_general_ci as summary,
+                   o.status as status,
+                   'important' as priority,
+                   coalesce(o.update_time, o.create_time,
+                            current_timestamp) as created_time,
+                   greatest(timestampdiff(second,
+                           coalesce(o.update_time, o.create_time,
+                                    current_timestamp),
+                           current_timestamp), 0) as waiting_seconds,
+                   context_dept.dept_id as dept_id,
+                   context_dept.dept_name collate utf8mb4_general_ci as dept_name,
+                   context_dept.dept_type collate utf8mb4_general_ci as dept_type,
+                   <include refid="ActionableScopeMode"/> as scope_mode,
+                   'revise' as route_type,
+                   cast(null as char) as required_permission,
+                   1 as count_value
+            from inv_transfer_order o
+                 inner join sys_dept context_dept
+                    on context_dept.dept_id = coalesce(
+                        o.to_warehouse_id, o.to_dept_id)
+            where o.transfer_type = 'cross_store'
+              and o.status = 'draft'
+              and o.source_confirm_status = 'RESELECT_REQUIRED'
+              and o.reselection_from_transfer_id is not null
+              <include refid="SharedCurrentOrganizationScope">
+                  <property name="scopeColumn" value="context_dept.dept_id"/>
+              </include>
+        </if>
+
+        <if test="enabledTypes != null and enabledTypes.contains('INV_STOCK_CHECK_EXECUTE')">
+            union all
+            select 'inventory' as source,
+                   'INV_STOCK_CHECK_EXECUTE' as type,
+                   'execution' as category,
+                   s.check_id as business_id,
+                   s.check_no as business_no,
+                   case
+                       when s.deadline &lt; current_timestamp
+                           then concat('盘点已逾期：', s.check_no)
+                       when timestampdiff(second, current_timestamp, s.deadline)
+                                &lt;= #{stockCheckDueSoonHours} * 3600
+                           then concat('盘点即将到期：', s.check_no)
+                       else concat('待执行盘点：', s.check_no)
+                   end collate utf8mb4_general_ci as title,
+                   concat('盘点人：', coalesce(nullif(s.counter_name, ''), '未命名'),
+                          '；截止：', date_format(s.deadline, '%Y-%m-%d %H:%i'))
+                       collate utf8mb4_general_ci as summary,
+                   case
+                       when s.deadline &lt; current_timestamp then 'overdue'
+                       when timestampdiff(second, current_timestamp, s.deadline)
+                                &lt;= #{stockCheckDueSoonHours} * 3600 then 'due_soon'
+                       else 'pending'
+                   end as status,
+                   case
+                       when s.deadline &lt; current_timestamp then 'urgent'
+                       when timestampdiff(second, current_timestamp, s.deadline)
+                                &lt;= #{stockCheckDueSoonHours} * 3600 then 'important'
+                       else 'normal'
+                   end as priority,
+                   coalesce(s.create_time, current_timestamp) as created_time,
+                   greatest(timestampdiff(second,
+                           coalesce(s.create_time, current_timestamp),
+                           current_timestamp), 0) as waiting_seconds,
+                   context_dept.dept_id as dept_id,
+                   context_dept.dept_name collate utf8mb4_general_ci as dept_name,
+                   context_dept.dept_type collate utf8mb4_general_ci as dept_type,
+                   <include refid="ActionableScopeMode"/> as scope_mode,
+                   'input' as route_type,
+                   'inv:stockCheck:submit' as required_permission,
+                   1 as count_value
+            from inv_stock_check s
+                 inner join sys_dept context_dept on context_dept.dept_id = s.shop_dept_id
+            where s.status = 'draft'
+              and s.counter_user_id = #{userId}
+              and s.deadline is not null
+              <include refid="DirectOwnerAuthorizedOrganizationScope">
+                  <property name="scopeColumn" value="s.shop_dept_id"/>
+              </include>
+        </if>
+
+        <if test="enabledTypes != null and enabledTypes.contains('INV_STOCK_CHECK_RETURNED')">
+            union all
+            select 'inventory' as source,
+                   'INV_STOCK_CHECK_RETURNED' as type,
+                   'returned' as category,
+                   s.check_id as business_id,
+                   s.check_no as business_no,
+                   concat('盘点已退回：', s.check_no) collate utf8mb4_general_ci as title,
+                   coalesce(nullif(s.last_reject_reason, ''), '审批驳回，请修改后重新提交') collate utf8mb4_general_ci as summary,
+                   s.status as status,
+                   'important' as priority,
+                   coalesce(s.last_rejected_time, s.update_time, s.create_time,
+                            current_timestamp) as created_time,
+                   greatest(timestampdiff(second,
+                           coalesce(s.last_rejected_time, s.update_time, s.create_time,
+                                    current_timestamp),
+                           current_timestamp), 0) as waiting_seconds,
+                   context_dept.dept_id as dept_id,
+                   context_dept.dept_name collate utf8mb4_general_ci as dept_name,
+                   context_dept.dept_type collate utf8mb4_general_ci as dept_type,
+                   <include refid="ActionableScopeMode"/> as scope_mode,
+                   'revise' as route_type,
+                   'inv:stockCheck:submit' as required_permission,
+                   1 as count_value
+            from inv_stock_check s
+                 inner join sys_dept context_dept on context_dept.dept_id = s.shop_dept_id
+            where (
+                    s.status = 'returned'
+                    or (
+                        s.status = 'rejected'
+                        and coalesce(s.approval_engine, 'LEGACY') = 'LEGACY'
+                    )
+                  )
+              and coalesce(s.counter_user_id, s.submitted_user_id) = #{userId}
+              <include refid="DirectOwnerAuthorizedOrganizationScope">
+                  <property name="scopeColumn" value="s.shop_dept_id"/>
+              </include>
+        </if>
+
+        <if test="enabledTypes != null and enabledTypes.contains('INV_STOCK_CHECK_RESTART')">
+            union all
+            select 'inventory' as source,
+                   'INV_STOCK_CHECK_RESTART' as type,
+                   'returned' as category,
+                   s.check_id as business_id,
+                   s.check_no as business_no,
+                   concat('重新盘点：', s.check_no) collate utf8mb4_general_ci as title,
+                   coalesce(nullif(s.last_invalid_reason, ''), '库存快照已变化，请重新盘点') collate utf8mb4_general_ci as summary,
+                   s.status as status,
+                   'important' as priority,
+                   coalesce(s.last_invalidated_time, current_timestamp) as created_time,
+                   greatest(timestampdiff(second,
+                           coalesce(s.last_invalidated_time, current_timestamp),
+                           current_timestamp), 0) as waiting_seconds,
+                   context_dept.dept_id as dept_id,
+                   context_dept.dept_name collate utf8mb4_general_ci as dept_name,
+                   context_dept.dept_type collate utf8mb4_general_ci as dept_type,
+                   <include refid="ActionableScopeMode"/> as scope_mode,
+                   'restart' as route_type,
+                   'inv:stockCheck:submit' as required_permission,
+                   1 as count_value
+            from inv_stock_check s
+                 inner join sys_dept context_dept on context_dept.dept_id = s.shop_dept_id
+            where s.status = 'invalidated'
+              and coalesce(s.counter_user_id, s.submitted_user_id) = #{userId}
+              <include refid="DirectOwnerAuthorizedOrganizationScope">
+                  <property name="scopeColumn" value="s.shop_dept_id"/>
+              </include>
+        </if>
+
+        <if test="enabledTypes != null and enabledTypes.contains('INV_OUT_OF_STOCK')">
+            union all
+            select 'inventory' as source,
+                   'INV_OUT_OF_STOCK' as type,
+                   'risk' as category,
+                   st.shop_dept_id as business_id,
+                   concat('ORG-', st.shop_dept_id) as business_no,
+                   concat(context_dept.dept_name, '缺货预警') collate utf8mb4_general_ci as title,
+                   convert(concat('缺货商品：', count(distinct st.product_id), ' 种') using utf8mb4) collate utf8mb4_general_ci as summary,
+                   'out_of_stock' as status,
+                   'urgent' as priority,
+                   min(coalesce(st.update_time, st.create_time, current_timestamp)) as created_time,
+                   greatest(timestampdiff(second,
+                           min(coalesce(st.update_time, st.create_time, current_timestamp)),
+                           current_timestamp), 0) as waiting_seconds,
+                   context_dept.dept_id as dept_id,
+                   context_dept.dept_name collate utf8mb4_general_ci as dept_name,
+                   context_dept.dept_type collate utf8mb4_general_ci as dept_type,
+                   <include refid="ActionableScopeMode"/> as scope_mode,
+                   'view_risk' as route_type,
+                   'inv:stock:list' as required_permission,
+                   count(distinct st.product_id) as count_value
+            from inv_stock st
+                 inner join inv_product p on p.product_id = st.product_id
+                 inner join sys_dept context_dept on context_dept.dept_id = st.shop_dept_id
+            where coalesce(st.available_quantity, st.current_quantity, 0) &lt;= 0
+              <include refid="SharedCurrentOrganizationScope">
+                  <property name="scopeColumn" value="st.shop_dept_id"/>
+              </include>
+            group by st.shop_dept_id, context_dept.dept_id, context_dept.dept_name, context_dept.dept_type
+        </if>
+
+        <if test="enabledTypes != null and enabledTypes.contains('INV_LOW_STOCK')">
+            union all
+            select 'inventory' as source,
+                   'INV_LOW_STOCK' as type,
+                   'risk' as category,
+                   st.shop_dept_id as business_id,
+                   concat('ORG-', st.shop_dept_id) as business_no,
+                   concat(context_dept.dept_name, '低库存预警') collate utf8mb4_general_ci as title,
+                   convert(concat('低库存商品：', count(distinct st.product_id), ' 种') using utf8mb4) collate utf8mb4_general_ci as summary,
+                   'low_stock' as status,
+                   'normal' as priority,
+                   min(coalesce(st.update_time, st.create_time, current_timestamp)) as created_time,
+                   greatest(timestampdiff(second,
+                           min(coalesce(st.update_time, st.create_time, current_timestamp)),
+                           current_timestamp), 0) as waiting_seconds,
+                   context_dept.dept_id as dept_id,
+                   context_dept.dept_name collate utf8mb4_general_ci as dept_name,
+                   context_dept.dept_type collate utf8mb4_general_ci as dept_type,
+                   <include refid="ActionableScopeMode"/> as scope_mode,
+                   'view_risk' as route_type,
+                   'inv:stock:list' as required_permission,
+                   count(distinct st.product_id) as count_value
+            from inv_stock st
+                 inner join inv_product p on p.product_id = st.product_id
+                 inner join sys_dept context_dept on context_dept.dept_id = st.shop_dept_id
+            where coalesce(st.available_quantity, st.current_quantity, 0) &gt; 0
+              and coalesce(st.available_quantity, st.current_quantity, 0)
+                    &lt;= coalesce(p.safety_stock_min, 10)
+              <include refid="SharedCurrentOrganizationScope">
+                  <property name="scopeColumn" value="st.shop_dept_id"/>
+              </include>
+            group by st.shop_dept_id, context_dept.dept_id, context_dept.dept_name, context_dept.dept_type
+        </if>
+    </sql>
+
+    <sql id="InventoryTodoFilters">
+        <where>
+            <if test="query != null and query.type != null and query.type != ''">
+                type = #{query.type}
+            </if>
+            <if test="query != null and query.category != null and query.category != ''">
+                and category = #{query.category}
+            </if>
+            <if test="query != null and query.priority != null and query.priority != ''">
+                and priority = #{query.priority}
+            </if>
+            <if test="query != null and query.keyword != null and query.keyword != ''">
+                and (
+                    business_no like concat('%', #{query.keyword}, '%')
+                    or title like concat('%', #{query.keyword}, '%')
+                    or summary like concat('%', #{query.keyword}, '%')
+                )
+            </if>
+        </where>
+    </sql>
+
+    <select id="selectInventoryTodoList" resultMap="TodoItemResult">
+        select source, type, category, business_id, business_no, title, summary,
+               status, priority, created_time, waiting_seconds,
+               dept_id, dept_name, dept_type, scope_mode, route_type, required_permission
+        from (
+            <include refid="InventoryTodoUnion"/>
+        ) inventory_todo
+        <include refid="InventoryTodoFilters"/>
+        order by field(priority, 'urgent', 'important', 'normal'), created_time asc,
+                 business_id asc, type asc, route_type asc
+    </select>
+
+    <select id="selectRecentInventoryTodos" resultMap="TodoItemResult">
+        select source, type, category, business_id, business_no, title, summary,
+               status, priority, created_time, waiting_seconds,
+               dept_id, dept_name, dept_type, scope_mode, route_type, required_permission
+        from (
+            <include refid="InventoryTodoUnion"/>
+        ) inventory_todo
+        <include refid="InventoryTodoFilters"/>
+        order by field(priority, 'urgent', 'important', 'normal'), created_time asc,
+                 business_id asc, type asc, route_type asc
+        limit #{limit}
+    </select>
+
+    <select id="selectInventoryTodoCounts"
+            resultType="com.erp.inventory.domain.vo.InvTodoCountRow">
+        select type, category, priority, sum(count_value) as count
+        from (
+            <include refid="InventoryTodoUnion"/>
+        ) inventory_todo
+        <include refid="InventoryTodoFilters"/>
+        group by type, category, priority
+    </select>
+</mapper>

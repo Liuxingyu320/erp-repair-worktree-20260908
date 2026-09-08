@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.file.drive.mapper.DriveUploadReservationMapper">
+
+    <resultMap id="ReservationResult" type="com.erp.file.drive.domain.DriveUploadReservation">
+        <id property="reservationId" column="reservation_id" />
+        <result property="spaceId" column="space_id" />
+        <result property="storageKey" column="storage_key" />
+        <result property="reservedBytes" column="reserved_bytes" />
+        <result property="status" column="status" />
+        <result property="expireTime" column="expire_time" />
+        <result property="retryCount" column="retry_count" />
+        <result property="nextRetryTime" column="next_retry_time" />
+        <result property="version" column="version" />
+        <result property="createBy" column="create_by" />
+        <result property="createTime" column="create_time" />
+        <result property="updateBy" column="update_by" />
+        <result property="updateTime" column="update_time" />
+        <result property="lastErrorCode" column="last_error_code" />
+    </resultMap>
+
+    <sql id="ReservationColumns">
+        reservation_id, space_id, storage_key, reserved_bytes, status,
+        expire_time, retry_count, next_retry_time, version,
+        create_by, create_time, update_by, update_time, last_error_code
+    </sql>
+
+    <select id="selectById" resultMap="ReservationResult">
+        select <include refid="ReservationColumns" />
+        from drive_upload_reservation
+        where reservation_id = #{reservationId}
+    </select>
+
+    <select id="selectForUpdate" resultMap="ReservationResult">
+        select <include refid="ReservationColumns" />
+        from drive_upload_reservation
+        where reservation_id = #{reservationId}
+        for update
+    </select>
+
+    <select id="selectCleanupCandidates" resultMap="ReservationResult">
+        select <include refid="ReservationColumns" />
+        from drive_upload_reservation
+        where (status = 'RESERVED' and expire_time &lt;= #{now})
+           or (status = 'CLEANUP_FAILED' and next_retry_time &lt;= #{now})
+           or (status = 'CLEANING' and update_time &lt;= #{staleCleaningBefore})
+        order by coalesce(next_retry_time, expire_time), reservation_id
+        limit #{limit}
+    </select>
+
+    <select id="sumPendingBytes" resultType="java.lang.Long">
+        select coalesce(sum(reserved_bytes), 0)
+        from drive_upload_reservation
+        where status in ('RESERVED', 'CLEANING', 'CLEANUP_FAILED')
+    </select>
+
+    <select id="countStale" resultType="int">
+        select count(*)
+        from drive_upload_reservation
+        where (status = 'RESERVED' and expire_time &lt;= #{now})
+           or (status = 'CLEANING' and update_time &lt;= #{staleCleaningBefore})
+    </select>
+
+    <select id="countCleanupFailed" resultType="int">
+        select count(*)
+        from drive_upload_reservation
+        where status = 'CLEANUP_FAILED'
+    </select>
+
+    <insert id="insertReservation">
+        insert into drive_upload_reservation (
+            reservation_id, space_id, storage_key, reserved_bytes, status,
+            expire_time, retry_count, next_retry_time, version,
+            create_by, create_time, update_by, update_time, last_error_code
+        ) values (
+            #{reservationId}, #{spaceId}, #{storageKey}, #{reservedBytes}, #{status},
+            #{expireTime}, #{retryCount}, #{nextRetryTime}, #{version},
+            #{createBy}, #{createTime}, #{updateBy}, #{updateTime}, #{lastErrorCode}
+        )
+    </insert>
+
+    <update id="claimCleanup">
+        update drive_upload_reservation
+        set status = 'CLEANING',
+            version = version + 1,
+            update_by = #{updateBy},
+            update_time = #{now}
+        where reservation_id = #{reservationId}
+          and version = #{version}
+          and (
+            (status = 'RESERVED' and expire_time &lt;= #{now})
+            or (status = 'CLEANUP_FAILED' and next_retry_time &lt;= #{now})
+            or (status = 'CLEANING' and update_time &lt;= #{staleCleaningBefore})
+          )
+    </update>
+
+    <update id="markCleanupFailed">
+        update drive_upload_reservation
+        set status = 'CLEANUP_FAILED',
+            retry_count = #{retryCount},
+            next_retry_time = #{nextRetryTime},
+            last_error_code = #{lastErrorCode},
+            version = version + 1,
+            update_by = #{updateBy},
+            update_time = now()
+        where reservation_id = #{reservationId}
+          and version = #{version}
+          and status in ('RESERVED', 'CLEANING')
+    </update>
+
+    <delete id="deleteExpected">
+        delete from drive_upload_reservation
+        where reservation_id = #{reservationId}
+          and version = #{version}
+          and status = #{status}
+    </delete>
+
+</mapper>

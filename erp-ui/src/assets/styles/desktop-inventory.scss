@@ -1,0 +1,625 @@
+/**
+ * Desktop inventory visual layer
+ *
+ * The route class is supplied by AppMain, so this polish stays inside the
+ * desktop /inventory workspace and never leaks into mobile or other modules.
+ */
+
+@media screen and (min-width: 992px) {
+  .app-wrapper:not(.mobile) .app-main.inventory-module {
+    --inv-accent: var(--erp-primary, #0b6b53);
+    --inv-accent-strong: var(--erp-primary-hover, #075441);
+    --inv-accent-soft: var(--erp-primary-soft, #e7f2ed);
+    --inv-cyan: var(--erp-info, #2866b1);
+    --inv-cyan-soft: #edf4fd;
+    --inv-mint: var(--erp-success, #147a50);
+    --inv-mint-soft: #e8f4ed;
+    --inv-amber: var(--erp-warning, #a76505);
+    --inv-amber-soft: #fff3dc;
+    --inv-rose: var(--erp-danger, #c4322b);
+    --inv-rose-soft: #fff0ee;
+    --inv-surface-border: var(--erp-border, #dde2de);
+    --inv-card-shadow: var(--erp-shadow-card, 0 8px 22px rgba(23, 33, 29, 0.055));
+
+    background: var(--erp-canvas, #f4f5f2);
+
+    .app-container {
+      position: relative;
+      min-height: 100%;
+      padding: 22px 24px 32px;
+      background: transparent !important;
+    }
+
+    .app-container::before {
+      display: none;
+    }
+
+    /* Shared business surfaces */
+    .app-container .el-card,
+    .app-container .search-card,
+    .app-container .table-card,
+    .app-container .filter-card,
+    .app-container .content-card {
+      border-color: var(--inv-surface-border) !important;
+      border-radius: var(--erp-radius-md, 12px) !important;
+      background: var(--erp-surface, #ffffff);
+      box-shadow: var(--inv-card-shadow);
+    }
+
+    .app-container > .el-card,
+    .app-container > .search-card,
+    .app-container > .table-card,
+    .app-container > .filter-card,
+    .app-container > .content-card,
+    .app-container main > .el-card,
+    .app-container main > .search-card,
+    .app-container main > .table-card {
+      transition:
+        border-color var(--motion-duration-fast) var(--motion-ease-standard),
+        box-shadow var(--motion-duration-fast) var(--motion-ease-standard);
+    }
+
+    .app-container > .el-card:hover,
+    .app-container main > .el-card:hover {
+      border-color: #c5d0ca !important;
+      box-shadow: 0 10px 28px rgba(23, 33, 29, 0.075);
+    }
+
+    .app-container > .el-card:first-child,
+    .app-container > .inventory-page-hero + .el-card,
+    .app-container > .search-card,
+    .app-container > .filter-card,
+    .app-container main > .search-card {
+      border-color: var(--inv-surface-border) !important;
+      background: var(--erp-surface, #ffffff);
+      box-shadow: inset 3px 0 0 var(--inv-accent), var(--inv-card-shadow);
+    }
+
+    .el-card__header {
+      min-height: 54px;
+      padding: 15px 20px;
+      background: var(--erp-surface-raised, #fbfcfa);
+      border-bottom-color: var(--erp-border, #dde2de);
+    }
+
+    .el-card__body {
+      padding: 19px 20px 20px;
+    }
+
+    .card-header,
+    .processing-head,
+    .record-toolbar {
+      color: var(--erp-text, #17211d);
+    }
+
+    .card-header,
+    .processing-head {
+      min-height: 26px;
+    }
+
+    .card-header > span:first-child,
+    .card-title,
+    .table-title,
+    .panel-title {
+      color: var(--erp-text, #17211d);
+      font-weight: 700;
+      letter-spacing: -0.01em;
+    }
+
+    .card-header > span:first-child,
+    .card-title,
+    .panel-title {
+      font-size: 15px;
+    }
+
+    .card-subtitle,
+    .panel-sub,
+    .summary-text,
+    .record-total,
+    .catalog-total,
+    .stock-total {
+      color: var(--erp-text-secondary, #66736d);
+      font-size: 12px;
+    }
+
+    /* Page introductions */
+    .page-heading,
+    .page-header,
+    .overview-main {
+      position: relative;
+    }
+
+    .page-heading {
+      min-height: 76px;
+      margin-bottom: 14px !important;
+      padding: 15px 18px 15px 20px;
+      overflow: hidden;
+      border: 1px solid var(--inv-surface-border);
+      border-radius: var(--erp-radius-md, 12px);
+      background: var(--erp-surface, #ffffff);
+      box-shadow: var(--inv-card-shadow);
+    }
+
+    .page-heading::before {
+      position: absolute;
+      top: 15px;
+      bottom: 15px;
+      left: 0;
+      width: 4px;
+      border-radius: 0 4px 4px 0;
+      background: var(--inv-accent);
+      content: "";
+    }
+
+    .page-heading h1,
+    .page-heading h2,
+    .overview-title-block h2 {
+      color: var(--erp-text, #17211d) !important;
+      font-weight: 700 !important;
+      letter-spacing: -0.025em;
+    }
+
+    .page-heading p,
+    .page-header p,
+    .overview-kicker {
+      color: var(--erp-text-secondary, #66736d) !important;
+      line-height: 1.6;
+    }
+
+    .section-eyebrow,
+    .overview-kicker {
+      color: var(--inv-accent) !important;
+      font-size: 11px !important;
+      font-weight: 750;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    /* Search and action areas */
+    .app-container > .el-card:first-child .el-form--inline,
+    .app-container > .inventory-page-hero + .el-card .el-form--inline,
+    .app-container > .filter-card .el-form--inline,
+    .app-container > .search-card .el-form--inline,
+    .app-container main > .search-card .el-form--inline,
+    .query-form {
+      display: flex;
+      align-items: flex-end;
+      flex-wrap: wrap;
+      gap: 10px 14px;
+    }
+
+    .app-container > .el-card:first-child .el-form--inline .el-form-item,
+    .app-container > .inventory-page-hero + .el-card .el-form--inline .el-form-item,
+    .app-container > .filter-card .el-form--inline .el-form-item,
+    .app-container > .search-card .el-form--inline .el-form-item,
+    .app-container main > .search-card .el-form--inline .el-form-item,
+    .query-form .el-form-item {
+      margin-right: 0;
+      margin-bottom: 0;
+    }
+
+    .el-form-item__label {
+      padding-right: 9px;
+      color: #52605a;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .query-actions .el-form-item__content,
+    .app-container > .el-card:first-child .el-form-item:last-child .el-form-item__content,
+    .app-container > .inventory-page-hero + .el-card .el-form-item:last-child .el-form-item__content,
+    .app-container > .filter-card .el-form-item:last-child .el-form-item__content {
+      display: inline-flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .query-actions .el-button + .el-button,
+    .app-container > .el-card:first-child .el-form-item:last-child .el-button + .el-button,
+    .app-container > .inventory-page-hero + .el-card .el-form-item:last-child .el-button + .el-button,
+    .app-container > .filter-card .el-form-item:last-child .el-button + .el-button {
+      margin-left: 0;
+    }
+
+    .el-input__inner,
+    .el-textarea__inner,
+    .el-range-editor.el-input__inner {
+      border-color: var(--erp-border-strong, #cbd3ce) !important;
+      background: #ffffff;
+    }
+
+    .el-input__inner:hover,
+    .el-textarea__inner:hover,
+    .el-range-editor.el-input__inner:hover {
+      border-color: #8fb3a4 !important;
+    }
+
+    .el-input__inner:focus,
+    .el-textarea__inner:focus,
+    .el-select .el-input.is-focus .el-input__inner,
+    .el-range-editor.is-active,
+    .el-range-editor.is-active:hover {
+      border-color: var(--inv-accent) !important;
+      box-shadow: var(--erp-focus-ring, 0 0 0 3px rgba(11, 107, 83, 0.18));
+    }
+
+    .el-button--primary:not(.is-plain) {
+      border-color: var(--inv-accent);
+      background: var(--inv-accent);
+      box-shadow: 0 4px 12px rgba(11, 107, 83, 0.16);
+    }
+
+    .el-button--primary:not(.is-plain):hover,
+    .el-button--primary:not(.is-plain):focus {
+      border-color: var(--inv-accent-strong);
+      background: var(--inv-accent-strong);
+      box-shadow: 0 5px 14px rgba(11, 107, 83, 0.22);
+    }
+
+    /* Metric and operational summary cards */
+    .metric-row,
+    .metric-grid,
+    .transfer-dashboard,
+    .overview-metrics,
+    .customer-ops-grid,
+    .oe-ops-grid {
+      gap: 12px !important;
+    }
+
+    .metric-card,
+    .transfer-metric,
+    .overview-metric,
+    .customer-ops-grid > div,
+    .oe-ops-cell {
+      position: relative;
+      min-height: 82px;
+      overflow: hidden;
+      border: 1px solid var(--inv-surface-border) !important;
+      border-radius: var(--erp-radius-md, 12px) !important;
+      background: var(--erp-surface, #ffffff) !important;
+      box-shadow: var(--inv-card-shadow) !important;
+      transition:
+        border-color var(--motion-duration-fast) var(--motion-ease-standard),
+        box-shadow var(--motion-duration-fast) var(--motion-ease-standard);
+    }
+
+    .metric-card,
+    .overview-metric,
+    .customer-ops-grid > div,
+    .oe-ops-cell {
+      padding: 13px 15px !important;
+    }
+
+    .transfer-metric .el-card__body {
+      padding: 15px 16px;
+    }
+
+    .metric-card::before,
+    .transfer-metric::before,
+    .overview-metric::before,
+    .customer-ops-grid > div::before,
+    .oe-ops-cell::before {
+      position: absolute;
+      top: 0;
+      right: 18px;
+      left: 18px;
+      height: 3px;
+      border-radius: 0 0 6px 6px;
+      background: var(--inv-accent);
+      content: "";
+      opacity: 0.88;
+    }
+
+    .metric-card:nth-child(4n + 2)::before,
+    .transfer-metric:nth-child(4n + 2)::before,
+    .overview-metric:nth-child(4n + 2)::before,
+    .customer-ops-grid > div:nth-child(4n + 2)::before,
+    .oe-ops-cell:nth-child(4n + 2)::before {
+      background: var(--inv-cyan);
+    }
+
+    .metric-card:nth-child(4n + 3)::before,
+    .transfer-metric:nth-child(4n + 3)::before,
+    .overview-metric:nth-child(4n + 3)::before,
+    .customer-ops-grid > div:nth-child(4n + 3)::before,
+    .oe-ops-cell:nth-child(4n + 3)::before {
+      background: var(--inv-amber);
+    }
+
+    .metric-card:nth-child(4n)::before,
+    .transfer-metric:nth-child(4n)::before,
+    .overview-metric:nth-child(4n)::before,
+    .oe-ops-cell:nth-child(4n)::before {
+      background: var(--inv-rose);
+    }
+
+    .metric-card:hover,
+    .transfer-metric:hover,
+    .overview-metric:hover,
+    .customer-ops-grid > div:hover,
+    .oe-ops-cell:hover {
+      border-color: #b7c5be !important;
+      box-shadow: 0 10px 26px rgba(23, 33, 29, 0.08) !important;
+    }
+
+    .metric-value,
+    .overview-metric strong,
+    .customer-ops-grid strong,
+    .oe-ops-cell strong {
+      color: var(--erp-text, #17211d);
+      font-size: 23px !important;
+      font-weight: 780 !important;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: -0.025em;
+    }
+
+    .metric-label,
+    .overview-metric span,
+    .customer-ops-grid span,
+    .oe-ops-cell span {
+      color: var(--erp-text-secondary, #66736d) !important;
+      font-size: 12px;
+      font-weight: 650;
+    }
+
+    .metric-extra,
+    .oe-ops-cell small {
+      color: var(--erp-text-muted, #8a948f) !important;
+      line-height: 1.5;
+    }
+
+    .warning-value,
+    .overview-metric.loss strong,
+    .customer-ops-grid strong.warning,
+    .oe-ops-cell.warning strong {
+      color: var(--inv-amber) !important;
+    }
+
+    .danger-value,
+    .customer-ops-grid strong.danger,
+    .oe-ops-cell.danger strong {
+      color: var(--inv-rose) !important;
+    }
+
+    .success-value,
+    .oe-ops-cell.success strong {
+      color: var(--inv-mint) !important;
+    }
+
+    /* Data tables */
+    .el-table {
+      border-radius: 12px;
+    }
+
+    .el-table th.el-table__cell,
+    .el-table .el-table__header-wrapper th,
+    .el-table .el-table__fixed-header-wrapper th {
+      height: 48px;
+      color: #46534d;
+      background: #f6f8f6 !important;
+      border-bottom-color: var(--erp-border, #dde2de) !important;
+    }
+
+    .el-table th.el-table__cell > .cell {
+      font-size: 12px;
+      font-weight: 750;
+      letter-spacing: 0.025em;
+    }
+
+    .el-table td.el-table__cell {
+      height: 49px;
+      border-bottom-color: #edf0ee !important;
+    }
+
+    .el-table--striped .el-table__body tr.el-table__row--striped td.el-table__cell {
+      background: #fbfcfa;
+    }
+
+    .el-table__body tr:hover > td.el-table__cell,
+    .el-table__body tr.hover-row > td.el-table__cell {
+      background: #f3f8f5 !important;
+    }
+
+    .el-table__fixed-right,
+    .el-table__fixed {
+      border-color: var(--erp-border, #dde2de);
+      box-shadow: -10px 0 22px rgba(23, 33, 29, 0.055);
+    }
+
+    .el-table .el-button--text {
+      border-radius: 7px !important;
+      font-weight: 650;
+    }
+
+    .el-table .el-button--text:hover,
+    .el-table .el-button--text:focus {
+      background: var(--inv-accent-soft);
+    }
+
+    .el-table__empty-block {
+      min-height: 210px;
+      background: var(--erp-surface-raised, #fbfcfa);
+    }
+
+    .pagination-container {
+      margin-top: 16px;
+      padding-top: 13px;
+      border-top-color: #e8eef6;
+    }
+
+    /* Category navigation */
+    aside.category-panel {
+      border: 0;
+      background: transparent !important;
+    }
+
+    .category-card {
+      border-color: var(--inv-surface-border) !important;
+      background: var(--erp-surface, #ffffff) !important;
+      box-shadow: var(--inv-card-shadow) !important;
+    }
+
+    .category-card .el-card__header {
+      background: var(--erp-surface-raised, #fbfcfa);
+    }
+
+    .category-search .el-input__inner {
+      background: #ffffff;
+    }
+
+    .category-tree .el-tree-node__content {
+      min-height: 32px;
+      margin: 2px 0;
+      border-radius: 9px;
+    }
+
+    .category-tree .el-tree-node__content:hover {
+      background: var(--inv-accent-soft) !important;
+    }
+
+    .category-tree .is-current > .el-tree-node__content {
+      color: var(--inv-accent-strong) !important;
+      background: var(--inv-accent-soft) !important;
+      box-shadow: inset 3px 0 0 var(--inv-accent);
+    }
+
+    .tree-node-marker {
+      width: 5px !important;
+      height: 5px !important;
+      flex-basis: 5px !important;
+      background: var(--inv-accent) !important;
+      box-shadow: 0 0 0 3px rgba(11, 107, 83, 0.08);
+    }
+
+    .category-summary {
+      border: 1px solid var(--inv-surface-border);
+      background: var(--erp-surface-muted, #f8f8f5) !important;
+    }
+
+    /* Inventory-specific cards and secondary navigation */
+    .customer-card {
+      overflow: hidden;
+      background: var(--erp-surface, #ffffff) !important;
+    }
+
+    .customer-card:hover {
+      border-color: #b7c5be !important;
+      box-shadow: 0 10px 26px rgba(23, 33, 29, 0.08) !important;
+    }
+
+    .customer-avatar {
+      width: 48px !important;
+      height: 48px !important;
+      color: var(--inv-accent) !important;
+      background: var(--inv-accent-soft) !important;
+      box-shadow: inset 0 0 0 1px rgba(11, 107, 83, 0.1);
+    }
+
+    .customer-card .card-actions {
+      border-top-color: #e8eef6 !important;
+    }
+
+    .stock-tabs,
+    .catalog-tabs,
+    .record-toolbar,
+    .processing-head {
+      border-color: #e5ebf4 !important;
+    }
+
+    .stock-tabs,
+    .catalog-tabs,
+    .record-toolbar {
+      padding: 10px 12px 13px;
+      border-radius: 11px;
+      background: var(--erp-surface-muted, #f8f8f5);
+    }
+
+    .el-radio-button__orig-radio:checked + .el-radio-button__inner {
+      border-color: var(--inv-accent) !important;
+      background: var(--inv-accent) !important;
+      box-shadow: -1px 0 0 0 var(--inv-accent), 0 4px 10px rgba(11, 107, 83, 0.16) !important;
+    }
+
+    .context-alert,
+    .app-container > .el-alert {
+      border-radius: 13px;
+      box-shadow: 0 6px 18px rgba(30, 41, 59, 0.04);
+    }
+
+    .flow-step,
+    .approval-node {
+      border-radius: 12px !important;
+      box-shadow: 0 5px 14px rgba(30, 41, 59, 0.04);
+    }
+
+    .flow-step.done {
+      border-color: #a7f3d0;
+      background: var(--inv-mint-soft);
+    }
+
+    .flow-step.current {
+      border-color: #fde68a;
+      background: var(--inv-amber-soft);
+    }
+
+    .stock-detail-image,
+    .catalog-detail-image,
+    .customer-photo,
+    .detail-item {
+      border-color: var(--inv-surface-border) !important;
+      border-radius: 12px !important;
+      background: var(--erp-surface-muted, #f8f8f5) !important;
+    }
+
+    .price-text,
+    .number-text,
+    .amount-txt,
+    .quantity-preview {
+      font-variant-numeric: tabular-nums;
+    }
+  }
+}
+
+@media screen and (min-width: 992px) and (max-width: 1280px) {
+  .app-wrapper:not(.mobile) .app-main.inventory-module {
+    .app-container {
+      padding: 18px 18px 26px;
+    }
+
+    .app-container::before {
+      right: 18px;
+      left: 18px;
+    }
+
+    .metric-grid,
+    .transfer-dashboard,
+    .overview-metrics {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-wrapper:not(.mobile) .app-main.inventory-module {
+    .app-container > .el-card,
+    .app-container main > .el-card,
+    .metric-card,
+    .transfer-metric,
+    .overview-metric,
+    .customer-card,
+    .customer-ops-grid > div,
+    .oe-ops-cell {
+      transition: none !important;
+    }
+
+    .metric-card:hover,
+    .transfer-metric:hover,
+    .overview-metric:hover,
+    .customer-card:hover,
+    .customer-ops-grid > div:hover,
+    .oe-ops-cell:hover {
+      transform: none;
+    }
+  }
+}

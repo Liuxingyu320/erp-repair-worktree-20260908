@@ -1,0 +1,417 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.inventory.mapper.InvTransferReceiptDiscrepancyAdjudicationAsyncWorkflowMapper">
+
+    <resultMap id="WorkflowLinkResult"
+            type="com.erp.inventory.domain.transfer.InvTransferReceiptDiscrepancyAdjudicationAsyncWorkflowLink">
+        <id property="workflowId" column="workflow_id"/>
+        <result property="requestId" column="request_id"/>
+        <result property="caseId" column="discrepancy_case_id"/>
+        <result property="caseVersionBefore" column="case_version_before"/>
+        <result property="adjudicationId" column="adjudication_id"/>
+        <result property="actionId" column="adjudication_action_id"/>
+        <result property="actionVersionBefore"
+                column="action_version_before"/>
+        <result property="discrepancyType" column="discrepancy_type"/>
+        <result property="actionType" column="action_type"/>
+        <result property="effectKind" column="effect_kind"/>
+        <result property="workflowType" column="workflow_type"/>
+        <result property="parentTransferId" column="parent_transfer_id"/>
+        <result property="parentTransferType"
+                column="parent_transfer_type"/>
+        <result property="childTransferId" column="child_transfer_id"/>
+        <result property="childTransferType"
+                column="child_transfer_type"/>
+        <result property="originalSourceLocationDeptId"
+                column="original_source_location_dept_id"/>
+        <result property="originalTargetLocationDeptId"
+                column="original_target_location_dept_id"/>
+        <result property="childSourceLocationDeptId"
+                column="child_source_location_dept_id"/>
+        <result property="childTargetLocationDeptId"
+                column="child_target_location_dept_id"/>
+        <result property="receiptAllocationId"
+                column="receipt_allocation_id"/>
+        <result property="shipmentAllocationId"
+                column="shipment_allocation_id"/>
+        <result property="itemType" column="item_type"/>
+        <result property="itemId" column="item_id"/>
+        <result property="productId" column="product_id"/>
+        <result property="trackingPolicy" column="tracking_policy"/>
+        <result property="inventorySource" column="inventory_source"/>
+        <result property="quarantineBalanceId"
+                column="quarantine_balance_id"/>
+        <result property="quarantineLotId"
+                column="quarantine_lot_id"/>
+        <result property="quarantineLocationId"
+                column="quarantine_location_id"/>
+        <result property="quantity" column="action_quantity"/>
+        <result property="sourceCostPrice" column="source_cost_price"/>
+        <result property="amount" column="action_amount"/>
+        <result property="sourceBusinessType"
+                column="source_business_type"/>
+        <result property="sourceBusinessId" column="source_business_id"/>
+        <result property="effectReference" column="effect_reference"/>
+        <result property="dispatchChildStatus"
+                column="dispatch_child_status"/>
+        <result property="reservationCount" column="reservation_count"/>
+        <result property="reservedQuantity" column="reserved_quantity"/>
+        <result property="decisionFingerprint"
+                column="decision_fingerprint"/>
+        <result property="workflowFingerprint"
+                column="workflow_fingerprint"/>
+        <result property="executorUserId" column="executor_user_id"/>
+        <result property="executorName" column="executor_name"/>
+        <result property="createTime" column="create_time"/>
+    </resultMap>
+
+    <resultMap id="ChildFactResult"
+            type="com.erp.inventory.domain.transfer.InvTransferReceiptDiscrepancyAdjudicationAsyncWorkflowChildFact">
+        <id property="transferId" column="transfer_id"/>
+        <result property="transferType" column="transfer_type"/>
+        <result property="sourceBusinessType"
+                column="source_business_type"/>
+        <result property="sourceBusinessId" column="source_business_id"/>
+        <result property="sourceLocationDeptId"
+                column="source_location_dept_id"/>
+        <result property="targetLocationDeptId"
+                column="target_location_dept_id"/>
+        <result property="status" column="status"/>
+        <result property="detailCount" column="detail_count"/>
+        <result property="itemType" column="item_type"/>
+        <result property="itemId" column="item_id"/>
+        <result property="productId" column="product_id"/>
+        <result property="requestedQuantity"
+                column="requested_quantity"/>
+        <result property="deliveredQuantity"
+                column="delivered_quantity"/>
+        <result property="reservationKind" column="reservation_kind"/>
+        <result property="reservationCount" column="reservation_count"/>
+        <result property="reservedQuantity" column="reserved_quantity"/>
+        <result property="reservationStatus" column="reservation_status"/>
+        <result property="consumedQuantity" column="consumed_quantity"/>
+        <result property="releasedQuantity" column="released_quantity"/>
+        <result property="v2ShipmentCount" column="v2_shipment_count"/>
+        <result property="legacyShipmentCount"
+                column="legacy_shipment_count"/>
+        <result property="receiptCount" column="receipt_count"/>
+        <result property="openDiscrepancyCount"
+                column="open_discrepancy_count"/>
+    </resultMap>
+
+    <select id="selectLinkForUpdate" resultMap="WorkflowLinkResult">
+        select workflow_id, request_id, discrepancy_case_id,
+               case_version_before, adjudication_id,
+               adjudication_action_id, action_version_before,
+               discrepancy_type, action_type, effect_kind, workflow_type,
+               parent_transfer_id, parent_transfer_type,
+               child_transfer_id, child_transfer_type,
+               original_source_location_dept_id,
+               original_target_location_dept_id,
+               child_source_location_dept_id,
+               child_target_location_dept_id, receipt_allocation_id,
+               shipment_allocation_id, item_type, item_id, product_id,
+               tracking_policy, inventory_source, quarantine_balance_id,
+               quarantine_lot_id, quarantine_location_id,
+               action_quantity, source_cost_price, action_amount,
+               source_business_type, source_business_id, effect_reference,
+               dispatch_child_status, reservation_count,
+               reserved_quantity, decision_fingerprint,
+               workflow_fingerprint, executor_user_id, executor_name,
+               create_time
+        from inv_transfer_receipt_discrepancy_adjudication_workflow_link
+        where adjudication_action_id = #{actionId}
+        for update
+    </select>
+
+    <insert id="insertLink">
+        insert into
+            inv_transfer_receipt_discrepancy_adjudication_workflow_link (
+            request_id, discrepancy_case_id, case_version_before,
+            adjudication_id, adjudication_action_id,
+            action_version_before, discrepancy_type, action_type,
+            effect_kind, workflow_type, parent_transfer_id,
+            parent_transfer_type, child_transfer_id, child_transfer_type,
+            original_source_location_dept_id,
+            original_target_location_dept_id,
+            child_source_location_dept_id,
+            child_target_location_dept_id, receipt_allocation_id,
+            shipment_allocation_id, item_type, item_id, product_id,
+            tracking_policy, inventory_source, quarantine_balance_id,
+            quarantine_lot_id, quarantine_location_id, action_quantity,
+            source_cost_price, action_amount, source_business_type,
+            source_business_id, effect_reference, dispatch_child_status,
+            reservation_count, reserved_quantity, decision_fingerprint,
+            workflow_fingerprint, executor_user_id, executor_name,
+            create_by, create_time
+        )
+        select #{link.requestId}, c.discrepancy_case_id,
+               #{link.caseVersionBefore}, a.adjudication_id,
+               x.adjudication_action_id, #{link.actionVersionBefore},
+               c.discrepancy_type, x.action_type, #{link.effectKind},
+               #{link.workflowType}, p.transfer_id, p.transfer_type,
+               child.transfer_id, child.transfer_type,
+               coalesce(nullif(p.from_warehouse_id, 0), p.from_dept_id),
+               coalesce(nullif(p.to_warehouse_id, 0), p.to_dept_id),
+               coalesce(nullif(child.from_warehouse_id, 0),
+                        child.from_dept_id),
+               coalesce(nullif(child.to_warehouse_id, 0),
+                        child.to_dept_id),
+               ra.receipt_allocation_id, sa.allocation_id, ra.item_type,
+               ra.item_id, ra.product_id, ra.tracking_policy,
+               #{link.inventorySource}, #{link.quarantineBalanceId},
+               #{link.quarantineLotId}, #{link.quarantineLocationId},
+               x.action_quantity, a.source_cost_price, x.action_amount,
+               child.source_business_type, child.source_business_id,
+               #{link.effectReference}, child.status,
+               #{link.reservationCount}, #{link.reservedQuantity},
+               a.decision_fingerprint, #{link.workflowFingerprint},
+               #{link.executorUserId}, #{link.executorName},
+               #{link.executorName}, #{link.createdAt}
+        from inv_transfer_receipt_discrepancy_case c
+        inner join inv_transfer_receipt_discrepancy_adjudication a
+                on a.discrepancy_case_id = c.discrepancy_case_id
+               and a.adjudication_id = #{link.adjudicationId}
+        inner join
+            inv_transfer_receipt_discrepancy_adjudication_action x
+                on x.discrepancy_case_id = c.discrepancy_case_id
+               and x.adjudication_id = a.adjudication_id
+               and x.adjudication_action_id = #{link.actionId}
+        inner join inv_transfer_shipment_receipt_allocation ra
+                on ra.receipt_allocation_id = c.receipt_allocation_id
+               and ra.receipt_id = c.receipt_id
+               and ra.shipment_id = c.shipment_id
+               and ra.shipment_allocation_id =
+                   c.shipment_allocation_id
+        inner join inv_transfer_shipment_allocation sa
+                on sa.allocation_id = c.shipment_allocation_id
+               and sa.shipment_id = c.shipment_id
+               and sa.transfer_id = c.transfer_id
+               and sa.allocation_id = ra.shipment_allocation_id
+        inner join inv_transfer_order p
+                on p.transfer_id = c.transfer_id
+               and p.transfer_id = #{link.parentTransferId}
+        inner join inv_transfer_order child
+                on child.transfer_id = #{link.childTransferId}
+        inner join inv_transfer_detail d
+                on d.transfer_id = child.transfer_id
+        where c.discrepancy_case_id = #{link.caseId}
+          and c.case_version = #{link.caseVersionBefore}
+          and c.discrepancy_type = #{link.discrepancyType}
+          and c.discrepancy_quantity &gt;= #{link.quantity}
+          and c.source_cost_price = #{link.sourceCostPrice}
+          and c.discrepancy_amount &gt;= #{link.amount}
+          and a.case_version_after &lt;= c.case_version
+          and a.decision_fingerprint = #{link.decisionFingerprint}
+          and a.source_cost_price = #{link.sourceCostPrice}
+          and a.plan_status in (
+              'adjudication_planned', 'adjudication_executing')
+          and c.status = a.plan_status
+          and x.action_type = #{link.actionType}
+          and x.coverage_kind = 'resolution'
+          and x.action_quantity = #{link.quantity}
+          and x.action_amount = #{link.amount}
+          and x.execution_status = 'pending'
+          and x.execution_version = #{link.actionVersionBefore}
+          and x.execution_effect_reference is null
+          and ra.item_type = #{link.itemType}
+          and ra.item_id = #{link.itemId}
+          and ra.product_id &lt;=&gt; #{link.productId}
+          and ra.tracking_policy = #{link.trackingPolicy}
+          and ra.cost_price = #{link.sourceCostPrice}
+          and sa.transfer_detail_id = ra.transfer_detail_id
+          and sa.cost_price = #{link.sourceCostPrice}
+          and p.transfer_type = #{link.parentTransferType}
+          and coalesce(nullif(p.from_warehouse_id, 0), p.from_dept_id) =
+              #{link.originalSourceLocationDeptId}
+          and coalesce(nullif(p.to_warehouse_id, 0), p.to_dept_id) =
+              #{link.originalTargetLocationDeptId}
+          and child.transfer_id &lt;&gt; p.transfer_id
+          and child.transfer_type = #{link.childTransferType}
+          and child.source_business_type = #{link.sourceBusinessType}
+          and child.source_business_id = #{link.sourceBusinessId}
+          and child.source_business_id = x.adjudication_action_id
+          and coalesce(nullif(child.from_warehouse_id, 0),
+                       child.from_dept_id) =
+              #{link.childSourceLocationDeptId}
+          and coalesce(nullif(child.to_warehouse_id, 0),
+                       child.to_dept_id) =
+              #{link.childTargetLocationDeptId}
+          and child.status = #{link.dispatchChildStatus}
+          and child.status in ('submitted', 'approved', 'reserved')
+          and d.item_type = #{link.itemType}
+          and d.item_id = #{link.itemId}
+          and d.product_id &lt;=&gt; #{link.productId}
+          and d.quantity = #{link.quantity}
+          and d.delivered_quantity = 0
+          and (select count(1) from inv_transfer_detail child_detail
+               where child_detail.transfer_id = child.transfer_id) = 1
+          and #{link.reservationCount} = 1
+          and #{link.reservedQuantity} = #{link.quantity}
+          and #{link.requestId} regexp
+              '^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$'
+          and #{link.decisionFingerprint} regexp '^[a-f0-9]{64}$'
+          and #{link.workflowFingerprint} regexp '^[a-f0-9]{64}$'
+          and #{link.executorUserId} &gt; 0
+          and length(#{link.executorName}) between 1 and 64
+          and #{link.effectReference} = concat(
+              case #{link.workflowType}
+                  when 'reship' then 'reship_transfer:'
+                  when 'return' then 'return_transfer:'
+                  else 'invalid:'
+              end, child.transfer_id)
+          and (
+              (c.discrepancy_type = 'shortage'
+               and x.action_type = 'reship'
+               and #{link.effectKind} = 'reship_workflow'
+               and #{link.workflowType} = 'reship'
+               and #{link.inventorySource} = 'available_stock'
+               and #{link.sourceBusinessType} =
+                   'transfer_discrepancy_reship'
+               and child.transfer_type = p.transfer_type
+               and #{link.childSourceLocationDeptId} =
+                   #{link.originalSourceLocationDeptId}
+               and #{link.childTargetLocationDeptId} =
+                   #{link.originalTargetLocationDeptId}
+               and #{link.quarantineBalanceId} is null
+               and #{link.quarantineLotId} is null
+               and #{link.quarantineLocationId} is null)
+              or
+              (c.discrepancy_type = 'damaged'
+               and x.action_type = 'return_to_source'
+               and #{link.effectKind} = 'return_workflow'
+               and #{link.workflowType} = 'return'
+               and #{link.inventorySource} = 'quarantine_detail'
+               and #{link.sourceBusinessType} =
+                   'transfer_discrepancy_return'
+               and child.transfer_type = case p.transfer_type
+                   when 'warehouse' then 'store_return'
+                   when 'store_return' then 'warehouse'
+                   when 'cross_store' then 'cross_store'
+                   else 'invalid'
+               end
+               and #{link.childSourceLocationDeptId} =
+                   #{link.originalTargetLocationDeptId}
+               and #{link.childTargetLocationDeptId} =
+                   #{link.originalSourceLocationDeptId}
+               and #{link.quarantineBalanceId} =
+                   ra.damaged_target_balance_id
+               and #{link.quarantineLotId} = ra.damaged_target_lot_id
+               and #{link.quarantineLocationId} =
+                   ra.quarantine_location_id)
+          )
+          and not exists (
+              select 1
+              from inv_transfer_receipt_discrepancy_adjudication_workflow_link prior
+              where prior.request_id = #{link.requestId}
+                 or prior.adjudication_action_id = #{link.actionId}
+                 or prior.child_transfer_id = #{link.childTransferId}
+                 or prior.effect_reference = #{link.effectReference}
+                 or (prior.source_business_type =
+                         #{link.sourceBusinessType}
+                     and prior.source_business_id =
+                         #{link.sourceBusinessId})
+                 or prior.workflow_fingerprint =
+                     #{link.workflowFingerprint}
+          )
+    </insert>
+
+    <select id="selectChildForUpdate" resultMap="ChildFactResult">
+        select child.transfer_id, child.transfer_type,
+               child.source_business_type, child.source_business_id,
+               coalesce(nullif(child.from_warehouse_id, 0),
+                        child.from_dept_id) as source_location_dept_id,
+               coalesce(nullif(child.to_warehouse_id, 0),
+                        child.to_dept_id) as target_location_dept_id,
+               child.status,
+               (select count(1)
+                from inv_transfer_detail all_detail
+                where all_detail.transfer_id = child.transfer_id)
+                   as detail_count,
+               d.item_type, d.item_id, d.product_id,
+               d.quantity as requested_quantity,
+               d.delivered_quantity, link.inventory_source
+                   as reservation_kind,
+               case link.inventory_source
+                   when 'available_stock' then (
+                       select count(1)
+                       from inv_transfer_reservation actual
+                       where actual.transfer_id = child.transfer_id
+                         and actual.transfer_detail_id = d.detail_id
+                         and actual.reservation_round =
+                             child.approval_round)
+                   when 'quarantine_detail' then (
+                       select count(1)
+                       from inv_transfer_quarantine_reservation actual
+                       where actual.child_transfer_id = child.transfer_id
+                         and actual.child_transfer_detail_id = d.detail_id
+                         and actual.reservation_round =
+                             child.approval_round)
+                   else 0
+               end as reservation_count,
+               case link.inventory_source
+                   when 'available_stock' then standard_reservation.reserved_quantity
+                   when 'quarantine_detail' then quarantine_reservation.reserved_quantity
+                   else 0
+               end as reserved_quantity,
+               case link.inventory_source
+                   when 'available_stock' then standard_reservation.status
+                   when 'quarantine_detail' then quarantine_reservation.status
+                   else 'INVALID'
+               end as reservation_status,
+               case link.inventory_source
+                   when 'available_stock' then standard_reservation.consumed_quantity
+                   when 'quarantine_detail' then quarantine_reservation.consumed_quantity
+                   else 0
+               end as consumed_quantity,
+               case link.inventory_source
+                   when 'available_stock' then standard_reservation.released_quantity
+                   when 'quarantine_detail' then quarantine_reservation.released_quantity
+                   else 0
+               end as released_quantity,
+               (select count(1)
+                from inv_transfer_shipment v2_shipment
+                where v2_shipment.transfer_id = child.transfer_id
+                  and v2_shipment.inventory_write_version = 'V2_DETAIL')
+                   as v2_shipment_count,
+               (select count(1)
+                from inv_transfer_shipment legacy_shipment
+                where legacy_shipment.transfer_id = child.transfer_id
+                  and coalesce(legacy_shipment.inventory_write_version,
+                               'LEGACY') &lt;&gt; 'V2_DETAIL')
+                   as legacy_shipment_count,
+               (select count(1)
+                from inv_transfer_shipment_receipt receipt
+                where receipt.transfer_id = child.transfer_id)
+                   as receipt_count,
+               (select count(1)
+                from inv_transfer_receipt_discrepancy_case discrepancy
+                where discrepancy.transfer_id = child.transfer_id
+                  and discrepancy.status &lt;&gt; 'resolved')
+                   as open_discrepancy_count
+        from inv_transfer_receipt_discrepancy_adjudication_workflow_link
+             link
+        inner join inv_transfer_order child
+                on child.transfer_id = link.child_transfer_id
+               and child.transfer_id = #{childTransferId}
+        inner join inv_transfer_detail d
+                on d.detail_id = (
+                    select min(first_detail.detail_id)
+                    from inv_transfer_detail first_detail
+                    where first_detail.transfer_id = child.transfer_id)
+        left join inv_transfer_reservation standard_reservation
+               on link.inventory_source = 'available_stock'
+              and standard_reservation.transfer_id = child.transfer_id
+              and standard_reservation.transfer_detail_id = d.detail_id
+              and standard_reservation.reservation_round = child.approval_round
+        left join inv_transfer_quarantine_reservation quarantine_reservation
+               on link.inventory_source = 'quarantine_detail'
+              and quarantine_reservation.child_transfer_id = child.transfer_id
+              and quarantine_reservation.child_transfer_detail_id = d.detail_id
+              and quarantine_reservation.reservation_round = child.approval_round
+        where link.adjudication_action_id = #{actionId}
+          and link.child_transfer_id = #{childTransferId}
+        for update
+    </select>
+
+</mapper>

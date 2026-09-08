@@ -1,0 +1,527 @@
+frontend_api_id,module,exported_function,http_method,url_expression,normalized_path,source,contract_status
+FEAPI-0001,approval/definition,listApprovalTemplates,GET,`${BASE_URL}/templates`,/approval/templates,erp-ui/src/api/approval/definition.js:6,待与后端/OpenAPI 核验
+FEAPI-0002,approval/definition,getApprovalTemplate,GET,`${BASE_URL}/templates/${templateId}`,/approval/templates/{templateId},erp-ui/src/api/approval/definition.js:10,待与后端/OpenAPI 核验
+FEAPI-0003,approval/definition,listApprovalRules,GET,`${BASE_URL}/rules`,/approval/rules,erp-ui/src/api/approval/definition.js:14,待与后端/OpenAPI 核验
+FEAPI-0004,approval/definition,getApprovalRule,GET,`${BASE_URL}/rules/${ruleId}`,/approval/rules/{ruleId},erp-ui/src/api/approval/definition.js:18,待与后端/OpenAPI 核验
+FEAPI-0005,approval/definition,createApprovalRule,POST,`${BASE_URL}/rules`,/approval/rules,erp-ui/src/api/approval/definition.js:22,待与后端/OpenAPI 核验
+FEAPI-0006,approval/definition,updateApprovalRule,PUT,`${BASE_URL}/rules/${ruleId}`,/approval/rules/{ruleId},erp-ui/src/api/approval/definition.js:26,待与后端/OpenAPI 核验
+FEAPI-0007,approval/definition,createApprovalRuleDraft,POST,`${BASE_URL}/rules/${ruleId}/drafts`,/approval/rules/{ruleId}/drafts,erp-ui/src/api/approval/definition.js:30,待与后端/OpenAPI 核验
+FEAPI-0008,approval/definition,updateApprovalVersion,PUT,`${BASE_URL}/versions/${versionId}`,/approval/versions/{versionId},erp-ui/src/api/approval/definition.js:34,待与后端/OpenAPI 核验
+FEAPI-0009,approval/definition,publishApprovalVersion,POST,`${BASE_URL}/versions/${versionId}/publish`,/approval/versions/{versionId}/publish,erp-ui/src/api/approval/definition.js:38,待与后端/OpenAPI 核验
+FEAPI-0010,approval/definition,disableApprovalRule,POST,`${BASE_URL}/rules/${ruleId}/disable`,/approval/rules/{ruleId}/disable,erp-ui/src/api/approval/definition.js:42,待与后端/OpenAPI 核验
+FEAPI-0011,approval/definition,previewApprovalCandidates,POST,`${BASE_URL}/versions/${versionId}/preview`,/approval/versions/{versionId}/preview,erp-ui/src/api/approval/definition.js:46,待与后端/OpenAPI 核验
+FEAPI-0012,approval/monitor,listApprovalInstances,GET,`${BASE_URL}/instances`,/approval/instances,erp-ui/src/api/approval/monitor.js:6,待与后端/OpenAPI 核验
+FEAPI-0013,approval/monitor,getApprovalInstance,GET,`${BASE_URL}/instances/${instanceId}`,/approval/instances/{instanceId},erp-ui/src/api/approval/monitor.js:10,待与后端/OpenAPI 核验
+FEAPI-0014,approval/monitor,listLegacyApprovalTemplates,GET,`${BASE_URL}/legacy/templates`,/approval/legacy/templates,erp-ui/src/api/approval/monitor.js:14,待与后端/OpenAPI 核验
+FEAPI-0015,approval/monitor,listLegacyApprovalInstances,GET,`${BASE_URL}/legacy/instances`,/approval/legacy/instances,erp-ui/src/api/approval/monitor.js:18,待与后端/OpenAPI 核验
+FEAPI-0016,approval/monitor,getLegacyApprovalInstance,GET,`${BASE_URL}/legacy/instances/${encodeURIComponent(businessCode)}/${legacyInstanceId}`,/approval/legacy/instances/{businessCode}/{legacyInstanceId},erp-ui/src/api/approval/monitor.js:23,待与后端/OpenAPI 核验
+FEAPI-0017,approval/monitor,terminateApprovalInstance,POST,`${BASE_URL}/instances/${instanceId}/terminate`,/approval/instances/{instanceId}/terminate,erp-ui/src/api/approval/monitor.js:29,待与后端/OpenAPI 核验
+FEAPI-0018,approval/monitor,reassignApprovalTask,POST,`${BASE_URL}/tasks/${taskId}/reassign`,/approval/tasks/{taskId}/reassign,erp-ui/src/api/approval/monitor.js:33,待与后端/OpenAPI 核验
+FEAPI-0019,approval/monitor,replayApprovalCallback,POST,`${BASE_URL}/callbacks/${outboxId}/replay`,/approval/callbacks/{outboxId}/replay,erp-ui/src/api/approval/monitor.js:37,待与后端/OpenAPI 核验
+FEAPI-0020,approval/task,unknown,POST,`${BASE_URL}/${taskId}/${action}`,/approval/tasks/{taskId}/{action},erp-ui/src/api/approval/task.js:7,待与后端/OpenAPI 核验
+FEAPI-0021,approval/validation,listApprovalValidationRuns,GET,`${BASE_URL}/runs`,/approval/validation/runs,erp-ui/src/api/approval/validation.js:6,待与后端/OpenAPI 核验
+FEAPI-0022,approval/validation,getApprovalValidationRun,GET,`${BASE_URL}/runs/${runId}`,/approval/validation/runs/{runId},erp-ui/src/api/approval/validation.js:10,待与后端/OpenAPI 核验
+FEAPI-0023,approval/validation,runApprovalValidation,POST,`${BASE_URL}/run`,/approval/validation/run,erp-ui/src/api/approval/validation.js:14,待与后端/OpenAPI 核验
+FEAPI-0024,drive/admin,getDriveAdminStatus,GET,base + '/status',/file/drive/admin/status,erp-ui/src/api/drive/admin.js:6,待与后端/OpenAPI 核验
+FEAPI-0025,drive/admin,getDriveQuotaOverview,GET,base + '/quota/overview',/file/drive/admin/quota/overview,erp-ui/src/api/drive/admin.js:10,待与后端/OpenAPI 核验
+FEAPI-0026,drive/admin,getDriveCapacity,GET,base + '/quota/capacity',/file/drive/admin/quota/capacity,erp-ui/src/api/drive/admin.js:14,待与后端/OpenAPI 核验
+FEAPI-0027,drive/admin,updateDriveCapacity,PUT,base + '/quota/capacity',/file/drive/admin/quota/capacity,erp-ui/src/api/drive/admin.js:18,待与后端/OpenAPI 核验
+FEAPI-0028,drive/admin,listDrivePersonalPolicies,GET,base + '/quota/personal-policies',/file/drive/admin/quota/personal-policies,erp-ui/src/api/drive/admin.js:22,待与后端/OpenAPI 核验
+FEAPI-0029,drive/admin,listDriveQuotaPosts,GET,base + '/quota/posts',/file/drive/admin/quota/posts,erp-ui/src/api/drive/admin.js:26,待与后端/OpenAPI 核验
+FEAPI-0030,drive/admin,listDriveOrganizationTypeRules,GET,base + '/organizations/type-rules',/file/drive/admin/organizations/type-rules,erp-ui/src/api/drive/admin.js:30,待与后端/OpenAPI 核验
+FEAPI-0031,drive/admin,saveDriveOrganizationTypeRule,PUT,base + '/organizations/type-rules/' + encodeURIComponent(deptType),/file/drive/admin/organizations/type-rules/{deptType},erp-ui/src/api/drive/admin.js:35,待与后端/OpenAPI 核验
+FEAPI-0032,drive/admin,saveDrivePersonalPolicy,PUT,base + '/quota/personal-policies/' + encodeURIComponent(subjectType) + '/' + subjectId,/file/drive/admin/quota/personal-policies/{subjectType}/{subjectId},erp-ui/src/api/drive/admin.js:44,待与后端/OpenAPI 核验
+FEAPI-0033,drive/admin,deleteDrivePersonalPolicy,DELETE,base + '/quota/personal-policies/' + encodeURIComponent(subjectType) + '/' + subjectId,/file/drive/admin/quota/personal-policies/{subjectType}/{subjectId},erp-ui/src/api/drive/admin.js:53,待与后端/OpenAPI 核验
+FEAPI-0034,drive/admin,listDriveQuotaUsers,GET,base + '/quota/users',/file/drive/admin/quota/users,erp-ui/src/api/drive/admin.js:61,待与后端/OpenAPI 核验
+FEAPI-0035,drive/admin,listDriveOrganizations,GET,base + '/organizations',/file/drive/admin/organizations,erp-ui/src/api/drive/admin.js:65,待与后端/OpenAPI 核验
+FEAPI-0036,drive/admin,saveDriveOrganization,PUT,base + '/organizations/' + deptId,/file/drive/admin/organizations/{deptId},erp-ui/src/api/drive/admin.js:70,待与后端/OpenAPI 核验
+FEAPI-0037,drive/admin,saveDriveOrganizationsBatch,POST,base + '/organizations/batch',/file/drive/admin/organizations/batch,erp-ui/src/api/drive/admin.js:78,待与后端/OpenAPI 核验
+FEAPI-0038,drive/admin,previewDriveQuotaImpact,POST,base + '/quota/impact',/file/drive/admin/quota/impact,erp-ui/src/api/drive/admin.js:82,待与后端/OpenAPI 核验
+FEAPI-0039,drive/admin,reconcileDriveOrganizations,POST,base + '/organizations/reconcile',/file/drive/admin/organizations/reconcile,erp-ui/src/api/drive/admin.js:86,待与后端/OpenAPI 核验
+FEAPI-0040,drive/index,listDriveSpaces,GET,'/file/drive/spaces',/file/drive/spaces,erp-ui/src/api/drive/index.js:5,待与后端/OpenAPI 核验
+FEAPI-0041,drive/index,listDriveNodes,GET,'/file/drive/nodes',/file/drive/nodes,erp-ui/src/api/drive/index.js:13,待与后端/OpenAPI 核验
+FEAPI-0042,drive/index,getDriveNode,GET,'/file/drive/nodes/' + nodeId,/file/drive/nodes/{nodeId},erp-ui/src/api/drive/index.js:22,待与后端/OpenAPI 核验
+FEAPI-0043,drive/index,createDriveFolder,POST,'/file/drive/folders',/file/drive/folders,erp-ui/src/api/drive/index.js:30,待与后端/OpenAPI 核验
+FEAPI-0044,drive/index,uploadDriveFile,POST,'/file/drive/files',/file/drive/files,erp-ui/src/api/drive/index.js:43,待与后端/OpenAPI 核验
+FEAPI-0045,drive/index,renameDriveNode,PUT,'/file/drive/nodes/' + nodeId + '/name',/file/drive/nodes/{nodeId}/name,erp-ui/src/api/drive/index.js:56,待与后端/OpenAPI 核验
+FEAPI-0046,drive/index,moveDriveNode,PUT,'/file/drive/nodes/' + nodeId + '/move',/file/drive/nodes/{nodeId}/move,erp-ui/src/api/drive/index.js:65,待与后端/OpenAPI 核验
+FEAPI-0047,drive/index,trashDriveNode,DELETE,'/file/drive/nodes/' + nodeId,/file/drive/nodes/{nodeId},erp-ui/src/api/drive/index.js:74,待与后端/OpenAPI 核验
+FEAPI-0048,drive/index,listRecentDriveNodes,GET,'/file/drive/recent',/file/drive/recent,erp-ui/src/api/drive/index.js:83,待与后端/OpenAPI 核验
+FEAPI-0049,drive/index,listDriveTrash,GET,'/file/drive/trash',/file/drive/trash,erp-ui/src/api/drive/index.js:92,待与后端/OpenAPI 核验
+FEAPI-0050,drive/index,restoreDriveNode,POST,'/file/drive/trash/' + nodeId + '/restore',/file/drive/trash/{nodeId}/restore,erp-ui/src/api/drive/index.js:101,待与后端/OpenAPI 核验
+FEAPI-0051,drive/index,purgeDriveNode,DELETE,'/file/drive/trash/' + nodeId,/file/drive/trash/{nodeId},erp-ui/src/api/drive/index.js:109,待与后端/OpenAPI 核验
+FEAPI-0052,drive/index,emptyDriveTrash,DELETE,'/file/drive/trash',/file/drive/trash,erp-ui/src/api/drive/index.js:117,待与后端/OpenAPI 核验
+FEAPI-0053,drive/index,getDriveContent,GET,'/file/drive/nodes/' + nodeId + '/content',/file/drive/nodes/{nodeId}/content,erp-ui/src/api/drive/index.js:126,待与后端/OpenAPI 核验
+FEAPI-0054,drive/index,updateDriveQuota,PUT,'/file/drive/spaces/' + spaceId + '/quota',/file/drive/spaces/{spaceId}/quota,erp-ui/src/api/drive/index.js:137,待与后端/OpenAPI 核验
+FEAPI-0055,hr/completeness,getHrCompletenessSummary,GET,"""/system/hr/completeness/summary""",/system/hr/completeness/summary,erp-ui/src/api/hr/completeness.js:4,待与后端/OpenAPI 核验
+FEAPI-0056,hr/completeness,listHrCompletenessEmployees,GET,"""/system/hr/completeness/employees""",/system/hr/completeness/employees,erp-ui/src/api/hr/completeness.js:10,待与后端/OpenAPI 核验
+FEAPI-0057,hr/completeness,getHrCompletenessDepartments,GET,"""/system/hr/completeness/departments""",/system/hr/completeness/departments,erp-ui/src/api/hr/completeness.js:16,待与后端/OpenAPI 核验
+FEAPI-0058,hr/completeness,getHrMasterDataSummary,GET,"""/system/hr/completeness/master-data/summary""",/system/hr/completeness/master-data/summary,erp-ui/src/api/hr/completeness.js:22,待与后端/OpenAPI 核验
+FEAPI-0059,hr/completeness,listHrMasterDataIssues,GET,"""/system/hr/completeness/master-data/issues""",/system/hr/completeness/master-data/issues,erp-ui/src/api/hr/completeness.js:28,待与后端/OpenAPI 核验
+FEAPI-0060,hr/completeness,getHrMasterDataIssueCodes,GET,"""/system/hr/completeness/master-data/codes""",/system/hr/completeness/master-data/codes,erp-ui/src/api/hr/completeness.js:34,待与后端/OpenAPI 核验
+FEAPI-0061,hr/employee,listHrEmployees,GET,"""/system/hr/employee/list""",/system/hr/employee/list,erp-ui/src/api/hr/employee.js:6,待与后端/OpenAPI 核验
+FEAPI-0062,hr/employee,getHrEmployeeSummary,GET,"""/system/hr/employee/summary""",/system/hr/employee/summary,erp-ui/src/api/hr/employee.js:12,待与后端/OpenAPI 核验
+FEAPI-0063,hr/employee,getHrEmployeeFormOptions,GET,"""/system/hr/employee/form-options""",/system/hr/employee/form-options,erp-ui/src/api/hr/employee.js:18,待与后端/OpenAPI 核验
+FEAPI-0064,hr/employee,getHrEmployee,GET,`/system/hr/employee/${userId}`,/system/hr/employee/{userId},erp-ui/src/api/hr/employee.js:23,待与后端/OpenAPI 核验
+FEAPI-0065,hr/employee,initializeHrEmployeeProfile,POST,`/system/hr/employee/${userId}/profile/initialize`,/system/hr/employee/{userId}/profile/initialize,erp-ui/src/api/hr/employee.js:28,待与后端/OpenAPI 核验
+FEAPI-0066,hr/employee,getHrTransferBusinessDate,GET,"""/system/hr/employee/transfer/business-date""",/system/hr/employee/transfer/business-date,erp-ui/src/api/hr/employee.js:34,待与后端/OpenAPI 核验
+FEAPI-0067,hr/employee,confirmHrEmployeeTransfer,POST,`/system/hr/employee/${userId}/transfer`,/system/hr/employee/{userId}/transfer,erp-ui/src/api/hr/employee.js:39,待与后端/OpenAPI 核验
+FEAPI-0068,hr/employee,getHrOffboardingBusinessDate,GET,"""/system/hr/employee/offboard/business-date""",/system/hr/employee/offboard/business-date,erp-ui/src/api/hr/employee.js:46,待与后端/OpenAPI 核验
+FEAPI-0069,hr/employee,confirmHrEmployeeOffboarding,POST,`/system/hr/employee/${userId}/offboard`,/system/hr/employee/{userId}/offboard,erp-ui/src/api/hr/employee.js:51,待与后端/OpenAPI 核验
+FEAPI-0070,hr/employee,updateHrEmployee,PATCH,`/system/hr/employee/${userId}`,/system/hr/employee/{userId},erp-ui/src/api/hr/employee.js:61,待与后端/OpenAPI 核验
+FEAPI-0071,hr/employee,previewHrEmployeeDerived,POST,"""/system/hr/employee/derived-preview""",/system/hr/employee/derived-preview,erp-ui/src/api/hr/employee.js:69,待与后端/OpenAPI 核验
+FEAPI-0072,hr/employee,revealHrEmployeeSensitiveField,POST,`/system/hr/employee/${userId}/sensitive/reveal`,/system/hr/employee/{userId}/sensitive/reveal,erp-ui/src/api/hr/employee.js:76,待与后端/OpenAPI 核验
+FEAPI-0073,hr/employee,exportHrEmployeeSensitive,POST,"""/system/hr/employee/export-sensitive""",/system/hr/employee/export-sensitive,erp-ui/src/api/hr/employee.js:83,待与后端/OpenAPI 核验
+FEAPI-0074,hr/healthCertificate,getHealthCertificateCapability,GET,'/system/hr/health-certificate/capability',/system/hr/health-certificate/capability,erp-ui/src/api/hr/healthCertificate.js:4,待与后端/OpenAPI 核验
+FEAPI-0075,hr/healthCertificate,getMyHealthCertificates,GET,'/system/hr/health-certificate/me',/system/hr/health-certificate/me,erp-ui/src/api/hr/healthCertificate.js:8,待与后端/OpenAPI 核验
+FEAPI-0076,hr/healthCertificate,saveMyHealthCertificateDraft,POST,'/system/hr/health-certificate/me/draft',/system/hr/health-certificate/me/draft,erp-ui/src/api/hr/healthCertificate.js:12,待与后端/OpenAPI 核验
+FEAPI-0077,hr/healthCertificate,submitMyHealthCertificate,POST,'/system/hr/health-certificate/me/submit',/system/hr/health-certificate/me/submit,erp-ui/src/api/hr/healthCertificate.js:16,待与后端/OpenAPI 核验
+FEAPI-0078,hr/healthCertificate,withdrawMyHealthCertificate,POST,`/system/hr/health-certificate/me/${certificateId}/withdraw`,/system/hr/health-certificate/me/{certificateId}/withdraw,erp-ui/src/api/hr/healthCertificate.js:20,待与后端/OpenAPI 核验
+FEAPI-0079,hr/healthCertificate,listHealthCertificates,GET,'/system/hr/health-certificate/list',/system/hr/health-certificate/list,erp-ui/src/api/hr/healthCertificate.js:24,待与后端/OpenAPI 核验
+FEAPI-0080,hr/healthCertificate,getHealthCertificateOpsSummary,GET,'/system/hr/health-certificate/ops-summary',/system/hr/health-certificate/ops-summary,erp-ui/src/api/hr/healthCertificate.js:28,待与后端/OpenAPI 核验
+FEAPI-0081,hr/healthCertificate,getEmployeeHealthCertificates,GET,`/system/hr/health-certificate/employee/${userId}`,/system/hr/health-certificate/employee/{userId},erp-ui/src/api/hr/healthCertificate.js:32,待与后端/OpenAPI 核验
+FEAPI-0082,hr/healthCertificate,reviewHealthCertificate,POST,`/system/hr/health-certificate/${certificateId}/review`,/system/hr/health-certificate/{certificateId}/review,erp-ui/src/api/hr/healthCertificate.js:36,待与后端/OpenAPI 核验
+FEAPI-0083,hr/healthCertificate,getHealthCertificateAttachment,GET,`/system/hr/health-certificate/${certificateId}/attachment`,/system/hr/health-certificate/{certificateId}/attachment,erp-ui/src/api/hr/healthCertificate.js:40,待与后端/OpenAPI 核验
+FEAPI-0084,hr/legacyEmployeeImport,LEGACY_HR_EMPLOYEE_IMPORT_ACTION,POST,/system/hr/employee/importData,/system/hr/employee/importData,erp-ui/src/api/hr/legacyEmployeeImport.js:1,间接 action，已定位唯一后端方法候选
+FEAPI-0085,hr/legacyEmployeeImport,LEGACY_HR_EMPLOYEE_IMPORT_TEMPLATE_ACTION,POST,/system/hr/employee/importTemplate,/system/hr/employee/importTemplate,erp-ui/src/api/hr/legacyEmployeeImport.js:2,间接 action，已定位唯一后端方法候选
+FEAPI-0086,hr/onboarding,listHrOnboarding,GET,"""/system/hr/onboarding/list""",/system/hr/onboarding/list,erp-ui/src/api/hr/onboarding.js:3,待与后端/OpenAPI 核验
+FEAPI-0087,hr/onboarding,getHrOnboardingSummary,GET,"""/system/hr/onboarding/summary""",/system/hr/onboarding/summary,erp-ui/src/api/hr/onboarding.js:4,待与后端/OpenAPI 核验
+FEAPI-0088,hr/onboarding,getHrOnboarding,GET,`/system/hr/onboarding/${id}`,/system/hr/onboarding/{id},erp-ui/src/api/hr/onboarding.js:5,待与后端/OpenAPI 核验
+FEAPI-0089,hr/onboarding,createHrOnboarding,POST,"""/system/hr/onboarding""",/system/hr/onboarding,erp-ui/src/api/hr/onboarding.js:6,待与后端/OpenAPI 核验
+FEAPI-0090,hr/onboarding,updateHrOnboarding,PUT,`/system/hr/onboarding/${id}`,/system/hr/onboarding/{id},erp-ui/src/api/hr/onboarding.js:7,待与后端/OpenAPI 核验
+FEAPI-0091,hr/onboarding,markHrOnboardingReady,POST,`/system/hr/onboarding/${id}/ready`,/system/hr/onboarding/{id}/ready,erp-ui/src/api/hr/onboarding.js:8,待与后端/OpenAPI 核验
+FEAPI-0092,hr/onboarding,returnHrOnboardingToDraft,POST,`/system/hr/onboarding/${id}/return-to-draft`,/system/hr/onboarding/{id}/return-to-draft,erp-ui/src/api/hr/onboarding.js:9,待与后端/OpenAPI 核验
+FEAPI-0093,hr/onboarding,getHrOnboardingConflicts,GET,`/system/hr/onboarding/${id}/conflicts`,/system/hr/onboarding/{id}/conflicts,erp-ui/src/api/hr/onboarding.js:10,待与后端/OpenAPI 核验
+FEAPI-0094,hr/onboarding,confirmHrOnboarding,POST,`/system/hr/onboarding/${id}/confirm`,/system/hr/onboarding/{id}/confirm,erp-ui/src/api/hr/onboarding.js:11,待与后端/OpenAPI 核验
+FEAPI-0095,hr/onboarding,cancelHrOnboarding,POST,`/system/hr/onboarding/${id}/cancel`,/system/hr/onboarding/{id}/cancel,erp-ui/src/api/hr/onboarding.js:12,待与后端/OpenAPI 核验
+FEAPI-0096,hr/onboarding,restoreHrOnboarding,POST,`/system/hr/onboarding/${id}/restore`,/system/hr/onboarding/{id}/restore,erp-ui/src/api/hr/onboarding.js:13,待与后端/OpenAPI 核验
+FEAPI-0097,hr/onboarding,getHrOnboardingFormOptions,GET,"""/system/hr/onboarding/form-options""",/system/hr/onboarding/form-options,erp-ui/src/api/hr/onboarding.js:14,待与后端/OpenAPI 核验
+FEAPI-0098,hr/onboarding,listHrOnboardingPositionConfigs,GET,"""/system/hr/onboarding/config/list""",/system/hr/onboarding/config/list,erp-ui/src/api/hr/onboarding.js:15,待与后端/OpenAPI 核验
+FEAPI-0099,hr/onboarding,getHrOnboardingPositionConfig,GET,`/system/hr/onboarding/config/${id}`,/system/hr/onboarding/config/{id},erp-ui/src/api/hr/onboarding.js:16,待与后端/OpenAPI 核验
+FEAPI-0100,hr/onboarding,createHrOnboardingPositionConfig,POST,"""/system/hr/onboarding/config""",/system/hr/onboarding/config,erp-ui/src/api/hr/onboarding.js:17,待与后端/OpenAPI 核验
+FEAPI-0101,hr/onboarding,updateHrOnboardingPositionConfig,PUT,`/system/hr/onboarding/config/${id}`,/system/hr/onboarding/config/{id},erp-ui/src/api/hr/onboarding.js:18,待与后端/OpenAPI 核验
+FEAPI-0102,hr/onboarding,disableHrOnboardingPositionConfig,POST,`/system/hr/onboarding/config/${id}/disable`,/system/hr/onboarding/config/{id}/disable,erp-ui/src/api/hr/onboarding.js:19,待与后端/OpenAPI 核验
+FEAPI-0103,hr/onboarding,getHrOnboardingPositionConfigOptions,GET,"""/system/hr/onboarding/config/options""",/system/hr/onboarding/config/options,erp-ui/src/api/hr/onboarding.js:20,待与后端/OpenAPI 核验
+FEAPI-0104,hr/onboarding,previewHrOnboardingImport,POST,"""/system/hr/onboarding/import/preview""",/system/hr/onboarding/import/preview,erp-ui/src/api/hr/onboarding.js:22,待与后端/OpenAPI 核验
+FEAPI-0105,hr/onboarding,getHrOnboardingImportBatch,GET,`/system/hr/onboarding/import/${id}`,/system/hr/onboarding/import/{id},erp-ui/src/api/hr/onboarding.js:29,待与后端/OpenAPI 核验
+FEAPI-0106,hr/onboarding,confirmHrOnboardingImport,POST,`/system/hr/onboarding/import/${id}/confirm`,/system/hr/onboarding/import/{id}/confirm,erp-ui/src/api/hr/onboarding.js:30,待与后端/OpenAPI 核验
+FEAPI-0107,hr/onboarding,downloadHrOnboardingTemplate,GET,"""/system/hr/onboarding/import/template""",/system/hr/onboarding/import/template,erp-ui/src/api/hr/onboarding.js:31,待与后端/OpenAPI 核验
+FEAPI-0108,hr/onboarding,downloadHrOnboardingErrorRows,GET,`/system/hr/onboarding/import/${id}/errors`,/system/hr/onboarding/import/{id}/errors,erp-ui/src/api/hr/onboarding.js:32,待与后端/OpenAPI 核验
+FEAPI-0109,hr/team,listHrTeam,GET,'/system/hr/team/list',/system/hr/team/list,erp-ui/src/api/hr/team.js:4,待与后端/OpenAPI 核验
+FEAPI-0110,hr/team,getHrTeamMember,GET,`/system/hr/team/${userId}`,/system/hr/team/{userId},erp-ui/src/api/hr/team.js:8,待与后端/OpenAPI 核验
+FEAPI-0111,inventory/category,categoryTree,GET,'/inventory/category/tree',/inventory/category/tree,erp-ui/src/api/inventory/category.js:5,待与后端/OpenAPI 核验
+FEAPI-0112,inventory/category,getCategory,GET,'/inventory/category/' + categoryId,/inventory/category/{categoryId},erp-ui/src/api/inventory/category.js:10,待与后端/OpenAPI 核验
+FEAPI-0113,inventory/category,addCategory,POST,'/inventory/category',/inventory/category,erp-ui/src/api/inventory/category.js:15,待与后端/OpenAPI 核验
+FEAPI-0114,inventory/category,updateCategory,POST,'/inventory/category/update',/inventory/category/update,erp-ui/src/api/inventory/category.js:20,待与后端/OpenAPI 核验
+FEAPI-0115,inventory/category,delCategory,DELETE,'/inventory/category/' + categoryId,/inventory/category/{categoryId},erp-ui/src/api/inventory/category.js:25,待与后端/OpenAPI 核验
+FEAPI-0116,inventory/customer,listCustomer,GET,'/inventory/customer/list',/inventory/customer/list,erp-ui/src/api/inventory/customer.js:5,待与后端/OpenAPI 核验
+FEAPI-0117,inventory/customer,getCustomer,GET,'/inventory/customer/' + customerId,/inventory/customer/{customerId},erp-ui/src/api/inventory/customer.js:10,待与后端/OpenAPI 核验
+FEAPI-0118,inventory/customer,addCustomer,POST,'/inventory/customer',/inventory/customer,erp-ui/src/api/inventory/customer.js:15,待与后端/OpenAPI 核验
+FEAPI-0119,inventory/customer,updateCustomer,POST,'/inventory/customer/update',/inventory/customer/update,erp-ui/src/api/inventory/customer.js:20,待与后端/OpenAPI 核验
+FEAPI-0120,inventory/customer,delCustomer,DELETE,'/inventory/customer/' + customerIds,/inventory/customer/{customerIds},erp-ui/src/api/inventory/customer.js:25,待与后端/OpenAPI 核验
+FEAPI-0121,inventory/customer,listCustomerOptions,GET,'/inventory/customer/options',/inventory/customer/options,erp-ui/src/api/inventory/customer.js:29,待与后端/OpenAPI 核验
+FEAPI-0122,inventory/customer,listCustomerServiceCards,GET,'/inventory/customer/service-card/list',/inventory/customer/service-card/list,erp-ui/src/api/inventory/customer.js:33,待与后端/OpenAPI 核验
+FEAPI-0123,inventory/customer,listCustomerServiceAudits,GET,'/inventory/customer/service-card/audit',/inventory/customer/service-card/audit,erp-ui/src/api/inventory/customer.js:37,待与后端/OpenAPI 核验
+FEAPI-0124,inventory/customer,getCustomerServiceCardOpsSummary,GET,'/inventory/customer/service-card/ops-summary',/inventory/customer/service-card/ops-summary,erp-ui/src/api/inventory/customer.js:41,待与后端/OpenAPI 核验
+FEAPI-0125,inventory/customer,getCustomerServiceCard,GET,'/inventory/customer/service-card/' + customerId,/inventory/customer/service-card/{customerId},erp-ui/src/api/inventory/customer.js:45,待与后端/OpenAPI 核验
+FEAPI-0126,inventory/customer,getCustomerServiceCardPhoto,GET,'/inventory/customer/service-card/' + customerId + '/photo',/inventory/customer/service-card/{customerId}/photo,erp-ui/src/api/inventory/customer.js:50,待与后端/OpenAPI 核验
+FEAPI-0127,inventory/customer,createCustomerServiceCard,POST,'/inventory/customer/service-card',/inventory/customer/service-card,erp-ui/src/api/inventory/customer.js:60,待与后端/OpenAPI 核验
+FEAPI-0128,inventory/customer,updateCustomerServiceCard,PUT,'/inventory/customer/service-card/' + customerId,/inventory/customer/service-card/{customerId},erp-ui/src/api/inventory/customer.js:64,待与后端/OpenAPI 核验
+FEAPI-0129,inventory/customer,addCustomerServiceRecord,POST,'/inventory/customer/service-card/' + customerId + '/records',/inventory/customer/service-card/{customerId}/records,erp-ui/src/api/inventory/customer.js:68,待与后端/OpenAPI 核验
+FEAPI-0130,inventory/customer,archiveCustomerServiceCard,POST,'/inventory/customer/service-card/' + customerId + '/archive',/inventory/customer/service-card/{customerId}/archive,erp-ui/src/api/inventory/customer.js:72,待与后端/OpenAPI 核验
+FEAPI-0131,inventory/deliveryNotice,listDeliveryNotice,GET,'/inventory/deliveryNotice/list',/inventory/deliveryNotice/list,erp-ui/src/api/inventory/deliveryNotice.js:5,待与后端/OpenAPI 核验
+FEAPI-0132,inventory/deliveryNotice,getDeliveryNotice,GET,'/inventory/deliveryNotice/' + noticeId,/inventory/deliveryNotice/{noticeId},erp-ui/src/api/inventory/deliveryNotice.js:10,待与后端/OpenAPI 核验
+FEAPI-0133,inventory/deliveryNotice,createDeliveryNotice,POST,'/inventory/deliveryNotice/create/' + salesOrderId,/inventory/deliveryNotice/create/{salesOrderId},erp-ui/src/api/inventory/deliveryNotice.js:15,待与后端/OpenAPI 核验
+FEAPI-0134,inventory/deliveryNotice,deliverDeliveryNotice,POST,'/inventory/deliveryNotice/deliver/' + noticeId,/inventory/deliveryNotice/deliver/{noticeId},erp-ui/src/api/inventory/deliveryNotice.js:20,待与后端/OpenAPI 核验
+FEAPI-0135,inventory/deliveryNotice,cancelDeliveryNotice,DELETE,'/inventory/deliveryNotice/' + noticeId,/inventory/deliveryNotice/{noticeId},erp-ui/src/api/inventory/deliveryNotice.js:25,待与后端/OpenAPI 核验
+FEAPI-0136,inventory/gift,listGift,GET,'/inventory/gift/list',/inventory/gift/list,erp-ui/src/api/inventory/gift.js:4,待与后端/OpenAPI 核验
+FEAPI-0137,inventory/gift,getGift,GET,'/inventory/gift/' + giftId,/inventory/gift/{giftId},erp-ui/src/api/inventory/gift.js:8,待与后端/OpenAPI 核验
+FEAPI-0138,inventory/gift,addGift,POST,'/inventory/gift',/inventory/gift,erp-ui/src/api/inventory/gift.js:12,待与后端/OpenAPI 核验
+FEAPI-0139,inventory/gift,updateGift,POST,'/inventory/gift/update',/inventory/gift/update,erp-ui/src/api/inventory/gift.js:16,待与后端/OpenAPI 核验
+FEAPI-0140,inventory/gift,delGift,DELETE,'/inventory/gift/' + giftIds,/inventory/gift/{giftIds},erp-ui/src/api/inventory/gift.js:20,待与后端/OpenAPI 核验
+FEAPI-0141,inventory/gift,importGiftData,POST,'/inventory/gift/importData',/inventory/gift/importData,erp-ui/src/api/inventory/gift.js:24,待与后端/OpenAPI 核验
+FEAPI-0142,inventory/gift,importGiftTemplate,POST,'/inventory/gift/importTemplate',/inventory/gift/importTemplate,erp-ui/src/api/inventory/gift.js:28,待与后端/OpenAPI 核验
+FEAPI-0143,inventory/gift,giftCategoryTree,GET,'/inventory/gift/category/tree',/inventory/gift/category/tree,erp-ui/src/api/inventory/gift.js:32,待与后端/OpenAPI 核验
+FEAPI-0144,inventory/gift,getGiftCategory,GET,'/inventory/gift/category/' + categoryId,/inventory/gift/category/{categoryId},erp-ui/src/api/inventory/gift.js:36,待与后端/OpenAPI 核验
+FEAPI-0145,inventory/gift,addGiftCategory,POST,'/inventory/gift/category',/inventory/gift/category,erp-ui/src/api/inventory/gift.js:40,待与后端/OpenAPI 核验
+FEAPI-0146,inventory/gift,updateGiftCategory,POST,'/inventory/gift/category/update',/inventory/gift/category/update,erp-ui/src/api/inventory/gift.js:44,待与后端/OpenAPI 核验
+FEAPI-0147,inventory/gift,delGiftCategory,DELETE,'/inventory/gift/category/' + categoryId,/inventory/gift/category/{categoryId},erp-ui/src/api/inventory/gift.js:48,待与后端/OpenAPI 核验
+FEAPI-0148,inventory/mobile,getMobileOptions,GET,'/inventory/mobile/options/' + type,/inventory/mobile/options/{type},erp-ui/src/api/inventory/mobile.js:5,待与后端/OpenAPI 核验
+FEAPI-0149,inventory/mobile,getMobileWorkbenchSummary,GET,'/inventory/mobile/workbench/summary',/inventory/mobile/workbench/summary,erp-ui/src/api/inventory/mobile.js:13,待与后端/OpenAPI 核验
+FEAPI-0150,inventory/mobile,listTransferApprovalTodos,GET,'/inventory/mobile/transfer-approval/todo',/inventory/mobile/transfer-approval/todo,erp-ui/src/api/inventory/mobile.js:21,待与后端/OpenAPI 核验
+FEAPI-0151,inventory/oe,listOe,GET,'/inventory/oe/list',/inventory/oe/list,erp-ui/src/api/inventory/oe.js:4,待与后端/OpenAPI 核验
+FEAPI-0152,inventory/oe,getOe,GET,'/inventory/oe/' + oeItemId,/inventory/oe/{oeItemId},erp-ui/src/api/inventory/oe.js:8,待与后端/OpenAPI 核验
+FEAPI-0153,inventory/oe,addOe,POST,'/inventory/oe',/inventory/oe,erp-ui/src/api/inventory/oe.js:12,待与后端/OpenAPI 核验
+FEAPI-0154,inventory/oe,updateOe,POST,'/inventory/oe/update',/inventory/oe/update,erp-ui/src/api/inventory/oe.js:16,待与后端/OpenAPI 核验
+FEAPI-0155,inventory/oe,delOe,DELETE,'/inventory/oe/' + oeItemIds,/inventory/oe/{oeItemIds},erp-ui/src/api/inventory/oe.js:20,待与后端/OpenAPI 核验
+FEAPI-0156,inventory/oe,importOeData,POST,'/inventory/oe/importData',/inventory/oe/importData,erp-ui/src/api/inventory/oe.js:24,待与后端/OpenAPI 核验
+FEAPI-0157,inventory/oe,importOeTemplate,POST,'/inventory/oe/importTemplate',/inventory/oe/importTemplate,erp-ui/src/api/inventory/oe.js:28,待与后端/OpenAPI 核验
+FEAPI-0158,inventory/oe,oeCategoryTree,GET,'/inventory/oe/category/tree',/inventory/oe/category/tree,erp-ui/src/api/inventory/oe.js:32,待与后端/OpenAPI 核验
+FEAPI-0159,inventory/oe,getOeCategory,GET,'/inventory/oe/category/' + categoryId,/inventory/oe/category/{categoryId},erp-ui/src/api/inventory/oe.js:36,待与后端/OpenAPI 核验
+FEAPI-0160,inventory/oe,addOeCategory,POST,'/inventory/oe/category',/inventory/oe/category,erp-ui/src/api/inventory/oe.js:40,待与后端/OpenAPI 核验
+FEAPI-0161,inventory/oe,updateOeCategory,POST,'/inventory/oe/category/update',/inventory/oe/category/update,erp-ui/src/api/inventory/oe.js:44,待与后端/OpenAPI 核验
+FEAPI-0162,inventory/oe,delOeCategory,DELETE,'/inventory/oe/category/' + categoryId,/inventory/oe/category/{categoryId},erp-ui/src/api/inventory/oe.js:48,待与后端/OpenAPI 核验
+FEAPI-0163,inventory/oeReplenishment,listOeReplenishment,GET,'/inventory/oeReplenishment/list',/inventory/oeReplenishment/list,erp-ui/src/api/inventory/oeReplenishment.js:4,待与后端/OpenAPI 核验
+FEAPI-0164,inventory/oeReplenishment,getOeReplenishmentOpsStats,GET,'/inventory/oeReplenishment/ops-stats',/inventory/oeReplenishment/ops-stats,erp-ui/src/api/inventory/oeReplenishment.js:8,待与后端/OpenAPI 核验
+FEAPI-0165,inventory/oeReplenishment,getOeReplenishment,GET,`/inventory/oeReplenishment/${demandId}`,/inventory/oeReplenishment/{demandId},erp-ui/src/api/inventory/oeReplenishment.js:12,待与后端/OpenAPI 核验
+FEAPI-0166,inventory/oeReplenishment,createOeReplenishmentTransfer,POST,`/inventory/oeReplenishment/${demandId}/transfers`,/inventory/oeReplenishment/{demandId}/transfers,erp-ui/src/api/inventory/oeReplenishment.js:16,待与后端/OpenAPI 核验
+FEAPI-0167,inventory/oeReplenishment,markOeReplenishmentOutOfStock,POST,`/inventory/oeReplenishment/${demandId}/out-of-stock`,/inventory/oeReplenishment/{demandId}/out-of-stock,erp-ui/src/api/inventory/oeReplenishment.js:20,待与后端/OpenAPI 核验
+FEAPI-0168,inventory/oeReplenishment,closeOeReplenishment,POST,`/inventory/oeReplenishment/${demandId}/close`,/inventory/oeReplenishment/{demandId}/close,erp-ui/src/api/inventory/oeReplenishment.js:24,待与后端/OpenAPI 核验
+FEAPI-0169,inventory/product,listProduct,GET,'/inventory/product/list',/inventory/product/list,erp-ui/src/api/inventory/product.js:5,待与后端/OpenAPI 核验
+FEAPI-0170,inventory/product,getProduct,GET,'/inventory/product/' + productId,/inventory/product/{productId},erp-ui/src/api/inventory/product.js:10,待与后端/OpenAPI 核验
+FEAPI-0171,inventory/product,addProduct,POST,'/inventory/product',/inventory/product,erp-ui/src/api/inventory/product.js:15,待与后端/OpenAPI 核验
+FEAPI-0172,inventory/product,updateProduct,POST,'/inventory/product/update',/inventory/product/update,erp-ui/src/api/inventory/product.js:20,待与后端/OpenAPI 核验
+FEAPI-0173,inventory/product,delProduct,DELETE,'/inventory/product/' + productIds,/inventory/product/{productIds},erp-ui/src/api/inventory/product.js:25,待与后端/OpenAPI 核验
+FEAPI-0174,inventory/product,importData,POST,'/inventory/product/importData',/inventory/product/importData,erp-ui/src/api/inventory/product.js:30,待与后端/OpenAPI 核验
+FEAPI-0175,inventory/product,importTemplate,POST,'/inventory/product/importTemplate',/inventory/product/importTemplate,erp-ui/src/api/inventory/product.js:35,待与后端/OpenAPI 核验
+FEAPI-0176,inventory/purchase,savePurchase,POST,'/inventory/purchase/save',/inventory/purchase/save,erp-ui/src/api/inventory/purchase.js:5,待与后端/OpenAPI 核验
+FEAPI-0177,inventory/purchase,submitPurchase,POST,'/inventory/purchase/submit',/inventory/purchase/submit,erp-ui/src/api/inventory/purchase.js:10,待与后端/OpenAPI 核验
+FEAPI-0178,inventory/purchase,listPurchase,GET,'/inventory/purchase/list',/inventory/purchase/list,erp-ui/src/api/inventory/purchase.js:15,待与后端/OpenAPI 核验
+FEAPI-0179,inventory/purchase,listMyPurchases,GET,'/inventory/purchase/my',/inventory/purchase/my,erp-ui/src/api/inventory/purchase.js:20,待与后端/OpenAPI 核验
+FEAPI-0180,inventory/purchase,getPurchaseDetail,GET,'/inventory/purchase/' + orderId,/inventory/purchase/{orderId},erp-ui/src/api/inventory/purchase.js:25,待与后端/OpenAPI 核验
+FEAPI-0181,inventory/purchase,receivePurchase,POST,'/inventory/purchase/receive/' + orderId,/inventory/purchase/receive/{orderId},erp-ui/src/api/inventory/purchase.js:30,待与后端/OpenAPI 核验
+FEAPI-0182,inventory/purchase,qualityCheckPurchase,POST,'/inventory/purchase/qc/' + orderId,/inventory/purchase/qc/{orderId},erp-ui/src/api/inventory/purchase.js:35,待与后端/OpenAPI 核验
+FEAPI-0183,inventory/purchase,listPendingReceiptBatches,GET,'/inventory/purchase/' + orderId + '/receipt-batches/pending',/inventory/purchase/{orderId}/receipt-batches/pending,erp-ui/src/api/inventory/purchase.js:40,待与后端/OpenAPI 核验
+FEAPI-0184,inventory/purchase,qualityCheckPurchaseBatch,POST,'/inventory/purchase/qc/batch/' + orderId,/inventory/purchase/qc/batch/{orderId},erp-ui/src/api/inventory/purchase.js:45,待与后端/OpenAPI 核验
+FEAPI-0185,inventory/purchase,cancelPurchase,DELETE,'/inventory/purchase/' + orderId,/inventory/purchase/{orderId},erp-ui/src/api/inventory/purchase.js:50,待与后端/OpenAPI 核验
+FEAPI-0186,inventory/purchase,deleteDraftPurchase,DELETE,'/inventory/purchase/delete/' + orderId,/inventory/purchase/delete/{orderId},erp-ui/src/api/inventory/purchase.js:55,待与后端/OpenAPI 核验
+FEAPI-0187,inventory/purchaseReturn,listPurchaseReturn,GET,'/inventory/purchaseReturn/list',/inventory/purchaseReturn/list,erp-ui/src/api/inventory/purchaseReturn.js:5,待与后端/OpenAPI 核验
+FEAPI-0188,inventory/purchaseReturn,listMyPurchaseReturn,GET,'/inventory/purchaseReturn/my',/inventory/purchaseReturn/my,erp-ui/src/api/inventory/purchaseReturn.js:10,待与后端/OpenAPI 核验
+FEAPI-0189,inventory/purchaseReturn,getPurchaseReturn,GET,'/inventory/purchaseReturn/' + returnId,/inventory/purchaseReturn/{returnId},erp-ui/src/api/inventory/purchaseReturn.js:15,待与后端/OpenAPI 核验
+FEAPI-0190,inventory/purchaseReturn,savePurchaseReturn,POST,'/inventory/purchaseReturn/save',/inventory/purchaseReturn/save,erp-ui/src/api/inventory/purchaseReturn.js:20,待与后端/OpenAPI 核验
+FEAPI-0191,inventory/purchaseReturn,submitPurchaseReturn,POST,'/inventory/purchaseReturn/submit',/inventory/purchaseReturn/submit,erp-ui/src/api/inventory/purchaseReturn.js:25,待与后端/OpenAPI 核验
+FEAPI-0192,inventory/purchaseReturn,confirmPurchaseReturn,POST,'/inventory/purchaseReturn/confirm/' + returnId,/inventory/purchaseReturn/confirm/{returnId},erp-ui/src/api/inventory/purchaseReturn.js:30,待与后端/OpenAPI 核验
+FEAPI-0193,inventory/purchaseReturn,cancelPurchaseReturn,DELETE,'/inventory/purchaseReturn/' + returnId,/inventory/purchaseReturn/{returnId},erp-ui/src/api/inventory/purchaseReturn.js:35,待与后端/OpenAPI 核验
+FEAPI-0194,inventory/report,getReportSummary,GET,'/inventory/report/summary',/inventory/report/summary,erp-ui/src/api/inventory/report.js:5,待与后端/OpenAPI 核验
+FEAPI-0195,inventory/report,listStockWarning,GET,'/inventory/report/stock-warning',/inventory/report/stock-warning,erp-ui/src/api/inventory/report.js:10,待与后端/OpenAPI 核验
+FEAPI-0196,inventory/sales,saveSales,POST,'/inventory/sales/save',/inventory/sales/save,erp-ui/src/api/inventory/sales.js:5,待与后端/OpenAPI 核验
+FEAPI-0197,inventory/sales,submitSales,POST,'/inventory/sales/submit',/inventory/sales/submit,erp-ui/src/api/inventory/sales.js:10,待与后端/OpenAPI 核验
+FEAPI-0198,inventory/sales,listSales,GET,'/inventory/sales/list',/inventory/sales/list,erp-ui/src/api/inventory/sales.js:15,待与后端/OpenAPI 核验
+FEAPI-0199,inventory/sales,listMySales,GET,'/inventory/sales/my',/inventory/sales/my,erp-ui/src/api/inventory/sales.js:20,待与后端/OpenAPI 核验
+FEAPI-0200,inventory/sales,getSalesDetail,GET,'/inventory/sales/' + orderId,/inventory/sales/{orderId},erp-ui/src/api/inventory/sales.js:25,待与后端/OpenAPI 核验
+FEAPI-0201,inventory/sales,cancelSales,DELETE,'/inventory/sales/' + orderId,/inventory/sales/{orderId},erp-ui/src/api/inventory/sales.js:30,待与后端/OpenAPI 核验
+FEAPI-0202,inventory/salesReturn,listSalesReturn,GET,'/inventory/salesReturn/list',/inventory/salesReturn/list,erp-ui/src/api/inventory/salesReturn.js:5,待与后端/OpenAPI 核验
+FEAPI-0203,inventory/salesReturn,listMySalesReturn,GET,'/inventory/salesReturn/my',/inventory/salesReturn/my,erp-ui/src/api/inventory/salesReturn.js:10,待与后端/OpenAPI 核验
+FEAPI-0204,inventory/salesReturn,getSalesReturn,GET,'/inventory/salesReturn/' + returnId,/inventory/salesReturn/{returnId},erp-ui/src/api/inventory/salesReturn.js:15,待与后端/OpenAPI 核验
+FEAPI-0205,inventory/salesReturn,saveSalesReturn,POST,'/inventory/salesReturn/save',/inventory/salesReturn/save,erp-ui/src/api/inventory/salesReturn.js:20,待与后端/OpenAPI 核验
+FEAPI-0206,inventory/salesReturn,submitSalesReturn,POST,'/inventory/salesReturn/submit',/inventory/salesReturn/submit,erp-ui/src/api/inventory/salesReturn.js:25,待与后端/OpenAPI 核验
+FEAPI-0207,inventory/salesReturn,confirmSalesReturn,POST,'/inventory/salesReturn/confirm/' + returnId,/inventory/salesReturn/confirm/{returnId},erp-ui/src/api/inventory/salesReturn.js:30,待与后端/OpenAPI 核验
+FEAPI-0208,inventory/salesReturn,cancelSalesReturn,DELETE,'/inventory/salesReturn/' + returnId,/inventory/salesReturn/{returnId},erp-ui/src/api/inventory/salesReturn.js:35,待与后端/OpenAPI 核验
+FEAPI-0209,inventory/stock,listStock,GET,'/inventory/stock/list',/inventory/stock/list,erp-ui/src/api/inventory/stock.js:5,待与后端/OpenAPI 核验
+FEAPI-0210,inventory/stock,getStockSummary,GET,'/inventory/stock/summary',/inventory/stock/summary,erp-ui/src/api/inventory/stock.js:10,待与后端/OpenAPI 核验
+FEAPI-0211,inventory/stock,getStock,GET,'/inventory/stock/' + stockId,/inventory/stock/{stockId},erp-ui/src/api/inventory/stock.js:15,待与后端/OpenAPI 核验
+FEAPI-0212,inventory/stock,adjustStock,POST,'/inventory/stock/adjust',/inventory/stock/adjust,erp-ui/src/api/inventory/stock.js:20,待与后端/OpenAPI 核验
+FEAPI-0213,inventory/stock,listStockLog,GET,'/inventory/stock/log/list',/inventory/stock/log/list,erp-ui/src/api/inventory/stock.js:25,待与后端/OpenAPI 核验
+FEAPI-0214,inventory/stockCheck,listStockCheck,GET,'/inventory/stockCheck/list',/inventory/stockCheck/list,erp-ui/src/api/inventory/stockCheck.js:5,待与后端/OpenAPI 核验
+FEAPI-0215,inventory/stockCheck,getStockCheck,GET,'/inventory/stockCheck/' + checkId,/inventory/stockCheck/{checkId},erp-ui/src/api/inventory/stockCheck.js:10,待与后端/OpenAPI 核验
+FEAPI-0216,inventory/stockCheck,createStockCheck,POST,'/inventory/stockCheck/create',/inventory/stockCheck/create,erp-ui/src/api/inventory/stockCheck.js:15,待与后端/OpenAPI 核验
+FEAPI-0217,inventory/stockCheck,listStockCheckCounterCandidates,GET,'/inventory/stockCheck/counter-candidates',/inventory/stockCheck/counter-candidates,erp-ui/src/api/inventory/stockCheck.js:20,待与后端/OpenAPI 核验
+FEAPI-0218,inventory/stockCheck,assignStockCheck,PUT,'/inventory/stockCheck/' + checkId + '/assignment',/inventory/stockCheck/{checkId}/assignment,erp-ui/src/api/inventory/stockCheck.js:25,待与后端/OpenAPI 核验
+FEAPI-0219,inventory/stockCheck,inputStockCheck,POST,'/inventory/stockCheck/input/' + checkId,/inventory/stockCheck/input/{checkId},erp-ui/src/api/inventory/stockCheck.js:30,待与后端/OpenAPI 核验
+FEAPI-0220,inventory/stockCheck,submitStockCheck,POST,'/inventory/stockCheck/submit/' + checkId,/inventory/stockCheck/submit/{checkId},erp-ui/src/api/inventory/stockCheck.js:35,待与后端/OpenAPI 核验
+FEAPI-0221,inventory/stockCheck,restartStockCheck,POST,'/inventory/stockCheck/restart/' + checkId,/inventory/stockCheck/restart/{checkId},erp-ui/src/api/inventory/stockCheck.js:40,待与后端/OpenAPI 核验
+FEAPI-0222,inventory/stockCheck,listStockCheckApprovalTodos,GET,'/inventory/stockCheck/approval/todo',/inventory/stockCheck/approval/todo,erp-ui/src/api/inventory/stockCheck.js:45,待与后端/OpenAPI 核验
+FEAPI-0223,inventory/stockCheck,approveStockCheck,POST,'/inventory/stockCheck/approval/' + checkId + '/approve',/inventory/stockCheck/approval/{checkId}/approve,erp-ui/src/api/inventory/stockCheck.js:50,待与后端/OpenAPI 核验
+FEAPI-0224,inventory/stockCheck,rejectStockCheck,POST,'/inventory/stockCheck/approval/' + checkId + '/reject',/inventory/stockCheck/approval/{checkId}/reject,erp-ui/src/api/inventory/stockCheck.js:55,待与后端/OpenAPI 核验
+FEAPI-0225,inventory/stockCheck,getStockCheckApprovalTrack,GET,'/inventory/stockCheck/' + checkId + '/approval-track',/inventory/stockCheck/{checkId}/approval-track,erp-ui/src/api/inventory/stockCheck.js:60,待与后端/OpenAPI 核验
+FEAPI-0226,inventory/stockCheck,cancelStockCheck,POST,'/inventory/stockCheck/cancel/' + checkId,/inventory/stockCheck/cancel/{checkId},erp-ui/src/api/inventory/stockCheck.js:65,待与后端/OpenAPI 核验
+FEAPI-0227,inventory/stockCheck,withdrawStockCheck,POST,'/inventory/stockCheck/' + checkId + '/withdraw',/inventory/stockCheck/{checkId}/withdraw,erp-ui/src/api/inventory/stockCheck.js:70,待与后端/OpenAPI 核验
+FEAPI-0228,inventory/stockCheck,deleteStockCheck,DELETE,'/inventory/stockCheck/' + checkIds,/inventory/stockCheck/{checkIds},erp-ui/src/api/inventory/stockCheck.js:75,待与后端/OpenAPI 核验
+FEAPI-0229,inventory/supplier,listSupplier,GET,'/inventory/supplier/list',/inventory/supplier/list,erp-ui/src/api/inventory/supplier.js:5,待与后端/OpenAPI 核验
+FEAPI-0230,inventory/supplier,getSupplier,GET,'/inventory/supplier/' + supplierId,/inventory/supplier/{supplierId},erp-ui/src/api/inventory/supplier.js:10,待与后端/OpenAPI 核验
+FEAPI-0231,inventory/supplier,getSupplierProducts,GET,'/inventory/supplier/' + supplierId + '/products',/inventory/supplier/{supplierId}/products,erp-ui/src/api/inventory/supplier.js:15,待与后端/OpenAPI 核验
+FEAPI-0232,inventory/supplier,addSupplier,POST,'/inventory/supplier',/inventory/supplier,erp-ui/src/api/inventory/supplier.js:20,待与后端/OpenAPI 核验
+FEAPI-0233,inventory/supplier,updateSupplier,POST,'/inventory/supplier/update',/inventory/supplier/update,erp-ui/src/api/inventory/supplier.js:25,待与后端/OpenAPI 核验
+FEAPI-0234,inventory/supplier,delSupplier,DELETE,'/inventory/supplier/' + supplierIds,/inventory/supplier/{supplierIds},erp-ui/src/api/inventory/supplier.js:30,待与后端/OpenAPI 核验
+FEAPI-0235,inventory/transfer,listTransfer,GET,'/inventory/transfer/list',/inventory/transfer/list,erp-ui/src/api/inventory/transfer.js:9,待与后端/OpenAPI 核验
+FEAPI-0236,inventory/transfer,listTransferProcessing,GET,'/inventory/transfer/processing',/inventory/transfer/processing,erp-ui/src/api/inventory/transfer.js:14,待与后端/OpenAPI 核验
+FEAPI-0237,inventory/transfer,getTransferOpsSummary,GET,'/inventory/transfer/ops-summary',/inventory/transfer/ops-summary,erp-ui/src/api/inventory/transfer.js:18,待与后端/OpenAPI 核验
+FEAPI-0238,inventory/transfer,listTransferRecords,GET,'/inventory/transfer/records',/inventory/transfer/records,erp-ui/src/api/inventory/transfer.js:23,待与后端/OpenAPI 核验
+FEAPI-0239,inventory/transfer,getTransferDetail,GET,'/inventory/transfer/' + transferId,/inventory/transfer/{transferId},erp-ui/src/api/inventory/transfer.js:28,待与后端/OpenAPI 核验
+FEAPI-0240,inventory/transfer,getTransferApprovalTrack,GET,'/inventory/transfer/' + transferId + '/approval-track',/inventory/transfer/{transferId}/approval-track,erp-ui/src/api/inventory/transfer.js:33,待与后端/OpenAPI 核验
+FEAPI-0241,inventory/transfer,saveTransfer,POST,'/inventory/transfer/save',/inventory/transfer/save,erp-ui/src/api/inventory/transfer.js:38,待与后端/OpenAPI 核验
+FEAPI-0242,inventory/transfer,submitTransfer,POST,'/inventory/transfer/submit',/inventory/transfer/submit,erp-ui/src/api/inventory/transfer.js:43,待与后端/OpenAPI 核验
+FEAPI-0243,inventory/transfer,approveTransfer,POST,'/inventory/transfer/approve',/inventory/transfer/approve,erp-ui/src/api/inventory/transfer.js:48,待与后端/OpenAPI 核验
+FEAPI-0244,inventory/transfer,deliverTransfer,POST,'/inventory/transfer/deliver/' + transferId,/inventory/transfer/deliver/{transferId},erp-ui/src/api/inventory/transfer.js:53,待与后端/OpenAPI 核验
+FEAPI-0245,inventory/transfer,receiveTransfer,POST,'/inventory/transfer/receive/' + transferId,/inventory/transfer/receive/{transferId},erp-ui/src/api/inventory/transfer.js:63,待与后端/OpenAPI 核验
+FEAPI-0246,inventory/transfer,receiveShipment,POST,'/inventory/transfer/shipment/receive/' + shipmentId,/inventory/transfer/shipment/receive/{shipmentId},erp-ui/src/api/inventory/transfer.js:68,待与后端/OpenAPI 核验
+FEAPI-0247,inventory/transfer,cancelTransfer,DELETE,'/inventory/transfer/' + transferId,/inventory/transfer/{transferId},erp-ui/src/api/inventory/transfer.js:78,待与后端/OpenAPI 核验
+FEAPI-0248,inventory/transfer,withdrawTransfer,POST,'/inventory/transfer/' + transferId + '/withdraw',/inventory/transfer/{transferId}/withdraw,erp-ui/src/api/inventory/transfer.js:83,待与后端/OpenAPI 核验
+FEAPI-0249,inventory/transfer,deleteTransferDraft,DELETE,'/inventory/transfer/delete/' + transferId,/inventory/transfer/delete/{transferId},erp-ui/src/api/inventory/transfer.js:88,待与后端/OpenAPI 核验
+FEAPI-0250,inventory/transfer,listTransferDiscrepancies,GET,'/inventory/transfer/' + transferId + '/discrepancies',/inventory/transfer/{transferId}/discrepancies,erp-ui/src/api/inventory/transfer.js:92,待与后端/OpenAPI 核验
+FEAPI-0251,inventory/transfer,getTransferDiscrepancy,GET,'/inventory/transfer/discrepancies/' + discrepancyId,/inventory/transfer/discrepancies/{discrepancyId},erp-ui/src/api/inventory/transfer.js:96,待与后端/OpenAPI 核验
+FEAPI-0252,inventory/transfer,resolveTransferDiscrepancy,POST,'/inventory/transfer/discrepancies/' + discrepancyId + '/resolve',/inventory/transfer/discrepancies/{discrepancyId}/resolve,erp-ui/src/api/inventory/transfer.js:100,待与后端/OpenAPI 核验
+FEAPI-0253,inventory/transferApprovalRule,listTransferApprovalRule,GET,'/inventory/transfer/rule/list',/inventory/transfer/rule/list,erp-ui/src/api/inventory/transferApprovalRule.js:5,待与后端/OpenAPI 核验
+FEAPI-0254,inventory/transferApprovalRule,getTransferApprovalRule,GET,'/inventory/transfer/rule/' + ruleId,/inventory/transfer/rule/{ruleId},erp-ui/src/api/inventory/transferApprovalRule.js:10,待与后端/OpenAPI 核验
+FEAPI-0255,inventory/transferApprovalRule,addTransferApprovalRule,POST,'/inventory/transfer/rule',/inventory/transfer/rule,erp-ui/src/api/inventory/transferApprovalRule.js:15,待与后端/OpenAPI 核验
+FEAPI-0256,inventory/transferApprovalRule,updateTransferApprovalRule,PUT,'/inventory/transfer/rule',/inventory/transfer/rule,erp-ui/src/api/inventory/transferApprovalRule.js:20,待与后端/OpenAPI 核验
+FEAPI-0257,inventory/transferApprovalRule,delTransferApprovalRule,DELETE,'/inventory/transfer/rule/' + ruleId,/inventory/transfer/rule/{ruleId},erp-ui/src/api/inventory/transferApprovalRule.js:25,待与后端/OpenAPI 核验
+FEAPI-0258,inventory/transferApprovalRule,previewTransferApprovalRule,POST,'/inventory/transfer/rule/preview',/inventory/transfer/rule/preview,erp-ui/src/api/inventory/transferApprovalRule.js:30,待与后端/OpenAPI 核验
+FEAPI-0259,inventory/transferApprovalRule,previewTransferApprovalCandidates,POST,'/inventory/transfer/rule/' + ruleId + '/candidate-preview',/inventory/transfer/rule/{ruleId}/candidate-preview,erp-ui/src/api/inventory/transferApprovalRule.js:36,待与后端/OpenAPI 核验
+FEAPI-0260,login,login,POST,'/auth/login',/auth/login,erp-ui/src/api/login.js:6,待与后端/OpenAPI 核验
+FEAPI-0261,login,register,POST,'/auth/register',/auth/register,erp-ui/src/api/login.js:19,待与后端/OpenAPI 核验
+FEAPI-0262,login,getPasswordPolicy,GET,'/auth/passwordPolicy',/auth/passwordPolicy,erp-ui/src/api/login.js:31,待与后端/OpenAPI 核验
+FEAPI-0263,login,unlockScreen,POST,'/auth/unlockscreen',/auth/unlockscreen,erp-ui/src/api/login.js:43,待与后端/OpenAPI 核验
+FEAPI-0264,login,refreshToken,POST,'/auth/refresh',/auth/refresh,erp-ui/src/api/login.js:55,待与后端/OpenAPI 核验
+FEAPI-0265,login,getInfo,GET,'/system/user/getInfo',/system/user/getInfo,erp-ui/src/api/login.js:63,待与后端/OpenAPI 核验
+FEAPI-0266,login,logout,DELETE,'/auth/logout',/auth/logout,erp-ui/src/api/login.js:71,待与后端/OpenAPI 核验
+FEAPI-0267,login,getCodeImg,GET,'/code',/code,erp-ui/src/api/login.js:80,待与后端/OpenAPI 核验
+FEAPI-0268,menu,getRouters,GET,'/system/menu/getRouters',/system/menu/getRouters,erp-ui/src/api/menu.js:6,待与后端/OpenAPI 核验
+FEAPI-0269,monitor/job,listJob,GET,'/schedule/job/list',/schedule/job/list,erp-ui/src/api/monitor/job.js:6,待与后端/OpenAPI 核验
+FEAPI-0270,monitor/job,getJob,GET,'/schedule/job/' + jobId,/schedule/job/{jobId},erp-ui/src/api/monitor/job.js:15,待与后端/OpenAPI 核验
+FEAPI-0271,monitor/job,addJob,POST,'/schedule/job',/schedule/job,erp-ui/src/api/monitor/job.js:23,待与后端/OpenAPI 核验
+FEAPI-0272,monitor/job,updateJob,PUT,'/schedule/job',/schedule/job,erp-ui/src/api/monitor/job.js:32,待与后端/OpenAPI 核验
+FEAPI-0273,monitor/job,delJob,DELETE,'/schedule/job/' + jobId,/schedule/job/{jobId},erp-ui/src/api/monitor/job.js:41,待与后端/OpenAPI 核验
+FEAPI-0274,monitor/job,changeJobStatus,PUT,'/schedule/job/changeStatus',/schedule/job/changeStatus,erp-ui/src/api/monitor/job.js:53,待与后端/OpenAPI 核验
+FEAPI-0275,monitor/job,runJob,PUT,'/schedule/job/run',/schedule/job/run,erp-ui/src/api/monitor/job.js:67,待与后端/OpenAPI 核验
+FEAPI-0276,monitor/jobLog,listJobLog,GET,'/schedule/job/log/list',/schedule/job/log/list,erp-ui/src/api/monitor/jobLog.js:6,待与后端/OpenAPI 核验
+FEAPI-0277,monitor/jobLog,getJobLog,GET,'/schedule/job/log/' + jobLogId,/schedule/job/log/{jobLogId},erp-ui/src/api/monitor/jobLog.js:15,待与后端/OpenAPI 核验
+FEAPI-0278,monitor/jobLog,delJobLog,DELETE,'/schedule/job/log/' + jobLogId,/schedule/job/log/{jobLogId},erp-ui/src/api/monitor/jobLog.js:23,待与后端/OpenAPI 核验
+FEAPI-0279,monitor/jobLog,cleanJobLog,DELETE,'/schedule/job/log/clean',/schedule/job/log/clean,erp-ui/src/api/monitor/jobLog.js:31,待与后端/OpenAPI 核验
+FEAPI-0280,monitor/online,list,GET,'/system/online/list',/system/online/list,erp-ui/src/api/monitor/online.js:6,待与后端/OpenAPI 核验
+FEAPI-0281,monitor/online,forceLogout,DELETE,'/system/online/' + tokenId,/system/online/{tokenId},erp-ui/src/api/monitor/online.js:15,待与后端/OpenAPI 核验
+FEAPI-0282,oa/attendance,checkIn,POST,'/oa/attendance/checkIn',/oa/attendance/checkIn,erp-ui/src/api/oa/attendance.js:5,待与后端/OpenAPI 核验
+FEAPI-0283,oa/attendance,checkOut,POST,'/oa/attendance/checkOut',/oa/attendance/checkOut,erp-ui/src/api/oa/attendance.js:9,待与后端/OpenAPI 核验
+FEAPI-0284,oa/attendance,getRecord,GET,'/oa/attendance/' + recordId,/oa/attendance/{recordId},erp-ui/src/api/oa/attendance.js:13,待与后端/OpenAPI 核验
+FEAPI-0285,oa/attendance,listMyRecords,GET,'/oa/attendance/my',/oa/attendance/my,erp-ui/src/api/oa/attendance.js:17,待与后端/OpenAPI 核验
+FEAPI-0286,oa/attendance,listAllRecords,GET,'/oa/attendance/list',/oa/attendance/list,erp-ui/src/api/oa/attendance.js:21,待与后端/OpenAPI 核验
+FEAPI-0287,oa/fixedAsset,listFixedAssetConfigs,GET,'/oa/fixedAsset/config/list',/oa/fixedAsset/config/list,erp-ui/src/api/oa/fixedAsset.js:5,待与后端/OpenAPI 核验
+FEAPI-0288,oa/fixedAsset,getFixedAssetConfig,GET,'/oa/fixedAsset/config/' + configId,/oa/fixedAsset/config/{configId},erp-ui/src/api/oa/fixedAsset.js:13,待与后端/OpenAPI 核验
+FEAPI-0289,oa/fixedAsset,saveFixedAssetConfig,POST,'/oa/fixedAsset/config/save',/oa/fixedAsset/config/save,erp-ui/src/api/oa/fixedAsset.js:20,待与后端/OpenAPI 核验
+FEAPI-0290,oa/fixedAsset,deleteFixedAssetConfig,DELETE,'/oa/fixedAsset/config/' + configId,/oa/fixedAsset/config/{configId},erp-ui/src/api/oa/fixedAsset.js:28,待与后端/OpenAPI 核验
+FEAPI-0291,oa/fixedAsset,getFixedAssetQuota,GET,'/oa/fixedAsset/config/quota',/oa/fixedAsset/config/quota,erp-ui/src/api/oa/fixedAsset.js:35,待与后端/OpenAPI 核验
+FEAPI-0292,oa/fixedAsset,listFixedAssetRepairs,GET,'/oa/fixedAsset/repair/list',/oa/fixedAsset/repair/list,erp-ui/src/api/oa/fixedAsset.js:43,待与后端/OpenAPI 核验
+FEAPI-0293,oa/fixedAsset,getFixedAssetRepair,GET,'/oa/fixedAsset/repair/' + repairId,/oa/fixedAsset/repair/{repairId},erp-ui/src/api/oa/fixedAsset.js:51,待与后端/OpenAPI 核验
+FEAPI-0294,oa/fixedAsset,submitFixedAssetRepair,POST,'/oa/fixedAsset/repair/submit',/oa/fixedAsset/repair/submit,erp-ui/src/api/oa/fixedAsset.js:58,待与后端/OpenAPI 核验
+FEAPI-0295,oa/fixedAsset,precheckFixedAssetRepair,POST,'/oa/fixedAsset/repair/precheck',/oa/fixedAsset/repair/precheck,erp-ui/src/api/oa/fixedAsset.js:66,待与后端/OpenAPI 核验
+FEAPI-0296,oa/fixedAsset,submitFixedAssetRepairBatch,POST,'/oa/fixedAsset/repair/submit/batch',/oa/fixedAsset/repair/submit/batch,erp-ui/src/api/oa/fixedAsset.js:74,待与后端/OpenAPI 核验
+FEAPI-0297,oa/fixedAsset,listFixedAssetReplenishmentDeadOutboxes,GET,'/oa/fixedAsset/replenishment-outbox/dead',/oa/fixedAsset/replenishment-outbox/dead,erp-ui/src/api/oa/fixedAsset.js:82,待与后端/OpenAPI 核验
+FEAPI-0298,oa/fixedAsset,replayFixedAssetReplenishmentOutbox,POST,'/oa/fixedAsset/replenishment-outbox/' + outboxId + '/replay',/oa/fixedAsset/replenishment-outbox/{outboxId}/replay,erp-ui/src/api/oa/fixedAsset.js:90,待与后端/OpenAPI 核验
+FEAPI-0299,oa/fixedAsset,getFixedAssetReplenishmentOutboxSummary,GET,'/oa/fixedAsset/replenishment-outbox/summary',/oa/fixedAsset/replenishment-outbox/summary,erp-ui/src/api/oa/fixedAsset.js:98,待与后端/OpenAPI 核验
+FEAPI-0300,oa/fixedAsset,listFixedAssetReplenishmentOutboxes,GET,'/oa/fixedAsset/replenishment-outbox/list',/oa/fixedAsset/replenishment-outbox/list,erp-ui/src/api/oa/fixedAsset.js:105,待与后端/OpenAPI 核验
+FEAPI-0301,oa/fixedAsset,retryFixedAssetReplenishmentOutbox,POST,'/oa/fixedAsset/replenishment-outbox/' + outboxId + '/retry',/oa/fixedAsset/replenishment-outbox/{outboxId}/retry,erp-ui/src/api/oa/fixedAsset.js:113,待与后端/OpenAPI 核验
+FEAPI-0302,oa/laborContract,listLaborContract,GET,'/oa/laborContract/list',/oa/laborContract/list,erp-ui/src/api/oa/laborContract.js:5,待与后端/OpenAPI 核验
+FEAPI-0303,oa/laborContract,getLaborContract,GET,'/oa/laborContract/' + contractId,/oa/laborContract/{contractId},erp-ui/src/api/oa/laborContract.js:14,待与后端/OpenAPI 核验
+FEAPI-0304,oa/laborContract,saveLaborContract,POST,'/oa/laborContract/save',/oa/laborContract/save,erp-ui/src/api/oa/laborContract.js:22,待与后端/OpenAPI 核验
+FEAPI-0305,oa/laborContract,sendLaborContract,POST,'/oa/laborContract/send',/oa/laborContract/send,erp-ui/src/api/oa/laborContract.js:30,待与后端/OpenAPI 核验
+FEAPI-0306,oa/laborContract,voidLaborContract,POST,'/oa/laborContract/' + contractId + '/void',/oa/laborContract/{contractId}/void,erp-ui/src/api/oa/laborContract.js:38,待与后端/OpenAPI 核验
+FEAPI-0307,oa/laborContract,previewLaborContract,GET,'/oa/laborContract/' + contractId + '/preview',/oa/laborContract/{contractId}/preview,erp-ui/src/api/oa/laborContract.js:45,待与后端/OpenAPI 核验
+FEAPI-0308,oa/laborContract,downloadLaborContractFile,GET,'/oa/laborContract/download/' + contractId + '/' + kind,/oa/laborContract/download/{contractId}/{kind},erp-ui/src/api/oa/laborContract.js:53,待与后端/OpenAPI 核验
+FEAPI-0309,oa/laborContract,verifyLaborContractHash,POST,'/oa/laborContract/verify',/oa/laborContract/verify,erp-ui/src/api/oa/laborContract.js:61,待与后端/OpenAPI 核验
+FEAPI-0310,oa/laborContract,listLaborContractTemplate,GET,'/oa/laborContract/template/list',/oa/laborContract/template/list,erp-ui/src/api/oa/laborContract.js:70,待与后端/OpenAPI 核验
+FEAPI-0311,oa/laborContract,saveLaborContractTemplate,POST,'/oa/laborContract/template',/oa/laborContract/template,erp-ui/src/api/oa/laborContract.js:79,待与后端/OpenAPI 核验
+FEAPI-0312,oa/laborContract,getLaborContractSeal,GET,'/oa/laborContract/seal',/oa/laborContract/seal,erp-ui/src/api/oa/laborContract.js:87,待与后端/OpenAPI 核验
+FEAPI-0313,oa/laborContract,saveLaborContractSeal,POST,'/oa/laborContract/seal',/oa/laborContract/seal,erp-ui/src/api/oa/laborContract.js:95,待与后端/OpenAPI 核验
+FEAPI-0314,oa/laborContract,listMyLaborContracts,GET,'/oa/laborContract/mobile/my',/oa/laborContract/mobile/my,erp-ui/src/api/oa/laborContract.js:103,待与后端/OpenAPI 核验
+FEAPI-0315,oa/laborContract,getMyLaborContract,GET,'/oa/laborContract/mobile/' + contractId,/oa/laborContract/mobile/{contractId},erp-ui/src/api/oa/laborContract.js:111,待与后端/OpenAPI 核验
+FEAPI-0316,oa/laborContract,signMyLaborContract,POST,'/oa/laborContract/mobile/' + contractId + '/sign',/oa/laborContract/mobile/{contractId}/sign,erp-ui/src/api/oa/laborContract.js:118,待与后端/OpenAPI 核验
+FEAPI-0317,oa/purchase,savePurchase,POST,'/oa/purchase/save',/oa/purchase/save,erp-ui/src/api/oa/purchase.js:5,待与后端/OpenAPI 核验
+FEAPI-0318,oa/purchase,submitPurchase,POST,'/oa/purchase/submit',/oa/purchase/submit,erp-ui/src/api/oa/purchase.js:13,待与后端/OpenAPI 核验
+FEAPI-0319,oa/purchase,getPurchaseAvailability,GET,'/oa/purchase/availability',/oa/purchase/availability,erp-ui/src/api/oa/purchase.js:21,待与后端/OpenAPI 核验
+FEAPI-0320,oa/purchase,closePurchase,POST,'/oa/purchase/' + purchaseId + '/close',/oa/purchase/{purchaseId}/close,erp-ui/src/api/oa/purchase.js:29,待与后端/OpenAPI 核验
+FEAPI-0321,oa/purchase,withdrawPurchase,POST,'/oa/purchase/' + purchaseId + '/withdraw',/oa/purchase/{purchaseId}/withdraw,erp-ui/src/api/oa/purchase.js:36,待与后端/OpenAPI 核验
+FEAPI-0322,oa/purchase,listMyPurchases,GET,'/oa/purchase/my',/oa/purchase/my,erp-ui/src/api/oa/purchase.js:45,待与后端/OpenAPI 核验
+FEAPI-0323,oa/purchase,getPurchaseDetail,GET,'/oa/purchase/' + purchaseId,/oa/purchase/{purchaseId},erp-ui/src/api/oa/purchase.js:53,待与后端/OpenAPI 核验
+FEAPI-0324,oa/salary,getSalary,GET,'/oa/salary/' + salaryId,/oa/salary/{salaryId},erp-ui/src/api/oa/salary.js:4,待与后端/OpenAPI 核验
+FEAPI-0325,oa/salary,listMySalary,GET,'/oa/salary/my',/oa/salary/my,erp-ui/src/api/oa/salary.js:8,待与后端/OpenAPI 核验
+FEAPI-0326,oa/salary,listAllSalary,GET,'/oa/salary/list',/oa/salary/list,erp-ui/src/api/oa/salary.js:12,待与后端/OpenAPI 核验
+FEAPI-0327,oa/salary,calculateSalary,POST,'/oa/salary/calculate',/oa/salary/calculate,erp-ui/src/api/oa/salary.js:16,待与后端/OpenAPI 核验
+FEAPI-0328,oa/salary,preflightSalaryAttendance,GET,'/oa/salary/attendance-preflight',/oa/salary/attendance-preflight,erp-ui/src/api/oa/salary.js:20,待与后端/OpenAPI 核验
+FEAPI-0329,oa/salary,getSalaryConfig,GET,'/oa/salary/config',/oa/salary/config,erp-ui/src/api/oa/salary.js:24,待与后端/OpenAPI 核验
+FEAPI-0330,oa/salary,saveSalaryConfig,PUT,'/oa/salary/config',/oa/salary/config,erp-ui/src/api/oa/salary.js:28,待与后端/OpenAPI 核验
+FEAPI-0331,oa/salary,exportSalary,POST,'/oa/salary/export',/oa/salary/export,erp-ui/src/api/oa/salary.js:32,待与后端/OpenAPI 核验
+FEAPI-0332,oa/signPackage,listSignPackages,GET,'/oa/signPackage/list',/oa/signPackage/list,erp-ui/src/api/oa/signPackage.js:5,待与后端/OpenAPI 核验
+FEAPI-0333,oa/signPackage,getSignPackage,GET,'/oa/signPackage/' + packageId,/oa/signPackage/{packageId},erp-ui/src/api/oa/signPackage.js:14,待与后端/OpenAPI 核验
+FEAPI-0334,oa/signPackage,verifySignPackage,GET,'/oa/signPackage/' + packageId + '/verify',/oa/signPackage/{packageId}/verify,erp-ui/src/api/oa/signPackage.js:22,待与后端/OpenAPI 核验
+FEAPI-0335,oa/signPackage,createSignPackage,POST,'/oa/signPackage',/oa/signPackage,erp-ui/src/api/oa/signPackage.js:30,待与后端/OpenAPI 核验
+FEAPI-0336,oa/signPackage,updateSignPackage,PUT,'/oa/signPackage/' + packageId,/oa/signPackage/{packageId},erp-ui/src/api/oa/signPackage.js:38,待与后端/OpenAPI 核验
+FEAPI-0337,oa/signPackage,sendSignPackage,POST,'/oa/signPackage/' + packageId + '/send',/oa/signPackage/{packageId}/send,erp-ui/src/api/oa/signPackage.js:46,待与后端/OpenAPI 核验
+FEAPI-0338,oa/signPackage,getSignPackageCompanyOptions,GET,'/oa/signPackage/' + packageId + '/company-options',/oa/signPackage/{packageId}/company-options,erp-ui/src/api/oa/signPackage.js:53,待与后端/OpenAPI 核验
+FEAPI-0339,oa/signPackage,finalizeSignPackage,POST,'/oa/signPackage/' + packageId + '/finalize',/oa/signPackage/{packageId}/finalize,erp-ui/src/api/oa/signPackage.js:61,待与后端/OpenAPI 核验
+FEAPI-0340,oa/signPackage,listCompanySeals,GET,'/oa/signPackage/company/seals',/oa/signPackage/company/seals,erp-ui/src/api/oa/signPackage.js:69,待与后端/OpenAPI 核验
+FEAPI-0341,oa/signPackage,saveCompanySeal,POST,'/oa/signPackage/company/seals',/oa/signPackage/company/seals,erp-ui/src/api/oa/signPackage.js:77,待与后端/OpenAPI 核验
+FEAPI-0342,oa/signPackage,voidSignPackage,POST,'/oa/signPackage/' + packageId + '/void',/oa/signPackage/{packageId}/void,erp-ui/src/api/oa/signPackage.js:85,待与后端/OpenAPI 核验
+FEAPI-0343,oa/signPackage,listSignTemplates,GET,'/oa/signPackage/template/list',/oa/signPackage/template/list,erp-ui/src/api/oa/signPackage.js:93,待与后端/OpenAPI 核验
+FEAPI-0344,oa/signPackage,listSignTemplateTypes,GET,'/oa/signPackage/template/types',/oa/signPackage/template/types,erp-ui/src/api/oa/signPackage.js:102,待与后端/OpenAPI 核验
+FEAPI-0345,oa/signPackage,saveSignTemplate,POST,'/oa/signPackage/template',/oa/signPackage/template,erp-ui/src/api/oa/signPackage.js:110,待与后端/OpenAPI 核验
+FEAPI-0346,oa/signPackage,listSignPlans,GET,'/oa/signPackage/plan/list',/oa/signPackage/plan/list,erp-ui/src/api/oa/signPackage.js:118,待与后端/OpenAPI 核验
+FEAPI-0347,oa/signPackage,getSignPlan,GET,'/oa/signPackage/plan/' + planId,/oa/signPackage/plan/{planId},erp-ui/src/api/oa/signPackage.js:127,待与后端/OpenAPI 核验
+FEAPI-0348,oa/signPackage,saveSignPlan,POST,'/oa/signPackage/plan',/oa/signPackage/plan,erp-ui/src/api/oa/signPackage.js:134,待与后端/OpenAPI 核验
+FEAPI-0349,oa/signPackage,updateSignPlan,PUT,'/oa/signPackage/plan',/oa/signPackage/plan,erp-ui/src/api/oa/signPackage.js:142,待与后端/OpenAPI 核验
+FEAPI-0350,oa/signPackage,publishSignPlan,POST,'/oa/signPackage/plan/' + planId + '/publish',/oa/signPackage/plan/{planId}/publish,erp-ui/src/api/oa/signPackage.js:150,待与后端/OpenAPI 核验
+FEAPI-0351,oa/signPackage,matchSignTemplates,POST,'/oa/signPackage/template/match',/oa/signPackage/template/match,erp-ui/src/api/oa/signPackage.js:157,待与后端/OpenAPI 核验
+FEAPI-0352,oa/signPackage,previewSignPackageBatch,POST,'/oa/signPackage/batch/preview',/oa/signPackage/batch/preview,erp-ui/src/api/oa/signPackage.js:166,待与后端/OpenAPI 核验
+FEAPI-0353,oa/signPackage,createSignPackageDrafts,POST,'/oa/signPackage/batch/createDrafts',/oa/signPackage/batch/createDrafts,erp-ui/src/api/oa/signPackage.js:175,待与后端/OpenAPI 核验
+FEAPI-0354,oa/signPackage,listMySignPackages,GET,'/oa/signPackage/mobile/list',/oa/signPackage/mobile/list,erp-ui/src/api/oa/signPackage.js:183,待与后端/OpenAPI 核验
+FEAPI-0355,oa/signPackage,getMySignPackage,GET,'/oa/signPackage/mobile/' + packageId,/oa/signPackage/mobile/{packageId},erp-ui/src/api/oa/signPackage.js:191,待与后端/OpenAPI 核验
+FEAPI-0356,oa/signPackage,confirmSignPackageDocumentRead,POST,'/oa/signPackage/mobile/' + packageId + '/read/' + documentId,/oa/signPackage/mobile/{packageId}/read/{documentId},erp-ui/src/api/oa/signPackage.js:198,待与后端/OpenAPI 核验
+FEAPI-0357,oa/signPackage,signMySignPackage,POST,'/oa/signPackage/mobile/' + packageId + '/sign',/oa/signPackage/mobile/{packageId}/sign,erp-ui/src/api/oa/signPackage.js:206,待与后端/OpenAPI 核验
+FEAPI-0358,oa/signPackage,confirmMyFinalSignPackage,POST,'/oa/signPackage/mobile/' + packageId + '/final-confirm',/oa/signPackage/mobile/{packageId}/final-confirm,erp-ui/src/api/oa/signPackage.js:214,待与后端/OpenAPI 核验
+FEAPI-0359,oa/signPackage,downloadMySignPackageDocument,GET,'/oa/signPackage/mobile/' + packageId + '/documents/' + documentId + '/file',/oa/signPackage/mobile/{packageId}/documents/{documentId}/file,erp-ui/src/api/oa/signPackage.js:222,待与后端/OpenAPI 核验
+FEAPI-0360,oa/signPackage,downloadMySignedSignPackageDocument,GET,'/oa/signPackage/mobile/' + packageId + '/documents/' + documentId + '/signed-file',/oa/signPackage/mobile/{packageId}/documents/{documentId}/signed-file,erp-ui/src/api/oa/signPackage.js:230,待与后端/OpenAPI 核验
+FEAPI-0361,oa/signPackage,downloadMyFinalSignPackageDocument,GET,'/oa/signPackage/mobile/' + packageId + '/documents/' + documentId + '/final-file',/oa/signPackage/mobile/{packageId}/documents/{documentId}/final-file,erp-ui/src/api/oa/signPackage.js:238,待与后端/OpenAPI 核验
+FEAPI-0362,oa/signPackage,downloadMySignPackageCertificate,GET,'/oa/signPackage/mobile/' + packageId + '/documents/' + documentId + '/certificate',/oa/signPackage/mobile/{packageId}/documents/{documentId}/certificate,erp-ui/src/api/oa/signPackage.js:246,待与后端/OpenAPI 核验
+FEAPI-0363,oa/signPackage,downloadSignPackageDocument,GET,'/oa/signPackage/' + packageId + '/documents/' + documentId + '/file',/oa/signPackage/{packageId}/documents/{documentId}/file,erp-ui/src/api/oa/signPackage.js:254,待与后端/OpenAPI 核验
+FEAPI-0364,oa/signPackage,downloadSignedSignPackageDocument,GET,'/oa/signPackage/' + packageId + '/documents/' + documentId + '/signed-file',/oa/signPackage/{packageId}/documents/{documentId}/signed-file,erp-ui/src/api/oa/signPackage.js:262,待与后端/OpenAPI 核验
+FEAPI-0365,oa/signPackage,downloadFinalSignPackageDocument,GET,'/oa/signPackage/' + packageId + '/documents/' + documentId + '/final-file',/oa/signPackage/{packageId}/documents/{documentId}/final-file,erp-ui/src/api/oa/signPackage.js:270,待与后端/OpenAPI 核验
+FEAPI-0366,oa/signPackage,downloadSignPackageCertificate,GET,'/oa/signPackage/' + packageId + '/documents/' + documentId + '/certificate',/oa/signPackage/{packageId}/documents/{documentId}/certificate,erp-ui/src/api/oa/signPackage.js:278,待与后端/OpenAPI 核验
+FEAPI-0367,oa/signTask,listSignTasks,GET,'/oa/signTask/list',/oa/signTask/list,erp-ui/src/api/oa/signTask.js:5,待与后端/OpenAPI 核验
+FEAPI-0368,oa/signTask,getSignTaskMetrics,GET,'/oa/signTask/metrics',/oa/signTask/metrics,erp-ui/src/api/oa/signTask.js:14,待与后端/OpenAPI 核验
+FEAPI-0369,oa/signTask,getSignTask,GET,'/oa/signTask/' + taskId,/oa/signTask/{taskId},erp-ui/src/api/oa/signTask.js:22,待与后端/OpenAPI 核验
+FEAPI-0370,oa/signTask,revalidateSignTask,POST,'/oa/signTask/' + taskId + '/revalidate',/oa/signTask/{taskId}/revalidate,erp-ui/src/api/oa/signTask.js:30,待与后端/OpenAPI 核验
+FEAPI-0371,oa/signTask,sendSignTask,POST,'/oa/signTask/' + taskId + '/send',/oa/signTask/{taskId}/send,erp-ui/src/api/oa/signTask.js:38,待与后端/OpenAPI 核验
+FEAPI-0372,oa/signTask,retrySignTask,POST,'/oa/signTask/' + taskId + '/retry',/oa/signTask/{taskId}/retry,erp-ui/src/api/oa/signTask.js:46,待与后端/OpenAPI 核验
+FEAPI-0373,oa/signTask,retrySignTaskNotification,POST,'/oa/signTask/' + taskId + '/notification/retry',/oa/signTask/{taskId}/notification/retry,erp-ui/src/api/oa/signTask.js:54,待与后端/OpenAPI 核验
+FEAPI-0374,oa/signTask,cancelSignTask,POST,'/oa/signTask/' + taskId + '/cancel',/oa/signTask/{taskId}/cancel,erp-ui/src/api/oa/signTask.js:62,待与后端/OpenAPI 核验
+FEAPI-0375,oa/todo,getTodoSummary,GET,'/oa/todo/summary',/oa/todo/summary,erp-ui/src/api/oa/todo.js:5,待与后端/OpenAPI 核验
+FEAPI-0376,oa/todo,listTodos,GET,'/oa/todo/list',/oa/todo/list,erp-ui/src/api/oa/todo.js:13,待与后端/OpenAPI 核验
+FEAPI-0377,system/config,listConfig,GET,'/system/config/list',/system/config/list,erp-ui/src/api/system/config.js:6,待与后端/OpenAPI 核验
+FEAPI-0378,system/config,getConfig,GET,'/system/config/' + configId,/system/config/{configId},erp-ui/src/api/system/config.js:15,待与后端/OpenAPI 核验
+FEAPI-0379,system/config,getConfigKey,GET,'/system/config/configKey/' + configKey,/system/config/configKey/{configKey},erp-ui/src/api/system/config.js:23,待与后端/OpenAPI 核验
+FEAPI-0380,system/config,addConfig,POST,'/system/config',/system/config,erp-ui/src/api/system/config.js:31,待与后端/OpenAPI 核验
+FEAPI-0381,system/config,updateConfig,PUT,'/system/config',/system/config,erp-ui/src/api/system/config.js:40,待与后端/OpenAPI 核验
+FEAPI-0382,system/config,delConfig,DELETE,'/system/config/' + configId,/system/config/{configId},erp-ui/src/api/system/config.js:49,待与后端/OpenAPI 核验
+FEAPI-0383,system/config,refreshCache,DELETE,'/system/config/refreshCache',/system/config/refreshCache,erp-ui/src/api/system/config.js:57,待与后端/OpenAPI 核验
+FEAPI-0384,system/dept,listDept,GET,'/system/dept/list',/system/dept/list,erp-ui/src/api/system/dept.js:6,待与后端/OpenAPI 核验
+FEAPI-0385,system/dept,listDeptLeaderOptions,GET,'/system/dept/leader-options',/system/dept/leader-options,erp-ui/src/api/system/dept.js:15,待与后端/OpenAPI 核验
+FEAPI-0386,system/dept,listShopTree,GET,'/system/dept/shop-tree',/system/dept/shop-tree,erp-ui/src/api/system/dept.js:24,待与后端/OpenAPI 核验
+FEAPI-0387,system/dept,listWarehouseDept,GET,'/system/dept/warehouse-list',/system/dept/warehouse-list,erp-ui/src/api/system/dept.js:32,待与后端/OpenAPI 核验
+FEAPI-0388,system/dept,listVisibleStoreDept,GET,'/system/dept/visible-store-list',/system/dept/visible-store-list,erp-ui/src/api/system/dept.js:41,待与后端/OpenAPI 核验
+FEAPI-0389,system/dept,listDeptExcludeChild,GET,'/system/dept/list/exclude/' + deptId,/system/dept/list/exclude/{deptId},erp-ui/src/api/system/dept.js:50,待与后端/OpenAPI 核验
+FEAPI-0390,system/dept,getDept,GET,'/system/dept/' + deptId,/system/dept/{deptId},erp-ui/src/api/system/dept.js:58,待与后端/OpenAPI 核验
+FEAPI-0391,system/dept,addDept,POST,'/system/dept',/system/dept,erp-ui/src/api/system/dept.js:66,待与后端/OpenAPI 核验
+FEAPI-0392,system/dept,updateDept,PUT,'/system/dept',/system/dept,erp-ui/src/api/system/dept.js:75,待与后端/OpenAPI 核验
+FEAPI-0393,system/dept,updateDeptSort,PUT,'/system/dept/updateSort',/system/dept/updateSort,erp-ui/src/api/system/dept.js:84,待与后端/OpenAPI 核验
+FEAPI-0394,system/dept,delDept,DELETE,'/system/dept/' + deptId,/system/dept/{deptId},erp-ui/src/api/system/dept.js:94,待与后端/OpenAPI 核验
+FEAPI-0395,system/dict/data,listData,GET,'/system/dict/data/list',/system/dict/data/list,erp-ui/src/api/system/dict/data.js:6,待与后端/OpenAPI 核验
+FEAPI-0396,system/dict/data,getData,GET,'/system/dict/data/' + dictCode,/system/dict/data/{dictCode},erp-ui/src/api/system/dict/data.js:15,待与后端/OpenAPI 核验
+FEAPI-0397,system/dict/data,getDicts,GET,'/system/dict/data/type/' + dictType,/system/dict/data/type/{dictType},erp-ui/src/api/system/dict/data.js:23,待与后端/OpenAPI 核验
+FEAPI-0398,system/dict/data,addData,POST,'/system/dict/data',/system/dict/data,erp-ui/src/api/system/dict/data.js:31,待与后端/OpenAPI 核验
+FEAPI-0399,system/dict/data,updateData,PUT,'/system/dict/data',/system/dict/data,erp-ui/src/api/system/dict/data.js:40,待与后端/OpenAPI 核验
+FEAPI-0400,system/dict/data,delData,DELETE,'/system/dict/data/' + dictCode,/system/dict/data/{dictCode},erp-ui/src/api/system/dict/data.js:49,待与后端/OpenAPI 核验
+FEAPI-0401,system/dict/type,listType,GET,'/system/dict/type/list',/system/dict/type/list,erp-ui/src/api/system/dict/type.js:6,待与后端/OpenAPI 核验
+FEAPI-0402,system/dict/type,getType,GET,'/system/dict/type/' + dictId,/system/dict/type/{dictId},erp-ui/src/api/system/dict/type.js:15,待与后端/OpenAPI 核验
+FEAPI-0403,system/dict/type,addType,POST,'/system/dict/type',/system/dict/type,erp-ui/src/api/system/dict/type.js:23,待与后端/OpenAPI 核验
+FEAPI-0404,system/dict/type,updateType,PUT,'/system/dict/type',/system/dict/type,erp-ui/src/api/system/dict/type.js:32,待与后端/OpenAPI 核验
+FEAPI-0405,system/dict/type,delType,DELETE,'/system/dict/type/' + dictId,/system/dict/type/{dictId},erp-ui/src/api/system/dict/type.js:41,待与后端/OpenAPI 核验
+FEAPI-0406,system/dict/type,refreshCache,DELETE,'/system/dict/type/refreshCache',/system/dict/type/refreshCache,erp-ui/src/api/system/dict/type.js:49,待与后端/OpenAPI 核验
+FEAPI-0407,system/dict/type,optionselect,GET,'/system/dict/type/optionselect',/system/dict/type/optionselect,erp-ui/src/api/system/dict/type.js:57,待与后端/OpenAPI 核验
+FEAPI-0408,system/file,deleteFile,DELETE,'/file/delete',/file/delete,erp-ui/src/api/system/file.js:5,待与后端/OpenAPI 核验
+FEAPI-0409,system/legalEntity,listLegalEntityOptions,GET,'/system/legalEntity/options',/system/legalEntity/options,erp-ui/src/api/system/legalEntity.js:5,待与后端/OpenAPI 核验
+FEAPI-0410,system/legalEntity,listLegalEntities,GET,'/system/legalEntity/list',/system/legalEntity/list,erp-ui/src/api/system/legalEntity.js:12,待与后端/OpenAPI 核验
+FEAPI-0411,system/legalEntity,getLegalEntity,GET,'/system/legalEntity/' + legalEntityId,/system/legalEntity/{legalEntityId},erp-ui/src/api/system/legalEntity.js:20,待与后端/OpenAPI 核验
+FEAPI-0412,system/legalEntity,createLegalEntity,POST,'/system/legalEntity',/system/legalEntity,erp-ui/src/api/system/legalEntity.js:27,待与后端/OpenAPI 核验
+FEAPI-0413,system/legalEntity,updateLegalEntity,PUT,'/system/legalEntity',/system/legalEntity,erp-ui/src/api/system/legalEntity.js:35,待与后端/OpenAPI 核验
+FEAPI-0414,system/logininfor,list,GET,'/system/logininfor/list',/system/logininfor/list,erp-ui/src/api/system/logininfor.js:6,待与后端/OpenAPI 核验
+FEAPI-0415,system/logininfor,delLogininfor,DELETE,'/system/logininfor/' + infoId,/system/logininfor/{infoId},erp-ui/src/api/system/logininfor.js:15,待与后端/OpenAPI 核验
+FEAPI-0416,system/logininfor,unlockLogininfor,GET,'/system/logininfor/unlock/' + userName,/system/logininfor/unlock/{userName},erp-ui/src/api/system/logininfor.js:23,待与后端/OpenAPI 核验
+FEAPI-0417,system/logininfor,cleanLogininfor,DELETE,'/system/logininfor/clean',/system/logininfor/clean,erp-ui/src/api/system/logininfor.js:30,待与后端/OpenAPI 核验
+FEAPI-0418,system/menu,listMenu,GET,'/system/menu/list',/system/menu/list,erp-ui/src/api/system/menu.js:6,待与后端/OpenAPI 核验
+FEAPI-0419,system/menu,getMenu,GET,'/system/menu/' + menuId,/system/menu/{menuId},erp-ui/src/api/system/menu.js:15,待与后端/OpenAPI 核验
+FEAPI-0420,system/menu,treeselect,GET,'/system/menu/treeselect',/system/menu/treeselect,erp-ui/src/api/system/menu.js:23,待与后端/OpenAPI 核验
+FEAPI-0421,system/menu,roleMenuTreeselect,GET,'/system/menu/roleMenuTreeselect/' + roleId,/system/menu/roleMenuTreeselect/{roleId},erp-ui/src/api/system/menu.js:31,待与后端/OpenAPI 核验
+FEAPI-0422,system/menu,addMenu,POST,'/system/menu',/system/menu,erp-ui/src/api/system/menu.js:39,待与后端/OpenAPI 核验
+FEAPI-0423,system/menu,updateMenu,PUT,'/system/menu',/system/menu,erp-ui/src/api/system/menu.js:48,待与后端/OpenAPI 核验
+FEAPI-0424,system/menu,updateMenuSort,PUT,'/system/menu/updateSort',/system/menu/updateSort,erp-ui/src/api/system/menu.js:57,待与后端/OpenAPI 核验
+FEAPI-0425,system/menu,delMenu,DELETE,'/system/menu/' + menuId,/system/menu/{menuId},erp-ui/src/api/system/menu.js:67,待与后端/OpenAPI 核验
+FEAPI-0426,system/mobile,getMobileProfile,GET,'/system/mobile/profile',/system/mobile/profile,erp-ui/src/api/system/mobile.js:5,待与后端/OpenAPI 核验
+FEAPI-0427,system/mobile,getMobileWarehouseOptions,GET,'/system/mobile/options/warehouses',/system/mobile/options/warehouses,erp-ui/src/api/system/mobile.js:12,待与后端/OpenAPI 核验
+FEAPI-0428,system/notice,listNotice,GET,'/system/notice/list',/system/notice/list,erp-ui/src/api/system/notice.js:6,待与后端/OpenAPI 核验
+FEAPI-0429,system/notice,getNotice,GET,'/system/notice/' + noticeId,/system/notice/{noticeId},erp-ui/src/api/system/notice.js:15,待与后端/OpenAPI 核验
+FEAPI-0430,system/notice,getInboxNotice,GET,'/system/notice/inbox/' + noticeId,/system/notice/inbox/{noticeId},erp-ui/src/api/system/notice.js:23,待与后端/OpenAPI 核验
+FEAPI-0431,system/notice,addNotice,POST,'/system/notice',/system/notice,erp-ui/src/api/system/notice.js:31,待与后端/OpenAPI 核验
+FEAPI-0432,system/notice,updateNotice,PUT,'/system/notice',/system/notice,erp-ui/src/api/system/notice.js:40,待与后端/OpenAPI 核验
+FEAPI-0433,system/notice,previewNoticeAudience,POST,'/system/notice/audience-preview',/system/notice/audience-preview,erp-ui/src/api/system/notice.js:49,待与后端/OpenAPI 核验
+FEAPI-0434,system/notice,getNoticeAudienceOptions,GET,'/system/notice/audience-options',/system/notice/audience-options,erp-ui/src/api/system/notice.js:58,待与后端/OpenAPI 核验
+FEAPI-0435,system/notice,publishNotice,POST,`/system/notice/${noticeId}/publish`,/system/notice/{noticeId}/publish,erp-ui/src/api/system/notice.js:67,待与后端/OpenAPI 核验
+FEAPI-0436,system/notice,cancelNoticeSchedule,POST,`/system/notice/${noticeId}/cancel-schedule`,/system/notice/{noticeId}/cancel-schedule,erp-ui/src/api/system/notice.js:76,待与后端/OpenAPI 核验
+FEAPI-0437,system/notice,offlineNotice,POST,`/system/notice/${noticeId}/offline`,/system/notice/{noticeId}/offline,erp-ui/src/api/system/notice.js:85,待与后端/OpenAPI 核验
+FEAPI-0438,system/notice,createNoticeVersion,POST,`/system/notice/${noticeId}/new-version`,/system/notice/{noticeId}/new-version,erp-ui/src/api/system/notice.js:94,待与后端/OpenAPI 核验
+FEAPI-0439,system/notice,delNotice,DELETE,'/system/notice/' + noticeId,/system/notice/{noticeId},erp-ui/src/api/system/notice.js:104,待与后端/OpenAPI 核验
+FEAPI-0440,system/notice,listNoticeTop,GET,'/system/notice/listTop',/system/notice/listTop,erp-ui/src/api/system/notice.js:112,待与后端/OpenAPI 核验
+FEAPI-0441,system/notice,markNoticeRead,POST,'/system/notice/markRead',/system/notice/markRead,erp-ui/src/api/system/notice.js:120,待与后端/OpenAPI 核验
+FEAPI-0442,system/notice,markNoticeReadAll,POST,'/system/notice/markReadAll',/system/notice/markReadAll,erp-ui/src/api/system/notice.js:129,待与后端/OpenAPI 核验
+FEAPI-0443,system/notice,listNoticeReadUsers,GET,'/system/notice/readUsers/list',/system/notice/readUsers/list,erp-ui/src/api/system/notice.js:137,待与后端/OpenAPI 核验
+FEAPI-0444,system/operlog,list,GET,'/system/operlog/list',/system/operlog/list,erp-ui/src/api/system/operlog.js:6,待与后端/OpenAPI 核验
+FEAPI-0445,system/operlog,getOperlog,GET,'/system/operlog/' + operId,/system/operlog/{operId},erp-ui/src/api/system/operlog.js:15,待与后端/OpenAPI 核验
+FEAPI-0446,system/operlog,delOperlog,DELETE,'/system/operlog/' + operId,/system/operlog/{operId},erp-ui/src/api/system/operlog.js:23,待与后端/OpenAPI 核验
+FEAPI-0447,system/operlog,cleanOperlog,DELETE,'/system/operlog/clean',/system/operlog/clean,erp-ui/src/api/system/operlog.js:31,待与后端/OpenAPI 核验
+FEAPI-0448,system/post,listPost,GET,'/system/post/list',/system/post/list,erp-ui/src/api/system/post.js:6,待与后端/OpenAPI 核验
+FEAPI-0449,system/post,optionselectPost,GET,'/system/post/optionselect',/system/post/optionselect,erp-ui/src/api/system/post.js:15,待与后端/OpenAPI 核验
+FEAPI-0450,system/post,getPost,GET,'/system/post/' + postId,/system/post/{postId},erp-ui/src/api/system/post.js:23,待与后端/OpenAPI 核验
+FEAPI-0451,system/post,addPost,POST,'/system/post',/system/post,erp-ui/src/api/system/post.js:31,待与后端/OpenAPI 核验
+FEAPI-0452,system/post,updatePost,PUT,'/system/post',/system/post,erp-ui/src/api/system/post.js:40,待与后端/OpenAPI 核验
+FEAPI-0453,system/post,delPost,DELETE,'/system/post/' + postId,/system/post/{postId},erp-ui/src/api/system/post.js:49,待与后端/OpenAPI 核验
+FEAPI-0454,system/role,listRole,GET,'/system/role/list',/system/role/list,erp-ui/src/api/system/role.js:6,待与后端/OpenAPI 核验
+FEAPI-0455,system/role,getRole,GET,'/system/role/' + roleId,/system/role/{roleId},erp-ui/src/api/system/role.js:15,待与后端/OpenAPI 核验
+FEAPI-0456,system/role,addRole,POST,'/system/role',/system/role,erp-ui/src/api/system/role.js:23,待与后端/OpenAPI 核验
+FEAPI-0457,system/role,updateRole,PUT,'/system/role',/system/role,erp-ui/src/api/system/role.js:32,待与后端/OpenAPI 核验
+FEAPI-0458,system/role,dataScope,PUT,'/system/role/dataScope',/system/role/dataScope,erp-ui/src/api/system/role.js:41,待与后端/OpenAPI 核验
+FEAPI-0459,system/role,changeRoleStatus,PUT,'/system/role/changeStatus',/system/role/changeStatus,erp-ui/src/api/system/role.js:54,待与后端/OpenAPI 核验
+FEAPI-0460,system/role,delRole,DELETE,'/system/role/' + roleId,/system/role/{roleId},erp-ui/src/api/system/role.js:63,待与后端/OpenAPI 核验
+FEAPI-0461,system/role,allocatedUserList,GET,'/system/role/authUser/allocatedList',/system/role/authUser/allocatedList,erp-ui/src/api/system/role.js:71,待与后端/OpenAPI 核验
+FEAPI-0462,system/role,unallocatedUserList,GET,'/system/role/authUser/unallocatedList',/system/role/authUser/unallocatedList,erp-ui/src/api/system/role.js:80,待与后端/OpenAPI 核验
+FEAPI-0463,system/role,authUserCancel,PUT,'/system/role/authUser/cancel',/system/role/authUser/cancel,erp-ui/src/api/system/role.js:89,待与后端/OpenAPI 核验
+FEAPI-0464,system/role,authUserCancelAll,PUT,'/system/role/authUser/cancelAll',/system/role/authUser/cancelAll,erp-ui/src/api/system/role.js:98,待与后端/OpenAPI 核验
+FEAPI-0465,system/role,authUserSelectAll,PUT,'/system/role/authUser/selectAll',/system/role/authUser/selectAll,erp-ui/src/api/system/role.js:107,待与后端/OpenAPI 核验
+FEAPI-0466,system/role,deptTreeSelect,GET,'/system/role/deptTree/' + roleId,/system/role/deptTree/{roleId},erp-ui/src/api/system/role.js:116,待与后端/OpenAPI 核验
+FEAPI-0467,system/role,roleCreateDeptTree,GET,'/system/role/deptTree',/system/role/deptTree,erp-ui/src/api/system/role.js:124,待与后端/OpenAPI 核验
+FEAPI-0468,system/role,optionselect,GET,'/system/role/optionselect',/system/role/optionselect,erp-ui/src/api/system/role.js:132,待与后端/OpenAPI 核验
+FEAPI-0469,system/salaryConfig,listSalaryScheme,GET,'/system/salaryConfig/list',/system/salaryConfig/list,erp-ui/src/api/system/salaryConfig.js:6,待与后端/OpenAPI 核验
+FEAPI-0470,system/salaryConfig,getSalaryScheme,GET,'/system/salaryConfig/' + schemeId,/system/salaryConfig/{schemeId},erp-ui/src/api/system/salaryConfig.js:15,待与后端/OpenAPI 核验
+FEAPI-0471,system/salaryConfig,salarySchemeOptions,GET,'/system/salaryConfig/options',/system/salaryConfig/options,erp-ui/src/api/system/salaryConfig.js:23,待与后端/OpenAPI 核验
+FEAPI-0472,system/salaryConfig,salaryUserOptions,GET,'/system/salaryConfig/users',/system/salaryConfig/users,erp-ui/src/api/system/salaryConfig.js:32,待与后端/OpenAPI 核验
+FEAPI-0473,system/salaryConfig,salaryShopTree,GET,'/system/salaryConfig/shopTree',/system/salaryConfig/shopTree,erp-ui/src/api/system/salaryConfig.js:41,待与后端/OpenAPI 核验
+FEAPI-0474,system/salaryConfig,addSalaryScheme,POST,'/system/salaryConfig',/system/salaryConfig,erp-ui/src/api/system/salaryConfig.js:49,待与后端/OpenAPI 核验
+FEAPI-0475,system/salaryConfig,updateSalaryScheme,PUT,'/system/salaryConfig',/system/salaryConfig,erp-ui/src/api/system/salaryConfig.js:58,待与后端/OpenAPI 核验
+FEAPI-0476,system/salaryConfig,delSalaryScheme,DELETE,'/system/salaryConfig/' + schemeId,/system/salaryConfig/{schemeId},erp-ui/src/api/system/salaryConfig.js:67,待与后端/OpenAPI 核验
+FEAPI-0477,system/salaryConfig,listSalaryItems,GET,'/system/salaryConfig/' + schemeId + '/items',/system/salaryConfig/{schemeId}/items,erp-ui/src/api/system/salaryConfig.js:75,待与后端/OpenAPI 核验
+FEAPI-0478,system/salaryConfig,addSalaryItem,POST,'/system/salaryConfig/item',/system/salaryConfig/item,erp-ui/src/api/system/salaryConfig.js:83,待与后端/OpenAPI 核验
+FEAPI-0479,system/salaryConfig,updateSalaryItem,PUT,'/system/salaryConfig/item',/system/salaryConfig/item,erp-ui/src/api/system/salaryConfig.js:92,待与后端/OpenAPI 核验
+FEAPI-0480,system/salaryConfig,delSalaryItem,DELETE,'/system/salaryConfig/item/' + itemId,/system/salaryConfig/item/{itemId},erp-ui/src/api/system/salaryConfig.js:101,待与后端/OpenAPI 核验
+FEAPI-0481,system/salaryConfig,getRoleSalary,GET,'/system/salaryConfig/role/' + roleId,/system/salaryConfig/role/{roleId},erp-ui/src/api/system/salaryConfig.js:109,待与后端/OpenAPI 核验
+FEAPI-0482,system/salaryConfig,getRoleSalaryBatch,GET,'/system/salaryConfig/role/batch',/system/salaryConfig/role/batch,erp-ui/src/api/system/salaryConfig.js:117,待与后端/OpenAPI 核验
+FEAPI-0483,system/salaryConfig,saveRoleSalary,PUT,'/system/salaryConfig/role/' + roleId,/system/salaryConfig/role/{roleId},erp-ui/src/api/system/salaryConfig.js:126,待与后端/OpenAPI 核验
+FEAPI-0484,system/salaryConfig,getUserSalary,GET,'/system/salaryConfig/user/' + userId,/system/salaryConfig/user/{userId},erp-ui/src/api/system/salaryConfig.js:135,待与后端/OpenAPI 核验
+FEAPI-0485,system/salaryConfig,getUserSalaryBatch,GET,'/system/salaryConfig/user/batch',/system/salaryConfig/user/batch,erp-ui/src/api/system/salaryConfig.js:143,待与后端/OpenAPI 核验
+FEAPI-0486,system/salaryConfig,saveUserSalary,PUT,'/system/salaryConfig/user/' + userId,/system/salaryConfig/user/{userId},erp-ui/src/api/system/salaryConfig.js:152,待与后端/OpenAPI 核验
+FEAPI-0487,system/user,listUser,GET,'/system/user/list',/system/user/list,erp-ui/src/api/system/user.js:7,待与后端/OpenAPI 核验
+FEAPI-0488,system/user,getUserSetupSummary,GET,'/system/user/setup-summary',/system/user/setup-summary,erp-ui/src/api/system/user.js:17,待与后端/OpenAPI 核验
+FEAPI-0489,system/user,getUser,GET,'/system/user/' + parseStrEmpty(userId),/system/user/{parseStrEmpty_userId},erp-ui/src/api/system/user.js:26,待与后端/OpenAPI 核验
+FEAPI-0490,system/user,getUserPii,GET,`/system/user/${userId}/pii`,/system/user/{userId}/pii,erp-ui/src/api/system/user.js:34,待与后端/OpenAPI 核验
+FEAPI-0491,system/user,updateUserPii,PUT,`/system/user/${userId}/${afterCreate ? 'pii-after-create' : 'pii'}`,/system/user/{userId}/{afterCreate_pii-after-create_pii},erp-ui/src/api/system/user.js:43,待与后端/OpenAPI 核验
+FEAPI-0492,system/user,addUser,POST,'/system/user',/system/user,erp-ui/src/api/system/user.js:53,待与后端/OpenAPI 核验
+FEAPI-0493,system/user,updateUser,PUT,'/system/user',/system/user,erp-ui/src/api/system/user.js:62,待与后端/OpenAPI 核验
+FEAPI-0494,system/user,previewUserDerivedProfile,POST,"""/system/user/derived-preview""",/system/user/derived-preview,erp-ui/src/api/system/user.js:71,待与后端/OpenAPI 核验
+FEAPI-0495,system/user,delUser,DELETE,'/system/user/' + userId,/system/user/{userId},erp-ui/src/api/system/user.js:80,待与后端/OpenAPI 核验
+FEAPI-0496,system/user,resetUserPwd,PUT,'/system/user/resetPwd',/system/user/resetPwd,erp-ui/src/api/system/user.js:89,待与后端/OpenAPI 核验
+FEAPI-0497,system/user,changeUserStatus,PUT,'/system/user/changeStatus',/system/user/changeStatus,erp-ui/src/api/system/user.js:102,待与后端/OpenAPI 核验
+FEAPI-0498,system/user,getUserProfile,GET,'/system/user/profile',/system/user/profile,erp-ui/src/api/system/user.js:111,待与后端/OpenAPI 核验
+FEAPI-0499,system/user,updateUserProfile,PUT,'/system/user/profile',/system/user/profile,erp-ui/src/api/system/user.js:119,待与后端/OpenAPI 核验
+FEAPI-0500,system/user,getProfileCompletion,GET,'/system/user/profile/completion',/system/user/profile/completion,erp-ui/src/api/system/user.js:128,待与后端/OpenAPI 核验
+FEAPI-0501,system/user,updateProfileCompletion,PUT,'/system/user/profile/completion',/system/user/profile/completion,erp-ui/src/api/system/user.js:136,待与后端/OpenAPI 核验
+FEAPI-0502,system/user,updateUserPwd,PUT,'/system/user/profile/updatePwd',/system/user/profile/updatePwd,erp-ui/src/api/system/user.js:149,待与后端/OpenAPI 核验
+FEAPI-0503,system/user,uploadAvatar,POST,'/system/user/profile/avatar',/system/user/profile/avatar,erp-ui/src/api/system/user.js:158,待与后端/OpenAPI 核验
+FEAPI-0504,system/user,getAuthRole,GET,'/system/user/authRole/' + userId,/system/user/authRole/{userId},erp-ui/src/api/system/user.js:168,待与后端/OpenAPI 核验
+FEAPI-0505,system/user,updateAuthRole,PUT,'/system/user/authRole',/system/user/authRole,erp-ui/src/api/system/user.js:176,待与后端/OpenAPI 核验
+FEAPI-0506,system/user,deptTreeSelect,GET,'/system/user/deptTree',/system/user/deptTree,erp-ui/src/api/system/user.js:185,待与后端/OpenAPI 核验
+FEAPI-0507,system/userNotification,listUserNotifications,GET,'/system/user-notification/list',/system/user-notification/list,erp-ui/src/api/system/userNotification.js:5,待与后端/OpenAPI 核验
+FEAPI-0508,system/userNotification,getUserNotificationUnreadCount,GET,'/system/user-notification/unread-count',/system/user-notification/unread-count,erp-ui/src/api/system/userNotification.js:13,待与后端/OpenAPI 核验
+FEAPI-0509,system/userNotification,markUserNotificationRead,POST,'/system/user-notification/' + notificationId + '/read',/system/user-notification/{notificationId}/read,erp-ui/src/api/system/userNotification.js:21,待与后端/OpenAPI 核验
+FEAPI-0510,system/userNotification,registerUserDeviceToken,POST,'/system/user-notification/device-token',/system/user-notification/device-token,erp-ui/src/api/system/userNotification.js:29,待与后端/OpenAPI 核验
+FEAPI-0511,system/userNotification,disableUserDeviceToken,DELETE,'/system/user-notification/device-token',/system/user-notification/device-token,erp-ui/src/api/system/userNotification.js:37,待与后端/OpenAPI 核验
+FEAPI-0512,system/userShop,shopTree,GET,'/system/user/shop/tree',/system/user/shop/tree,erp-ui/src/api/system/userShop.js:6,待与后端/OpenAPI 核验
+FEAPI-0513,system/userShop,getUserShop,GET,'/system/user/shop/' + userId,/system/user/shop/{userId},erp-ui/src/api/system/userShop.js:14,待与后端/OpenAPI 核验
+FEAPI-0514,system/userShop,batchUserShop,GET,'/system/user/shop/batch',/system/user/shop/batch,erp-ui/src/api/system/userShop.js:22,待与后端/OpenAPI 核验
+FEAPI-0515,system/userShop,previewUserShop,POST,'/system/user/shop/' + userId + '/preview',/system/user/shop/{userId}/preview,erp-ui/src/api/system/userShop.js:31,待与后端/OpenAPI 核验
+FEAPI-0516,system/userShop,updateUserShop,PUT,'/system/user/shop/' + userId,/system/user/shop/{userId},erp-ui/src/api/system/userShop.js:40,待与后端/OpenAPI 核验
+FEAPI-0517,tool/gen,listTable,GET,'/code/gen/list',/code/gen/list,erp-ui/src/api/tool/gen.js:6,待与后端/OpenAPI 核验
+FEAPI-0518,tool/gen,listDbTable,GET,'/code/gen/db/list',/code/gen/db/list,erp-ui/src/api/tool/gen.js:14,待与后端/OpenAPI 核验
+FEAPI-0519,tool/gen,getGenTable,GET,'/code/gen/' + tableId,/code/gen/{tableId},erp-ui/src/api/tool/gen.js:23,待与后端/OpenAPI 核验
+FEAPI-0520,tool/gen,updateGenTable,PUT,'/code/gen',/code/gen,erp-ui/src/api/tool/gen.js:31,待与后端/OpenAPI 核验
+FEAPI-0521,tool/gen,importTable,POST,'/code/gen/importTable',/code/gen/importTable,erp-ui/src/api/tool/gen.js:40,待与后端/OpenAPI 核验
+FEAPI-0522,tool/gen,previewTable,GET,'/code/gen/preview/' + tableId,/code/gen/preview/{tableId},erp-ui/src/api/tool/gen.js:49,待与后端/OpenAPI 核验
+FEAPI-0523,tool/gen,delTable,DELETE,'/code/gen/' + tableId,/code/gen/{tableId},erp-ui/src/api/tool/gen.js:57,待与后端/OpenAPI 核验
+FEAPI-0524,tool/gen,genCode,GET,'/code/gen/genCode/' + tableName,/code/gen/genCode/{tableName},erp-ui/src/api/tool/gen.js:65,待与后端/OpenAPI 核验
+FEAPI-0525,tool/gen,synchDb,GET,'/code/gen/synchDb/' + tableName,/code/gen/synchDb/{tableName},erp-ui/src/api/tool/gen.js:73,待与后端/OpenAPI 核验
+FEAPI-0526,workbench/todo,PROVIDERS,GET,`${provider}/${endpoint}`,{provider}/{endpoint},erp-ui/src/api/workbench/todo.js:16,待与后端/OpenAPI 核验

@@ -1,0 +1,136 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.oa.mapper.OaFixedAssetConfigMapper">
+
+    <resultMap id="OaFixedAssetConfigResult" type="OaFixedAssetConfig">
+        <id property="configId" column="config_id"/>
+        <result property="shopDeptId" column="shop_dept_id"/>
+        <result property="shopDeptName" column="shop_dept_name"/>
+        <result property="oeItemId" column="oe_item_id"/>
+        <result property="oeItemCode" column="oe_item_code"/>
+        <result property="oeItemName" column="oe_item_name"/>
+        <result property="itemDescription" column="item_description"/>
+        <result property="orderUnit" column="order_unit"/>
+        <result property="imageUrl" column="image_url"/>
+        <result property="purchaseReferenceUrl" column="purchase_reference_url"/>
+        <result property="purchaseReferenceNote" column="purchase_reference_note"/>
+        <result property="assetQuantity" column="asset_quantity"/>
+        <result property="assetUnitPrice" column="asset_unit_price"/>
+        <result property="assetAmount" column="asset_amount"/>
+        <result property="status" column="status"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateBy" column="update_by"/>
+        <result property="updateTime" column="update_time"/>
+        <result property="remark" column="remark"/>
+    </resultMap>
+
+    <sql id="baseColumns">
+        c.config_id, c.shop_dept_id, sd.dept_name as shop_dept_name,
+        c.oe_item_id, i.oe_item_code, i.oe_item_name, i.item_description,
+        i.order_unit, i.image_url, i.purchase_reference_url,
+        i.purchase_reference_note,
+        c.asset_quantity, c.asset_unit_price, c.asset_amount, c.status,
+        c.create_by, c.create_time, c.update_by, c.update_time, c.remark
+    </sql>
+
+    <sql id="fromSql">
+        from oa_fixed_asset_config c
+        left join sys_dept sd on sd.dept_id = c.shop_dept_id
+        left join inv_oe_item i on i.oe_item_id = c.oe_item_id and i.del_flag = '0'
+    </sql>
+
+    <select id="selectConfigList" parameterType="OaFixedAssetConfig" resultMap="OaFixedAssetConfigResult">
+        select <include refid="baseColumns"/> <include refid="fromSql"/>
+        <where>
+            <if test="shopDeptId != null">and c.shop_dept_id = #{shopDeptId}</if>
+            <if test="oeItemId != null">and c.oe_item_id = #{oeItemId}</if>
+            <if test="oeItemName != null and oeItemName != ''">and i.oe_item_name like concat('%', #{oeItemName}, '%')</if>
+            <if test="status != null and status != ''">and c.status = #{status}</if>
+            <if test="params.scopeDeptIds != null and params.scopeDeptIds.size() > 0">
+                and c.shop_dept_id in
+                <foreach collection="params.scopeDeptIds" item="scopeDeptId" open="(" close=")" separator=",">
+                    #{scopeDeptId}
+                </foreach>
+            </if>
+        </where>
+        order by c.config_id desc
+    </select>
+
+    <select id="selectConfigById" resultMap="OaFixedAssetConfigResult">
+        select <include refid="baseColumns"/> <include refid="fromSql"/>
+        where c.config_id = #{configId}
+    </select>
+
+    <select id="sumAssetAmountByShop" resultType="java.math.BigDecimal">
+        select coalesce(sum(asset_amount), 0)
+        from oa_fixed_asset_config
+        where shop_dept_id = #{shopDeptId}
+          and status = '0'
+    </select>
+
+    <select id="selectOeItemSnapshot" resultMap="OaFixedAssetConfigResult">
+        select null as config_id,
+               null as shop_dept_id,
+               null as shop_dept_name,
+               i.oe_item_id,
+               i.oe_item_code,
+               i.oe_item_name,
+               i.item_description,
+               i.order_unit,
+               i.image_url,
+               i.purchase_reference_url,
+               i.purchase_reference_note,
+               null as asset_quantity,
+               i.cost_price as asset_unit_price,
+               null as asset_amount,
+               i.status,
+               i.create_by,
+               i.create_time,
+               i.update_by,
+               i.update_time,
+               i.remark
+        from inv_oe_item i
+        where i.oe_item_id = #{oeItemId}
+          and i.del_flag = '0'
+          and i.status = '0'
+    </select>
+
+    <select id="selectActiveConfigByShopAndOeItem" resultMap="OaFixedAssetConfigResult">
+        select <include refid="baseColumns"/> <include refid="fromSql"/>
+        where c.shop_dept_id = #{shopDeptId}
+          and c.oe_item_id = #{oeItemId}
+          and c.status = '0'
+        limit 1
+    </select>
+
+    <insert id="insertConfig" parameterType="OaFixedAssetConfig" useGeneratedKeys="true" keyProperty="configId">
+        insert into oa_fixed_asset_config (
+            shop_dept_id, oe_item_id, asset_quantity, asset_unit_price, asset_amount, status,
+            create_by, create_time, remark
+        ) values (
+            #{shopDeptId}, #{oeItemId}, #{assetQuantity}, #{assetUnitPrice}, #{assetAmount}, #{status},
+            #{createBy}, sysdate(), #{remark}
+        )
+    </insert>
+
+    <update id="updateConfig" parameterType="OaFixedAssetConfig">
+        update oa_fixed_asset_config
+        <set>
+            <if test="shopDeptId != null">shop_dept_id = #{shopDeptId},</if>
+            <if test="oeItemId != null">oe_item_id = #{oeItemId},</if>
+            <if test="assetQuantity != null">asset_quantity = #{assetQuantity},</if>
+            <if test="assetUnitPrice != null">asset_unit_price = #{assetUnitPrice},</if>
+            <if test="assetAmount != null">asset_amount = #{assetAmount},</if>
+            <if test="status != null and status != ''">status = #{status},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            <if test="updateBy != null and updateBy != ''">update_by = #{updateBy},</if>
+            update_time = sysdate()
+        </set>
+        where config_id = #{configId}
+    </update>
+
+    <delete id="deleteConfigById">
+        delete from oa_fixed_asset_config where config_id = #{configId}
+    </delete>
+</mapper>

@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.system.mapper.SysRoleSalarySchemeMapper">
+
+    <resultMap id="SysRoleSalarySchemeResult" type="SysRoleSalaryScheme">
+        <id     property="relationId"    column="relation_id"   />
+        <result property="roleId"        column="role_id"       />
+        <result property="schemeId"      column="scheme_id"     />
+        <result property="itemId"        column="item_id"       />
+        <result property="priority"      column="priority"      />
+        <result property="effectiveDate" column="effective_date"/>
+        <result property="schemeName"    column="scheme_name"   />
+        <result property="socialType"    column="social_type"   />
+        <result property="postName"      column="post_name"     />
+        <result property="regionName"    column="region_name"   />
+        <result property="totalSalary"   column="total_salary"  />
+        <result property="createBy"      column="create_by"     />
+        <result property="createTime"    column="create_time"   />
+        <result property="updateBy"      column="update_by"     />
+        <result property="updateTime"    column="update_time"   />
+        <result property="remark"        column="remark"        />
+    </resultMap>
+
+    <sql id="selectRoleSalarySchemeVo">
+        select rs.relation_id,
+               rs.role_id,
+               rs.scheme_id,
+               rs.item_id,
+               rs.priority,
+               rs.effective_date,
+               rs.create_by,
+               rs.create_time,
+               rs.update_by,
+               rs.update_time,
+               rs.remark,
+               s.scheme_name,
+               s.social_type,
+               i.post_name,
+               i.region_name,
+               i.total_salary
+        from sys_role_salary_scheme rs
+             left join sys_salary_scheme s on s.scheme_id = rs.scheme_id
+             left join sys_salary_scheme_item i on i.item_id = rs.item_id
+    </sql>
+
+    <select id="selectRoleSalarySchemesByRoleId" parameterType="Long" resultMap="SysRoleSalarySchemeResult">
+        <include refid="selectRoleSalarySchemeVo"/>
+        where rs.role_id = #{roleId}
+        order by rs.priority desc, rs.relation_id asc
+    </select>
+
+    <select id="selectRoleSalarySchemesByRoleIds" resultMap="SysRoleSalarySchemeResult">
+        <include refid="selectRoleSalarySchemeVo"/>
+        where rs.role_id in
+        <foreach collection="roleIds" item="roleId" open="(" separator="," close=")">
+            #{roleId}
+        </foreach>
+        order by rs.role_id asc, rs.priority desc, rs.relation_id asc
+    </select>
+
+    <select id="selectRoleSalarySchemesBySchemeId" parameterType="Long" resultMap="SysRoleSalarySchemeResult">
+        <include refid="selectRoleSalarySchemeVo"/>
+        where rs.scheme_id = #{schemeId}
+        order by rs.priority desc, rs.relation_id asc
+    </select>
+
+    <delete id="deleteRoleSalarySchemeByRoleId" parameterType="Long">
+        delete from sys_role_salary_scheme where role_id = #{roleId}
+    </delete>
+
+    <delete id="deleteRoleSalarySchemeBySchemeIds" parameterType="Long">
+        delete from sys_role_salary_scheme where scheme_id in
+        <foreach collection="array" item="schemeId" open="(" separator="," close=")">
+            #{schemeId}
+        </foreach>
+    </delete>
+
+    <insert id="batchRoleSalaryScheme">
+        insert into sys_role_salary_scheme (
+            role_id,
+            scheme_id,
+            item_id,
+            priority,
+            effective_date,
+            remark,
+            create_by,
+            create_time
+        ) values
+        <foreach collection="list" item="item" separator=",">
+            (
+                #{item.roleId},
+                #{item.schemeId},
+                #{item.itemId},
+                #{item.priority},
+                #{item.effectiveDate},
+                #{item.remark},
+                #{item.createBy},
+                sysdate()
+            )
+        </foreach>
+    </insert>
+</mapper>

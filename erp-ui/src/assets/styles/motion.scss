@@ -1,0 +1,378 @@
+/*
+ * ERP motion system
+ *
+ * Productivity-first weighting: Emil Kowalski (restraint and speed), then
+ * Jakub Krehel (subtle production polish). Motion is limited to feedback,
+ * orientation, and state continuity; high-frequency route changes stay instant.
+ */
+
+:root {
+  --motion-duration-instant: 0ms;
+  --motion-duration-fast: 120ms;
+  --motion-duration-base: 180ms;
+  --motion-duration-slow: 240ms;
+  --motion-ease-enter: cubic-bezier(0.16, 1, 0.3, 1);
+  --motion-ease-exit: cubic-bezier(0.4, 0, 1, 1);
+  --motion-ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --motion-distance-enter: 8px;
+  --motion-distance-exit: 4px;
+  --motion-press-scale: 0.98;
+  --motion-enter-blur: 2px;
+  --motion-exit-blur: 1px;
+}
+
+/* Pointer-only tactile feedback. Keyboard activation deliberately stays instant. */
+@media (prefers-reduced-motion: no-preference) {
+  :where(
+    .el-button,
+    .mobile-button,
+    .mobile-icon-button,
+    .mobile-system-control,
+    .collapse-button,
+    .tree-action-icon,
+    .pan-btn
+  ) {
+    transition:
+      transform var(--motion-duration-fast) var(--motion-ease-standard),
+      filter var(--motion-duration-fast) var(--motion-ease-standard);
+  }
+
+  html[data-input-modality="pointer"]
+    :where(
+      .el-button,
+      .mobile-button,
+      .mobile-icon-button,
+      .mobile-system-control,
+      .collapse-button,
+      .tree-action-icon,
+      .pan-btn
+    ):not(.is-disabled):not(.is-loading):not(:disabled):not([aria-disabled="true"]):active {
+    transform: scale(var(--motion-press-scale));
+    filter: brightness(0.97);
+  }
+}
+
+/* Desktop shell changes are high-frequency and avoid layout animation. */
+#app .main-container,
+#app .sidebar-container,
+.collapse-transition,
+.horizontal-collapse-transition {
+  transition: none !important;
+}
+
+/* The mobile sidebar is spatial; pointer opening gets one short transform cue. */
+#app .mobile .sidebar-container {
+  transition: none !important;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  html[data-input-modality="pointer"] #app .mobile .sidebar-container {
+    transition: transform var(--motion-duration-base) var(--motion-ease-standard) !important;
+  }
+}
+
+/*
+ * Element UI overlays: short enter, quieter exit, and logical origins.
+ * These rules replace the library's large scale/20px travel defaults.
+ */
+.el-fade-in-linear-enter-active,
+.el-fade-in-enter-active,
+.fade-in-linear-enter-active {
+  transition:
+    opacity var(--motion-duration-base) var(--motion-ease-enter),
+    filter var(--motion-duration-base) var(--motion-ease-enter);
+  filter: blur(0);
+}
+
+.el-fade-in-linear-leave-active,
+.el-fade-in-leave-active,
+.fade-in-linear-leave-active {
+  transition:
+    opacity var(--motion-duration-fast) var(--motion-ease-exit),
+    filter var(--motion-duration-fast) var(--motion-ease-exit);
+  filter: blur(0);
+}
+
+.el-fade-in-linear-enter,
+.el-fade-in-enter,
+.fade-in-linear-enter {
+  opacity: 0;
+  filter: blur(var(--motion-enter-blur));
+}
+
+.el-fade-in-linear-leave-to,
+.el-fade-in-leave-to,
+.fade-in-linear-leave-to {
+  opacity: 0;
+  filter: blur(var(--motion-exit-blur));
+}
+
+.el-zoom-in-center-enter-active,
+.el-zoom-in-top-enter-active,
+.el-zoom-in-bottom-enter-active,
+.el-zoom-in-left-enter-active {
+  transition:
+    opacity var(--motion-duration-base) var(--motion-ease-enter),
+    transform var(--motion-duration-base) var(--motion-ease-enter),
+    filter var(--motion-duration-base) var(--motion-ease-enter);
+  filter: blur(0);
+}
+
+.el-zoom-in-center-leave-active,
+.el-zoom-in-top-leave-active,
+.el-zoom-in-bottom-leave-active,
+.el-zoom-in-left-leave-active {
+  transition:
+    opacity var(--motion-duration-fast) var(--motion-ease-exit),
+    transform var(--motion-duration-fast) var(--motion-ease-exit),
+    filter var(--motion-duration-fast) var(--motion-ease-exit);
+  filter: blur(0);
+}
+
+.el-zoom-in-center-enter {
+  opacity: 0;
+  transform: scale(0.96);
+  filter: blur(var(--motion-enter-blur));
+}
+
+.el-zoom-in-center-leave-active,
+.el-zoom-in-center-leave-to {
+  opacity: 0;
+  transform: scale(0.98);
+  filter: blur(var(--motion-exit-blur));
+}
+
+.el-zoom-in-top-enter,
+.el-zoom-in-left-enter {
+  opacity: 0;
+  transform: translateY(calc(0px - var(--motion-distance-enter))) scale(0.98);
+  filter: blur(var(--motion-enter-blur));
+}
+
+.el-zoom-in-top-leave-active,
+.el-zoom-in-left-leave-active,
+.el-zoom-in-top-leave-to,
+.el-zoom-in-left-leave-to {
+  opacity: 0;
+  transform: translateY(calc(0px - var(--motion-distance-exit))) scale(0.99);
+  filter: blur(var(--motion-exit-blur));
+}
+
+.el-zoom-in-bottom-enter {
+  opacity: 0;
+  transform: translateY(var(--motion-distance-enter)) scale(0.98);
+  filter: blur(var(--motion-enter-blur));
+}
+
+.el-zoom-in-bottom-leave-active,
+.el-zoom-in-bottom-leave-to {
+  opacity: 0;
+  transform: translateY(var(--motion-distance-exit)) scale(0.99);
+  filter: blur(var(--motion-exit-blur));
+}
+
+.el-zoom-in-top-enter-active,
+.el-zoom-in-top-leave-active {
+  transform-origin: center top;
+}
+
+.el-zoom-in-bottom-enter-active,
+.el-zoom-in-bottom-leave-active {
+  transform-origin: center bottom;
+}
+
+.el-zoom-in-left-enter-active,
+.el-zoom-in-left-leave-active {
+  transform-origin: top left;
+}
+
+/* Dialog and message-box wrappers are interruptible transitions, not keyframes. */
+.dialog-fade-enter-active,
+.dialog-fade-leave-active,
+.msgbox-fade-enter-active,
+.msgbox-fade-leave-active {
+  animation: none !important;
+}
+
+.dialog-fade-enter-active,
+.msgbox-fade-enter-active {
+  transition: opacity var(--motion-duration-base) var(--motion-ease-enter);
+}
+
+.dialog-fade-leave-active,
+.msgbox-fade-leave-active {
+  transition: opacity var(--motion-duration-fast) var(--motion-ease-exit);
+}
+
+/* Large dialogs can contain several tables; avoid full-surface GPU blur. */
+.dialog-fade-enter-active .el-dialog {
+  transition:
+    opacity var(--motion-duration-base) var(--motion-ease-enter),
+    transform var(--motion-duration-base) var(--motion-ease-enter);
+}
+
+.dialog-fade-leave-active .el-dialog {
+  transition:
+    opacity var(--motion-duration-fast) var(--motion-ease-exit),
+    transform var(--motion-duration-fast) var(--motion-ease-exit);
+}
+
+.dialog-fade-enter,
+.dialog-fade-leave-to,
+.msgbox-fade-enter,
+.msgbox-fade-leave-to {
+  opacity: 0;
+}
+
+.dialog-fade-enter .el-dialog {
+  opacity: 0;
+  transform: translateY(var(--motion-distance-enter));
+}
+
+/*
+ * Element UI moves append-to-body dialogs while Vue 2 is entering them.
+ * Safari can retain the dialog-fade-enter class after that move, which would
+ * otherwise leave the dialog transparent behind a live modal overlay. Dialog
+ * availability is more important than decorative enter motion in this ERP, so
+ * an entering dialog wrapper always resolves to its final visible state.
+ */
+.el-dialog__wrapper.dialog-fade-enter {
+  opacity: 1 !important;
+}
+
+.el-dialog__wrapper.dialog-fade-enter .el-dialog {
+  opacity: 1 !important;
+  transform: none !important;
+}
+
+/*
+ * Element UI also reparents append-to-body drawers during their Vue 2 enter
+ * transition. Safari can leave both el-drawer-fade-enter classes attached,
+ * freezing the wrapper at the transparent first frame while its modal remains
+ * visible. Resolve only the wrapper to its final painted state so the existing
+ * drawer slide and leave animations remain unchanged.
+ */
+.el-drawer__wrapper.el-drawer-fade-enter,
+.el-drawer__wrapper.el-drawer-fade-enter-active {
+  opacity: 1 !important;
+  animation: none !important;
+}
+
+.dialog-fade-leave-to .el-dialog {
+  opacity: 0;
+  transform: translateY(calc(0px - var(--motion-distance-exit)));
+}
+
+/* Message boxes are compact enough to retain the low-cost focus cue. */
+.msgbox-fade-enter-active .el-message-box {
+  transition:
+    opacity var(--motion-duration-base) var(--motion-ease-enter),
+    transform var(--motion-duration-base) var(--motion-ease-enter),
+    filter var(--motion-duration-base) var(--motion-ease-enter);
+}
+
+.msgbox-fade-leave-active .el-message-box {
+  transition:
+    opacity var(--motion-duration-fast) var(--motion-ease-exit),
+    transform var(--motion-duration-fast) var(--motion-ease-exit),
+    filter var(--motion-duration-fast) var(--motion-ease-exit);
+}
+
+.msgbox-fade-enter .el-message-box {
+  opacity: 0;
+  transform: translateY(var(--motion-distance-enter));
+  filter: blur(var(--motion-enter-blur));
+}
+
+.msgbox-fade-leave-to .el-message-box {
+  opacity: 0;
+  transform: translateY(calc(0px - var(--motion-distance-exit)));
+  filter: blur(var(--motion-exit-blur));
+}
+
+/* Messages keep their stacking position instant; only visual state transitions. */
+.el-message {
+  transition:
+    opacity var(--motion-duration-base) var(--motion-ease-enter),
+    transform var(--motion-duration-base) var(--motion-ease-enter),
+    filter var(--motion-duration-base) var(--motion-ease-enter);
+}
+
+.el-message-fade-enter {
+  opacity: 0;
+  transform: translate(-50%, calc(0px - var(--motion-distance-enter)));
+  filter: blur(var(--motion-enter-blur));
+}
+
+.el-message-fade-leave-active {
+  opacity: 0;
+  transform: translate(-50%, calc(0px - var(--motion-distance-exit)));
+  filter: blur(var(--motion-exit-blur));
+  transition-duration: var(--motion-duration-fast);
+  transition-timing-function: var(--motion-ease-exit);
+}
+
+.el-notification {
+  transition:
+    opacity var(--motion-duration-base) var(--motion-ease-enter),
+    transform var(--motion-duration-base) var(--motion-ease-enter),
+    filter var(--motion-duration-base) var(--motion-ease-enter);
+}
+
+.el-notification-fade-enter.right {
+  right: 16px;
+  transform: translateX(var(--motion-distance-enter));
+  filter: blur(var(--motion-enter-blur));
+}
+
+.el-notification-fade-enter.left {
+  left: 16px;
+  transform: translateX(calc(0px - var(--motion-distance-enter)));
+  filter: blur(var(--motion-enter-blur));
+}
+
+.el-notification-fade-leave-active {
+  opacity: 0;
+  transform: translateY(calc(0px - var(--motion-distance-exit)));
+  filter: blur(var(--motion-exit-blur));
+  transition-duration: var(--motion-duration-fast);
+  transition-timing-function: var(--motion-ease-exit);
+}
+
+/* Sidebar collapse is occasional, but the former 1.5s logo fade was excessive. */
+.sidebarLogoFade-enter-active {
+  transition-duration: var(--motion-duration-base) !important;
+  transition-timing-function: var(--motion-ease-enter) !important;
+}
+
+/* Motion accessibility is global: desktop, mobile, and third-party components. */
+@media (prefers-reduced-motion: reduce) {
+  html:focus-within {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-delay: 0ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    transition-delay: 0ms !important;
+  }
+
+  html[data-input-modality]
+    :where(
+      .el-button,
+      .mobile-button,
+      .mobile-icon-button,
+      .mobile-system-control,
+      .collapse-button,
+      .tree-action-icon,
+      .pan-btn
+    ):active {
+    transform: none !important;
+    filter: none !important;
+  }
+}

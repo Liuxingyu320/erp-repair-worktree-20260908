@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.system.mapper.SysUserShopMapper">
+
+    <resultMap type="SysUserShop" id="SysUserShopResult">
+        <result property="userId"     column="user_id"     />
+        <result property="deptId"     column="dept_id"     />
+        <result property="isDefault"  column="is_default"  />
+        <result property="createBy"   column="create_by"   />
+        <result property="createTime" column="create_time" />
+    </resultMap>
+
+    <select id="selectShopDeptIdsByUserId" resultType="Long">
+        select us.dept_id
+        from sys_user_shop us
+             inner join sys_dept d on d.dept_id = us.dept_id
+        where us.user_id = #{userId}
+          and d.del_flag = '0'
+          and d.status = '0'
+          and d.dept_type in ('GROUP', 'COMPANY', 'STORE', 'WAREHOUSE')
+        order by d.parent_id, d.order_num
+    </select>
+
+    <select id="selectAllShopDeptIdsByUserId" resultType="Long">
+        select us.dept_id
+        from sys_user_shop us
+        where us.user_id = #{userId}
+        order by us.dept_id
+    </select>
+
+    <select id="lockUserForShopScope" resultType="Long">
+        select user_id
+        from sys_user
+        where user_id = #{userId}
+          and del_flag = '0'
+        for update
+    </select>
+
+    <select id="selectUserShopsByUserIds" resultMap="SysUserShopResult">
+        select us.user_id,
+               us.dept_id,
+               us.is_default,
+               us.create_by,
+               us.create_time
+        from sys_user_shop us
+             inner join sys_dept d on d.dept_id = us.dept_id
+        where us.user_id in
+        <foreach collection="userIds" item="userId" open="(" separator="," close=")">
+            #{userId}
+        </foreach>
+          and d.del_flag = '0'
+          and d.status = '0'
+          and d.dept_type in ('GROUP', 'COMPANY', 'STORE', 'WAREHOUSE')
+        order by us.user_id, d.parent_id, d.order_num
+    </select>
+
+    <select id="countUserShopScope" resultType="int">
+        select count(1)
+        from sys_user_shop us
+             inner join sys_dept scope_dept on scope_dept.dept_id = us.dept_id
+             inner join sys_dept target_dept on target_dept.dept_id = #{deptId}
+        where us.user_id = #{userId}
+          and scope_dept.del_flag = '0'
+          and scope_dept.status = '0'
+          and scope_dept.dept_type in ('GROUP', 'COMPANY', 'STORE', 'WAREHOUSE')
+          and target_dept.del_flag = '0'
+          and target_dept.status = '0'
+          and target_dept.dept_type in ('GROUP', 'COMPANY', 'STORE', 'WAREHOUSE')
+          and (
+              target_dept.dept_id = scope_dept.dept_id
+              or find_in_set(scope_dept.dept_id, target_dept.ancestors)
+          )
+    </select>
+
+    <delete id="deleteUserShopByUserId" parameterType="Long">
+        delete from sys_user_shop where user_id = #{userId}
+    </delete>
+
+    <delete id="deleteUserShopByUserIdAndDeptIds">
+        delete from sys_user_shop
+        where user_id = #{userId}
+        <choose>
+            <when test="deptIds != null and deptIds.size() > 0">
+                and dept_id in
+                <foreach collection="deptIds" item="deptId" open="(" separator="," close=")">
+                    #{deptId}
+                </foreach>
+            </when>
+            <otherwise>
+                and 1 = 0
+            </otherwise>
+        </choose>
+    </delete>
+
+    <delete id="deleteUserShopByUserIds" parameterType="Long">
+        delete from sys_user_shop where user_id in
+        <foreach collection="array" item="userId" open="(" separator="," close=")">
+            #{userId}
+        </foreach>
+    </delete>
+
+    <insert id="batchUserShop">
+        insert into sys_user_shop(user_id, dept_id, is_default, create_by, create_time) values
+        <foreach item="item" index="index" collection="list" separator=",">
+            (#{item.userId}, #{item.deptId}, #{item.isDefault}, #{item.createBy}, sysdate())
+        </foreach>
+    </insert>
+
+    <insert id="insertUserShopIfAbsent">
+        insert into sys_user_shop (user_id, dept_id, is_default, create_by, create_time)
+        select #{userId}, #{deptId}, 'N', #{operator}, sysdate() from dual
+        where not exists (
+            select 1 from sys_user_shop where user_id = #{userId} and dept_id = #{deptId}
+        )
+    </insert>
+</mapper>

@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "releaseId": "new-business-20260714",
+  "candidateCommit": "0000000000000000000000000000000000000000",
+  "runId": "uat-20260714-001",
+  "completedAt": "2026-07-14T18:00:00+08:00",
+  "environment": {
+    "databaseFingerprintSha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "organizationFingerprintSha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "stores": ["storeA", "storeB"],
+    "warehouses": ["warehouseA", "warehouseB"]
+  },
+  "artifacts": {
+    "api": {
+      "path": "../../../output/uat/api-evidence.json",
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "checkCount": 1,
+      "status": "passed"
+    },
+    "browser": {
+      "path": "../../../output/playwright/new-business/browser-results.tsv",
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "checkCount": 1,
+      "status": "passed"
+    }
+  },
+  "scenarios": [
+    { "id": "health-certificate", "status": "passed", "evidenceTypes": ["api", "browser"], "negativeCaseCount": 1, "reviewer": "验收人", "reviewedAt": "2026-07-14T18:00:00+08:00" },
+    { "id": "fixed-asset-reporting", "status": "passed", "evidenceTypes": ["api", "browser"], "negativeCaseCount": 1, "reviewer": "验收人", "reviewedAt": "2026-07-14T18:00:00+08:00" },
+    { "id": "transfer-return-discrepancy", "status": "passed", "evidenceTypes": ["api", "browser"], "negativeCaseCount": 1, "reviewer": "验收人", "reviewedAt": "2026-07-14T18:00:00+08:00" },
+    { "id": "customer-service-card", "status": "passed", "evidenceTypes": ["api", "browser"], "negativeCaseCount": 1, "reviewer": "验收人", "reviewedAt": "2026-07-14T18:00:00+08:00" }
+  ],
+  "signoff": {
+    "businessOwner": "业务负责人",
+    "qaOwner": "测试负责人",
+    "releaseOwner": "发布负责人",
+    "approvedAt": "2026-07-14T18:00:00+08:00",
+    "decision": "approved"
+  }
+}

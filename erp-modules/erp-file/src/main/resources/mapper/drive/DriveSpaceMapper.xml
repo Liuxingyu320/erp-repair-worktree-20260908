@@ -1,0 +1,156 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.file.drive.mapper.DriveSpaceMapper">
+
+    <resultMap id="DriveSpaceResult" type="com.erp.file.drive.domain.DriveSpace">
+        <id property="spaceId" column="space_id" />
+        <result property="spaceKey" column="space_key" />
+        <result property="spaceType" column="space_type" />
+        <result property="ownerUserId" column="owner_user_id" />
+        <result property="deptId" column="dept_id" />
+        <result property="spaceName" column="space_name" />
+        <result property="quotaBytes" column="quota_bytes" />
+        <result property="usedBytes" column="used_bytes" />
+        <result property="quotaSourceType" column="quota_source_type" />
+        <result property="quotaSourceId" column="quota_source_id" />
+        <result property="quotaSyncedTime" column="quota_synced_time" />
+        <result property="status" column="status" />
+        <result property="version" column="version" />
+        <result property="createBy" column="create_by" />
+        <result property="createTime" column="create_time" />
+        <result property="updateBy" column="update_by" />
+        <result property="updateTime" column="update_time" />
+        <result property="remark" column="remark" />
+    </resultMap>
+
+    <sql id="DriveSpaceColumns">
+        space_id, space_key, space_type, owner_user_id, dept_id, space_name,
+        quota_bytes, used_bytes, quota_source_type, quota_source_id,
+        quota_synced_time, status, version, create_by, create_time, update_by,
+        update_time, remark
+    </sql>
+
+    <select id="selectById" resultMap="DriveSpaceResult">
+        select <include refid="DriveSpaceColumns" />
+        from drive_space
+        where space_id = #{spaceId}
+    </select>
+
+    <select id="selectByIdForUpdate" resultMap="DriveSpaceResult">
+        select <include refid="DriveSpaceColumns" />
+        from drive_space
+        where space_id = #{spaceId}
+        for update
+    </select>
+
+    <select id="selectByKey" resultMap="DriveSpaceResult">
+        select <include refid="DriveSpaceColumns" />
+        from drive_space
+        where space_key = #{spaceKey}
+    </select>
+
+    <select id="selectByDeptIds" resultMap="DriveSpaceResult">
+        select <include refid="DriveSpaceColumns" />
+        from drive_space
+        where space_type = 'DEPARTMENT'
+          <choose>
+              <when test="deptIds != null and deptIds.size() > 0">
+                  and dept_id in
+                  <foreach collection="deptIds" item="deptId" open="(" separator="," close=")">
+                      #{deptId}
+                  </foreach>
+              </when>
+              <otherwise>
+                  and 1 = 0
+              </otherwise>
+          </choose>
+        order by dept_id
+    </select>
+
+    <select id="selectByType" resultMap="DriveSpaceResult">
+        select <include refid="DriveSpaceColumns" />
+        from drive_space
+        where space_type = #{spaceType}
+        order by space_id
+    </select>
+
+    <select id="selectTotalUsedBytes" resultType="java.lang.Long">
+        select coalesce(sum(used_bytes), 0)
+        from drive_space
+    </select>
+
+    <insert id="insertIgnore" useGeneratedKeys="true" keyProperty="spaceId">
+        insert ignore into drive_space (
+            space_key, space_type, owner_user_id, dept_id, space_name,
+            quota_bytes, used_bytes, quota_source_type, quota_source_id,
+            quota_synced_time, status, version, create_by, create_time,
+            update_by, update_time, remark
+        ) values (
+            #{spaceKey}, #{spaceType}, #{ownerUserId}, #{deptId}, #{spaceName},
+            #{quotaBytes}, #{usedBytes}, #{quotaSourceType}, #{quotaSourceId},
+            #{quotaSyncedTime}, #{status}, #{version}, #{createBy}, #{createTime},
+            #{updateBy}, #{updateTime}, #{remark}
+        )
+    </insert>
+
+    <update id="reserveQuota">
+        update drive_space
+        set used_bytes = used_bytes + #{bytes},
+            version = version + 1,
+            update_time = now()
+        where space_id = #{spaceId}
+          and status = 'ACTIVE'
+          and used_bytes + #{bytes} &lt;= quota_bytes
+    </update>
+
+    <update id="releaseQuota">
+        update drive_space
+        set used_bytes = used_bytes - #{bytes},
+            version = version + 1,
+            update_time = now()
+        where space_id = #{spaceId}
+          and status = 'ACTIVE'
+          and used_bytes &gt;= #{bytes}
+    </update>
+
+    <update id="updateQuota">
+        update drive_space
+        set quota_bytes = #{quotaBytes},
+            version = version + 1,
+            update_by = #{updateBy},
+            update_time = now()
+        where space_id = #{spaceId}
+          and version = #{version}
+          and status = 'ACTIVE'
+          and used_bytes &lt;= #{quotaBytes}
+    </update>
+
+    <update id="updateEffectiveQuota">
+        update drive_space
+        set quota_bytes = #{quotaBytes},
+            quota_source_type = #{quotaSourceType},
+            quota_source_id = #{quotaSourceId},
+            quota_synced_time = now(),
+            version = version + 1,
+            update_by = #{updateBy},
+            update_time = now()
+        where space_id = #{spaceId}
+          and version = #{version}
+          and status in ('ACTIVE', 'READ_ONLY')
+    </update>
+
+    <update id="updateOrganizationMetadata">
+        update drive_space
+        set space_name = #{spaceName},
+            status = #{status},
+            version = version + 1,
+            update_by = #{updateBy},
+            update_time = now()
+        where space_type = 'DEPARTMENT'
+          and dept_id = #{deptId}
+          and (space_name &lt;&gt; #{spaceName} or status &lt;&gt; #{status})
+    </update>
+
+</mapper>

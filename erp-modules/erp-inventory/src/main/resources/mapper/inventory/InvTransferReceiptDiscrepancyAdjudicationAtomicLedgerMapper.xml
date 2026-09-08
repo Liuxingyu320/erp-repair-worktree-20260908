@@ -1,0 +1,271 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.inventory.mapper.InvTransferReceiptDiscrepancyAdjudicationAtomicLedgerMapper">
+
+    <insert id="insertResponsibilityLedger">
+        insert into
+            inv_transfer_receipt_discrepancy_responsibility_ledger (
+            request_id, discrepancy_case_id, adjudication_id,
+            adjudication_action_id, action_version_before,
+            action_version_after, case_version_before,
+            case_version_after, case_status_before, case_status_after,
+            plan_status_before, plan_status_after, action_status_before,
+            action_status_after,
+            action_sequence, receipt_id, receipt_allocation_id,
+            shipment_id, transfer_id, shipment_allocation_id, item_type,
+            item_id, product_id, discrepancy_type, action_type,
+            effect_kind, responsible_party, action_quantity,
+            source_cost_price, action_amount, decision_fingerprint,
+            execution_fingerprint, adjudication_note, action_note,
+            evidence_refs, required_permission, operator_user_id,
+            operator_name, occurred_time, create_by, create_time
+        )
+        select #{effect.execution.requestId}, c.discrepancy_case_id,
+               a.adjudication_id, x.adjudication_action_id,
+               #{effect.execution.executionVersionBefore},
+               #{effect.execution.executionVersionAfter},
+               #{effect.execution.caseVersionBefore},
+               #{effect.execution.caseVersionAfter},
+               #{effect.execution.caseStatusBefore},
+               #{effect.execution.caseStatusAfter},
+               #{effect.execution.planStatusBefore},
+               #{effect.execution.planStatusAfter},
+               #{effect.execution.actionStatusBefore},
+               #{effect.execution.actionStatusAfter},
+               x.action_sequence, c.receipt_id,
+               c.receipt_allocation_id, c.shipment_id, c.transfer_id,
+               c.shipment_allocation_id, ra.item_type, ra.item_id,
+               ra.product_id, c.discrepancy_type, x.action_type,
+               #{effect.ledgerKind}, x.responsible_party,
+               x.action_quantity, a.source_cost_price, x.action_amount,
+               a.decision_fingerprint,
+               #{effect.execution.eventFingerprint},
+               a.adjudication_note, x.action_note, a.evidence_refs,
+               #{effect.execution.requiredPermission},
+               #{effect.execution.executorUserId},
+               #{effect.execution.executorName},
+               #{effect.execution.executedAt},
+               #{effect.execution.executorName}, sysdate()
+        from inv_transfer_receipt_discrepancy_case c
+        inner join inv_transfer_receipt_discrepancy_adjudication a
+                on a.discrepancy_case_id = c.discrepancy_case_id
+               and a.adjudication_id =
+                   #{effect.execution.adjudicationId}
+        inner join
+            inv_transfer_receipt_discrepancy_adjudication_action x
+                on x.discrepancy_case_id = c.discrepancy_case_id
+               and x.adjudication_id = a.adjudication_id
+               and x.adjudication_action_id =
+                   #{effect.execution.actionId}
+        inner join inv_transfer_shipment_receipt_allocation ra
+                on ra.receipt_allocation_id = c.receipt_allocation_id
+               and ra.receipt_id = c.receipt_id
+               and ra.shipment_id = c.shipment_id
+               and ra.shipment_allocation_id =
+                   c.shipment_allocation_id
+        where c.discrepancy_case_id = #{effect.execution.caseId}
+          and c.case_version = #{effect.execution.caseVersionBefore}
+          and c.status = #{effect.execution.caseStatusBefore}
+          and a.plan_status = #{effect.execution.planStatusBefore}
+          and a.decision_fingerprint =
+              #{effect.execution.decisionFingerprint}
+          and a.source_cost_price =
+              #{effect.execution.sourceCostPrice}
+          and x.action_sequence = #{effect.execution.actionSequence}
+          and x.action_type = 'responsibility_adjustment'
+          and x.action_type = #{effect.execution.actionType}
+          and x.coverage_kind = #{effect.execution.coverageKind}
+          and ((c.discrepancy_type = 'shortage'
+                and x.coverage_kind = 'resolution')
+               or (c.discrepancy_type = 'damaged'
+                   and x.coverage_kind = 'responsibility'))
+          and x.action_quantity = #{effect.execution.quantity}
+          and x.action_amount = #{effect.execution.amount}
+          and x.responsible_party =
+              #{effect.execution.responsibleParty}
+          and x.execution_status =
+              #{effect.execution.actionStatusBefore}
+          and x.execution_status = 'pending'
+          and x.execution_version =
+              #{effect.execution.executionVersionBefore}
+          and x.execution_effect_reference is null
+          and c.discrepancy_type in ('shortage', 'damaged')
+          and c.discrepancy_type =
+              #{effect.execution.discrepancyType}
+          and #{effect.ledgerKind} = 'responsibility_ledger'
+          and #{effect.execution.effectKind} =
+              'responsibility_ledger'
+          and #{effect.execution.command} = 'dispatch'
+          and #{effect.execution.actionStatusAfter} = 'completed'
+          and #{effect.execution.executionVersionAfter} =
+              #{effect.execution.executionVersionBefore} + 1
+          and #{effect.execution.caseVersionAfter} =
+              #{effect.execution.caseVersionBefore} + 1
+          and #{effect.execution.effectReference} is null
+          and #{effect.execution.requiredPermission} =
+              'inv:transfer:discrepancy:execute'
+          and exists (
+              select 1
+              from inv_transfer_receipt_discrepancy_adjudication_execution_event event
+              where event.request_id = #{effect.execution.requestId}
+                and event.discrepancy_case_id =
+                    #{effect.execution.caseId}
+                and event.adjudication_id =
+                    #{effect.execution.adjudicationId}
+                and event.adjudication_action_id =
+                    #{effect.execution.actionId}
+                and event.action_version_before =
+                    #{effect.execution.executionVersionBefore}
+                and event.action_version_after =
+                    #{effect.execution.executionVersionAfter}
+                and event.effect_kind = #{effect.execution.effectKind}
+                and event.event_fingerprint =
+                    #{effect.execution.eventFingerprint}
+          )
+          and length(trim(a.adjudication_note)) between 1 and 500
+          and length(trim(x.action_note)) between 1 and 500
+          and length(trim(a.evidence_refs)) between 1 and 2000
+          and not exists (
+              select 1
+              from inv_transfer_receipt_discrepancy_responsibility_ledger prior
+              where prior.request_id = #{effect.execution.requestId}
+                 or (prior.adjudication_action_id =
+                         #{effect.execution.actionId}
+                     and prior.action_version_before =
+                         #{effect.execution.executionVersionBefore})
+          )
+    </insert>
+
+    <insert id="insertShortageLossLedger">
+        insert into
+            inv_transfer_receipt_discrepancy_shortage_loss_ledger (
+            request_id, discrepancy_case_id, adjudication_id,
+            adjudication_action_id, action_version_before,
+            action_version_after, case_version_before,
+            case_version_after, case_status_before, case_status_after,
+            plan_status_before, plan_status_after, action_status_before,
+            action_status_after,
+            action_sequence, receipt_id, receipt_allocation_id,
+            shipment_id, transfer_id, shipment_allocation_id, item_type,
+            item_id, product_id, discrepancy_type, action_type,
+            effect_kind, loss_type, responsible_party, loss_quantity,
+            source_cost_price, loss_amount, decision_fingerprint,
+            execution_fingerprint, adjudication_note, action_note,
+            evidence_refs, required_permission, operator_user_id,
+            operator_name, occurred_time, create_by, create_time
+        )
+        select #{effect.execution.requestId}, c.discrepancy_case_id,
+               a.adjudication_id, x.adjudication_action_id,
+               #{effect.execution.executionVersionBefore},
+               #{effect.execution.executionVersionAfter},
+               #{effect.execution.caseVersionBefore},
+               #{effect.execution.caseVersionAfter},
+               #{effect.execution.caseStatusBefore},
+               #{effect.execution.caseStatusAfter},
+               #{effect.execution.planStatusBefore},
+               #{effect.execution.planStatusAfter},
+               #{effect.execution.actionStatusBefore},
+               #{effect.execution.actionStatusAfter},
+               x.action_sequence, c.receipt_id,
+               c.receipt_allocation_id, c.shipment_id, c.transfer_id,
+               c.shipment_allocation_id, ra.item_type, ra.item_id,
+               ra.product_id, c.discrepancy_type, x.action_type,
+               #{effect.ledgerKind}, 'transport_shortage',
+               x.responsible_party, x.action_quantity,
+               a.source_cost_price, x.action_amount,
+               a.decision_fingerprint,
+               #{effect.execution.eventFingerprint},
+               a.adjudication_note, x.action_note, a.evidence_refs,
+               #{effect.execution.requiredPermission},
+               #{effect.execution.executorUserId},
+               #{effect.execution.executorName},
+               #{effect.execution.executedAt},
+               #{effect.execution.executorName}, sysdate()
+        from inv_transfer_receipt_discrepancy_case c
+        inner join inv_transfer_receipt_discrepancy_adjudication a
+                on a.discrepancy_case_id = c.discrepancy_case_id
+               and a.adjudication_id =
+                   #{effect.execution.adjudicationId}
+        inner join
+            inv_transfer_receipt_discrepancy_adjudication_action x
+                on x.discrepancy_case_id = c.discrepancy_case_id
+               and x.adjudication_id = a.adjudication_id
+               and x.adjudication_action_id =
+                   #{effect.execution.actionId}
+        inner join inv_transfer_shipment_receipt_allocation ra
+                on ra.receipt_allocation_id = c.receipt_allocation_id
+               and ra.receipt_id = c.receipt_id
+               and ra.shipment_id = c.shipment_id
+               and ra.shipment_allocation_id =
+                   c.shipment_allocation_id
+        where c.discrepancy_case_id = #{effect.execution.caseId}
+          and c.case_version = #{effect.execution.caseVersionBefore}
+          and c.status = #{effect.execution.caseStatusBefore}
+          and a.plan_status = #{effect.execution.planStatusBefore}
+          and a.decision_fingerprint =
+              #{effect.execution.decisionFingerprint}
+          and a.source_cost_price =
+              #{effect.execution.sourceCostPrice}
+          and x.action_sequence = #{effect.execution.actionSequence}
+          and x.action_type = 'transport_loss_write_off'
+          and x.action_type = #{effect.execution.actionType}
+          and x.coverage_kind = 'resolution'
+          and x.coverage_kind = #{effect.execution.coverageKind}
+          and x.action_quantity = #{effect.execution.quantity}
+          and x.action_amount = #{effect.execution.amount}
+          and x.responsible_party =
+              #{effect.execution.responsibleParty}
+          and x.execution_status =
+              #{effect.execution.actionStatusBefore}
+          and x.execution_status = 'pending'
+          and x.execution_version =
+              #{effect.execution.executionVersionBefore}
+          and x.execution_effect_reference is null
+          and c.discrepancy_type = 'shortage'
+          and c.discrepancy_type =
+              #{effect.execution.discrepancyType}
+          and #{effect.ledgerKind} = 'shortage_loss_ledger'
+          and #{effect.execution.effectKind} =
+              'shortage_loss_ledger'
+          and #{effect.execution.command} = 'dispatch'
+          and #{effect.execution.actionStatusAfter} = 'completed'
+          and #{effect.execution.executionVersionAfter} =
+              #{effect.execution.executionVersionBefore} + 1
+          and #{effect.execution.caseVersionAfter} =
+              #{effect.execution.caseVersionBefore} + 1
+          and #{effect.execution.effectReference} is null
+          and #{effect.execution.requiredPermission} =
+              'inv:transfer:discrepancy:execute'
+          and exists (
+              select 1
+              from inv_transfer_receipt_discrepancy_adjudication_execution_event event
+              where event.request_id = #{effect.execution.requestId}
+                and event.discrepancy_case_id =
+                    #{effect.execution.caseId}
+                and event.adjudication_id =
+                    #{effect.execution.adjudicationId}
+                and event.adjudication_action_id =
+                    #{effect.execution.actionId}
+                and event.action_version_before =
+                    #{effect.execution.executionVersionBefore}
+                and event.action_version_after =
+                    #{effect.execution.executionVersionAfter}
+                and event.effect_kind = #{effect.execution.effectKind}
+                and event.event_fingerprint =
+                    #{effect.execution.eventFingerprint}
+          )
+          and length(trim(a.adjudication_note)) between 1 and 500
+          and length(trim(x.action_note)) between 1 and 500
+          and length(trim(a.evidence_refs)) between 1 and 2000
+          and not exists (
+              select 1
+              from inv_transfer_receipt_discrepancy_shortage_loss_ledger prior
+              where prior.request_id = #{effect.execution.requestId}
+                 or (prior.adjudication_action_id =
+                         #{effect.execution.actionId}
+                     and prior.action_version_before =
+                         #{effect.execution.executionVersionBefore})
+          )
+    </insert>
+
+</mapper>

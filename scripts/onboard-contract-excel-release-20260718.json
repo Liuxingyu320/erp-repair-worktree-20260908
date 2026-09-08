@@ -1,0 +1,269 @@
+{
+  "schemaVersion": 1,
+  "releaseId": "onboard-contract-excel-20260718",
+  "status": "development",
+  "executionPolicy": "manual-phased",
+  "sourceDirectory": "sql",
+  "deployDirectory": "docker/mysql/db",
+  "migrationList": "scripts/onboard-contract-excel-migrations-20260718.list",
+  "releaseFileList": "scripts/onboard-contract-excel-release-files-20260718.list",
+  "deletedPathList": "scripts/onboard-contract-excel-deleted-paths-20260718.list",
+  "mixedPathList": "scripts/onboard-contract-excel-mixed-paths-20260718.list",
+  "sourceBoundaryMode": "feature-hunks-reassembled-on-clean-candidate",
+  "releaseFileCount": 193,
+  "deletedPathCount": 10,
+  "mixedPathCount": 86,
+  "requiresReleaseIds": [
+    "contract-signing-release-a-20260716"
+  ],
+  "prerequisiteRelease": {
+    "status": "verification-pending",
+    "releaseId": "contract-signing-release-a-20260716",
+    "manifestPath": "scripts/contract-signing-release-20260716.json",
+    "releaseRef": "refs/tags/contract-signing-release-a-20260716",
+    "commit": null,
+    "manifestSha256": null
+  },
+  "supersedesReleaseIds": [
+    "existing-employee-onboard-contract-20260717"
+  ],
+  "dockerBootstrapIncluded": true,
+  "migrationCount": 2,
+  "migrations": [
+    {
+      "file": "erp_oa_sign_onboard_import_20260718.sql",
+      "sha256": "e79554c95992186ebf15318cd14066fb65ec77883c1887ca01b642f595e3f945",
+      "phase": "01-onboard-import-schema-before-backend",
+      "applyMode": "manual-native-mysql",
+      "creates": [
+        "oa_sign_onboard_import_batch",
+        "oa_sign_onboard_import_row",
+        "oa_sign_onboard_data_request"
+      ],
+      "backupTables": [
+        "oa_sign_task",
+        "oa_sign_package"
+      ],
+      "requiresTables": [
+        "oa_sign_task",
+        "oa_sign_package"
+      ],
+      "requiresColumns": {
+        "oa_sign_task": [
+          "task_id",
+          "employee_id",
+          "scenario",
+          "status"
+        ],
+        "oa_sign_package": [
+          "package_id",
+          "employee_address_snapshot",
+          "source_plan_name"
+        ]
+      }
+    },
+    {
+      "file": "erp_system_sign_profile_supplement_20260718.sql",
+      "sha256": "07e04d77a4e60dd174846151f9f3cdfca1a732e42f0239c85717408b9ad2ba3e",
+      "phase": "02-reviewed-profile-supplement-before-backend",
+      "applyMode": "manual-native-mysql",
+      "creates": [
+        "sys_sign_profile_supplement_audit"
+      ],
+      "backupTables": [
+        "sys_user_profile"
+      ],
+      "requiresTables": [
+        "sys_user_profile"
+      ],
+      "requiresColumns": {
+        "sys_user_profile": [
+          "user_id",
+          "current_address"
+        ]
+      }
+    }
+  ],
+  "sqlCopies": {
+    "erp_oa_sign_onboard_import_20260718.sql": [
+      "sql/erp_oa_sign_onboard_import_20260718.sql",
+      "docker/mysql/db/erp_oa_sign_onboard_import_20260718.sql",
+      "erp-modules/erp-oa/src/main/resources/db/migration/erp_oa_sign_onboard_import_20260718.sql"
+    ],
+    "erp_system_sign_profile_supplement_20260718.sql": [
+      "sql/erp_system_sign_profile_supplement_20260718.sql",
+      "docker/mysql/db/erp_system_sign_profile_supplement_20260718.sql"
+    ]
+  },
+  "deploymentOrder": [
+    "verify-release-a-schema-without-rerunning-old-migrations",
+    "backup-and-apply-two-manual-migrations",
+    "verify-schema-indexes-and-feature-defaults",
+    "deploy-system-api-and-system-service",
+    "deploy-oa-service-with-excel-import-disabled",
+    "deploy-frontend-with-entry-hidden",
+    "register-and-review-nine-disabled-template-candidates",
+    "publish-reviewed-template-plan-versions",
+    "run-isolated-three-person-uat",
+    "enable-one-scope-gray-uat",
+    "run-selected-27-person-batch",
+    "verify-final-pdf-hash-and-audit-evidence"
+  ],
+  "featureDefaults": {
+    "oa.sign.excel-import.enabled": false,
+    "VUE_APP_SIGN_EXCEL_IMPORT_ENABLED": false,
+    "hr.sign.lifecycle-automation.enabled": false,
+    "oa.sign.emergency-create.enabled": false,
+    "oa.sign.expiry.enabled": false,
+    "oa.sign.reminder.enabled": false
+  },
+  "templateCandidates": {
+    "version": "20260718-v5-draft",
+    "count": 9,
+    "applicationArtifactIncluded": false,
+    "registrationPayloadGenerated": false,
+    "activationStatus": "disabled",
+    "items": [
+      {
+        "type": "ONBOARD_COMMITMENT",
+        "file": "05_ONBOARD_COMMITMENT.docx",
+        "sha256": "9cc4474fa78b6e9707cb87316d87023ab6b654b31e6488c4bbd857edd47b5816",
+        "size": 15841
+      },
+      {
+        "type": "ONBOARD_LABOR_CONTRACT",
+        "file": "09_ONBOARD_LABOR_CONTRACT.docx",
+        "sha256": "fdbe2df12eb3704370126e09f2c26fd7cd09e0a06db1e0fe960f42f9513f2118",
+        "size": 34494
+      },
+      {
+        "type": "ONBOARD_HANDBOOK_RECEIPT",
+        "file": "10_ONBOARD_HANDBOOK_RECEIPT.docx",
+        "sha256": "65675b6182ee5c9cdd6650f94341cfccd4b23e69dfbde87c806cd41aee2f4b66",
+        "size": 17721
+      },
+      {
+        "type": "ONBOARD_SALARY_CONFIRM",
+        "file": "11_ONBOARD_SALARY_CONFIRM_A.docx",
+        "sha256": "c3341591b4806fcc5909315040a2e174da0eaa90245169cf74aba735d5ad8551",
+        "size": 19527
+      },
+      {
+        "type": "ONBOARD_SALARY_CONFIRM",
+        "file": "12_ONBOARD_SALARY_CONFIRM_B.docx",
+        "sha256": "e2ba862e63fc8e41485fc26348e354fc568126247f9676571690a030f3957c1c",
+        "size": 18847
+      },
+      {
+        "type": "ONBOARD_SERVICE_CONTRACT",
+        "file": "13_ONBOARD_SERVICE_CONTRACT.docx",
+        "sha256": "3794b2a1f54b734fd36acd49dfd6e7920892a290744de6fc34e19d9ef51eb5b4",
+        "size": 33456
+      },
+      {
+        "type": "ONBOARD_SERVICE_RECEIPT",
+        "file": "14_ONBOARD_SERVICE_RECEIPT.docx",
+        "sha256": "4c72f4ec27b75aa070df051c736b316dae1c9752550ef46b9d670ede887c6a13",
+        "size": 19478
+      },
+      {
+        "type": "ONBOARD_CONFIDENTIAL_NONCOMPETE",
+        "file": "15_ONBOARD_CONFIDENTIAL_NONCOMPETE.docx",
+        "sha256": "0ab9894b08ad4b91ea1b5b1cd3b2c07332c5ef6483453af525069bee7999ba40",
+        "size": 19016
+      },
+      {
+        "type": "ONBOARD_MINOR_NONSTUDENT_DECLARATION",
+        "file": "16_ONBOARD_MINOR_NONSTUDENT_DECLARATION.docx",
+        "sha256": "264b642c03c9699ac234d1642e4da06d77f4c10bba5d6e2cffc5e65fca2031c9",
+        "size": 13381
+      }
+    ]
+  },
+  "sourceCandidate": {
+    "status": "reassembly-pending",
+    "baselineReleaseId": "contract-signing-release-a-20260716",
+    "baselineCommit": null,
+    "approvedPatchSha256": null,
+    "approvedPatchExcludes": [],
+    "requiredChangedPaths": [
+      "docker/mysql/db/erp_oa_sign_onboard_import_20260718.sql",
+      "docker/mysql/db/erp_system_sign_profile_supplement_20260718.sql",
+      "erp-modules/erp-oa/src/main/java/com/erp/oa/controller/OaSignOnboardImportController.java",
+      "erp-modules/erp-oa/src/main/java/com/erp/oa/service/impl/OaSignOnboardImportService.java",
+      "erp-modules/erp-oa/src/main/java/com/erp/oa/service/impl/OaSignTaskBatchSendService.java",
+      "erp-modules/erp-system/src/main/java/com/erp/system/controller/SysSigningProfileSupplementController.java",
+      "erp-ui/package.json",
+      "erp-ui/scripts/validate-onboard-release-build.cjs",
+      "erp-ui/scripts/write-onboard-release-provenance.cjs",
+      "erp-ui/src/settings.js",
+      "erp-ui/src/views/hr/components/HrSignDataImportDialog.vue",
+      "pom.xml",
+      "scripts/onboard-contract-excel-migrations-20260718.list",
+      "scripts/verify-onboard-contract-excel-release.sh",
+      "scripts/verify_onboard_contract_excel_artifacts.py",
+      "scripts/verify_onboard_contract_excel_attestations.py",
+      "scripts/verify_onboard_contract_excel_gate_evidence.py",
+      "scripts/verify_onboard_contract_excel_readiness.py",
+      "sql/erp_oa_sign_onboard_import_20260718.sql",
+      "sql/erp_system_sign_profile_supplement_20260718.sql"
+    ],
+    "candidateHeadMustBeVerifiedAtRuntime": true,
+    "worktreeMustBeClean": true,
+    "diffMustStayWithinReleaseAndDeletedPaths": true
+  },
+  "buildPolicy": {
+    "cleanCandidateRequired": true,
+    "fullImmutableJarAndDistRequired": true,
+    "incrementalClassOverlayForbidden": true,
+    "dirtyWorkspaceArchiveForbidden": true,
+    "externalSignedAttestationsRequired": true,
+    "frontendExcelEntryCompiledEnabledRequired": true,
+    "piiWorkbookIncluded": false,
+    "signatureSealEvidenceIncluded": false
+  },
+  "artifactEvidence": {
+    "status": "build-pending",
+    "oaJar": {
+      "path": "docker/erp/modules/oa/jar/erp-modules-oa.jar",
+      "sha256": null
+    },
+    "systemJar": {
+      "path": "docker/erp/modules/system/jar/erp-modules-system.jar",
+      "sha256": null
+    },
+    "frontendDist": {
+      "path": "docker/nginx/html/dist",
+      "treeSha256": null
+    }
+  },
+  "approvalAnchors": {
+    "sourceApprovalEnvironmentVariable": "ONBOARD_CONTRACT_EXCEL_SOURCE_APPROVAL",
+    "sourceApprovalSignatureEnvironmentVariable": "ONBOARD_CONTRACT_EXCEL_SOURCE_APPROVAL_SIGNATURE",
+    "buildAttestationEnvironmentVariable": "ONBOARD_CONTRACT_EXCEL_BUILD_ATTESTATION",
+    "buildAttestationSignatureEnvironmentVariable": "ONBOARD_CONTRACT_EXCEL_BUILD_ATTESTATION_SIGNATURE",
+    "trustedSignerPublicKeyEnvironmentVariable": "ONBOARD_CONTRACT_EXCEL_TRUSTED_SIGNER_PUBLIC_KEY",
+    "trustedSignerSha256EnvironmentVariable": "ONBOARD_CONTRACT_EXCEL_TRUSTED_SIGNER_SHA256"
+  },
+  "externalGates": {
+    "nativeMySqlRehearsal": "external-pending",
+    "templateHrLegalApproval": "external-pending",
+    "templateRegistrationAndPlanPublish": "external-pending",
+    "isolatedThreePersonUat": "external-pending",
+    "selected27WorkbookUat": "external-pending",
+    "finalPdfHashAuditEvidence": "external-pending",
+    "oneScopeGrayApproval": "external-pending"
+  },
+  "externalGateEvidence": {
+    "path": "docs/releases/evidence/20260718-onboard-contract-excel-evidence.json",
+    "sha256": null
+  },
+  "rollbackPolicy": {
+    "firstAction": "disable-oa-excel-import-and-hide-ui-entry",
+    "preserveGeneratedTasks": true,
+    "preserveImportBatches": true,
+    "preserveDocumentsSignaturesHashesAndAudit": true,
+    "deleteBusinessEvidence": false,
+    "forwardOnlySchema": true
+  }
+}

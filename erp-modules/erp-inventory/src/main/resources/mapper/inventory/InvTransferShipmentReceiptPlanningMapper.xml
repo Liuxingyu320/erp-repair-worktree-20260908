@@ -1,0 +1,185 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.inventory.mapper.InvTransferShipmentReceiptPlanningMapper">
+
+    <resultMap id="WarehouseModeResult"
+            type="com.erp.inventory.domain.transfer.InvWarehouseStockMode">
+        <id property="warehouseId" column="warehouse_id"/>
+        <result property="writeMode" column="write_mode"/>
+        <result property="readMode" column="read_mode"/>
+        <result property="reconcileStatus" column="reconcile_status"/>
+        <result property="lastReconcileTime" column="last_reconcile_time"/>
+        <result property="lastReconcileBatch" column="last_reconcile_batch"/>
+        <result property="approvedBy" column="approved_by"/>
+        <result property="approvedTime" column="approved_time"/>
+    </resultMap>
+
+    <resultMap id="AllocationFactResult"
+            type="com.erp.inventory.domain.transfer.InvTransferReceiptPlanningAllocationFact">
+        <id property="allocationId" column="allocation_id"/>
+        <result property="shipmentId" column="shipment_id"/>
+        <result property="shipmentDetailId" column="shipment_detail_id"/>
+        <result property="transferId" column="transfer_id"/>
+        <result property="transferDetailId" column="transfer_detail_id"/>
+        <result property="itemType" column="item_type"/>
+        <result property="itemId" column="item_id"/>
+        <result property="productId" column="product_id"/>
+        <result property="itemCode" column="item_code"/>
+        <result property="itemName" column="item_name"/>
+        <result property="unit" column="unit"/>
+        <result property="allocationPolicy" column="allocation_policy"/>
+        <result property="trackingPolicy" column="tracking_policy"/>
+        <result property="allocatedQuantity" column="allocated_quantity"/>
+        <result property="balanceVersionAfter" column="balance_version_after"/>
+        <result property="costPrice" column="cost_price"/>
+        <result property="totalCost" column="total_cost"/>
+        <result property="sourceWarehouseId" column="source_warehouse_id"/>
+        <result property="sourceBalanceId" column="source_balance_id"/>
+        <result property="sourceLotId" column="source_lot_id"/>
+        <result property="sourceLocationId" column="source_location_id"/>
+        <result property="sourceLotNo" column="source_lot_no"/>
+        <result property="supplierBatchNo" column="supplier_batch_no"/>
+        <result property="productionDate" column="production_date"/>
+        <result property="expiryDate" column="expiry_date"/>
+        <result property="qcStatus" column="qc_status"/>
+        <result property="lotStatus" column="lot_status"/>
+        <result property="sourceReceiptDisposition" column="source_receipt_disposition"/>
+        <result property="sourceLocationCode" column="source_location_code"/>
+        <result property="sourceLocationType" column="source_location_type"/>
+        <result property="shipmentDetailShippedQuantity" column="shipment_detail_shipped_quantity"/>
+        <result property="shipmentDetailReceivedQuantity" column="shipment_detail_received_quantity"/>
+        <result property="transferDetailRequestedQuantity" column="transfer_detail_requested_quantity"/>
+        <result property="transferDetailDeliveredQuantity" column="transfer_detail_delivered_quantity"/>
+        <result property="transferDetailReceivedQuantity" column="transfer_detail_received_quantity"/>
+        <result property="acceptedReceivedQuantity" column="accepted_received_quantity"/>
+        <result property="damagedReceivedQuantity" column="damaged_received_quantity"/>
+        <result property="shortageReportedQuantity" column="shortage_reported_quantity"/>
+        <result property="receiptVersion" column="receipt_version"/>
+    </resultMap>
+
+    <resultMap id="SerialFactResult"
+            type="com.erp.inventory.domain.transfer.InvTransferReceiptPlanningSerialFact">
+        <id property="shipmentSerialId" column="shipment_serial_id"/>
+        <result property="allocationId" column="allocation_id"/>
+        <result property="shipmentId" column="shipment_id"/>
+        <result property="serialId" column="serial_id"/>
+        <result property="serialNoSnapshot" column="serial_no_snapshot"/>
+        <result property="currentSerialNo" column="current_serial_no"/>
+        <result property="itemType" column="item_type"/>
+        <result property="itemId" column="item_id"/>
+        <result property="sourceBalanceId" column="source_balance_id"/>
+        <result property="sourceLotId" column="source_lot_id"/>
+        <result property="sourceLocationId" column="source_location_id"/>
+        <result property="statusAfter" column="status_after"/>
+        <result property="currentWarehouseId" column="current_warehouse_id"/>
+        <result property="currentBalanceId" column="current_balance_id"/>
+        <result property="currentLotId" column="current_lot_id"/>
+        <result property="currentLocationId" column="current_location_id"/>
+        <result property="currentStatus" column="current_status"/>
+    </resultMap>
+
+    <resultMap id="LocationResult"
+            type="com.erp.inventory.domain.transfer.InvTransferReceiptLocationCandidate">
+        <id property="locationId" column="location_id"/>
+        <result property="warehouseId" column="warehouse_id"/>
+        <result property="locationCode" column="location_code"/>
+        <result property="locationName" column="location_name"/>
+        <result property="locationType" column="location_type"/>
+        <result property="sortOrder" column="sort_order"/>
+        <result property="status" column="status"/>
+        <result property="virtualFlag" column="is_virtual"/>
+    </resultMap>
+
+    <select id="selectTargetWarehouseMode" resultMap="WarehouseModeResult">
+        select warehouse_id, write_mode, read_mode, reconcile_status,
+               last_reconcile_time, last_reconcile_batch,
+               approved_by, approved_time
+        from inv_warehouse_stock_mode
+        where warehouse_id = #{warehouseId}
+    </select>
+
+    <select id="selectAllocations" resultMap="AllocationFactResult">
+        select a.allocation_id, a.shipment_id, a.shipment_detail_id,
+               a.transfer_id, a.transfer_detail_id,
+               sd.item_type, sd.item_id, sd.product_id,
+               sd.item_code, sd.item_name, td.unit,
+               a.allocation_policy, a.tracking_policy,
+               a.allocated_quantity,
+               a.balance_version_after, a.cost_price, a.total_cost,
+               lot.warehouse_id as source_warehouse_id,
+               a.balance_id as source_balance_id,
+               a.lot_id as source_lot_id,
+               a.location_id as source_location_id,
+               lot.lot_no as source_lot_no, lot.supplier_batch_no,
+               lot.production_date, lot.expiry_date,
+               lot.qc_status, lot.lot_status,
+               lot.receipt_disposition as source_receipt_disposition,
+               loc.location_code as source_location_code,
+               loc.location_type as source_location_type,
+               sd.shipped_quantity as shipment_detail_shipped_quantity,
+               sd.received_quantity as shipment_detail_received_quantity,
+               td.quantity as transfer_detail_requested_quantity,
+               td.delivered_quantity as transfer_detail_delivered_quantity,
+               td.received_quantity as transfer_detail_received_quantity,
+               a.accepted_received_quantity,
+               a.damaged_received_quantity,
+               a.shortage_reported_quantity, a.receipt_version
+        from inv_transfer_shipment_allocation a
+        inner join inv_transfer_shipment_detail sd
+                on sd.shipment_detail_id = a.shipment_detail_id
+               and sd.shipment_id = a.shipment_id
+               and sd.transfer_id = a.transfer_id
+               and sd.transfer_detail_id = a.transfer_detail_id
+        inner join inv_transfer_detail td
+                on td.detail_id = a.transfer_detail_id
+               and td.transfer_id = a.transfer_id
+        inner join inv_inventory_lot lot
+                on lot.lot_id = a.lot_id
+               and lot.item_type = sd.item_type
+               and lot.item_id = sd.item_id
+        inner join inv_warehouse_location loc
+                on loc.location_id = a.location_id
+               and loc.warehouse_id = lot.warehouse_id
+        where a.shipment_id = #{shipmentId}
+        order by a.allocation_id
+    </select>
+
+    <select id="selectShipmentSerials" resultMap="SerialFactResult">
+        select audit.shipment_serial_id, audit.allocation_id,
+               audit.shipment_id, audit.serial_id,
+               audit.serial_no_snapshot,
+               serial_current.serial_no as current_serial_no,
+               audit.item_type, audit.item_id,
+               audit.source_balance_id, audit.source_lot_id,
+               audit.source_location_id, audit.status_after,
+               serial_current.warehouse_id as current_warehouse_id,
+               serial_current.balance_id as current_balance_id,
+               serial_current.lot_id as current_lot_id,
+               serial_current.location_id as current_location_id,
+               serial_current.serial_status as current_status
+        from inv_transfer_shipment_serial audit
+        left join inv_inventory_serial serial_current
+               on serial_current.serial_id = audit.serial_id
+              and serial_current.item_type = audit.item_type
+              and serial_current.item_id = audit.item_id
+        left join inv_transfer_shipment_receipt_serial receipt_serial
+               on receipt_serial.shipment_id = audit.shipment_id
+              and receipt_serial.shipment_serial_id = audit.shipment_serial_id
+        where audit.shipment_id = #{shipmentId}
+          and receipt_serial.receipt_serial_id is null
+        order by audit.allocation_id, audit.serial_id
+    </select>
+
+    <select id="selectTargetLocations" resultMap="LocationResult">
+        select location_id, warehouse_id, location_code, location_name,
+               location_type, sort_order, status, is_virtual
+        from inv_warehouse_location
+        where warehouse_id = #{warehouseId}
+          and status = '0'
+          and is_virtual = '0'
+          and location_type in ('storage', 'quarantine')
+        order by case when location_type = 'quarantine' then 1 else 0 end,
+                 sort_order, location_id
+    </select>
+
+</mapper>

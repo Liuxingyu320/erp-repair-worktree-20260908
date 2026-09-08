@@ -1,0 +1,220 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.inventory.mapper.InvTransferReceiptDiscrepancyAdjudicationBasisMapper">
+
+    <resultMap id="AdjudicationBasisResult"
+            type="com.erp.inventory.domain.transfer.InvTransferReceiptDiscrepancyStoredAdjudicationBasis">
+        <id property="basisId" column="adjudication_basis_id" />
+        <result property="tokenHash" column="token_hash" />
+        <result property="caseId" column="discrepancy_case_id" />
+        <result property="caseVersion" column="case_version" />
+        <result property="factFingerprint" column="fact_fingerprint" />
+        <result property="sourceConfirmationEventId"
+                column="source_confirmation_event_id" />
+        <result property="targetConfirmationEventId"
+                column="target_confirmation_event_id" />
+        <result property="selectedShopDeptId"
+                column="selected_shop_dept_id" />
+        <result property="scopeDigest" column="scope_digest" />
+        <result property="requiredPermission"
+                column="required_permission" />
+        <result property="adjudicatorUserId"
+                column="adjudicator_user_id" />
+        <result property="adjudicatorName" column="adjudicator_name" />
+        <result property="basisStatus" column="basis_status" />
+        <result property="issuedAt" column="issued_at" />
+        <result property="expiresAt" column="expires_at" />
+        <result property="consumedAt" column="consumed_at" />
+        <result property="consumedRequestId"
+                column="consumed_request_id" />
+        <result property="consumedAdjudicationId"
+                column="consumed_adjudication_id" />
+    </resultMap>
+
+    <insert id="insertIssuedBasis" useGeneratedKeys="true"
+            keyProperty="generatedId.value">
+        insert into inv_transfer_receipt_discrepancy_adjudication_basis (
+            token_hash, discrepancy_case_id, case_version,
+            fact_fingerprint, source_confirmation_event_id,
+            target_confirmation_event_id, selected_shop_dept_id,
+            scope_digest, required_permission, adjudicator_user_id,
+            adjudicator_name, basis_status, issued_at, expires_at,
+            create_by, create_time
+        )
+        select #{basis.tokenHash}, c.discrepancy_case_id,
+               c.case_version, c.fact_fingerprint,
+               source_event.confirmation_event_id,
+               target_event.confirmation_event_id,
+               #{basis.selectedShopDeptId}, #{basis.scopeDigest},
+               #{basis.requiredPermission}, #{basis.adjudicatorUserId},
+               #{basis.adjudicatorName}, 'issued',
+               #{basis.issuedAt}, #{basis.expiresAt},
+               #{basis.adjudicatorName}, #{basis.issuedAt}
+        from inv_transfer_receipt_discrepancy_case c
+        inner join inv_transfer_order o
+                on o.transfer_id = c.transfer_id
+        inner join inv_transfer_receipt_discrepancy_confirmation_event
+                source_event
+                on source_event.confirmation_event_id =
+                   #{basis.sourceConfirmationEventId}
+               and source_event.discrepancy_case_id =
+                   c.discrepancy_case_id
+               and source_event.party_role = 'source'
+               and source_event.party_dept_id = coalesce(
+                   nullif(o.from_warehouse_id, 0), o.from_dept_id)
+        inner join inv_transfer_receipt_discrepancy_confirmation_event
+                target_event
+                on target_event.confirmation_event_id =
+                   #{basis.targetConfirmationEventId}
+               and target_event.discrepancy_case_id =
+                   c.discrepancy_case_id
+               and target_event.party_role = 'target'
+               and target_event.party_dept_id = coalesce(
+                   nullif(o.to_warehouse_id, 0), o.to_dept_id)
+        where c.discrepancy_case_id = #{basis.caseId}
+          and c.case_version = #{basis.caseVersion}
+          and c.fact_fingerprint = #{basis.factFingerprint}
+          and c.status = 'awaiting_confirmation'
+          and source_event.case_version = c.case_version
+          and target_event.case_version = c.case_version
+          and source_event.fact_fingerprint = c.fact_fingerprint
+          and target_event.fact_fingerprint = c.fact_fingerprint
+          and source_event.decision = 'confirmed'
+          and target_event.decision = 'confirmed'
+          and source_event.operator_user_id &lt;&gt;
+              #{basis.adjudicatorUserId}
+          and target_event.operator_user_id &lt;&gt;
+              #{basis.adjudicatorUserId}
+          and source_event.confirmation_event_id = (
+              select max(source_latest.confirmation_event_id)
+              from inv_transfer_receipt_discrepancy_confirmation_event
+                   source_latest
+              where source_latest.discrepancy_case_id =
+                    c.discrepancy_case_id
+                and source_latest.party_role = 'source'
+          )
+          and target_event.confirmation_event_id = (
+              select max(target_latest.confirmation_event_id)
+              from inv_transfer_receipt_discrepancy_confirmation_event
+                   target_latest
+              where target_latest.discrepancy_case_id =
+                    c.discrepancy_case_id
+                and target_latest.party_role = 'target'
+          )
+          and #{basis.requiredPermission} =
+              'inv:transfer:discrepancy:adjudicate'
+          and #{basis.basisStatus} = 'issued'
+          and #{basis.adjudicatorUserId} &gt; 0
+          and length(#{basis.adjudicatorName}) between 1 and 64
+          and #{basis.selectedShopDeptId} in
+              <foreach collection="basis.scopeDeptIds" item="scopeDeptId"
+                      open="(" separator="," close=")">
+                  #{scopeDeptId}
+              </foreach>
+          and (
+              coalesce(nullif(o.from_warehouse_id, 0), o.from_dept_id) in
+              <foreach collection="basis.scopeDeptIds" item="scopeDeptId"
+                      open="(" separator="," close=")">
+                  #{scopeDeptId}
+              </foreach>
+              or coalesce(nullif(o.to_warehouse_id, 0), o.to_dept_id) in
+              <foreach collection="basis.scopeDeptIds" item="scopeDeptId"
+                      open="(" separator="," close=")">
+                  #{scopeDeptId}
+              </foreach>
+          )
+          and #{basis.tokenHash} regexp '^[a-f0-9]{64}$'
+          and #{basis.scopeDigest} regexp '^[a-f0-9]{64}$'
+          and #{basis.expiresAt} = date_add(
+              #{basis.issuedAt}, interval 5 minute)
+          and not exists (
+              select 1
+              from inv_transfer_receipt_discrepancy_adjudication_basis prior
+              where prior.token_hash = #{basis.tokenHash}
+          )
+    </insert>
+
+    <select id="selectByTokenHashForUpdate"
+            resultMap="AdjudicationBasisResult">
+        select adjudication_basis_id, token_hash, discrepancy_case_id,
+               case_version, fact_fingerprint,
+               source_confirmation_event_id,
+               target_confirmation_event_id, selected_shop_dept_id,
+               scope_digest, required_permission, adjudicator_user_id,
+               adjudicator_name, basis_status, issued_at, expires_at,
+               consumed_at, consumed_request_id,
+               consumed_adjudication_id
+        from inv_transfer_receipt_discrepancy_adjudication_basis
+        where token_hash = #{tokenHash}
+          and #{tokenHash} regexp '^[a-f0-9]{64}$'
+        for update
+    </select>
+
+    <update id="consumeIssuedBasis">
+        update inv_transfer_receipt_discrepancy_adjudication_basis basis
+        set basis_status = 'consumed',
+            consumed_at = #{consumption.consumedAt},
+            consumed_request_id = #{consumption.requestId},
+            consumed_adjudication_id =
+                #{consumption.adjudicationId},
+            update_by = #{consumption.adjudicatorName},
+            update_time = #{consumption.consumedAt}
+        where basis.adjudication_basis_id = #{consumption.basisId}
+          and basis.token_hash = #{consumption.tokenHash}
+          and basis.discrepancy_case_id = #{consumption.caseId}
+          and basis.case_version = #{consumption.caseVersion}
+          and basis.fact_fingerprint = #{consumption.factFingerprint}
+          and basis.source_confirmation_event_id =
+              #{consumption.sourceConfirmationEventId}
+          and basis.target_confirmation_event_id =
+              #{consumption.targetConfirmationEventId}
+          and basis.selected_shop_dept_id =
+              #{consumption.selectedShopDeptId}
+          and basis.scope_digest = #{consumption.scopeDigest}
+          and basis.required_permission =
+              #{consumption.requiredPermission}
+          and basis.adjudicator_user_id =
+              #{consumption.adjudicatorUserId}
+          and basis.adjudicator_name = #{consumption.adjudicatorName}
+          and basis.issued_at = #{consumption.issuedAt}
+          and basis.expires_at = #{consumption.expiresAt}
+          and basis.basis_status = 'issued'
+          and basis.consumed_at is null
+          and basis.consumed_request_id is null
+          and basis.consumed_adjudication_id is null
+          and #{consumption.tokenHash} regexp '^[a-f0-9]{64}$'
+          and #{consumption.factFingerprint} regexp '^[a-f0-9]{64}$'
+          and #{consumption.scopeDigest} regexp '^[a-f0-9]{64}$'
+          and #{consumption.requiredPermission} =
+              'inv:transfer:discrepancy:adjudicate'
+          and #{consumption.consumedAt} &gt;= #{consumption.issuedAt}
+          and #{consumption.consumedAt} &lt; #{consumption.expiresAt}
+          and exists (
+              select 1
+              from inv_transfer_receipt_discrepancy_adjudication adjudication
+              where adjudication.adjudication_id =
+                    #{consumption.adjudicationId}
+                and adjudication.request_id = #{consumption.requestId}
+                and adjudication.discrepancy_case_id =
+                    #{consumption.caseId}
+                and adjudication.case_version_before =
+                    #{consumption.caseVersion}
+                and adjudication.case_version_after =
+                    #{consumption.caseVersion} + 1
+                and adjudication.fact_fingerprint =
+                    #{consumption.factFingerprint}
+                and adjudication.source_confirmation_event_id =
+                    #{consumption.sourceConfirmationEventId}
+                and adjudication.target_confirmation_event_id =
+                    #{consumption.targetConfirmationEventId}
+                and adjudication.adjudicator_user_id =
+                    #{consumption.adjudicatorUserId}
+                and adjudication.adjudicator_name =
+                    #{consumption.adjudicatorName}
+                and adjudication.required_permission =
+                    #{consumption.requiredPermission}
+                and adjudication.plan_status = 'adjudication_planned'
+          )
+    </update>
+
+</mapper>

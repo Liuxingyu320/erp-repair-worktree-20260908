@@ -1,0 +1,2 @@
+# Backward-compatible system schema expansion required before the code cutover.
+erp_system_config_metadata_20260813.sql

@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.oa.mapper.OaSignTaskEventMapper">
+
+    <resultMap id="OaSignTaskEventResult" type="com.erp.oa.domain.OaSignTaskEvent">
+        <id property="eventId" column="event_id"/>
+        <result property="taskId" column="task_id"/>
+        <result property="fromStatus" column="from_status"/>
+        <result property="toStatus" column="to_status"/>
+        <result property="operatorType" column="operator_type"/>
+        <result property="operatorUserId" column="operator_user_id"/>
+        <result property="reasonCode" column="reason_code"/>
+        <result property="reasonDetail" column="reason_detail"/>
+        <result property="requestId" column="request_id"/>
+        <result property="ipAddress" column="ip_address"/>
+        <result property="userAgent" column="user_agent"/>
+        <result property="prevEventHash" column="prev_event_hash"/>
+        <result property="eventHash" column="event_hash"/>
+        <result property="createdTime" column="created_time"/>
+    </resultMap>
+
+    <sql id="baseColumns">
+        event_id, task_id, from_status, to_status, operator_type, operator_user_id,
+        reason_code, reason_detail, request_id, ip_address, user_agent,
+        prev_event_hash, event_hash, created_time
+    </sql>
+
+    <insert id="insertOaSignTaskEvent" parameterType="com.erp.oa.domain.OaSignTaskEvent"
+            useGeneratedKeys="true" keyProperty="eventId">
+        insert into oa_sign_task_event (
+            task_id, from_status, to_status, operator_type, operator_user_id,
+            reason_code, reason_detail, request_id, ip_address, user_agent,
+            prev_event_hash, event_hash, created_time
+        ) values (
+            #{taskId}, #{fromStatus}, #{toStatus}, #{operatorType}, #{operatorUserId},
+            #{reasonCode}, #{reasonDetail}, #{requestId}, #{ipAddress}, #{userAgent},
+            #{prevEventHash}, #{eventHash}, #{createdTime}
+        )
+    </insert>
+
+    <select id="selectTaskEvents" resultMap="OaSignTaskEventResult">
+        select <include refid="baseColumns"/>
+        from oa_sign_task_event
+        where task_id = #{taskId}
+        order by created_time, event_id
+    </select>
+
+    <select id="selectLastTaskEvent" resultMap="OaSignTaskEventResult">
+        select <include refid="baseColumns"/>
+        from oa_sign_task_event
+        where task_id = #{taskId}
+        order by created_time desc, event_id desc
+        limit 1
+    </select>
+
+    <select id="selectEventByRequestId" resultMap="OaSignTaskEventResult">
+        select <include refid="baseColumns"/>
+        from oa_sign_task_event
+        where request_id = #{requestId}
+        limit 1
+    </select>
+
+    <delete id="deleteTaskEvents">
+        delete from oa_sign_task_event where task_id = #{taskId}
+    </delete>
+</mapper>

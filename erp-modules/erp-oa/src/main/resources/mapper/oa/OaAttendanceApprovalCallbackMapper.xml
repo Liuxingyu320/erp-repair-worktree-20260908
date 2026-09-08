@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.oa.attendance.approval.OaAttendanceApprovalCallbackMapper">
+
+    <resultMap id="ApprovalState" type="com.erp.oa.attendance.approval.OaAttendanceApprovalState">
+        <id property="businessId" column="business_id"/>
+        <result property="userId" column="user_id"/>
+        <result property="shopId" column="shop_id"/>
+        <result property="status" column="status"/>
+        <result property="businessRound" column="business_round"/>
+        <result property="approvalInstanceId" column="approval_instance_id"/>
+        <result property="rowVersion" column="row_version"/>
+        <result property="lastApprovalEventKey" column="last_approval_event_key"/>
+    </resultMap>
+
+    <select id="selectLeaveForUpdate" resultMap="ApprovalState">
+        select leave_request_id as business_id, user_id, shop_id, status, business_round,
+               approval_instance_id, row_version, last_approval_event_key
+        from oa_attendance_leave_request
+        where leave_request_id = #{businessId}
+        for update
+    </select>
+
+    <select id="selectLeave" resultMap="ApprovalState">
+        select leave_request_id as business_id, user_id, shop_id, status, business_round,
+               approval_instance_id, row_version, last_approval_event_key
+        from oa_attendance_leave_request
+        where leave_request_id = #{businessId}
+    </select>
+
+    <select id="countLeaveAttachments" resultType="int">
+        select count(*)
+        from oa_attendance_leave_attachment
+        where leave_request_id = #{businessId}
+    </select>
+
+    <select id="selectCorrectionForUpdate" resultMap="ApprovalState">
+        select correction_request_id as business_id, user_id, shop_id, status, business_round,
+               approval_instance_id, row_version, last_approval_event_key
+        from oa_attendance_correction_request
+        where correction_request_id = #{businessId}
+        for update
+    </select>
+
+    <update id="updateLeaveDecision">
+        update oa_attendance_leave_request
+        set status = #{targetStatus},
+            last_approval_event_key = #{eventKey},
+            row_version = row_version + 1,
+            update_by = 'approval',
+            update_time = #{decisionTime},
+            approved_at = case when #{targetStatus} = 'APPROVED' then #{decisionTime} else approved_at end,
+            rejected_at = case when #{targetStatus} = 'REJECTED' then #{decisionTime} else rejected_at end,
+            cancelled_at = case when #{targetStatus} in ('CANCELLED', 'TERMINATED') then #{decisionTime} else cancelled_at end
+        where leave_request_id = #{businessId}
+          and status = #{expectedStatus}
+          and row_version = #{expectedVersion}
+    </update>
+
+    <update id="updateCorrectionDecision">
+        update oa_attendance_correction_request
+        set status = #{targetStatus},
+            last_approval_event_key = #{eventKey},
+            row_version = row_version + 1,
+            update_by = 'approval',
+            update_time = #{decisionTime},
+            approved_at = case when #{targetStatus} = 'APPROVED' then #{decisionTime} else approved_at end,
+            rejected_at = case when #{targetStatus} = 'REJECTED' then #{decisionTime} else rejected_at end,
+            cancelled_at = case when #{targetStatus} in ('CANCELLED', 'TERMINATED') then #{decisionTime} else cancelled_at end
+        where correction_request_id = #{businessId}
+          and status = #{expectedStatus}
+          and row_version = #{expectedVersion}
+    </update>
+
+    <update id="invalidateLeaveDayResults">
+        update oa_attendance_day_result d
+        join oa_attendance_schedule s on s.schedule_id = d.schedule_id
+        join oa_attendance_leave_request r
+          on r.leave_request_id = #{businessId}
+         and r.user_id = s.user_id and r.shop_id = s.shop_id
+        set d.settled_at = null,
+            d.result_status = 'PENDING',
+            d.exception_codes = 'LEAVE_DECISION_CHANGED',
+            d.row_version = d.row_version + 1,
+            d.calculated_at = #{decisionTime},
+            d.update_by = 'approval', d.update_time = #{decisionTime}
+        where s.status in ('PUBLISHED', 'CHANGED')
+          and timestamp(s.business_date, s.start_time_snapshot) &lt; r.end_time
+          and timestamp(
+                case when s.cross_day_snapshot = 1
+                     then date_add(s.business_date, interval 1 day)
+                     else s.business_date end,
+                s.end_time_snapshot) &gt; r.start_time
+    </update>
+
+    <update id="invalidateCorrectionDayResult">
+        update oa_attendance_day_result d
+        join oa_attendance_correction_request c
+          on c.correction_request_id = #{businessId}
+         and c.schedule_id = d.schedule_id
+        set d.settled_at = null,
+            d.result_status = 'PENDING',
+            d.exception_codes = 'CORRECTION_DECISION_CHANGED',
+            d.row_version = d.row_version + 1,
+            d.calculated_at = #{decisionTime},
+            d.update_by = 'approval', d.update_time = #{decisionTime}
+    </update>
+</mapper>

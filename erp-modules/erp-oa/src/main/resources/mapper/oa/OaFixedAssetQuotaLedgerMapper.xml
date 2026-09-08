@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.oa.mapper.OaFixedAssetQuotaLedgerMapper">
+
+    <select id="sumUsedQuotaAmount" resultType="java.math.BigDecimal">
+        select coalesce(sum(amount), 0)
+        from oa_fixed_asset_quota_ledger
+        where shop_dept_id = #{shopDeptId}
+          and quota_year = #{quotaYear}
+          and movement_type in ('normal_submit', 'advance_future_months')
+    </select>
+
+    <insert id="insertLedger" parameterType="OaFixedAssetQuotaLedger" useGeneratedKeys="true" keyProperty="ledgerId">
+        insert into oa_fixed_asset_quota_ledger (
+            repair_id, shop_dept_id, quota_year, movement_type, amount,
+            create_by, create_time, remark
+        ) values (
+            #{repairId}, #{shopDeptId}, #{quotaYear}, #{movementType}, #{amount},
+            #{createBy}, sysdate(), #{remark}
+        )
+    </insert>
+</mapper>

@@ -1,0 +1,94 @@
+{
+  "schemaVersion": 1,
+  "releaseId": "inventory-transfer-audit-20260807",
+  "status": "deployed-local-audited",
+  "baselineCommit": "b408b7054a481fac692878fcdc24e7ea5bc9cc68",
+  "baselineCommitSemantics": "build-baseline-only-dirty-worktree-not-reproducible-by-commit",
+  "workingTreeReproducible": false,
+  "executionPolicy": "automatic",
+  "sourceFileList": "scripts/inventory-transfer-audit-release-files-20260807.list",
+  "sourceFileCount": 20,
+  "sourceHashAlgorithm": "sha256",
+  "sourceHashPolicy": "per-file-fail-closed-with-recorded-git-status",
+  "sourceHashExclusions": [
+    {
+      "file": "scripts/inventory-transfer-audit-release-20260807.json",
+      "reason": "self-referential metadata; schema and cross-file relations are verified fail-closed"
+    }
+  ],
+  "migrationList": "scripts/inventory-transfer-audit-migrations-20260807.list",
+  "migrationCount": 1,
+  "sourceDirectory": "sql",
+  "deployDirectory": "docker/mysql/releases/inventory-transfer-audit-20260807",
+  "preconditions": {
+    "tables": ["inv_transfer_order"],
+    "columns": [
+      {
+        "table": "inv_transfer_order",
+        "names": ["transfer_id", "create_by", "submitted_time", "from_dept_id", "to_dept_id"]
+      }
+    ],
+    "indexes": []
+  },
+  "migrations": [
+    {
+      "file": "erp_inventory_transfer_audit_identity_20260807.sql",
+      "sourceFile": "sql/erp_inventory_transfer_audit_identity_20260807.sql",
+      "dockerDbFile": "docker/mysql/db/erp_inventory_transfer_audit_identity_20260807.sql",
+      "releaseFile": "docker/mysql/releases/inventory-transfer-audit-20260807/erp_inventory_transfer_audit_identity_20260807.sql",
+      "sha256": "666c2c7bf388839eab3d13534a4c25b758206c085e01e1feab9ede44b6f45151",
+      "creates": [],
+      "backupTables": ["inv_transfer_order"]
+    }
+  ],
+  "bootstrap": {
+    "file": "docker/mysql/bootstrap-files.list",
+    "entry": "erp_inventory_transfer_audit_identity_20260807.sql",
+    "occurrences": 1,
+    "mustFollow": "erp_inventory_stock_log_business_type_20260804.sql"
+  },
+  "sourceFiles": [
+    {"file": "docker/mysql/bootstrap-files.list", "sha256": "841808a878b2225b7d10012611bcdd29e4fdd12ff24377550c18ca05d11558eb", "gitStatus": " M"},
+    {"file": "docker/mysql/db/erp_inventory_transfer_audit_identity_20260807.sql", "sha256": "666c2c7bf388839eab3d13534a4c25b758206c085e01e1feab9ede44b6f45151", "gitStatus": "??"},
+    {"file": "docker/mysql/releases/inventory-transfer-audit-20260807/erp_inventory_transfer_audit_identity_20260807.sql", "sha256": "666c2c7bf388839eab3d13534a4c25b758206c085e01e1feab9ede44b6f45151", "gitStatus": ".."},
+    {"file": "erp-modules/erp-inventory/src/main/java/com/erp/inventory/domain/InvTransferOrder.java", "sha256": "d9d0c7c4de5b349ac82ebd3a41311a2fdb604a7c88b35ed945760c619649c263", "gitStatus": " M"},
+    {"file": "erp-modules/erp-inventory/src/main/java/com/erp/inventory/service/impl/InvTransferServiceImpl.java", "sha256": "b72f797ea321bbed241d35cd70607678c73f2d358f868904d56ce6617c0b64be", "gitStatus": " M"},
+    {"file": "erp-modules/erp-inventory/src/main/resources/mapper/inventory/InvTransferOrderMapper.xml", "sha256": "39584daa10d41a3e818d131f9d74db3f10aa3510b88d94c9c73f7bd148a9f51b", "gitStatus": " M"},
+    {"file": "erp-modules/erp-inventory/src/test/java/com/erp/inventory/mapper/InventoryMapperBindingTest.java", "sha256": "4c6ff618ba44c17e28490c39587627c1ea9878c644f0df09b41b5fed862550da", "gitStatus": " M"},
+    {"file": "erp-modules/erp-inventory/src/test/java/com/erp/inventory/mapper/InventorySchemaMigrationTest.java", "sha256": "3c8e87c662cec1762f1f6933e3508338dcfc557ac6e45bba3902a6ac724cd768", "gitStatus": " M"},
+    {"file": "erp-modules/erp-inventory/src/test/java/com/erp/inventory/mapper/NewBusinessOpsMapperBindingTest.java", "sha256": "07e25ac218f6124ce6c46b17ec23090b4ab4dc546650ab4ebc842d079f70c339", "gitStatus": " M"},
+    {"file": "erp-modules/erp-inventory/src/test/java/com/erp/inventory/service/impl/InvTransferServiceImplTest.java", "sha256": "706d9e57fbe7ab1554ee15717cd730a53078d907fdcde3602ab2722f5bbb080c", "gitStatus": " M"},
+    {"file": "erp-ui/src/views/inventory/transfer/index.vue", "sha256": "52122535031c2382dc2588b94596b63f8a04f163c6b14a8889f5f1d5712c8bc6", "gitStatus": " M"},
+    {"file": "erp-ui/src/views/inventory/transfer/transferOrgHierarchy.js", "sha256": "1449db4beb831139c63e6dd8edf25031eec202a78776b189fff9a29b863c990d", "gitStatus": "??"},
+    {"file": "erp-ui/test/inventoryTransferAuditRelease.test.js", "sha256": "e95d6d0bb65f99f5857fd6f52f61c2e1adfee4609c8ccc12c131d5c59501c8b9", "gitStatus": "??"},
+    {"file": "erp-ui/test/transferOrgHierarchy.test.js", "sha256": "ddc1300f91651f8ac4931d9a7def47fdd59bbe08fa914159096c52603b7ec7f7", "gitStatus": "??"},
+    {"file": "erp-ui/test/transferWarehouseProcessingVisibility.test.js", "sha256": "4dda49e238d1c4cd21b381b99559ce3aba6f6f3e75233cb3a61e8077bd5c3d34", "gitStatus": " M"},
+    {"file": "scripts/inventory-transfer-audit-migrations-20260807.list", "sha256": "4a7dcf2d7dd785f91fc08068f25e42d5ad37237a8bcf747bb5bdfc3bcc871d44", "gitStatus": "??"},
+    {"file": "scripts/inventory-transfer-audit-release-files-20260807.list", "sha256": "af01909ba9f88e4d447caf67db1c0af3bba56c9e73bde801ca03d71e26c5bc8b", "gitStatus": "??"},
+    {"file": "scripts/verify-inventory-transfer-audit-release.sh", "sha256": "57137555c35460fa0f1eb0ca9b1294096ad3536a63ff176379b8e01b0d64f9d7", "gitStatus": "??"},
+    {"file": "sql/erp_inventory_transfer_audit_identity_20260807.sql", "sha256": "666c2c7bf388839eab3d13534a4c25b758206c085e01e1feab9ede44b6f45151", "gitStatus": "??"}
+  ],
+  "deployedArtifactEvidence": {
+    "inventoryJarSha256": "841c8df5d05f68868b1608fcd5c730efa96a07ca0d1699891a13599c60f252fd",
+    "uiDistManifestSha256": "4226a55100f625176fbed8c7f3c6bb328ab2a7f9e4aca7465c4ae580ad060f6e",
+    "uiIndexSha256": "873c69f15119e1343324aaca853c13534419db26882c20ef8119752a3a499cb0",
+    "releaseInfoSha256": "a5607cc219afb41ab0de1d394fc97bb8cb30f091dc80ea37477f6e799cda3bf3",
+    "backupDirectory": "output/deploy/transfer-audit-20260807-071306"
+  },
+  "historicalDataRisk": {
+    "scope": "existing 16 transfer orders",
+    "unresolvedCreatorAccounts": ["TF202606140001", "TF202606180001"],
+    "originalAccount": "ll",
+    "policy": "do not use account or create_by as a human name; leave the snapshot name NULL and display historical-name-unrecorded",
+    "currentSubmittedSample": "5 warehouse-visible submitted orders have trusted names"
+  },
+  "integrationTests": [
+    "erp-modules/erp-inventory/src/test/java/com/erp/inventory/mapper/InventorySchemaMigrationTest.java",
+    "erp-ui/test/transferWarehouseProcessingVisibility.test.js",
+    "erp-ui/test/transferOrgHierarchy.test.js",
+    "erp-ui/test/inventoryTransferAuditRelease.test.js"
+  ],
+  "artifactSha256Required": true,
+  "databaseWritePerformedByThisGovernanceTask": false,
+  "deploymentPerformedByThisGovernanceTask": false
+}

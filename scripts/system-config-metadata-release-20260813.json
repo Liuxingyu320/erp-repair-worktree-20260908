@@ -1,0 +1,52 @@
+{
+  "schemaVersion": 1,
+  "releaseId": "system-config-metadata-20260813",
+  "baselineCommit": "8d20c8059c66b88db4652cac7f1e3334abfdc099",
+  "migrationList": "scripts/system-config-metadata-migrations-20260813.list",
+  "migrationCount": 1,
+  "sourceDirectory": "sql",
+  "deployDirectory": "docker/mysql/releases/system-config-metadata-20260813",
+  "executionPolicy": "automatic",
+  "featureFlags": [],
+  "preconditions": {
+    "tables": [
+      "sys_config",
+      "sys_user"
+    ],
+    "columns": [
+      {
+        "table": "sys_config",
+        "names": [
+          "config_id",
+          "config_type"
+        ]
+      },
+      {
+        "table": "sys_user",
+        "names": [
+          "user_id",
+          "pwd_update_date",
+          "credential_state",
+          "temporary_password_expires_at"
+        ]
+      }
+    ],
+    "indexes": []
+  },
+  "migrations": [
+    {
+      "file": "erp_system_config_metadata_20260813.sql",
+      "sha256": "a13de45db2d413e94f6b83062de7ab22992d795a7dd1dd6cac10e5f7c1204543",
+      "creates": [],
+      "backupTables": [
+        "sys_config",
+        "sys_user"
+      ]
+    }
+  ],
+  "integrationTests": [
+    "scripts/test_system_config_metadata_migration.py",
+    "erp-modules/erp-system/src/test/java/com/erp/system/mapper/SystemManagementMigrationSourceTest.java"
+  ],
+  "artifactSha256Required": true
+}

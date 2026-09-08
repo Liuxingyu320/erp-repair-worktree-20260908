@@ -1,0 +1,26 @@
+const assert = require("assert")
+const fs = require("fs")
+const path = require("path")
+
+const root = path.resolve(__dirname, "..")
+const read = file => fs.readFileSync(path.join(root, file), "utf8")
+
+const api = read("src/api/hr/employee.js")
+const page = read("src/views/hr/employee/index.vue")
+const list = read("src/views/hr/components/HrEmployeeList.vue")
+const readiness = read("src/views/hr/completeness/components/HrMasterDataIssues.vue")
+
+assert.ok(api.includes("initializeHrEmployeeProfile"))
+assert.ok(api.includes("/system/hr/employee/${userId}/profile/initialize"))
+assert.ok(api.includes('method: "post"'))
+assert.ok(page.includes(':initial-action="routeAction"'))
+assert.ok(page.includes('query.action === "initializeProfile"'))
+assert.ok(list.includes("profileInitialized === false"))
+assert.ok(list.includes("handleInitializeProfile"))
+assert.ok(list.includes("initializeHrEmployeeProfile"))
+assert.ok(list.includes("hr:employee:edit"))
+assert.ok(list.includes("建立档案"))
+assert.ok(readiness.includes("EMPLOYEE_PROFILE_MISSING"))
+assert.ok(readiness.includes("建立档案"))
+
+console.log("hr employee profile initialization tests passed")

@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.oa.mapper.OaLaborContractEventMapper">
+
+    <resultMap id="OaLaborContractEventResult" type="OaLaborContractEvent">
+        <id property="eventId" column="event_id"/>
+        <result property="contractId" column="contract_id"/>
+        <result property="eventType" column="event_type"/>
+        <result property="eventSummary" column="event_summary"/>
+        <result property="operatorId" column="operator_id"/>
+        <result property="operatorName" column="operator_name"/>
+        <result property="clientIp" column="client_ip"/>
+        <result property="userAgent" column="user_agent"/>
+        <result property="fileHash" column="file_hash"/>
+        <result property="documentVersion" column="document_version"/>
+        <result property="documentHash" column="document_hash"/>
+        <result property="prevEventHash" column="prev_event_hash"/>
+        <result property="eventHash" column="event_hash"/>
+        <result property="requestId" column="request_id"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="remark" column="remark"/>
+    </resultMap>
+
+    <insert id="insertOaLaborContractEvent" parameterType="OaLaborContractEvent" useGeneratedKeys="true" keyProperty="eventId">
+        insert into oa_labor_contract_event (
+            contract_id, event_type, event_summary, operator_id, operator_name,
+            client_ip, user_agent, file_hash, document_version, document_hash,
+            prev_event_hash, event_hash, request_id, create_by, create_time, remark
+        ) values (
+            #{contractId}, #{eventType}, #{eventSummary}, #{operatorId}, #{operatorName},
+            #{clientIp}, #{userAgent}, #{fileHash}, #{documentVersion}, #{documentHash},
+            #{prevEventHash}, #{eventHash}, #{requestId}, #{createBy}, #{createTime}, #{remark}
+        )
+    </insert>
+
+    <select id="selectEventsByContractId" resultMap="OaLaborContractEventResult">
+        select event_id, contract_id, event_type, event_summary, operator_id, operator_name,
+               client_ip, user_agent, file_hash, document_version, document_hash,
+               prev_event_hash, event_hash, request_id, create_by, create_time, remark
+        from oa_labor_contract_event
+        where contract_id = #{contractId}
+        order by event_id asc
+    </select>
+
+    <select id="selectLatestEventHashByContractId" resultType="String">
+        select event_hash
+        from oa_labor_contract_event
+        where contract_id = #{contractId}
+        order by event_id desc
+        limit 1
+    </select>
+</mapper>

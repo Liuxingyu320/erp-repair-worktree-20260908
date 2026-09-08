@@ -1,0 +1,240 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.oa.mapper.OaLaborContractMapper">
+
+    <resultMap id="OaLaborContractResult" type="OaLaborContract">
+        <id property="contractId" column="contract_id"/>
+        <result property="templateId" column="template_id"/>
+        <result property="templateName" column="template_name"/>
+        <result property="employeeId" column="employee_id"/>
+        <result property="employeeDeptId" column="employee_dept_id"/>
+        <result property="employeeDeptName" column="employee_dept_name"/>
+        <result property="shopDeptId" column="shop_dept_id"/>
+        <result property="shopDeptName" column="shop_dept_name"/>
+        <result property="schemeId" column="scheme_id"/>
+        <result property="salaryItemId" column="salary_item_id"/>
+        <result property="contractNo" column="contract_no"/>
+        <result property="contractTitle" column="contract_title"/>
+        <result property="employeeName" column="employee_name"/>
+        <result property="employeeIdCard" column="employee_id_card"/>
+        <result property="employeePhone" column="employee_phone"/>
+        <result property="postName" column="post_name"/>
+        <result property="socialType" column="social_type"/>
+        <result property="contractStartDate" column="contract_start_date"/>
+        <result property="contractEndDate" column="contract_end_date"/>
+        <result property="probationStartDate" column="probation_start_date"/>
+        <result property="probationEndDate" column="probation_end_date"/>
+        <result property="baseSalary" column="base_salary"/>
+        <result property="managementAllowance" column="management_allowance"/>
+        <result property="overtimePay" column="overtime_pay"/>
+        <result property="rewardAllowance" column="reward_allowance"/>
+        <result property="fullAttendanceBonus" column="full_attendance_bonus"/>
+        <result property="socialSubsidy" column="social_subsidy"/>
+        <result property="commuteSubsidy" column="commute_subsidy"/>
+        <result property="totalSalary" column="total_salary"/>
+        <result property="accommodationText" column="accommodation_text"/>
+        <result property="commuteText" column="commute_text"/>
+        <result property="status" column="status"/>
+        <result property="previewFileUrl" column="preview_file_url"/>
+        <result property="archiveFileUrl" column="archive_file_url"/>
+        <result property="pdfFileUrl" column="pdf_file_url"/>
+        <result property="signatureFileUrl" column="signature_file_url"/>
+        <result property="contractFileHash" column="contract_file_hash"/>
+        <result property="documentVersion" column="document_version"/>
+        <result property="previewFileHash" column="preview_file_hash"/>
+        <result property="archiveFileHash" column="archive_file_hash"/>
+        <result property="certificateFileUrl" column="certificate_file_url"/>
+        <result property="certificateFileHash" column="certificate_file_hash"/>
+        <result property="templateFileHash" column="template_file_hash"/>
+        <result property="sealImageHash" column="seal_image_hash"/>
+        <result property="signerIp" column="signer_ip"/>
+        <result property="signerUserAgent" column="signer_user_agent"/>
+        <result property="sentTime" column="sent_time"/>
+        <result property="signedTime" column="signed_time"/>
+        <result property="voidedTime" column="voided_time"/>
+        <result property="signProvider" column="sign_provider"/>
+        <result property="providerContractId" column="provider_contract_id"/>
+        <result property="providerSignUrl" column="provider_sign_url"/>
+        <result property="providerStatus" column="provider_status"/>
+        <result property="providerCallbackPayload" column="provider_callback_payload"/>
+        <result property="caCertNo" column="ca_cert_no"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateBy" column="update_by"/>
+        <result property="updateTime" column="update_time"/>
+        <result property="remark" column="remark"/>
+    </resultMap>
+
+    <sql id="baseColumns">
+        c.contract_id, c.template_id, t.template_name,
+        c.employee_id, c.employee_dept_id, employee_dept.dept_name as employee_dept_name,
+        c.shop_dept_id, shop_dept.dept_name as shop_dept_name,
+        c.scheme_id, c.salary_item_id, c.contract_no, c.contract_title,
+        c.employee_name, c.employee_id_card, c.employee_phone, c.post_name, c.social_type,
+        c.contract_start_date, c.contract_end_date, c.probation_start_date, c.probation_end_date,
+        c.base_salary, c.management_allowance, c.overtime_pay, c.reward_allowance,
+        c.full_attendance_bonus, c.social_subsidy, c.commute_subsidy, c.total_salary,
+        c.accommodation_text, c.commute_text, c.status,
+        c.preview_file_url, c.archive_file_url, c.pdf_file_url, c.signature_file_url,
+        c.contract_file_hash, c.document_version, c.preview_file_hash, c.archive_file_hash,
+        c.certificate_file_url, c.certificate_file_hash, c.template_file_hash, c.seal_image_hash,
+        c.signer_ip, c.signer_user_agent,
+        c.sent_time, c.signed_time, c.voided_time,
+        c.sign_provider, c.provider_contract_id, c.provider_sign_url, c.provider_status,
+        c.provider_callback_payload, c.ca_cert_no,
+        c.create_by, c.create_time, c.update_by, c.update_time, c.remark
+    </sql>
+
+    <sql id="fromWithNames">
+        from oa_labor_contract c
+        left join oa_labor_contract_template t on t.template_id = c.template_id
+        left join sys_dept employee_dept on employee_dept.dept_id = c.employee_dept_id
+        left join sys_dept shop_dept on shop_dept.dept_id = c.shop_dept_id
+    </sql>
+
+    <insert id="insertOaLaborContract" parameterType="OaLaborContract" useGeneratedKeys="true" keyProperty="contractId">
+        insert into oa_labor_contract (
+            template_id, employee_id, employee_dept_id, shop_dept_id, scheme_id, salary_item_id,
+            contract_no, contract_title, employee_name, employee_id_card, employee_phone,
+            post_name, social_type, contract_start_date, contract_end_date,
+            probation_start_date, probation_end_date, base_salary, management_allowance,
+            overtime_pay, reward_allowance, full_attendance_bonus, social_subsidy,
+            commute_subsidy, total_salary, accommodation_text, commute_text, status,
+            preview_file_url, archive_file_url, pdf_file_url, signature_file_url, contract_file_hash,
+            document_version, preview_file_hash, archive_file_hash, certificate_file_url,
+            certificate_file_hash, template_file_hash, seal_image_hash,
+            signer_ip, signer_user_agent, sent_time, signed_time, voided_time,
+            sign_provider, provider_contract_id, provider_sign_url, provider_status,
+            provider_callback_payload, ca_cert_no, create_by, create_time, remark
+        ) values (
+            #{templateId}, #{employeeId}, #{employeeDeptId}, #{shopDeptId}, #{schemeId}, #{salaryItemId},
+            #{contractNo}, #{contractTitle}, #{employeeName}, #{employeeIdCard}, #{employeePhone},
+            #{postName}, #{socialType}, #{contractStartDate}, #{contractEndDate},
+            #{probationStartDate}, #{probationEndDate}, #{baseSalary}, #{managementAllowance},
+            #{overtimePay}, #{rewardAllowance}, #{fullAttendanceBonus}, #{socialSubsidy},
+            #{commuteSubsidy}, #{totalSalary}, #{accommodationText}, #{commuteText}, #{status},
+            #{previewFileUrl}, #{archiveFileUrl}, #{pdfFileUrl}, #{signatureFileUrl}, #{contractFileHash},
+            #{documentVersion}, #{previewFileHash}, #{archiveFileHash}, #{certificateFileUrl},
+            #{certificateFileHash}, #{templateFileHash}, #{sealImageHash},
+            #{signerIp}, #{signerUserAgent}, #{sentTime}, #{signedTime}, #{voidedTime},
+            #{signProvider}, #{providerContractId}, #{providerSignUrl}, #{providerStatus},
+            #{providerCallbackPayload}, #{caCertNo}, #{createBy}, sysdate(), #{remark}
+        )
+    </insert>
+
+    <update id="updateOaLaborContract" parameterType="OaLaborContract">
+        update oa_labor_contract
+        <set>
+            <if test="templateId != null">template_id = #{templateId},</if>
+            <if test="employeeId != null">employee_id = #{employeeId},</if>
+            <if test="employeeDeptId != null">employee_dept_id = #{employeeDeptId},</if>
+            <if test="shopDeptId != null">shop_dept_id = #{shopDeptId},</if>
+            <if test="schemeId != null">scheme_id = #{schemeId},</if>
+            <if test="salaryItemId != null">salary_item_id = #{salaryItemId},</if>
+            <if test="contractNo != null">contract_no = #{contractNo},</if>
+            <if test="contractTitle != null">contract_title = #{contractTitle},</if>
+            <if test="employeeName != null">employee_name = #{employeeName},</if>
+            <if test="employeeIdCard != null">employee_id_card = #{employeeIdCard},</if>
+            <if test="employeePhone != null">employee_phone = #{employeePhone},</if>
+            <if test="postName != null">post_name = #{postName},</if>
+            <if test="socialType != null">social_type = #{socialType},</if>
+            <if test="contractStartDate != null">contract_start_date = #{contractStartDate},</if>
+            <if test="contractEndDate != null">contract_end_date = #{contractEndDate},</if>
+            <if test="probationStartDate != null">probation_start_date = #{probationStartDate},</if>
+            <if test="probationEndDate != null">probation_end_date = #{probationEndDate},</if>
+            <if test="baseSalary != null">base_salary = #{baseSalary},</if>
+            <if test="managementAllowance != null">management_allowance = #{managementAllowance},</if>
+            <if test="overtimePay != null">overtime_pay = #{overtimePay},</if>
+            <if test="rewardAllowance != null">reward_allowance = #{rewardAllowance},</if>
+            <if test="fullAttendanceBonus != null">full_attendance_bonus = #{fullAttendanceBonus},</if>
+            <if test="socialSubsidy != null">social_subsidy = #{socialSubsidy},</if>
+            <if test="commuteSubsidy != null">commute_subsidy = #{commuteSubsidy},</if>
+            <if test="totalSalary != null">total_salary = #{totalSalary},</if>
+            <if test="accommodationText != null">accommodation_text = #{accommodationText},</if>
+            <if test="commuteText != null">commute_text = #{commuteText},</if>
+            <if test="status != null and status != ''">status = #{status},</if>
+            <if test="previewFileUrl != null">preview_file_url = #{previewFileUrl},</if>
+            <if test="archiveFileUrl != null">archive_file_url = #{archiveFileUrl},</if>
+            <if test="pdfFileUrl != null">pdf_file_url = #{pdfFileUrl},</if>
+            <if test="signatureFileUrl != null">signature_file_url = #{signatureFileUrl},</if>
+            <if test="contractFileHash != null">contract_file_hash = #{contractFileHash},</if>
+            <if test="documentVersion != null">document_version = #{documentVersion},</if>
+            <if test="previewFileHash != null">preview_file_hash = #{previewFileHash},</if>
+            <if test="archiveFileHash != null">archive_file_hash = #{archiveFileHash},</if>
+            <if test="certificateFileUrl != null">certificate_file_url = #{certificateFileUrl},</if>
+            <if test="certificateFileHash != null">certificate_file_hash = #{certificateFileHash},</if>
+            <if test="templateFileHash != null">template_file_hash = #{templateFileHash},</if>
+            <if test="sealImageHash != null">seal_image_hash = #{sealImageHash},</if>
+            <if test="signerIp != null">signer_ip = #{signerIp},</if>
+            <if test="signerUserAgent != null">signer_user_agent = #{signerUserAgent},</if>
+            <if test="sentTime != null">sent_time = #{sentTime},</if>
+            <if test="signedTime != null">signed_time = #{signedTime},</if>
+            <if test="voidedTime != null">voided_time = #{voidedTime},</if>
+            <if test="signProvider != null">sign_provider = #{signProvider},</if>
+            <if test="providerContractId != null">provider_contract_id = #{providerContractId},</if>
+            <if test="providerSignUrl != null">provider_sign_url = #{providerSignUrl},</if>
+            <if test="providerStatus != null">provider_status = #{providerStatus},</if>
+            <if test="providerCallbackPayload != null">provider_callback_payload = #{providerCallbackPayload},</if>
+            <if test="caCertNo != null">ca_cert_no = #{caCertNo},</if>
+            <if test="updateBy != null and updateBy != ''">update_by = #{updateBy},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            update_time = sysdate()
+        </set>
+        where contract_id = #{contractId}
+    </update>
+
+    <select id="selectOaLaborContractById" resultMap="OaLaborContractResult">
+        select <include refid="baseColumns"/> <include refid="fromWithNames"/>
+        where c.contract_id = #{contractId}
+    </select>
+
+    <select id="selectOaLaborContractList" parameterType="OaLaborContract" resultMap="OaLaborContractResult">
+        select <include refid="baseColumns"/> <include refid="fromWithNames"/>
+        <where>
+            <if test="employeeName != null and employeeName != ''">
+                and c.employee_name like concat('%', #{employeeName}, '%')
+            </if>
+            <if test="employeePhone != null and employeePhone != ''">
+                and c.employee_phone like concat('%', #{employeePhone}, '%')
+            </if>
+            <if test="socialType != null and socialType != ''">
+                and c.social_type = #{socialType}
+            </if>
+            <if test="status != null and status != ''">
+                and c.status = #{status}
+            </if>
+            <if test="shopDeptId != null">
+                and c.shop_dept_id = #{shopDeptId}
+            </if>
+            <if test="params.scopeDeptIds != null and params.scopeDeptIds.size() > 0">
+                and c.shop_dept_id in
+                <foreach collection="params.scopeDeptIds" item="scopeDeptId" open="(" close=")" separator=",">
+                    #{scopeDeptId}
+                </foreach>
+            </if>
+        </where>
+        order by c.contract_id desc
+    </select>
+
+    <select id="selectMyOaLaborContractList" parameterType="OaLaborContract" resultMap="OaLaborContractResult">
+        select <include refid="baseColumns"/> <include refid="fromWithNames"/>
+        <where>
+            c.employee_id = #{employeeId}
+            <if test="status != null and status != ''">
+                and c.status = #{status}
+            </if>
+        </where>
+        order by c.contract_id desc
+    </select>
+
+    <select id="selectOaLaborContractByEvidenceHash" resultMap="OaLaborContractResult">
+        select <include refid="baseColumns"/> <include refid="fromWithNames"/>
+        where c.preview_file_hash = #{hash}
+           or c.archive_file_hash = #{hash}
+           or c.certificate_file_hash = #{hash}
+           or c.contract_file_hash = #{hash}
+        limit 1
+    </select>
+</mapper>

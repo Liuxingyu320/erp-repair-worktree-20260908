@@ -1,0 +1,160 @@
+{
+  "schemaVersion": 1,
+  "releaseId": "erp-current-release-20260722",
+  "status": "candidate",
+  "executionPolicy": "manual-phased-forward-only",
+  "productionReleaseReady": false,
+  "sourceDirectory": "sql",
+  "deployDirectory": "docker/mysql/releases/erp-current-release-20260722",
+  "migrationList": "scripts/erp-current-release-20260722-migrations.list",
+  "migrationCount": 15,
+  "migrations": [
+    {
+      "sequence": 1,
+      "file": "erp_oa_sign_menu_permission_repair_20260716.sql",
+      "sha256": "a46dcc124db641bc609c063879e440ca1cd1520ed9e489a0575a7ab4d41025e8",
+      "phase": "01-menu-permission-repair",
+      "applyMode": "manual-native-mysql",
+      "forwardOnly": true,
+      "rerunnable": true
+    },
+    {
+      "sequence": 2,
+      "file": "erp_oa_sign_package_lifecycle_20260716.sql",
+      "sha256": "9ca9f8845d1741fea7c1ef203e01ad05379ff9c20ba1583f9b3535e8fec45742",
+      "phase": "02-package-lifecycle",
+      "applyMode": "manual-native-mysql",
+      "forwardOnly": true,
+      "rerunnable": true
+    },
+    {
+      "sequence": 3,
+      "file": "erp_oa_sign_document_policy_snapshot_20260716.sql",
+      "sha256": "b4eeabaa02f606258777d09c3a753b45c3be9cf0e18ea1e84d2d5a959c66455a",
+      "phase": "03-document-policy-snapshot",
+      "applyMode": "manual-native-mysql",
+      "forwardOnly": true,
+      "rerunnable": true
+    },
+    {
+      "sequence": 4,
+      "file": "erp_system_user_push_delivery_20260717.sql",
+      "sha256": "0ffbe86c227144306a0835afafb157a2e2cec7f62f6d82211580c0ecc2646a6d",
+      "phase": "04-user-push-delivery",
+      "applyMode": "manual-native-mysql",
+      "forwardOnly": true,
+      "rerunnable": true
+    },
+    {
+      "sequence": 5,
+      "file": "erp_oa_sign_onboard_import_20260718.sql",
+      "sha256": "e79554c95992186ebf15318cd14066fb65ec77883c1887ca01b642f595e3f945",
+      "phase": "05-onboard-import",
+      "applyMode": "manual-native-mysql",
+      "forwardOnly": true,
+      "rerunnable": true
+    },
+    {
+      "sequence": 6,
+      "file": "erp_system_sign_profile_supplement_20260718.sql",
+      "sha256": "07e04d77a4e60dd174846151f9f3cdfca1a732e42f0239c85717408b9ad2ba3e",
+      "phase": "06-sign-profile-supplement",
+      "applyMode": "manual-native-mysql",
+      "forwardOnly": true,
+      "rerunnable": true
+    },
+    {
+      "sequence": 7,
+      "file": "erp_oa_sign_salary_social_mapping_20260719.sql",
+      "sha256": "eb9607af03f34d65290b2a031bb29966e65a6d9726f36b918bc9a8dd1555a8a1",
+      "phase": "07-salary-social-mapping",
+      "applyMode": "manual-native-mysql",
+      "forwardOnly": true,
+      "rerunnable": true
+    },
+    {
+      "sequence": 8,
+      "file": "erp_system_sign_candidate_phone_index_20260719.sql",
+      "sha256": "ad662ad63dd2f431d1ad59dce928bf54596616c4c96e449b79f586b6d4681328",
+      "phase": "08-candidate-phone-index",
+      "applyMode": "manual-native-mysql",
+      "forwardOnly": true,
+      "rerunnable": true
+    },
+    {
+      "sequence": 9,
+      "file": "erp_oa_sign_company_salary_policy_20260720.sql",
+      "sha256": "6f222d063f185490254915ffa4324605e1c189fa18f79e2014da9b83a7facd2b",
+      "phase": "09-company-salary-policy",
+      "applyMode": "manual-native-mysql",
+      "forwardOnly": true,
+      "rerunnable": true
+    },
+    {
+      "sequence": 10,
+      "file": "erp_oa_sign_dual_sequence_evidence_20260720.sql",
+      "sha256": "eb962dd09462732b12a67e52420a93c7c3e672fed5bbb26cf47920972606fa0a",
+      "phase": "10-dual-sequence-evidence",
+      "applyMode": "manual-native-mysql",
+      "forwardOnly": true,
+      "rerunnable": true
+    },
+    {
+      "sequence": 11,
+      "file": "erp_oa_sign_onboard_send_idempotency_20260720.sql",
+      "sha256": "c6d2eda6d530504b503f6695a8ad7861035768aac635b4b0aeb069209fce2050",
+      "phase": "11-onboard-send-idempotency",
+      "applyMode": "manual-native-mysql",
+      "forwardOnly": true,
+      "rerunnable": true
+    },
+    {
+      "sequence": 12,
+      "file": "erp_oa_sign_task_batch_finalize_20260720.sql",
+      "sha256": "5cd0884efb6613763c3ef5ac0be3554e8a7b0c31162c5eef06a67dd838331960",
+      "phase": "12-task-batch-finalize",
+      "applyMode": "manual-native-mysql",
+      "forwardOnly": true,
+      "rerunnable": true
+    },
+    {
+      "sequence": 13,
+      "file": "erp_oa_sign_file_cleanup_20260720.sql",
+      "sha256": "0d57049074315bda6db4f802d689d1ab64c37473fa01c410e3b2fdf90d9fa559",
+      "phase": "13-file-cleanup",
+      "applyMode": "manual-native-mysql",
+      "forwardOnly": true,
+      "rerunnable": true
+    },
+    {
+      "sequence": 14,
+      "file": "erp_oa_sign_task_hard_delete_idempotency_20260720.sql",
+      "sha256": "cbddc4165293f04e8ceb3604317538ab2e1a198fae638316c22ed00c1cec7eca",
+      "phase": "14-task-hard-delete-idempotency",
+      "applyMode": "manual-native-mysql",
+      "forwardOnly": true,
+      "rerunnable": true
+    },
+    {
+      "sequence": 15,
+      "file": "erp_oa_sign_contract_term_snapshot_20260721.sql",
+      "sha256": "458fe540017d40c3902b387507b082bc447c2c4a826144e88b274f88927ab683",
+      "phase": "15-contract-term-snapshot",
+      "applyMode": "manual-native-mysql",
+      "forwardOnly": true,
+      "rerunnable": true
+    }
+  ],
+  "deploymentOrder": [
+    "production-readonly-preflight",
+    "backup-database-and-sign-files",
+    "apply-only-missing-migrations-in-order",
+    "deploy-backend",
+    "deploy-frontend",
+    "gray-uat"
+  ],
+  "rollbackPolicy": {
+    "application": "switch /opt/erp-new to the exact previous release",
+    "database": "forward-fix only; preserve contracts, signatures, hashes and audit evidence"
+  }
+}

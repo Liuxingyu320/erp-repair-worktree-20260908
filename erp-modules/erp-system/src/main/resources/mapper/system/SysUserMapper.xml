@@ -1,0 +1,1345 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.system.mapper.SysUserMapper">
+
+    <resultMap type="SysUser" id="SysUserResult">
+        <id     property="userId"        column="user_id"         />
+        <result property="deptId"        column="dept_id"         />
+        <result property="userName"      column="user_name"       />
+        <result property="nickName"      column="nick_name"       />
+        <result property="email"         column="email"           />
+        <result property="phonenumber"   column="phonenumber"     />
+        <result property="sex"           column="sex"             />
+        <result property="avatar"        column="avatar"          />
+        <result property="password"      column="password"        />
+        <result property="status"        column="status"          />
+        <result property="delFlag"       column="del_flag"        />
+        <result property="loginIp"       column="login_ip"        />
+        <result property="loginDate"     column="login_date"      />
+        <result property="pwdUpdateDate" column="pwd_update_date" />
+        <result property="mustChangePassword" column="must_change_password" />
+        <result property="credentialState" column="credential_state" />
+        <result property="temporaryPasswordExpiresAt" column="temporary_password_expires_at" />
+        <result property="postNames"     column="post_names"      />
+        <result property="roleCount"     column="role_count"      />
+        <result property="shopScopeCount" column="shop_scope_count" />
+        <result property="shopScopeNames" column="shop_scope_names" />
+        <result property="setupStatus"   column="setup_status"    />
+        <result property="createBy"      column="create_by"       />
+        <result property="createTime"    column="create_time"     />
+        <result property="updateBy"      column="update_by"       />
+        <result property="updateTime"    column="update_time"     />
+        <result property="remark"        column="remark"          />
+        <association property="dept"     javaType="SysDept"         resultMap="deptResult" />
+        <association property="profile"  javaType="com.erp.system.api.domain.SysUserProfile" resultMap="UserProfileResult" />
+        <collection  property="roles"    javaType="java.util.List"  resultMap="RoleResult" />
+    </resultMap>
+	
+    <resultMap id="deptResult" type="SysDept">
+        <id     property="deptId"    column="dept_id"     />
+        <result property="parentId"  column="parent_id"   />
+        <result property="deptName"  column="dept_name"   />
+        <result property="ancestors" column="ancestors"   />
+        <result property="orderNum"  column="order_num"   />
+        <result property="leader"    column="leader"      />
+        <result property="status"    column="dept_status" />
+    </resultMap>
+	
+    <resultMap id="RoleResult" type="SysRole">
+        <id     property="roleId"       column="role_id"        />
+        <result property="roleName"     column="role_name"      />
+        <result property="roleKey"      column="role_key"       />
+        <result property="roleSort"     column="role_sort"      />
+        <result property="dataScope"    column="data_scope"     />
+        <result property="status"       column="role_status"    />
+    </resultMap>
+
+    <resultMap id="UserProfileResult" type="com.erp.system.api.domain.SysUserProfile">
+        <id     property="profileId"                  column="profile_id"                  />
+        <result property="userId"                     column="profile_user_id"             />
+        <result property="employeeNo"                 column="employee_no"                 />
+        <result property="positionNo"                 column="position_no"                 />
+        <result property="companyName"                column="company_name"                />
+        <result property="deptLevel1Name"             column="dept_level1_name"            />
+        <result property="deptLevel2Name"             column="dept_level2_name"            />
+        <result property="deptLevel3Name"             column="dept_level3_name"            />
+        <result property="storeName"                  column="store_name"                  />
+        <result property="positionNames"              column="position_names"              />
+        <result property="jobGrade"                   column="job_grade"                   />
+        <result property="departmentSupervisor"       column="department_supervisor"       />
+        <result property="directSupervisor"           column="direct_supervisor"           />
+        <result property="directSupervisorUserId"     column="direct_supervisor_user_id"   />
+        <result property="employeeStatus"             column="employee_status"             />
+        <result property="employeeCategory"           column="employee_category"           />
+        <result property="birthDate"                  column="birth_date"                  />
+        <result property="idType"                     column="id_type"                     />
+        <result property="idNumber"                   column="id_number"                   />
+        <result property="bloodType"                  column="blood_type"                  />
+        <result property="registeredResidence"        column="registered_residence"        />
+        <result property="currentAddress"             column="current_address"             />
+        <result property="studentStatus"              column="student_status"              />
+        <result property="schoolName"                 column="school_name"                 />
+        <result property="retirementStatus"           column="retirement_status"           />
+        <result property="incomeStartYearMonth"       column="income_start_year_month"     />
+        <result property="firstEducation"             column="first_education"             />
+        <result property="firstDegree"                column="first_degree"                />
+        <result property="firstGraduationDate"        column="first_graduation_date"       />
+        <result property="firstGraduationSchool"      column="first_graduation_school"     />
+        <result property="firstMajor"                 column="first_major"                 />
+        <result property="highestEducation"           column="highest_education"           />
+        <result property="highestDegree"              column="highest_degree"              />
+        <result property="highestGraduationDate"      column="highest_graduation_date"     />
+        <result property="highestGraduationSchool"    column="highest_graduation_school"   />
+        <result property="highestMajor"               column="highest_major"               />
+        <result property="politicalStatus"            column="political_status"            />
+        <result property="maritalStatus"              column="marital_status"              />
+        <result property="nationality"                column="nationality"                 />
+        <result property="foreignNationalFlag"        column="foreign_national_flag"       />
+        <result property="ethnicity"                  column="ethnicity"                   />
+        <result property="healthStatus"               column="health_status"               />
+        <result property="emergencyContact"           column="emergency_contact"           />
+        <result property="emergencyContactRelation"   column="emergency_contact_relation"  />
+        <result property="emergencyContactPhone"      column="emergency_contact_phone"     />
+        <result property="recruitmentChannel"         column="recruitment_channel"         />
+        <result property="officePhone"                column="office_phone"                />
+        <result property="workStartDate"              column="work_start_date"             />
+        <result property="workYears"                  column="work_years"                  />
+        <result property="entryDate"                  column="entry_date"                  />
+        <result property="probationPeriod"            column="probation_period"            />
+        <result property="probationStartDate"         column="probation_start_date"        />
+        <result property="probationEndDate"           column="probation_end_date"          />
+        <result property="plannedRegularizationDate"  column="planned_regularization_date" />
+        <result property="actualRegularizationDate"   column="actual_regularization_date"  />
+        <result property="companyYears"               column="company_years"               />
+        <result property="currentPositionStartDate"   column="current_position_start_date" />
+        <result property="contractStartDate"          column="contract_start_date"         />
+        <result property="contractEndDate"            column="contract_end_date"           />
+        <result property="contractType"               column="contract_type"               />
+        <result property="contractTerm"               column="contract_term"               />
+        <result property="renewalCount"               column="renewal_count"               />
+        <result property="workLocation"               column="work_location"               />
+        <result property="workCityLevel"              column="work_city_level"             />
+        <result property="attendanceMethod"           column="attendance_method"           />
+        <result property="householdType"              column="household_type"              />
+        <result property="socialType"                 column="social_type"                 />
+        <result property="socialSecurityLocation"     column="social_security_location"    />
+        <result property="housingFundLocation"        column="housing_fund_location"       />
+        <result property="leaveDate"                  column="leave_date"                  />
+        <result property="bankName"                   column="bank_name"                   />
+        <result property="bankAccount"                column="bank_account"                />
+        <result property="legalEntity"                column="legal_entity"                />
+        <result property="legalEntityId" column="legal_entity_id" />
+        <result property="legalEntityCode" column="legal_entity_code" />
+        <result property="createBy"                   column="profile_create_by"           />
+        <result property="createTime"                 column="profile_create_time"         />
+        <result property="updateBy"                   column="profile_update_by"           />
+        <result property="updateTime"                 column="profile_update_time"         />
+    </resultMap>
+
+    <resultMap type="com.erp.system.domain.vo.SysUserPiiExportVo" id="SysUserPiiExportResult">
+        <id     property="userId"                     column="user_id"                     />
+        <result property="userName"                   column="user_name"                   />
+        <result property="nickName"                   column="nick_name"                   />
+        <result property="deptName"                   column="dept_name"                   />
+        <result property="phonenumber"                column="phonenumber"                 />
+        <result property="email"                      column="email"                       />
+        <result property="sex"                        column="sex"                         />
+        <result property="birthDate"                  column="birth_date"                  />
+        <result property="idType"                     column="id_type"                     />
+        <result property="idNumber"                   column="id_number"                   />
+        <result property="bloodType"                  column="blood_type"                  />
+        <result property="registeredResidence"        column="registered_residence"        />
+        <result property="currentAddress"             column="current_address"             />
+        <result property="firstEducation"             column="first_education"             />
+        <result property="firstDegree"                column="first_degree"                />
+        <result property="firstGraduationDate"        column="first_graduation_date"       />
+        <result property="firstGraduationSchool"      column="first_graduation_school"     />
+        <result property="firstMajor"                 column="first_major"                 />
+        <result property="highestEducation"           column="highest_education"           />
+        <result property="highestDegree"              column="highest_degree"              />
+        <result property="highestGraduationDate"      column="highest_graduation_date"     />
+        <result property="highestGraduationSchool"    column="highest_graduation_school"   />
+        <result property="highestMajor"               column="highest_major"               />
+        <result property="politicalStatus"            column="political_status"            />
+        <result property="maritalStatus"              column="marital_status"              />
+        <result property="nationality"                column="nationality"                 />
+        <result property="foreignNationalFlag"        column="foreign_national_flag"       />
+        <result property="ethnicity"                  column="ethnicity"                   />
+        <result property="healthStatus"               column="health_status"               />
+        <result property="emergencyContact"           column="emergency_contact"           />
+        <result property="emergencyContactRelation"   column="emergency_contact_relation"  />
+        <result property="emergencyContactPhone"      column="emergency_contact_phone"     />
+        <result property="officePhone"                column="office_phone"                />
+        <result property="workLocation"               column="work_location"               />
+        <result property="householdType"              column="household_type"              />
+        <result property="socialSecurityLocation"     column="social_security_location"    />
+        <result property="housingFundLocation"        column="housing_fund_location"       />
+        <result property="bankName"                   column="bank_name"                   />
+        <result property="bankAccount"                column="bank_account"                />
+    </resultMap>
+
+    <resultMap type="com.erp.system.api.domain.SignCandidateUser" id="SignCandidateUserResult">
+        <id     property="userId"      column="user_id"      />
+        <result property="userName"    column="user_name"    />
+        <result property="nickName"    column="nick_name"    />
+        <result property="phonenumber" column="phonenumber"  />
+        <result property="accountStatus" column="account_status" />
+        <result property="deptId"      column="dept_id"      />
+        <result property="deptName"    column="dept_name"    />
+        <result property="postNames"   column="post_names"   />
+        <result property="postId"      column="post_id"      />
+        <result property="postCode"    column="post_code"    />
+        <result property="postName"    column="post_name"    />
+        <result property="employeeNo"  column="employee_no"  />
+        <result property="employeeStatus" column="employee_status" />
+        <result property="idType"      column="id_type"      />
+        <result property="idNumber"    column="id_number"    />
+        <result property="currentAddress" column="current_address" />
+        <result property="studentStatus" column="student_status" />
+        <result property="schoolName" column="school_name" />
+        <result property="retirementStatus" column="retirement_status" />
+        <result property="incomeStartYearMonth" column="income_start_year_month" />
+        <result property="jobGrade"    column="job_grade"    />
+        <result property="contractType" column="contract_type" />
+        <result property="contractTerm" column="contract_term" />
+        <result property="socialType"  column="social_type"  />
+        <result property="legalEntity" column="legal_entity" />
+        <result property="legalEntityId" column="legal_entity_id" />
+        <result property="legalEntityCode" column="legal_entity_code" />
+        <result property="entryDate"   column="entry_date"   />
+        <result property="probationStartDate" column="probation_start_date" />
+        <result property="probationEndDate" column="probation_end_date" />
+        <result property="contractStartDate" column="contract_start_date" />
+        <result property="contractEndDate" column="contract_end_date" />
+        <result property="baseSalary" column="base_salary" />
+        <result property="postSalary" column="post_salary" />
+        <result property="fieldAllowance" column="field_allowance" />
+        <result property="performanceSalary" column="performance_salary" />
+        <result property="salaryTotal" column="salary_total" />
+        <result property="salaryVersion" column="salary_version" />
+    </resultMap>
+
+    <resultMap type="com.erp.system.domain.vo.SysUserListVo" id="SysUserManageListResult">
+        <id property="userId" column="user_id" />
+        <result property="deptId" column="dept_id" />
+        <result property="userName" column="user_name" />
+        <result property="nickName" column="nick_name" />
+        <result property="phonenumber" column="phonenumber" />
+        <result property="status" column="status" />
+        <result property="createTime" column="create_time" />
+        <result property="postNames" column="post_names" />
+        <result property="roleCount" column="role_count" />
+        <result property="shopScopeCount" column="shop_scope_count" />
+        <result property="shopScopeNames" column="shop_scope_names" />
+        <result property="setupStatus" column="setup_status" />
+        <association property="dept" javaType="com.erp.system.domain.vo.SysUserListVo$DepartmentSummary">
+            <id property="deptId" column="manage_dept_id" />
+            <result property="deptName" column="manage_dept_name" />
+        </association>
+        <association property="profile" javaType="com.erp.system.domain.vo.SysUserListVo$ProfileSummary">
+            <result property="employeeNo" column="profile_employee_no" />
+            <result property="positionNo" column="profile_position_no" />
+            <result property="companyName" column="profile_company_name" />
+            <result property="storeName" column="profile_store_name" />
+            <result property="positionNames" column="profile_position_names" />
+            <result property="jobGrade" column="profile_job_grade" />
+            <result property="employeeStatus" column="profile_employee_status" />
+            <result property="employeeCategory" column="profile_employee_category" />
+            <result property="entryDate" column="profile_entry_date" />
+            <result property="contractType" column="profile_contract_type" />
+            <result property="socialType" column="profile_social_type" />
+            <result property="legalEntity" column="profile_legal_entity" />
+        </association>
+    </resultMap>
+
+    <resultMap type="com.erp.system.domain.vo.SysUserManageDetailVo"
+               id="SysUserManageDetailResult" extends="SysUserManageListResult">
+        <result property="remark" column="remark" />
+    </resultMap>
+
+    <resultMap type="com.erp.system.domain.vo.SysUserSetupSummaryVo" id="SysUserSetupSummaryResult">
+        <result property="totalCount" column="total_count" />
+        <result property="activeCount" column="active_count" />
+        <result property="disabledCount" column="disabled_count" />
+        <result property="missingRoleCount" column="missing_role_count" />
+        <result property="missingShopScopeCount" column="missing_shop_scope_count" />
+        <result property="completeCount" column="complete_count" />
+    </resultMap>
+
+    <resultMap type="com.erp.system.domain.vo.SysUserPiiDetailVo" id="SysUserPiiDetailResult">
+        <id property="userId" column="user_id" />
+        <result property="userName" column="user_name" />
+        <result property="nickName" column="nick_name" />
+        <result property="email" column="email" />
+        <result property="phonenumber" column="phonenumber" />
+        <result property="sex" column="sex" />
+        <result property="birthDate" column="birth_date" />
+        <result property="idType" column="id_type" />
+        <result property="idNumber" column="id_number" />
+        <result property="bloodType" column="blood_type" />
+        <result property="registeredResidence" column="registered_residence" />
+        <result property="currentAddress" column="current_address" />
+        <result property="firstEducation" column="first_education" />
+        <result property="firstDegree" column="first_degree" />
+        <result property="firstGraduationDate" column="first_graduation_date" />
+        <result property="firstGraduationSchool" column="first_graduation_school" />
+        <result property="firstMajor" column="first_major" />
+        <result property="highestEducation" column="highest_education" />
+        <result property="highestDegree" column="highest_degree" />
+        <result property="highestGraduationDate" column="highest_graduation_date" />
+        <result property="highestGraduationSchool" column="highest_graduation_school" />
+        <result property="highestMajor" column="highest_major" />
+        <result property="politicalStatus" column="political_status" />
+        <result property="maritalStatus" column="marital_status" />
+        <result property="nationality" column="nationality" />
+        <result property="foreignNationalFlag" column="foreign_national_flag" />
+        <result property="ethnicity" column="ethnicity" />
+        <result property="healthStatus" column="health_status" />
+        <result property="emergencyContact" column="emergency_contact" />
+        <result property="emergencyContactRelation" column="emergency_contact_relation" />
+        <result property="emergencyContactPhone" column="emergency_contact_phone" />
+        <result property="officePhone" column="office_phone" />
+        <result property="workLocation" column="work_location" />
+        <result property="householdType" column="household_type" />
+        <result property="socialSecurityLocation" column="social_security_location" />
+        <result property="housingFundLocation" column="housing_fund_location" />
+        <result property="bankName" column="bank_name" />
+        <result property="bankAccount" column="bank_account" />
+    </resultMap>
+
+    <sql id="maskedUserName">
+        case when u.user_name regexp '^1[3-9][0-9]{9}$'
+             then concat(left(u.user_name, 3), '****', right(u.user_name, 4))
+             else u.user_name end
+    </sql>
+
+    <sql id="maskedPhoneNumber">
+        case when u.phonenumber is null or u.phonenumber = '' then u.phonenumber
+             when char_length(u.phonenumber) &lt; 7 then '***'
+             else concat(left(u.phonenumber, 3), '****', right(u.phonenumber, 4)) end
+    </sql>
+
+    <sql id="selectUserManageColumns">
+        u.user_id, u.dept_id, u.user_name, u.nick_name, u.phonenumber,
+        u.status, u.create_time,
+        upc.post_names,
+        coalesce(urc.role_count, 0) as role_count,
+        coalesce(usc.shop_scope_count, 0) as shop_scope_count,
+        usc.shop_scope_names,
+        case when coalesce(urc.role_count, 0) = 0 then 'missingRole'
+             when coalesce(usc.shop_scope_count, 0) = 0 then 'missingShopScope'
+             else 'complete' end as setup_status,
+        d.dept_id as manage_dept_id, d.dept_name as manage_dept_name,
+        p.employee_no as profile_employee_no,
+        p.position_no as profile_position_no,
+        p.company_name as profile_company_name,
+        p.store_name as profile_store_name,
+        p.position_names as profile_position_names,
+        p.job_grade as profile_job_grade,
+        p.employee_status as profile_employee_status,
+        p.employee_category as profile_employee_category,
+        p.entry_date as profile_entry_date,
+        p.contract_type as profile_contract_type,
+        p.social_type as profile_social_type,
+        p.legal_entity as profile_legal_entity
+    </sql>
+
+    <sql id="userManageJoins">
+        from sys_user u
+        left join sys_dept d on d.dept_id = u.dept_id
+        left join sys_user_profile p on p.user_id = u.user_id
+        left join (
+            select sup.user_id,
+                   group_concat(distinct sp.post_name order by sp.post_sort, sp.post_name separator '、') as post_names
+            from sys_user_post sup
+            inner join sys_post sp on sp.post_id = sup.post_id and sp.status = '0'
+            group by sup.user_id
+        ) upc on upc.user_id = u.user_id
+        left join (
+            select user_id, count(1) as role_count from sys_user_role group by user_id
+        ) urc on urc.user_id = u.user_id
+        left join (
+            select us.user_id, count(1) as shop_scope_count,
+                   group_concat(distinct sd.dept_name order by case when us.is_default = 'Y' then 0 else 1 end,
+                                sd.order_num, sd.dept_name separator '、') as shop_scope_names
+            from sys_user_shop us
+            inner join sys_dept sd on sd.dept_id = us.dept_id and sd.del_flag = '0' and sd.status = '0'
+            group by us.user_id
+        ) usc on usc.user_id = u.user_id
+    </sql>
+
+    <sql id="userManageFilters">
+        <if test="userId != null and userId != 0">and u.user_id = #{userId}</if>
+        <if test="userName != null and userName != ''">and u.user_name like concat('%', #{userName}, '%')</if>
+        <if test="nickName != null and nickName != ''">and u.nick_name like concat('%', #{nickName}, '%')</if>
+        <if test="status != null and status != ''">and u.status = #{status}</if>
+        <if test="phonenumber != null and phonenumber != ''">and u.phonenumber like concat('%', #{phonenumber}, '%')</if>
+        <if test="postId != null and postId != 0">
+            and exists (select 1 from sys_user_post fp where fp.user_id = u.user_id and fp.post_id = #{postId})
+        </if>
+        <if test="employeeNo != null and employeeNo != ''">and p.employee_no like concat('%', #{employeeNo}, '%')</if>
+        <if test="employeeStatus != null and employeeStatus != ''">
+            <choose>
+                <when test="employeeStatus == '正式'">and p.employee_status in ('正式','在职')</when>
+                <otherwise>and p.employee_status = #{employeeStatus}</otherwise>
+            </choose>
+        </if>
+        <if test="employeeCategory != null and employeeCategory != ''">and p.employee_category = #{employeeCategory}</if>
+        <if test="legalEntity != null and legalEntity != ''">and p.legal_entity like concat('%', #{legalEntity}, '%')</if>
+        <if test="workLocation != null and workLocation != ''">and p.work_location like concat('%', #{workLocation}, '%')</if>
+        <if test="params.beginTime != null and params.beginTime != ''">
+            and date_format(u.create_time,'%Y%m%d') &gt;= date_format(#{params.beginTime},'%Y%m%d')
+        </if>
+        <if test="params.endTime != null and params.endTime != ''">
+            and date_format(u.create_time,'%Y%m%d') &lt;= date_format(#{params.endTime},'%Y%m%d')
+        </if>
+        <if test="deptId != null and deptId != 0">
+            and (u.dept_id = #{deptId}
+                 or u.dept_id in (select t.dept_id from sys_dept t where find_in_set(#{deptId}, t.ancestors))
+                 or exists (select 1 from sys_user_shop fs
+                            inner join sys_dept fd on fd.dept_id = fs.dept_id
+                            where fs.user_id = u.user_id and fd.del_flag = '0' and fd.status = '0'
+                              and (fs.dept_id = #{deptId} or find_in_set(#{deptId}, fd.ancestors))))
+        </if>
+        <if test="setupStatus != null and setupStatus != ''">
+            <choose>
+                <when test="setupStatus == 'missingRole'">and coalesce(urc.role_count, 0) = 0</when>
+                <when test="setupStatus == 'missingShopScope'">
+                    and coalesce(urc.role_count, 0) &gt; 0 and coalesce(usc.shop_scope_count, 0) = 0
+                </when>
+                <when test="setupStatus == 'complete'">
+                    and coalesce(urc.role_count, 0) &gt; 0 and coalesce(usc.shop_scope_count, 0) &gt; 0
+                </when>
+            </choose>
+        </if>
+        <if test="params.salaryShopDeptId != null">
+            and (u.dept_id = #{params.salaryShopDeptId}
+                 or exists (select 1 from sys_user_shop ss
+                            where ss.user_id = u.user_id and ss.dept_id = #{params.salaryShopDeptId}))
+        </if>
+        ${params.dataScope}
+    </sql>
+
+	<sql id="selectUserVo">
+        select u.user_id, u.dept_id, u.user_name, u.nick_name, u.email, u.avatar, u.phonenumber, u.password, u.sex, u.status, u.del_flag, u.login_ip, u.login_date, u.pwd_update_date, u.credential_state, u.temporary_password_expires_at, u.create_by, u.create_time, u.update_by, u.update_time, u.remark,
+        d.dept_id, d.parent_id, d.ancestors, d.dept_name, d.order_num, d.leader, d.status as dept_status,
+        r.role_id, r.role_name, r.role_key, r.role_sort, r.data_scope, r.status as role_status,
+        p.profile_id, p.user_id as profile_user_id, p.employee_no, p.position_no, p.company_name, p.dept_level1_name, p.dept_level2_name,
+        p.dept_level3_name, p.store_name, p.position_names, p.job_grade, p.department_supervisor,
+        p.direct_supervisor, p.direct_supervisor_user_id, p.employee_status, p.employee_category, p.birth_date, p.id_type, p.id_number,
+        p.blood_type, p.registered_residence, p.current_address, p.student_status, p.school_name,
+        p.retirement_status, p.income_start_year_month, p.first_education, p.first_degree,
+        p.first_graduation_date, p.first_graduation_school, p.first_major, p.highest_education,
+        p.highest_degree, p.highest_graduation_date, p.highest_graduation_school, p.highest_major,
+        p.political_status, p.marital_status, p.nationality, p.foreign_national_flag, p.ethnicity,
+        p.health_status, p.emergency_contact, p.emergency_contact_relation, p.emergency_contact_phone,
+        p.recruitment_channel, p.office_phone, p.work_start_date, p.work_years, p.entry_date,
+        p.probation_period, p.probation_start_date, p.probation_end_date,
+        p.planned_regularization_date, p.actual_regularization_date, p.company_years,
+        p.current_position_start_date, p.contract_start_date, p.contract_end_date, p.contract_type, p.contract_term,
+        p.renewal_count, p.work_location, p.work_city_level, p.attendance_method, p.household_type,
+        p.social_type, p.social_security_location, p.housing_fund_location, p.leave_date, p.bank_name, p.bank_account,
+        p.legal_entity, p.legal_entity_id, p.legal_entity_code,
+        p.create_by as profile_create_by, p.create_time as profile_create_time,
+        p.update_by as profile_update_by, p.update_time as profile_update_time
+        from sys_user u
+		    left join sys_dept d on u.dept_id = d.dept_id
+		    left join sys_user_profile p on p.user_id = u.user_id
+		    left join sys_user_role ur on u.user_id = ur.user_id
+		    left join sys_role r on r.role_id = ur.role_id
+    </sql>
+
+	<!-- 登录、个人资料和账号存在性检查只读取认证所需字段，禁止把员工档案写入会话缓存。 -->
+	<sql id="selectLoginUserVo">
+		select u.user_id, u.dept_id, u.user_name, u.nick_name, u.email, u.avatar,
+		       u.phonenumber, u.password, u.sex, u.status, u.del_flag, u.login_ip,
+		       u.login_date, u.pwd_update_date, u.must_change_password,
+		       u.credential_state, u.temporary_password_expires_at,
+		       u.create_by, u.create_time, u.update_by, u.update_time, u.remark,
+		       d.dept_id, d.parent_id, d.ancestors, d.dept_name, d.order_num,
+		       d.leader, d.status as dept_status,
+		       r.role_id, r.role_name, r.role_key, r.role_sort, r.data_scope,
+		       r.status as role_status
+		from sys_user u
+		left join sys_dept d on u.dept_id = d.dept_id
+		left join sys_user_role ur on u.user_id = ur.user_id
+		left join sys_role r on r.role_id = ur.role_id
+	</sql>
+
+    <select id="selectUserList" parameterType="SysUser" resultMap="SysUserResult">
+				select u.user_id, u.dept_id, u.nick_name, u.user_name, u.phonenumber, u.status,
+				       u.login_date, u.create_time,
+				       upc.post_names,
+				       coalesce(urc.role_count, 0) as role_count,
+				       coalesce(usc.shop_scope_count, 0) as shop_scope_count,
+				       usc.shop_scope_names,
+				       case
+				           when coalesce(urc.role_count, 0) = 0 then 'missingRole'
+				           when coalesce(usc.shop_scope_count, 0) = 0 then 'missingShopScope'
+			           else 'complete'
+			       end as setup_status,
+			       d.dept_name, d.leader,
+                   p.profile_id, p.user_id as profile_user_id, p.employee_no, p.job_grade,
+                   p.employee_status, p.employee_category, p.contract_type, p.social_type
+            from sys_user u
+				left join sys_dept d on u.dept_id = d.dept_id
+				left join sys_user_profile p on p.user_id = u.user_id
+				left join (
+					select sup.user_id,
+					       group_concat(distinct sp.post_name order by sp.post_sort, sp.post_name separator '、') as post_names
+					from sys_user_post sup
+					     inner join sys_post sp on sp.post_id = sup.post_id
+					where sp.status = '0'
+					group by sup.user_id
+				) upc on upc.user_id = u.user_id
+				left join (
+				select user_id, count(1) as role_count
+				from sys_user_role
+				group by user_id
+				) urc on urc.user_id = u.user_id
+				left join (
+					select us.user_id,
+					       count(1) as shop_scope_count,
+					       group_concat(distinct sd.dept_name order by case when us.is_default = 'Y' then 0 else 1 end, sd.order_num, sd.dept_name separator '、') as shop_scope_names
+					from sys_user_shop us
+					     inner join sys_dept sd on sd.dept_id = us.dept_id
+					where sd.del_flag = '0'
+					  and sd.status = '0'
+					group by us.user_id
+				) usc on usc.user_id = u.user_id
+			where u.del_flag = '0'
+		<if test="userId != null and userId != 0">
+			AND u.user_id = #{userId}
+		</if>
+		<if test="userName != null and userName != ''">
+			AND u.user_name like concat('%', #{userName}, '%')
+		</if>
+		<if test="nickName != null and nickName != ''">
+			AND u.nick_name like concat('%', #{nickName}, '%')
+		</if>
+		<if test="status != null and status != ''">
+			AND u.status = #{status}
+		</if>
+		<if test="phonenumber != null and phonenumber != ''">
+			AND u.phonenumber like concat('%', #{phonenumber}, '%')
+		</if>
+		<if test="postId != null and postId != 0">
+			AND EXISTS (SELECT 1 FROM sys_user_post sup WHERE sup.user_id = u.user_id AND sup.post_id = #{postId})
+		</if>
+		<if test="employeeNo != null and employeeNo != ''">
+			AND p.employee_no like concat('%', #{employeeNo}, '%')
+		</if>
+		<if test="employeeStatus != null and employeeStatus != ''">
+			<choose>
+				<when test="employeeStatus == '正式'">AND p.employee_status in ('正式','在职')</when>
+				<otherwise>AND p.employee_status = #{employeeStatus}</otherwise>
+			</choose>
+		</if>
+		<if test="employeeCategory != null and employeeCategory != ''">
+			AND p.employee_category = #{employeeCategory}
+		</if>
+		<if test="legalEntity != null and legalEntity != ''">
+			AND p.legal_entity like concat('%', #{legalEntity}, '%')
+		</if>
+		<if test="workLocation != null and workLocation != ''">
+			AND p.work_location like concat('%', #{workLocation}, '%')
+		</if>
+		<if test="params.beginTime != null and params.beginTime != ''"><!-- 开始时间检索 -->
+			AND date_format(u.create_time,'%Y%m%d') &gt;= date_format(#{params.beginTime},'%Y%m%d')
+		</if>
+		<if test="params.endTime != null and params.endTime != ''"><!-- 结束时间检索 -->
+			AND date_format(u.create_time,'%Y%m%d') &lt;= date_format(#{params.endTime},'%Y%m%d')
+		</if>
+				<if test="deptId != null and deptId != 0">
+					AND (
+						u.dept_id = #{deptId}
+						OR u.dept_id IN ( SELECT t.dept_id FROM sys_dept t WHERE find_in_set(#{deptId}, ancestors) )
+						OR EXISTS (
+							SELECT 1
+							FROM sys_user_shop sus
+							     inner join sys_dept sd on sd.dept_id = sus.dept_id
+							WHERE sus.user_id = u.user_id
+							  AND sd.del_flag = '0'
+							  AND sd.status = '0'
+							  AND (
+								sus.dept_id = #{deptId}
+								OR find_in_set(#{deptId}, sd.ancestors)
+							  )
+						)
+					)
+				</if>
+			<if test="setupStatus != null and setupStatus != ''">
+				<choose>
+					<when test="setupStatus == 'missingRole'">
+						AND coalesce(urc.role_count, 0) = 0
+					</when>
+					<when test="setupStatus == 'missingShopScope'">
+						AND coalesce(urc.role_count, 0) &gt; 0
+						AND coalesce(usc.shop_scope_count, 0) = 0
+					</when>
+					<when test="setupStatus == 'complete'">
+						AND coalesce(urc.role_count, 0) &gt; 0
+						AND coalesce(usc.shop_scope_count, 0) &gt; 0
+					</when>
+				</choose>
+			</if>
+		<if test="params.salaryShopDeptId != null">
+			AND (
+				u.dept_id = #{params.salaryShopDeptId}
+				OR EXISTS (
+					SELECT 1
+					FROM sys_user_shop sus
+					WHERE sus.user_id = u.user_id
+					  AND sus.dept_id = #{params.salaryShopDeptId}
+				)
+			)
+		</if>
+		<!-- 数据范围过滤 -->
+		${params.dataScope}
+	</select>
+
+    <select id="selectUserManageList" parameterType="SysUser" resultMap="SysUserManageListResult">
+        select <include refid="selectUserManageColumns"/>
+        <include refid="userManageJoins"/>
+        where u.del_flag = '0'
+        <include refid="userManageFilters"/>
+    </select>
+
+    <select id="selectUserSetupSummary" parameterType="SysUser" resultMap="SysUserSetupSummaryResult">
+        select count(1) as total_count,
+               coalesce(sum(case when u.status = '0' then 1 else 0 end), 0) as active_count,
+               coalesce(sum(case when u.status = '1' then 1 else 0 end), 0) as disabled_count,
+               coalesce(sum(case when coalesce(urc.role_count, 0) = 0 then 1 else 0 end), 0)
+                   as missing_role_count,
+               coalesce(sum(case when coalesce(urc.role_count, 0) &gt; 0
+                                      and coalesce(usc.shop_scope_count, 0) = 0 then 1 else 0 end), 0)
+                   as missing_shop_scope_count,
+               coalesce(sum(case when coalesce(urc.role_count, 0) &gt; 0
+                                      and coalesce(usc.shop_scope_count, 0) &gt; 0 then 1 else 0 end), 0)
+                   as complete_count
+        <include refid="userManageJoins"/>
+        where u.del_flag = '0'
+        <include refid="userManageFilters"/>
+    </select>
+
+    <select id="selectUserManageDetail" parameterType="Long" resultMap="SysUserManageDetailResult">
+        select <include refid="selectUserManageColumns"/>, u.remark
+        <include refid="userManageJoins"/>
+        where u.del_flag = '0' and u.user_id = #{userId}
+    </select>
+
+    <select id="selectUserPiiById" parameterType="Long" resultMap="SysUserPiiDetailResult">
+        select u.user_id, u.user_name, u.nick_name, u.email, u.phonenumber, u.sex,
+               p.birth_date, p.id_type, p.id_number, p.blood_type,
+               p.registered_residence, p.current_address,
+               p.first_education, p.first_degree, p.first_graduation_date,
+               p.first_graduation_school, p.first_major,
+               p.highest_education, p.highest_degree, p.highest_graduation_date,
+               p.highest_graduation_school, p.highest_major,
+               p.political_status, p.marital_status, p.nationality,
+               p.foreign_national_flag, p.ethnicity, p.health_status,
+               p.emergency_contact, p.emergency_contact_relation, p.emergency_contact_phone,
+               p.office_phone, p.work_location, p.household_type,
+               p.social_security_location, p.housing_fund_location, p.bank_name, p.bank_account
+        from sys_user u
+        left join sys_user_profile p on p.user_id = u.user_id
+        where u.user_id = #{userId} and u.del_flag = '0'
+    </select>
+
+    <select id="selectUserPiiExportList" parameterType="SysUser"
+            resultMap="SysUserPiiExportResult">
+        select u.user_id, u.user_name, u.nick_name, d.dept_name,
+               u.phonenumber, u.email, u.sex, p.birth_date, p.id_type, p.id_number,
+               p.blood_type, p.registered_residence, p.current_address,
+               p.first_education, p.first_degree, p.first_graduation_date,
+               p.first_graduation_school, p.first_major,
+               p.highest_education, p.highest_degree, p.highest_graduation_date,
+               p.highest_graduation_school, p.highest_major,
+               p.political_status, p.marital_status, p.nationality, p.foreign_national_flag,
+               p.ethnicity, p.health_status, p.emergency_contact,
+               p.emergency_contact_relation, p.emergency_contact_phone, p.office_phone,
+               p.work_location, p.household_type, p.social_security_location,
+               p.housing_fund_location, p.bank_name, p.bank_account
+        <include refid="userManageJoins"/>
+        where u.del_flag = '0'
+        <include refid="userManageFilters"/>
+    </select>
+
+    <select id="selectUserOptionList" parameterType="SysUser" resultMap="SysUserResult">
+        select u.user_id, u.user_name, u.nick_name, u.dept_id, u.status,
+               (select group_concat(distinct sp.post_name order by sp.post_sort, sp.post_name separator '、')
+                from sys_user_post sup
+                inner join sys_post sp on sp.post_id = sup.post_id and sp.status = '0'
+                where sup.user_id = u.user_id) as post_names,
+               d.dept_id, d.parent_id, d.ancestors, d.dept_name, d.status as dept_status
+        from sys_user u
+        left join sys_dept d on d.dept_id = u.dept_id
+        where u.del_flag = '0'
+        <choose>
+            <when test="params.includeDisabled != null and params.includeDisabled">
+                <if test="status != null and status != ''">and u.status = #{status}</if>
+            </when>
+            <otherwise>and u.status = '0'</otherwise>
+        </choose>
+        <if test="userName != null and userName != ''">and u.user_name like concat('%', #{userName}, '%')</if>
+        <if test="nickName != null and nickName != ''">and u.nick_name like concat('%', #{nickName}, '%')</if>
+        <if test="postId != null and postId != 0">
+            and exists (select 1 from sys_user_post filter_up
+                        where filter_up.user_id = u.user_id and filter_up.post_id = #{postId})
+        </if>
+        <if test="params.keyword != null and params.keyword != ''">
+            and (u.user_name like concat('%', #{params.keyword}, '%')
+                 or u.nick_name like concat('%', #{params.keyword}, '%'))
+        </if>
+        <if test="params.excludeUserId != null">and u.user_id != #{params.excludeUserId}</if>
+        <if test="params.salaryShopDeptId != null">
+            and (u.dept_id = #{params.salaryShopDeptId}
+                 or exists (select 1 from sys_user_shop sus
+                            where sus.user_id = u.user_id and sus.dept_id = #{params.salaryShopDeptId}))
+        </if>
+        ${params.dataScope}
+        order by u.nick_name, u.user_name, u.user_id
+        <if test="params.limit != null">limit #{params.limit}</if>
+    </select>
+
+    <select id="selectVisibleUserIds" parameterType="SysUser" resultType="Long">
+        select distinct u.user_id
+        from sys_user u
+        left join sys_dept d on d.dept_id = u.dept_id
+        where u.del_flag = '0'
+          and u.user_id in
+          <foreach collection="params.candidateUserIds" item="candidateUserId"
+                   open="(" separator="," close=")">#{candidateUserId}</foreach>
+        ${params.dataScope}
+    </select>
+
+    <select id="selectHrEmployeeList" parameterType="com.erp.system.domain.vo.HrEmployeeQuery" resultMap="SysUserResult">
+        select u.user_id, u.dept_id, u.user_name, u.nick_name, u.email, u.phonenumber, u.sex,
+               u.status, u.del_flag, u.create_by, u.create_time, u.update_by, u.update_time, u.remark,
+               d.dept_id, d.parent_id, d.ancestors, d.dept_name, d.order_num, d.leader, d.status as dept_status,
+               upc.post_names,
+               coalesce(urc.role_count, 0) as role_count,
+               coalesce(usc.shop_scope_count, 0) as shop_scope_count,
+               usc.shop_scope_names,
+               case when hoc.account_configuration_status = 'CONFIGURED' then 'complete'
+                    when hoc.account_configuration_status = 'MISSING' then 'missingConfiguration'
+                    when coalesce(urc.role_count, 0) = 0 and coalesce(usc.shop_scope_count, 0) = 0
+                         then 'missingRoleAndShopScope'
+                    when coalesce(urc.role_count, 0) = 0 then 'missingRole'
+                    when coalesce(usc.shop_scope_count, 0) = 0 then 'missingShopScope'
+                    else 'complete' end as setup_status,
+               p.profile_id, p.user_id as profile_user_id, p.employee_no, p.position_no,
+               p.company_name, p.dept_level1_name, p.dept_level2_name, p.dept_level3_name,
+               p.store_name, p.position_names, p.job_grade, p.department_supervisor,
+               p.direct_supervisor, p.direct_supervisor_user_id, p.employee_status, p.employee_category,
+               p.birth_date, p.id_type, p.id_number, p.blood_type, p.registered_residence,
+               p.current_address, p.student_status, p.school_name, p.retirement_status,
+               p.income_start_year_month, p.first_education, p.first_degree, p.first_graduation_date,
+               p.first_graduation_school, p.first_major, p.highest_education, p.highest_degree,
+               p.highest_graduation_date, p.highest_graduation_school, p.highest_major,
+               p.political_status, p.marital_status, p.nationality, p.foreign_national_flag,
+               p.ethnicity, p.health_status, p.emergency_contact, p.emergency_contact_relation,
+               p.emergency_contact_phone, p.recruitment_channel, p.office_phone, p.work_start_date,
+               p.work_years, p.entry_date, p.probation_period, p.planned_regularization_date,
+               p.actual_regularization_date, p.company_years, p.current_position_start_date,
+               p.contract_start_date, p.contract_end_date, p.contract_type, p.contract_term,
+               p.renewal_count, p.work_location, p.work_city_level, p.attendance_method,
+               p.household_type, p.social_type, p.social_security_location, p.housing_fund_location,
+               p.leave_date, p.bank_name, p.bank_account, p.legal_entity,
+               p.create_by as profile_create_by, p.create_time as profile_create_time,
+               p.update_by as profile_update_by, p.update_time as profile_update_time
+        from sys_user u
+             left join sys_dept d on d.dept_id = u.dept_id
+             left join sys_user_profile p on p.user_id = u.user_id
+             left join hr_employee_health_certificate hc on hc.user_id = u.user_id
+                  and hc.current_flag = 'Y' and hc.review_status = 'APPROVED'
+                  and hc.del_flag = '0'
+             left join hr_onboarding hoc on hoc.linked_user_id = u.user_id
+                  and not exists (
+                      select 1 from hr_onboarding newer
+                      where newer.linked_user_id = hoc.linked_user_id
+                        and newer.onboarding_id &gt; hoc.onboarding_id
+                  )
+             left join (
+                 select sup.user_id,
+                        group_concat(distinct sp.post_name order by sp.post_sort, sp.post_name separator '、') as post_names
+                 from sys_user_post sup inner join sys_post sp on sp.post_id = sup.post_id
+                 where sp.status = '0' group by sup.user_id
+             ) upc on upc.user_id = u.user_id
+             left join (select user_id, count(1) as role_count from sys_user_role group by user_id) urc
+                    on urc.user_id = u.user_id
+             left join (
+                 select us.user_id, count(1) as shop_scope_count,
+                        group_concat(distinct sd.dept_name order by case when us.is_default='Y' then 0 else 1 end,
+                                     sd.order_num, sd.dept_name separator '、') as shop_scope_names
+                 from sys_user_shop us inner join sys_dept sd on sd.dept_id = us.dept_id
+                 where sd.del_flag='0' and sd.status='0' group by us.user_id
+             ) usc on usc.user_id = u.user_id
+        where u.del_flag = '0'
+          and u.user_id &lt;&gt; 1
+        <if test="params != null and params._hrActiveGovernanceOnly == true">
+            and (p.employee_status is null or p.employee_status &lt;&gt; '离职')
+        </if>
+        <if test="userId != null and userId != 0">and u.user_id = #{userId}</if>
+        <if test="keyword != null and keyword != ''">
+            and (u.nick_name like concat('%', #{keyword}, '%')
+                 or u.user_name like concat('%', #{keyword}, '%')
+                 or u.phonenumber like concat('%', #{keyword}, '%')
+                 or p.employee_no like concat('%', #{keyword}, '%')
+                 or p.position_no like concat('%', #{keyword}, '%')
+                 or upc.post_names like concat('%', #{keyword}, '%')
+                 or d.dept_name like concat('%', #{keyword}, '%'))
+        </if>
+        <if test="deptId != null and deptId != 0">
+            and (u.dept_id = #{deptId} or u.dept_id in
+                 (select hd.dept_id from sys_dept hd where find_in_set(#{deptId}, hd.ancestors)))
+        </if>
+        <if test="employeeStatus != null and employeeStatus != ''">
+            <choose>
+                <when test="employeeStatus == '正式'">and p.employee_status in ('正式','在职')</when>
+                <otherwise>and p.employee_status = #{employeeStatus}</otherwise>
+            </choose>
+        </if>
+        <if test="employeeCategory != null and employeeCategory != ''">and p.employee_category = #{employeeCategory}</if>
+        <if test="accountConfigurationStatus != null and accountConfigurationStatus != ''">
+            <choose>
+                <when test="accountConfigurationStatus == 'MISSING'">
+                    and (hoc.account_configuration_status = 'MISSING'
+                         or (hoc.account_configuration_status is null
+                             and (coalesce(urc.role_count, 0) = 0 or coalesce(usc.shop_scope_count, 0) = 0)))
+                </when>
+                <when test="accountConfigurationStatus == 'COMPLETE'">
+                    and (hoc.account_configuration_status = 'CONFIGURED'
+                         or (hoc.account_configuration_status is null
+                             and coalesce(urc.role_count, 0) &gt; 0 and coalesce(usc.shop_scope_count, 0) &gt; 0))
+                </when>
+                <otherwise>and 1 = 0</otherwise>
+            </choose>
+        </if>
+        <if test="contractDue == true">
+            and p.contract_end_date &gt;= #{contractDueFrom}
+            and p.contract_end_date &lt;= #{contractDueTo}
+            and (p.employee_status is null or p.employee_status &lt;&gt; '离职')
+        </if>
+        <if test="offboardAccountOnly == true">
+            and p.employee_status in ('待离职','离职')
+            and u.status = '0'
+        </if>
+        <if test="healthCertificateStatus != null and healthCertificateStatus != ''">
+            <choose>
+                <when test="healthCertificateStatus == 'NOT_SUBMITTED'">and hc.certificate_id is null</when>
+                <when test="healthCertificateStatus == 'EXPIRED'">and hc.expires_on &lt; current_date()</when>
+                <when test="healthCertificateStatus == 'EXPIRING'">and hc.expires_on between current_date() and date_add(current_date(), interval 30 day)</when>
+                <when test="healthCertificateStatus == 'VALID'">and hc.expires_on &gt; date_add(current_date(), interval 30 day)</when>
+                <otherwise>and 1 = 0</otherwise>
+            </choose>
+        </if>
+        <if test="healthCertificateExpiresFrom != null">and hc.expires_on &gt;= #{healthCertificateExpiresFrom}</if>
+        <if test="healthCertificateExpiresTo != null">and hc.expires_on &lt;= #{healthCertificateExpiresTo}</if>
+        ${params.dataScope}
+        order by u.user_id
+        <if test="maxRows != null and maxRows &gt; 0">limit #{maxRows}</if>
+    </select>
+
+    <select id="selectHrEmployeeForUpdate" parameterType="com.erp.system.domain.vo.HrEmployeeQuery" resultMap="SysUserResult">
+        select u.user_id, u.dept_id, u.user_name, u.nick_name, u.email, u.phonenumber, u.sex,
+               u.status, u.del_flag, u.create_by, u.create_time, u.update_by, u.update_time, u.remark,
+               d.dept_id, d.parent_id, d.ancestors, d.dept_name, d.order_num, d.leader, d.status as dept_status,
+               p.profile_id, p.user_id as profile_user_id, p.employee_no, p.position_no,
+               p.company_name, p.dept_level1_name, p.dept_level2_name, p.dept_level3_name,
+               p.store_name, p.position_names, p.job_grade, p.department_supervisor,
+               p.direct_supervisor, p.direct_supervisor_user_id, p.employee_status, p.employee_category,
+               p.birth_date, p.id_type, p.id_number, p.blood_type, p.registered_residence,
+               p.current_address, p.student_status, p.school_name, p.retirement_status,
+               p.income_start_year_month, p.first_education, p.first_degree, p.first_graduation_date,
+               p.first_graduation_school, p.first_major, p.highest_education, p.highest_degree,
+               p.highest_graduation_date, p.highest_graduation_school, p.highest_major,
+               p.political_status, p.marital_status, p.nationality, p.foreign_national_flag,
+               p.ethnicity, p.health_status, p.emergency_contact, p.emergency_contact_relation,
+               p.emergency_contact_phone, p.recruitment_channel, p.office_phone, p.work_start_date,
+               p.work_years, p.entry_date, p.probation_period, p.planned_regularization_date,
+               p.actual_regularization_date, p.company_years, p.current_position_start_date,
+               p.contract_start_date, p.contract_end_date, p.contract_type, p.contract_term,
+               p.renewal_count, p.work_location, p.work_city_level, p.attendance_method,
+               p.household_type, p.social_type, p.social_security_location, p.housing_fund_location,
+               p.leave_date, p.bank_name, p.bank_account, p.legal_entity,
+               p.create_by as profile_create_by, p.create_time as profile_create_time,
+               p.update_by as profile_update_by, p.update_time as profile_update_time
+        from sys_user u
+        left join sys_dept d on d.dept_id = u.dept_id
+        left join sys_user_profile p on p.user_id = u.user_id
+        where u.del_flag = '0'
+          and u.user_id &lt;&gt; 1
+          and u.user_id = #{userId}
+        <if test="params != null and params._hrActiveGovernanceOnly == true">
+            and (p.employee_status is null or p.employee_status &lt;&gt; '离职')
+        </if>
+        ${params.dataScope}
+        for update
+    </select>
+
+    <select id="selectSignCandidateUsers" parameterType="com.erp.system.api.domain.SignCandidateUserQuery" resultMap="SignCandidateUserResult">
+        select u.user_id, u.user_name, u.nick_name, u.phonenumber, u.status as account_status,
+               u.dept_id, d.dept_name, coalesce(upc.post_names, profile_sp.post_name) as post_names,
+               coalesce(main_sp.post_id, profile_sp.post_id) as post_id,
+               coalesce(main_sp.post_code, profile_sp.post_code) as post_code,
+               coalesce(main_sp.post_name, profile_sp.post_name) as post_name,
+               p.employee_no, p.employee_status, p.id_type, p.id_number,
+               p.current_address, p.student_status, p.school_name, p.retirement_status,
+               p.income_start_year_month, p.job_grade, p.contract_type, p.contract_term,
+               p.social_type, p.legal_entity, p.legal_entity_id, p.legal_entity_code,
+               date_format(p.entry_date, '%Y-%m-%d') as entry_date,
+               date_format(p.probation_start_date, '%Y-%m-%d') as probation_start_date,
+               date_format(p.probation_end_date, '%Y-%m-%d') as probation_end_date,
+               date_format(p.contract_start_date, '%Y-%m-%d') as contract_start_date,
+               date_format(p.contract_end_date, '%Y-%m-%d') as contract_end_date,
+               p.base_salary, p.post_salary, p.field_allowance, p.performance_salary,
+               p.salary_total, p.salary_version
+        from sys_user u
+             left join sys_dept d on u.dept_id = d.dept_id
+             left join sys_user_profile p on p.user_id = u.user_id
+             left join (
+                 select sup.user_id,
+                        group_concat(distinct sp.post_name order by sp.post_sort, sp.post_name separator '、') as post_names
+                 from sys_user_post sup
+                      inner join sys_post sp on sp.post_id = sup.post_id
+                 where sp.status = '0'
+                 group by sup.user_id
+             ) upc on upc.user_id = u.user_id
+             left join sys_user_post main_sup on main_sup.user_id = u.user_id
+                 and main_sup.post_id = (
+                     select main_sup2.post_id
+                     from sys_user_post main_sup2
+                          inner join sys_post main_sp2 on main_sp2.post_id = main_sup2.post_id
+                     where main_sup2.user_id = u.user_id
+                       and main_sp2.status = '0'
+                     order by main_sp2.post_sort asc, main_sp2.post_id asc
+                     limit 1
+                 )
+             left join sys_post main_sp on main_sp.post_id = main_sup.post_id
+             left join sys_post profile_sp on profile_sp.status = '0'
+                 and lower(profile_sp.post_code) collate utf8mb4_general_ci
+                     = lower(substring_index(p.position_no, '-', 1)) collate utf8mb4_general_ci
+        where u.del_flag = '0'
+        <if test="includeInactiveEmployees == null or includeInactiveEmployees == false">
+          and u.status = '0'
+          and (p.employee_status is null or p.employee_status &lt;&gt; '离职')
+        </if>
+        <if test="postName != null and postName != ''">
+            AND EXISTS (
+                SELECT 1
+                FROM sys_user_post sign_sup
+                     INNER JOIN sys_post sp ON sp.post_id = sign_sup.post_id
+                WHERE sign_sup.user_id = u.user_id
+                  AND sp.status = '0'
+                  AND sp.post_name = #{postName}
+            )
+        </if>
+        <if test="deptId != null and deptId != 0">
+            AND (
+                u.dept_id = #{deptId}
+                OR u.dept_id IN ( SELECT t.dept_id FROM sys_dept t WHERE find_in_set(#{deptId}, ancestors) )
+                OR EXISTS (
+                    SELECT 1
+                    FROM sys_user_shop sus
+                         inner join sys_dept sd on sd.dept_id = sus.dept_id
+                    WHERE sus.user_id = u.user_id
+                      AND sd.del_flag = '0'
+                      AND sd.status = '0'
+                      AND (
+                        sus.dept_id = #{deptId}
+                        OR find_in_set(#{deptId}, sd.ancestors)
+                      )
+                )
+            )
+        </if>
+        <if test="keyword != null and keyword != ''">
+            AND (
+                u.nick_name like concat('%', #{keyword}, '%')
+                OR u.user_name like concat('%', #{keyword}, '%')
+                OR u.phonenumber like concat('%', #{keyword}, '%')
+            )
+        </if>
+        <if test="userIds != null and userIds.length > 0">
+            AND u.user_id in
+            <foreach collection="userIds" item="candidateUserId" open="(" close=")" separator=",">
+                #{candidateUserId}
+            </foreach>
+        </if>
+        <if test="phoneNumbers != null and phoneNumbers.length > 0">
+            AND u.phonenumber in
+            <foreach collection="phoneNumbers" item="candidatePhone" open="(" close=")" separator=",">
+                #{candidatePhone}
+            </foreach>
+        </if>
+        order by u.user_id
+        limit #{limit}
+    </select>
+
+	<select id="selectAllocatedList" parameterType="SysUser" resultMap="SysUserResult">
+	    select distinct u.user_id, u.dept_id, u.user_name, u.nick_name, u.status,
+	           d.dept_id, d.parent_id, d.ancestors, d.dept_name, d.status as dept_status
+	    from sys_user u
+			 left join sys_dept d on u.dept_id = d.dept_id
+			 left join sys_user_role ur on u.user_id = ur.user_id
+			 left join sys_role r on r.role_id = ur.role_id
+	    where u.del_flag = '0' and r.role_id = #{roleId}
+	    <if test="userName != null and userName != ''">
+			AND u.user_name like concat('%', #{userName}, '%')
+		</if>
+		<if test="nickName != null and nickName != ''">
+			AND u.nick_name like concat('%', #{nickName}, '%')
+		</if>
+		<!-- 数据范围过滤 -->
+		${params.dataScope}
+	</select>
+	
+	<select id="selectUnallocatedList" parameterType="SysUser" resultMap="SysUserResult">
+	    select distinct u.user_id, u.dept_id, u.user_name, u.nick_name, u.status,
+	           d.dept_id, d.parent_id, d.ancestors, d.dept_name, d.status as dept_status
+	    from sys_user u
+			 left join sys_dept d on u.dept_id = d.dept_id
+			 left join sys_user_role ur on u.user_id = ur.user_id
+			 left join sys_role r on r.role_id = ur.role_id
+	    where u.del_flag = '0' and (r.role_id != #{roleId} or r.role_id IS NULL)
+	    and u.user_id not in (select u.user_id from sys_user u inner join sys_user_role ur on u.user_id = ur.user_id and ur.role_id = #{roleId})
+	    <if test="userName != null and userName != ''">
+			AND u.user_name like concat('%', #{userName}, '%')
+		</if>
+		<if test="nickName != null and nickName != ''">
+			AND u.nick_name like concat('%', #{nickName}, '%')
+		</if>
+		<!-- 数据范围过滤 -->
+		${params.dataScope}
+	</select>
+
+    <select id="selectAllocatedAssignmentList" parameterType="SysUser"
+            resultType="com.erp.system.domain.vo.SysUserAssignmentVo">
+        select distinct u.user_id, u.dept_id,
+               <include refid="maskedUserName"/> as user_name,
+               u.nick_name, <include refid="maskedPhoneNumber"/> as phonenumber,
+               d.dept_name, u.status, u.create_time
+        from sys_user u
+        left join sys_dept d on d.dept_id = u.dept_id
+        inner join sys_user_role ur on ur.user_id = u.user_id
+        where u.del_flag = '0' and ur.role_id = #{roleId}
+        <if test="userName != null and userName != ''">and u.user_name like concat('%', #{userName}, '%')</if>
+        <if test="phonenumber != null and phonenumber != ''">and u.phonenumber like concat('%', #{phonenumber}, '%')</if>
+        ${params.dataScope}
+    </select>
+
+    <select id="selectUnallocatedAssignmentList" parameterType="SysUser"
+            resultType="com.erp.system.domain.vo.SysUserAssignmentVo">
+        select u.user_id, u.dept_id,
+               <include refid="maskedUserName"/> as user_name,
+               u.nick_name, <include refid="maskedPhoneNumber"/> as phonenumber,
+               d.dept_name, u.status, u.create_time
+        from sys_user u
+        left join sys_dept d on d.dept_id = u.dept_id
+        where u.del_flag = '0'
+          and not exists (select 1 from sys_user_role ur where ur.user_id = u.user_id and ur.role_id = #{roleId})
+        <if test="userName != null and userName != ''">and u.user_name like concat('%', #{userName}, '%')</if>
+        <if test="phonenumber != null and phonenumber != ''">and u.phonenumber like concat('%', #{phonenumber}, '%')</if>
+        ${params.dataScope}
+    </select>
+
+    <select id="selectSalaryUserOptions" parameterType="SysUser"
+            resultType="com.erp.system.domain.vo.SysSalaryUserOptionVo">
+        select u.user_id, u.dept_id,
+               <include refid="maskedUserName"/> as user_name,
+               u.nick_name, <include refid="maskedPhoneNumber"/> as phonenumber,
+               d.dept_name, u.status
+        from sys_user u
+        left join sys_dept d on d.dept_id = u.dept_id
+        where u.del_flag = '0'
+        <if test="status != null and status != ''">and u.status = #{status}</if>
+        <if test="userName != null and userName != ''">and u.user_name like concat('%', #{userName}, '%')</if>
+        <if test="nickName != null and nickName != ''">and u.nick_name like concat('%', #{nickName}, '%')</if>
+        <if test="phonenumber != null and phonenumber != ''">and u.phonenumber like concat('%', #{phonenumber}, '%')</if>
+        <if test="params.salaryShopDeptId != null">
+            and (u.dept_id = #{params.salaryShopDeptId}
+                 or exists (select 1 from sys_user_shop ss
+                            where ss.user_id = u.user_id and ss.dept_id = #{params.salaryShopDeptId}))
+        </if>
+        ${params.dataScope}
+    </select>
+
+	<select id="selectUserByUserName" parameterType="String" resultMap="SysUserResult">
+	    <include refid="selectLoginUserVo"/>
+		where u.user_name = #{userName} and u.del_flag = '0'
+	</select>
+	
+	<select id="selectUserById" parameterType="Long" resultMap="SysUserResult">
+		<include refid="selectUserVo"/>
+		where u.user_id = #{userId}
+	</select>
+
+		<select id="selectScopedOnboardingConflictUsers" resultMap="SysUserResult">
+		select u.user_id, u.dept_id, u.user_name, u.nick_name, u.phonenumber, u.status, u.del_flag,
+		       d.dept_name,
+		       p.profile_id, p.user_id as profile_user_id, p.employee_no, p.position_no, p.id_number, p.employee_status,
+		       p.direct_supervisor_user_id
+		from sys_user u
+		join sys_dept d on d.dept_id = u.dept_id
+		left join sys_user_profile p on p.user_id = u.user_id
+		where u.del_flag = '0'
+		<choose>
+			<when test="(phone != null and phone != '') or (idNumber != null and idNumber != '')
+					or (employeeNo != null and employeeNo != '')">
+				and (
+					<trim prefixOverrides="or">
+						<if test="phone != null and phone != ''">or u.phonenumber = #{phone}</if>
+						<if test="idNumber != null and idNumber != ''">or p.id_number = #{idNumber}</if>
+						<if test="employeeNo != null and employeeNo != ''">or p.employee_no = #{employeeNo}</if>
+					</trim>
+				)
+			</when>
+			<otherwise>and 1 = 0</otherwise>
+		</choose>
+		${query.params.dataScope}
+		order by u.user_id
+		</select>
+
+		<select id="selectScopedOnboardingConflictUsersBatch" resultMap="SysUserResult">
+		select distinct u.user_id, u.dept_id, u.user_name, u.nick_name, u.phonenumber, u.status, u.del_flag,
+		       d.dept_name, p.profile_id, p.user_id as profile_user_id, p.employee_no, p.position_no, p.id_number, p.employee_status
+		from sys_user u join sys_dept d on d.dept_id=u.dept_id
+		left join sys_user_profile p on p.user_id=u.user_id
+		where u.del_flag='0' and (
+		<foreach collection="identities" item="identity" separator=" or ">
+		  <trim prefix="(" suffix=")" prefixOverrides="or">
+		    <if test="identity.phoneNumber != null and identity.phoneNumber != ''">or u.phonenumber=#{identity.phoneNumber}</if>
+		    <if test="identity.idNumber != null and identity.idNumber != ''">or p.id_number=#{identity.idNumber}</if>
+		    <if test="identity.employeeNo != null and identity.employeeNo != ''">or p.employee_no=#{identity.employeeNo}</if>
+		  </trim>
+		</foreach>)
+		${query.params.dataScope}
+		order by u.user_id
+		</select>
+
+		<select id="selectScopedOnboardingConflictUserForUpdate" resultMap="SysUserResult">
+			select u.user_id, u.dept_id, u.user_name, u.nick_name, u.phonenumber, u.sex,
+			       u.status, u.del_flag, u.create_by, u.create_time, u.update_by, u.update_time, u.remark,
+			       d.dept_id, d.parent_id, d.ancestors, d.dept_name, d.order_num, d.leader,
+			       d.status as dept_status,
+			       p.profile_id, p.user_id as profile_user_id, p.employee_no, p.position_no, p.company_name,
+			       p.dept_level1_name, p.dept_level2_name, p.dept_level3_name, p.store_name,
+			       p.position_names, p.job_grade, p.department_supervisor, p.direct_supervisor,
+			       p.direct_supervisor_user_id, p.employee_status, p.employee_category, p.birth_date,
+			       p.id_type, p.id_number, p.blood_type, p.registered_residence, p.current_address,
+			       p.student_status, p.school_name, p.retirement_status, p.income_start_year_month,
+			       p.first_education, p.first_degree, p.first_graduation_date, p.first_graduation_school,
+			       p.first_major, p.highest_education, p.highest_degree, p.highest_graduation_date,
+			       p.highest_graduation_school, p.highest_major, p.political_status, p.marital_status,
+			       p.nationality, p.foreign_national_flag, p.ethnicity, p.health_status,
+			       p.emergency_contact, p.emergency_contact_relation, p.emergency_contact_phone,
+			       p.recruitment_channel, p.office_phone, p.work_start_date, p.work_years, p.entry_date,
+			       p.probation_period, p.planned_regularization_date, p.actual_regularization_date,
+			       p.company_years, p.current_position_start_date, p.contract_start_date,
+			       p.contract_end_date, p.contract_type, p.contract_term, p.renewal_count,
+			       p.work_location, p.work_city_level, p.attendance_method, p.household_type,
+			       p.social_type, p.social_security_location, p.housing_fund_location, p.leave_date,
+			       p.bank_name, p.bank_account, p.legal_entity, p.create_by as profile_create_by,
+			       p.create_time as profile_create_time, p.update_by as profile_update_by,
+			       p.update_time as profile_update_time
+			from sys_user u
+			join sys_dept d on d.dept_id = u.dept_id
+			left join sys_user_profile p on p.user_id = u.user_id
+			where u.user_id = #{userId}
+			  and u.del_flag = '0'
+			<choose>
+				<when test="(phone != null and phone != '') or (idNumber != null and idNumber != '')
+						or (employeeNo != null and employeeNo != '')">
+					and (
+						<trim prefixOverrides="or">
+							<if test="phone != null and phone != ''">or u.phonenumber = #{phone}</if>
+							<if test="idNumber != null and idNumber != ''">or p.id_number = #{idNumber}</if>
+							<if test="employeeNo != null and employeeNo != ''">or p.employee_no = #{employeeNo}</if>
+						</trim>
+					)
+				</when>
+				<otherwise>and 1 = 0</otherwise>
+			</choose>
+			${query.params.dataScope}
+			for update
+		</select>
+	
+	<select id="checkUserNameUnique" parameterType="String" resultMap="SysUserResult">
+		select user_id, user_name from sys_user where user_name = #{userName} and del_flag = '0' limit 1
+	</select>
+	
+	<select id="checkPhoneUnique" parameterType="String" resultMap="SysUserResult">
+		select user_id, phonenumber from sys_user where phonenumber = #{phonenumber} and del_flag = '0' limit 1
+	</select>
+	
+	<select id="checkEmailUnique" parameterType="String" resultMap="SysUserResult">
+		select user_id, email from sys_user where email = #{email} and del_flag = '0' limit 1
+	</select>
+	
+	<insert id="insertUser" parameterType="SysUser" useGeneratedKeys="true" keyProperty="userId">
+ 		insert into sys_user(
+ 			<if test="userId != null and userId != 0">user_id,</if>
+ 			<if test="deptId != null and deptId != 0">dept_id,</if>
+ 			<if test="userName != null and userName != ''">user_name,</if>
+ 			<if test="nickName != null and nickName != ''">nick_name,</if>
+ 			<if test="email != null and email != ''">email,</if>
+ 			<if test="avatar != null and avatar != ''">avatar,</if>
+ 			<if test="phonenumber != null and phonenumber != ''">phonenumber,</if>
+ 			<if test="sex != null and sex != ''">sex,</if>
+ 			<if test="password != null and password != ''">password,</if>
+ 			<if test="status != null and status != ''">status,</if>
+			<if test="pwdUpdateDate != null">pwd_update_date,</if>
+			<if test="credentialState != null and credentialState != ''">credential_state,</if>
+			<if test="temporaryPasswordExpiresAt != null">temporary_password_expires_at,</if>
+ 			<if test="createBy != null and createBy != ''">create_by,</if>
+ 			<if test="remark != null and remark != ''">remark,</if>
+ 			create_time
+ 		)values(
+ 			<if test="userId != null and userId != ''">#{userId},</if>
+ 			<if test="deptId != null and deptId != ''">#{deptId},</if>
+ 			<if test="userName != null and userName != ''">#{userName},</if>
+ 			<if test="nickName != null and nickName != ''">#{nickName},</if>
+ 			<if test="email != null and email != ''">#{email},</if>
+ 			<if test="avatar != null and avatar != ''">#{avatar},</if>
+ 			<if test="phonenumber != null and phonenumber != ''">#{phonenumber},</if>
+ 			<if test="sex != null and sex != ''">#{sex},</if>
+ 			<if test="password != null and password != ''">#{password},</if>
+ 			<if test="status != null and status != ''">#{status},</if>
+			<if test="pwdUpdateDate != null">#{pwdUpdateDate},</if>
+			<if test="credentialState != null and credentialState != ''">#{credentialState},</if>
+			<if test="temporaryPasswordExpiresAt != null">#{temporaryPasswordExpiresAt},</if>
+ 			<if test="createBy != null and createBy != ''">#{createBy},</if>
+ 			<if test="remark != null and remark != ''">#{remark},</if>
+ 			sysdate()
+ 		)
+	</insert>
+	
+	<update id="updateUser" parameterType="SysUser">
+		update sys_user
+		<set>
+			<if test="deptId != 0">dept_id = #{deptId},</if>
+			<if test="nickName != null and nickName != ''">nick_name = #{nickName},</if>
+			<if test="email != null ">email = #{email},</if>
+			<if test="phonenumber != null ">phonenumber = #{phonenumber},</if>
+			<if test="sex != null and sex != ''">sex = #{sex},</if>
+			<if test="avatar != null and avatar != ''">avatar = #{avatar},</if>
+			<if test="status != null and status != ''">status = #{status},</if>
+			<if test="loginIp != null and loginIp != ''">login_ip = #{loginIp},</if>
+			<if test="loginDate != null">login_date = #{loginDate},</if>
+			<if test="updateBy != null and updateBy != ''">update_by = #{updateBy},</if>
+			<if test="remark != null">remark = #{remark},</if>
+			update_time = sysdate()
+		</set>
+		where user_id = #{userId}
+	</update>
+
+    <update id="updateUserPii">
+        update sys_user
+        <set>
+            <if test="values.containsKey('email')">email = #{values.email},</if>
+            <if test="values.containsKey('phonenumber')">phonenumber = #{values.phonenumber},</if>
+            <if test="values.containsKey('sex')">sex = #{values.sex},</if>
+            update_by = #{operator}, update_time = sysdate()
+        </set>
+        where user_id = #{userId} and del_flag = '0'
+    </update>
+
+	<update id="updateHrEmployeeProfileUser" parameterType="SysUser">
+		update sys_user
+		<set>
+			<if test="deptId != null and deptId != 0">dept_id = #{deptId},</if>
+			<if test="nickName != null and nickName != ''">nick_name = #{nickName},</if>
+			<if test="email != null">email = #{email},</if>
+			<if test="phonenumber != null">phonenumber = #{phonenumber},</if>
+			<if test="sex != null and sex != ''">sex = #{sex},</if>
+			<if test="status != null and status != ''">status = #{status},</if>
+			<if test="remark != null">remark = #{remark},</if>
+			<if test="updateBy != null and updateBy != ''">update_by = #{updateBy},</if>
+			update_time = sysdate()
+		</set>
+		where user_id = #{userId}
+	</update>
+
+    <update id="patchHrEmployeeUser">
+        update sys_user
+        <set>
+            <if test="values.containsKey('deptId')">dept_id = #{values.deptId},</if>
+            <if test="values.containsKey('employeeName')">nick_name = #{values.employeeName},</if>
+            <if test="values.containsKey('email')">email = #{values.email},</if>
+            <if test="values.containsKey('phoneNumber')">phonenumber = #{values.phoneNumber},</if>
+            <if test="values.containsKey('sex')">sex = #{values.sex},</if>
+            <if test="values.containsKey('remark')">remark = #{values.remark},</if>
+            update_by = #{operator}, update_time = sysdate()
+        </set>
+        where user_id = #{userId} and del_flag = '0'
+    </update>
+
+    <update id="updateTransferDept">
+        update sys_user
+        set dept_id = #{targetDeptId},
+            update_by = #{operator},
+            update_time = sysdate()
+        where user_id = #{userId}
+          and dept_id = #{expectedDeptId}
+          and del_flag = '0'
+    </update>
+
+    <update id="disableUserForOffboarding">
+        update sys_user
+        set status = '1',
+            update_by = #{operatorName},
+            update_time = sysdate()
+        where user_id = #{userId}
+          and status = #{expectedStatus}
+          and del_flag = '0'
+    </update>
+
+	<update id="updateUserStatus" parameterType="SysUser">
+		update sys_user set status = #{status}, update_time = sysdate() where user_id = #{userId}
+	</update>
+	
+	<update id="updateUserAvatar" parameterType="SysUser">
+ 		update sys_user set avatar = #{avatar}, update_time = sysdate() where user_id = #{userId}
+	</update>
+	
+  	<update id="updateLoginInfo" parameterType="SysUser">
+ 		update sys_user set login_ip = #{loginIp}, login_date = #{loginDate} where user_id = #{userId}
+	</update>
+	
+	<update id="resetUserPwd">
+		update sys_user
+		set pwd_update_date = sysdate(), password = #{password},
+			must_change_password = #{mustChangePassword}, update_time = sysdate()
+		where user_id = #{userId}
+	</update>
+
+	<update id="activateUserPassword">
+		update sys_user
+		set pwd_update_date = sysdate(), password = #{password}, credential_state = 'ACTIVE',
+			must_change_password = '0', temporary_password_expires_at = null,
+			update_by = #{updateBy}, update_time = sysdate()
+		where user_id = #{userId} and del_flag = '0'
+	</update>
+
+	<update id="resetUserTemporaryCredential">
+		update sys_user
+		set pwd_update_date = null, password = #{password}, credential_state = 'TEMPORARY',
+			must_change_password = '1', temporary_password_expires_at = #{temporaryPasswordExpiresAt}, update_by = #{updateBy},
+			update_time = sysdate()
+		where user_id = #{userId} and del_flag = '0'
+	</update>
+	
+	<delete id="deleteUserById" parameterType="Long">
+ 		update sys_user set del_flag = '2' where user_id = #{userId}
+ 	</delete>
+ 	
+ 	<delete id="deleteUserByIds" parameterType="Long">
+ 		update sys_user set del_flag = '2' where user_id in
+ 		<foreach collection="array" item="userId" open="(" separator="," close=")">
+ 			#{userId}
+        </foreach> 
+ 	</delete>
+	
+</mapper>

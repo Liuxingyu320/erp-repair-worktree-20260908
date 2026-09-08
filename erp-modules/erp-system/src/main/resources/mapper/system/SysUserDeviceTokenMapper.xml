@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.system.mapper.SysUserDeviceTokenMapper">
+
+    <resultMap id="SysUserDeviceTokenResult" type="SysUserDeviceToken">
+        <id property="tokenId" column="token_id" />
+        <result property="userId" column="user_id" />
+        <result property="platform" column="platform" />
+        <result property="token" column="token" />
+        <result property="tokenHash" column="token_hash" />
+        <result property="appId" column="app_id" />
+        <result property="deviceName" column="device_name" />
+        <result property="enabled" column="enabled" />
+        <result property="lastRegisteredTime" column="last_registered_time" />
+        <result property="disabledTime" column="disabled_time" />
+        <result property="createTime" column="create_time" />
+        <result property="updateTime" column="update_time" />
+    </resultMap>
+
+    <insert id="upsertDeviceToken" parameterType="SysUserDeviceToken">
+        insert into sys_user_device_token (
+            user_id, platform, token, token_hash, app_id, device_name, enabled,
+            last_registered_time, create_time, update_time
+        ) values (
+            #{userId}, #{platform}, #{token}, #{tokenHash}, #{appId}, #{deviceName}, '1',
+            sysdate(), sysdate(), sysdate()
+        )
+        on duplicate key update
+            user_id = values(user_id),
+            token = values(token),
+            app_id = values(app_id),
+            device_name = values(device_name),
+            enabled = '1',
+            last_registered_time = sysdate(),
+            disabled_time = null,
+            update_time = sysdate()
+    </insert>
+
+    <update id="disableDeviceToken">
+        update sys_user_device_token
+        set enabled = '0',
+            disabled_time = sysdate(),
+            update_time = sysdate()
+        where user_id = #{userId}
+          and platform = #{platform}
+          and token_hash = #{tokenHash}
+          and enabled = '1'
+    </update>
+
+    <update id="disableByTokenHash">
+        update sys_user_device_token
+        set enabled = '0',
+            disabled_time = sysdate(),
+            update_time = sysdate()
+        where platform = #{platform}
+          and token_hash = #{tokenHash}
+          and enabled = '1'
+    </update>
+
+    <select id="selectEnabledByUserId" resultMap="SysUserDeviceTokenResult">
+        select token_id, user_id, platform, token, token_hash, app_id, device_name,
+               enabled, last_registered_time, disabled_time, create_time, update_time
+        from sys_user_device_token
+        where user_id = #{userId}
+          and enabled = '1'
+        order by token_id
+    </select>
+
+</mapper>

@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.inventory.mapper.InvOeCategoryMapper">
+
+    <resultMap type="InvOeCategory" id="InvOeCategoryResult">
+        <id property="categoryId" column="category_id"/>
+        <result property="parentId" column="parent_id"/>
+        <result property="ancestors" column="ancestors"/>
+        <result property="categoryName" column="category_name"/>
+        <result property="categoryCode" column="category_code"/>
+        <result property="orderNum" column="order_num"/>
+        <result property="status" column="status"/>
+        <result property="delFlag" column="del_flag"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateBy" column="update_by"/>
+        <result property="updateTime" column="update_time"/>
+        <result property="remark" column="remark"/>
+    </resultMap>
+
+    <sql id="selectInvOeCategoryVo">
+        select category_id, parent_id, ancestors, category_name, category_code,
+               order_num, status, del_flag, create_by, create_time, update_by, update_time, remark
+        from inv_oe_category
+    </sql>
+
+    <select id="selectInvOeCategoryList" parameterType="InvOeCategory" resultMap="InvOeCategoryResult">
+        <include refid="selectInvOeCategoryVo"/>
+        where del_flag = '0'
+        <if test="categoryName != null and categoryName != ''">and category_name like concat('%', #{categoryName}, '%')</if>
+        <if test="status != null and status != ''">and status = #{status}</if>
+        order by order_num, category_id
+    </select>
+
+    <select id="selectInvOeCategoryById" parameterType="Long" resultMap="InvOeCategoryResult">
+        <include refid="selectInvOeCategoryVo"/>
+        where category_id = #{categoryId} and del_flag = '0'
+    </select>
+
+    <select id="countCategoryCode" resultType="int">
+        select count(1)
+        from inv_oe_category
+        where del_flag = '0'
+          and category_code = #{categoryCode}
+        <if test="excludeCategoryId != null">and category_id != #{excludeCategoryId}</if>
+    </select>
+
+    <select id="countChildCategory" parameterType="Long" resultType="int">
+        select count(1)
+        from inv_oe_category
+        where del_flag = '0'
+          and parent_id = #{categoryId}
+    </select>
+
+    <select id="countOeByCategoryId" parameterType="Long" resultType="int">
+        select count(1)
+        from inv_oe_item
+        where del_flag = '0'
+          and category_id = #{categoryId}
+    </select>
+
+    <insert id="insertInvOeCategory" parameterType="InvOeCategory" useGeneratedKeys="true" keyProperty="categoryId">
+        insert into inv_oe_category (
+            parent_id, ancestors, category_name, category_code, order_num,
+            status, del_flag, create_by, create_time, remark
+        ) values (
+            #{parentId}, #{ancestors}, #{categoryName}, #{categoryCode}, #{orderNum},
+            #{status}, '0', #{createBy}, sysdate(), #{remark}
+        )
+    </insert>
+
+    <update id="updateInvOeCategory" parameterType="InvOeCategory">
+        update inv_oe_category
+        <set>
+            <if test="categoryName != null">category_name = #{categoryName},</if>
+            <if test="categoryCode != null">category_code = #{categoryCode},</if>
+            <if test="parentId != null">parent_id = #{parentId},</if>
+            <if test="ancestors != null">ancestors = #{ancestors},</if>
+            <if test="orderNum != null">order_num = #{orderNum},</if>
+            <if test="status != null">status = #{status},</if>
+            update_by = #{updateBy}, update_time = sysdate()
+        </set>
+        where category_id = #{categoryId}
+    </update>
+
+    <delete id="deleteInvOeCategoryById" parameterType="Long">
+        update inv_oe_category set del_flag = '2' where category_id = #{categoryId}
+    </delete>
+
+</mapper>

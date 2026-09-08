@@ -1,0 +1,1032 @@
+:root {
+  --mobile-viewport-height: 100dvh;
+  --mobile-viewport-offset-top: 0px;
+  --mobile-keyboard-inset: 0px;
+  --mobile-safe-top: env(safe-area-inset-top, 0px);
+  --mobile-safe-right: env(safe-area-inset-right, 0px);
+  --mobile-safe-bottom: env(safe-area-inset-bottom, 0px);
+  --mobile-safe-left: env(safe-area-inset-left, 0px);
+
+  /* Warm white + deep tea-green design tokens (single source of truth) */
+  --mobile-color-page: #f4f5f2;
+  --mobile-color-surface: #ffffff;
+  --mobile-color-surface-soft: #f8f8f5;
+  --mobile-color-ink: #17211d;
+  --mobile-color-muted: #66736d;
+  --mobile-color-subtle: #8a948f;
+  --mobile-color-line: #dde2de;
+  --mobile-color-line-strong: #cbd3ce;
+  --mobile-color-primary: #0b6b53;
+  --mobile-color-primary-strong: #075441;
+  --mobile-color-primary-soft: #e7f2ed;
+  --mobile-color-warning: #a76505;
+  --mobile-color-warning-soft: #fff3dc;
+  --mobile-color-danger: #c4322b;
+  --mobile-color-danger-soft: #fff0ee;
+  --mobile-color-info: #2866b1;
+  --mobile-color-info-soft: #edf4fd;
+  --mobile-color-success: #147a50;
+  --mobile-color-success-soft: #e8f4ed;
+  --mobile-color-neutral: #5f6b66;
+  --mobile-color-neutral-soft: #eef1ef;
+
+  --mobile-space-1: 4px;
+  --mobile-space-2: 8px;
+  --mobile-space-3: 12px;
+  --mobile-space-4: 16px;
+  --mobile-space-5: 20px;
+  --mobile-space-6: 24px;
+  --mobile-space-7: 32px;
+  --mobile-radius-sm: 8px;
+  --mobile-radius-md: 12px;
+  --mobile-radius-lg: 16px;
+  --mobile-radius-pill: 999px;
+  --mobile-control-height: 44px;
+  --mobile-primary-control-height: 48px;
+  --mobile-topbar-height: 56px;
+  --mobile-bottom-nav-height: 68px;
+  --mobile-bottom-nav-total: calc(var(--mobile-bottom-nav-height) + var(--mobile-safe-bottom));
+  --mobile-content-max: 480px;
+  --mobile-shadow-sheet: 0 16px 40px rgba(23, 33, 29, 0.16);
+  --mobile-shadow-float: 0 8px 20px rgba(23, 33, 29, 0.08);
+  --mobile-shadow-card:
+    0 0 0 1px rgba(23, 33, 29, 0.035),
+    0 1px 2px rgba(23, 33, 29, 0.035),
+    0 10px 28px rgba(23, 33, 29, 0.055);
+  --mobile-shadow-control:
+    0 0 0 1px rgba(23, 33, 29, 0.025),
+    0 4px 12px rgba(23, 33, 29, 0.045);
+  --mobile-shadow-primary: 0 10px 24px rgba(11, 107, 83, 0.22);
+  --mobile-shadow-card-raised:
+    0 0 0 1px rgba(23, 33, 29, 0.045),
+    0 2px 5px rgba(23, 33, 29, 0.04),
+    0 16px 36px rgba(23, 33, 29, 0.075);
+  --mobile-shadow-inset: inset 0 1px 2px rgba(23, 33, 29, 0.045);
+  --mobile-gradient-primary: linear-gradient(135deg, #0b6b53 0%, #128064 100%);
+  --mobile-gradient-surface: linear-gradient(180deg, #ffffff 0%, #fdfefd 100%);
+  --mobile-focus-ring: 0 0 0 3px rgba(11, 107, 83, 0.2);
+  --mobile-pressed-filter: brightness(0.96);
+  --mobile-font-family: Inter, "PingFang SC", "Microsoft YaHei", "Helvetica Neue", Arial, system-ui, sans-serif;
+  --mobile-font-display: 28px;
+  --mobile-font-title: 24px;
+  --mobile-font-section: 17px;
+  --mobile-font-body: 15px;
+  --mobile-font-label: 13px;
+  --mobile-font-meta: 12px;
+  --mobile-font-metric: 24px;
+  --mobile-font-input: 16px;
+  --mobile-line-display: 36px;
+  --mobile-line-title: 32px;
+  --mobile-line-section: 24px;
+  --mobile-line-body: 22px;
+  --mobile-line-label: 18px;
+  --mobile-line-meta: 18px;
+  --mobile-line-metric: 30px;
+  --mobile-weight-regular: 400;
+  --mobile-weight-medium: 500;
+  --mobile-weight-semibold: 600;
+  --mobile-weight-bold: 700;
+  --mobile-duration-fast: var(--motion-duration-fast, 120ms);
+  --mobile-duration: var(--motion-duration-base, 180ms);
+  --mobile-duration-slow: 260ms;
+  --mobile-duration-exit: var(--motion-duration-fast, 120ms);
+  --mobile-ease-enter: var(--motion-ease-enter, cubic-bezier(0.16, 1, 0.3, 1));
+  --mobile-ease-exit: var(--motion-ease-exit, cubic-bezier(0.4, 0, 1, 1));
+  --mobile-ease-spring: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@supports not (height: 100dvh) {
+  :root {
+    --mobile-viewport-height: 100vh;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Page skeleton
+--------------------------------------------------------------------------- */
+.mobile-system-page {
+  width: 100%;
+  min-width: 0;
+  min-height: var(--mobile-viewport-height);
+  color: var(--mobile-color-ink);
+  background-color: var(--mobile-color-page);
+  background-image:
+    radial-gradient(circle at 100% 0%, rgba(11, 107, 83, 0.1) 0, rgba(11, 107, 83, 0) 270px),
+    radial-gradient(circle at 0% 72%, rgba(40, 102, 177, 0.055) 0, rgba(40, 102, 177, 0) 240px),
+    linear-gradient(180deg, #f8faf7 0%, var(--mobile-color-page) 44%, #f1f4f1 100%);
+  background-repeat: no-repeat;
+  font-family: var(--mobile-font-family);
+  font-size: var(--mobile-font-body);
+  line-height: var(--mobile-line-body);
+  font-weight: var(--mobile-weight-regular);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+.mobile-system-scroll {
+  min-width: 0;
+  min-height: 0;
+  height: var(--mobile-viewport-height);
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: calc(var(--mobile-bottom-nav-total) + var(--mobile-space-4));
+  scroll-padding-top: calc(var(--mobile-safe-top) + var(--mobile-space-4));
+  scroll-padding-bottom: calc(var(--mobile-bottom-nav-total) + var(--mobile-keyboard-inset) + var(--mobile-space-4));
+}
+
+.mobile-system-scroll--task {
+  padding-bottom: calc(var(--mobile-primary-control-height) + var(--mobile-safe-bottom) + var(--mobile-space-6) + var(--mobile-keyboard-inset));
+  scroll-padding-bottom: calc(var(--mobile-primary-control-height) + var(--mobile-safe-bottom) + var(--mobile-space-6) + var(--mobile-keyboard-inset));
+}
+
+.mobile-system-scroll--plain {
+  padding-bottom: calc(var(--mobile-safe-bottom) + var(--mobile-space-6));
+  scroll-padding-bottom: calc(var(--mobile-safe-bottom) + var(--mobile-space-6) + var(--mobile-keyboard-inset));
+}
+
+.mobile-system-content {
+  width: min(100%, var(--mobile-content-max));
+  margin: 0 auto;
+  box-sizing: border-box;
+  padding-left: calc(var(--mobile-safe-left) + var(--mobile-space-4));
+  padding-right: calc(var(--mobile-safe-right) + var(--mobile-space-4));
+}
+
+.mobile-system-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--mobile-space-3);
+  min-height: var(--mobile-topbar-height);
+  padding: calc(var(--mobile-safe-top) + var(--mobile-space-3))
+    calc(var(--mobile-safe-right) + var(--mobile-space-4))
+    var(--mobile-space-3)
+    calc(var(--mobile-safe-left) + var(--mobile-space-4));
+  border-bottom: 1px solid var(--mobile-color-line);
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 8px 24px rgba(23, 33, 29, 0.035);
+  backdrop-filter: blur(18px) saturate(125%);
+  -webkit-backdrop-filter: blur(18px) saturate(125%);
+}
+
+.mobile-system-topbar__copy {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.mobile-system-topbar__title {
+  margin: 0;
+  color: var(--mobile-color-ink);
+  font-size: var(--mobile-font-title);
+  line-height: 1.2;
+  font-weight: var(--mobile-weight-bold);
+  letter-spacing: -0.02em;
+}
+
+.mobile-system-topbar__subtitle {
+  margin: 4px 0 0;
+  color: var(--mobile-color-muted);
+  font-size: var(--mobile-font-label);
+  line-height: var(--mobile-line-label);
+  font-weight: var(--mobile-weight-medium);
+}
+
+.mobile-system-topbar__actions {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--mobile-space-2);
+  flex: 0 0 auto;
+}
+
+.mobile-system-panel {
+  min-width: 0;
+  border: 1px solid rgba(203, 211, 206, 0.82);
+  border-radius: var(--mobile-radius-lg);
+  background: var(--mobile-gradient-surface);
+  box-shadow: var(--mobile-shadow-card);
+}
+
+.mobile-system-panel--soft {
+  background: var(--mobile-color-surface-soft);
+}
+
+.mobile-system-panel--continuous {
+  overflow: hidden;
+}
+
+.mobile-system-panel--continuous > * + * {
+  border-top: 1px solid var(--mobile-color-line);
+}
+
+.mobile-system-control {
+  min-width: 44px;
+  min-height: 44px;
+  border: 1px solid var(--mobile-color-line-strong);
+  border-radius: var(--mobile-radius-md);
+  background: var(--mobile-color-surface);
+  color: var(--mobile-color-ink);
+  font: inherit;
+}
+
+/* ---------------------------------------------------------------------------
+   Controls & buttons
+--------------------------------------------------------------------------- */
+:where(.mobile-system-page, .mobile-system-sheet) button {
+  min-width: 44px;
+  min-height: var(--mobile-control-height);
+  box-sizing: border-box;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    transform var(--mobile-duration-fast) var(--mobile-ease-spring),
+    filter var(--mobile-duration-fast) var(--mobile-ease-spring),
+    opacity var(--mobile-duration-fast) var(--mobile-ease-spring);
+}
+
+:where(.mobile-system-page, .mobile-system-sheet)
+  :where(
+    input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="hidden"]):not([type="range"]):not([type="color"]),
+    select,
+    textarea
+  ) {
+  min-height: var(--mobile-control-height);
+  box-sizing: border-box;
+  font-size: var(--mobile-font-input);
+  border: 1px solid var(--mobile-color-line-strong);
+  border-radius: var(--mobile-radius-md);
+  color: var(--mobile-color-ink);
+  background: #fbfdfc;
+  box-shadow: var(--mobile-shadow-inset);
+  outline: 0;
+}
+
+:where(.mobile-system-page, .mobile-system-sheet)
+  :where(
+    input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="hidden"]):not([type="range"]):not([type="color"]),
+    select,
+    textarea
+  ):focus {
+  border-color: var(--mobile-color-primary);
+  background: var(--mobile-color-surface);
+  box-shadow: var(--mobile-focus-ring), var(--mobile-shadow-inset);
+}
+
+:where(.mobile-system-page, .mobile-system-sheet) :where(input, textarea)::placeholder {
+  color: var(--mobile-color-subtle);
+  opacity: 1;
+}
+
+:where(.mobile-system-page, .mobile-system-sheet)
+  button:not(:disabled):active {
+  transform: scale(0.98);
+  filter: var(--mobile-pressed-filter);
+}
+
+:where(.mobile-system-page, .mobile-system-sheet) button:disabled {
+  cursor: not-allowed;
+  opacity: 0.56;
+}
+
+.mobile-button {
+  min-width: 44px;
+  min-height: var(--mobile-control-height);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--mobile-space-2);
+  box-sizing: border-box;
+  padding: 0 var(--mobile-space-4);
+  border: 1px solid var(--mobile-color-line-strong);
+  border-radius: var(--mobile-radius-md);
+  color: var(--mobile-color-ink);
+  background: var(--mobile-color-surface);
+  font: inherit;
+  font-weight: var(--mobile-weight-semibold);
+  line-height: 1.2;
+  cursor: pointer;
+}
+
+.mobile-button--primary {
+  min-height: var(--mobile-primary-control-height);
+  border-color: var(--mobile-color-primary);
+  color: #fff;
+  background: var(--mobile-gradient-primary);
+  box-shadow: var(--mobile-shadow-primary);
+}
+
+.mobile-button--primary:not(:disabled):active {
+  background: var(--mobile-color-primary-strong);
+  border-color: var(--mobile-color-primary-strong);
+}
+
+.mobile-button--secondary {
+  color: var(--mobile-color-primary);
+  border-color: rgba(11, 107, 83, 0.28);
+  background: var(--mobile-color-primary-soft);
+}
+
+.mobile-button--tertiary {
+  color: var(--mobile-color-primary);
+  border-color: transparent;
+  background: transparent;
+}
+
+.mobile-button--danger {
+  color: var(--mobile-color-danger);
+  border-color: rgba(196, 50, 43, 0.3);
+  background: var(--mobile-color-danger-soft);
+}
+
+.mobile-button--block {
+  width: 100%;
+}
+
+.mobile-icon-button {
+  width: var(--mobile-control-height);
+  height: var(--mobile-control-height);
+  min-width: var(--mobile-control-height);
+  min-height: var(--mobile-control-height);
+  padding: 0;
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid var(--mobile-color-line);
+  border-radius: var(--mobile-radius-md);
+  color: var(--mobile-color-ink);
+  background: var(--mobile-color-surface);
+  box-shadow: var(--mobile-shadow-control);
+  cursor: pointer;
+}
+
+.mobile-touch-row {
+  min-height: var(--mobile-control-height);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--mobile-space-2);
+  box-sizing: border-box;
+  touch-action: manipulation;
+}
+
+/* ---------------------------------------------------------------------------
+   Status chips (text + color, never color alone)
+--------------------------------------------------------------------------- */
+.mobile-status-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 24px;
+  max-width: 100%;
+  box-sizing: border-box;
+  padding: 2px 8px;
+  border-radius: var(--mobile-radius-sm);
+  border: 1px solid transparent;
+  color: var(--mobile-color-neutral);
+  background: var(--mobile-color-neutral-soft);
+  font-size: var(--mobile-font-meta);
+  line-height: var(--mobile-line-meta);
+  font-weight: var(--mobile-weight-semibold);
+  white-space: nowrap;
+  box-shadow: 0 1px 2px rgba(23, 33, 29, 0.035);
+}
+
+.mobile-status-chip--draft,
+.mobile-status-chip--neutral {
+  color: var(--mobile-color-neutral);
+  background: var(--mobile-color-neutral-soft);
+  border-color: rgba(95, 107, 102, 0.16);
+}
+
+.mobile-status-chip--pending,
+.mobile-status-chip--warning {
+  color: var(--mobile-color-warning);
+  background: var(--mobile-color-warning-soft);
+  border-color: rgba(167, 101, 5, 0.18);
+}
+
+.mobile-status-chip--processing,
+.mobile-status-chip--info {
+  color: var(--mobile-color-info);
+  background: var(--mobile-color-info-soft);
+  border-color: rgba(40, 102, 177, 0.16);
+}
+
+.mobile-status-chip--success {
+  color: var(--mobile-color-success);
+  background: var(--mobile-color-success-soft);
+  border-color: rgba(20, 122, 80, 0.16);
+}
+
+.mobile-status-chip--danger,
+.mobile-status-chip--error {
+  color: var(--mobile-color-danger);
+  background: var(--mobile-color-danger-soft);
+  border-color: rgba(196, 50, 43, 0.18);
+}
+
+.mobile-status-chip--primary {
+  color: var(--mobile-color-primary);
+  background: var(--mobile-color-primary-soft);
+  border-color: rgba(11, 107, 83, 0.18);
+}
+
+/* ---------------------------------------------------------------------------
+   Data / page states (mutex: session > permission > context > network > loading > empty)
+--------------------------------------------------------------------------- */
+.mobile-state,
+.mobile-data-state {
+  position: relative;
+  overflow: hidden;
+  min-height: 180px;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: var(--mobile-space-2);
+  box-sizing: border-box;
+  padding: var(--mobile-space-6);
+  border: 1px solid var(--mobile-color-line);
+  border-radius: var(--mobile-radius-lg);
+  color: var(--mobile-color-muted);
+  background: var(--mobile-gradient-surface);
+  box-shadow: var(--mobile-shadow-card);
+  text-align: center;
+}
+
+.mobile-state strong,
+.mobile-data-state__title {
+  color: var(--mobile-color-ink);
+  font-size: 16px;
+  line-height: 1.35;
+  font-weight: var(--mobile-weight-bold);
+}
+
+.mobile-state p,
+.mobile-data-state__description {
+  max-width: 32em;
+  margin: 0;
+  color: var(--mobile-color-muted);
+  font-size: var(--mobile-font-body);
+  line-height: 1.55;
+  font-weight: var(--mobile-weight-regular);
+}
+
+.mobile-data-state__action {
+  margin-top: var(--mobile-space-2);
+}
+
+.mobile-data-state__skeleton {
+  width: min(100%, 228px);
+  display: grid;
+  gap: 8px;
+  margin-top: var(--mobile-space-2);
+}
+
+.mobile-data-state__skeleton span {
+  position: relative;
+  height: 9px;
+  overflow: hidden;
+  border-radius: var(--mobile-radius-pill);
+  background: rgba(40, 102, 177, 0.1);
+}
+
+.mobile-data-state__skeleton span:nth-child(2) {
+  width: 82%;
+  justify-self: center;
+}
+
+.mobile-data-state__skeleton span:nth-child(3) {
+  width: 58%;
+  justify-self: center;
+}
+
+.mobile-data-state__skeleton span::after {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.78), transparent);
+  content: "";
+  transform: translateX(-110%);
+}
+
+.mobile-state--error,
+.mobile-data-state--session-expired,
+.mobile-data-state--permission-error,
+.mobile-data-state--network-error,
+.mobile-data-state--error {
+  color: var(--mobile-color-danger);
+  border-color: rgba(196, 50, 43, 0.22);
+  background: var(--mobile-color-danger-soft);
+}
+
+.mobile-data-state--context-required,
+.mobile-data-state--context-mismatch,
+.mobile-data-state--warning {
+  color: var(--mobile-color-warning);
+  border-color: rgba(167, 101, 5, 0.22);
+  background: var(--mobile-color-warning-soft);
+}
+
+.mobile-data-state--loading,
+.mobile-data-state--info {
+  color: var(--mobile-color-info);
+  border-color: rgba(40, 102, 177, 0.16);
+  background: var(--mobile-color-info-soft);
+}
+
+.mobile-data-state--empty,
+.mobile-data-state--filtered-empty,
+.mobile-data-state--feature-closed {
+  color: var(--mobile-color-muted);
+}
+
+.mobile-data-state--compact {
+  min-height: 120px;
+  padding: var(--mobile-space-4);
+}
+
+.mobile-data-state--inline {
+  min-height: 0;
+  justify-items: start;
+  text-align: left;
+  padding: var(--mobile-space-3) var(--mobile-space-4);
+}
+
+.mobile-alert {
+  display: grid;
+  gap: 4px;
+  padding: var(--mobile-space-3) var(--mobile-space-4);
+  border: 1px solid var(--mobile-color-line);
+  border-radius: var(--mobile-radius-md);
+  background: var(--mobile-color-surface);
+  color: var(--mobile-color-ink);
+  box-shadow: var(--mobile-shadow-control);
+}
+
+.mobile-alert--warning {
+  border-color: rgba(167, 101, 5, 0.22);
+  background: var(--mobile-color-warning-soft);
+  color: var(--mobile-color-warning);
+}
+
+.mobile-alert--danger {
+  border-color: rgba(196, 50, 43, 0.22);
+  background: var(--mobile-color-danger-soft);
+  color: var(--mobile-color-danger);
+}
+
+.mobile-alert--info {
+  border-color: rgba(40, 102, 177, 0.16);
+  background: var(--mobile-color-info-soft);
+  color: var(--mobile-color-info);
+}
+
+.mobile-alert--success {
+  border-color: rgba(20, 122, 80, 0.16);
+  background: var(--mobile-color-success-soft);
+  color: var(--mobile-color-success);
+}
+
+.mobile-disabled-reason {
+  margin: var(--mobile-space-2) 0 0;
+  color: var(--mobile-color-muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.mobile-system-primary {
+  border-color: var(--mobile-color-primary);
+  background: var(--mobile-color-primary);
+  color: #ffffff;
+}
+
+.mobile-system-danger {
+  border-color: var(--mobile-color-danger);
+  color: var(--mobile-color-danger);
+}
+
+.mobile-system-muted {
+  color: var(--mobile-color-muted);
+}
+
+/* ---------------------------------------------------------------------------
+   Bottom navigation & task action bar
+--------------------------------------------------------------------------- */
+/*
+ * Keep the bottom navigation visually stable across workbench, feature,
+ * profile, inventory and HR shells. The slightly higher specificity is
+ * intentional: several legacy pages still carry scoped navigation rules.
+ */
+html body .mobile-system-page .mobile-system-bottom-nav {
+  position: fixed;
+  z-index: 80;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+  width: 100%;
+  max-width: none;
+  min-height: var(--mobile-bottom-nav-total);
+  margin: 0;
+  padding: 6px var(--mobile-safe-right) var(--mobile-safe-bottom) var(--mobile-safe-left);
+  box-sizing: border-box;
+  transform: none;
+  border: 0;
+  border-top: 1px solid var(--mobile-color-line);
+  border-radius: 0;
+  background: var(--mobile-color-surface);
+  box-shadow: 0 -10px 28px rgba(23, 33, 29, 0.075);
+}
+
+html body .mobile-system-page .mobile-system-bottom-nav button,
+html body .mobile-system-page .mobile-system-bottom-nav a {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  min-height: var(--mobile-control-height);
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 3px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--mobile-radius-md);
+  background: transparent;
+  color: var(--mobile-color-muted);
+  font: inherit;
+  font-size: var(--mobile-font-label);
+  line-height: var(--mobile-line-label);
+  font-weight: var(--mobile-weight-bold);
+  cursor: pointer;
+  transition:
+    transform var(--mobile-duration-fast) var(--mobile-ease-spring),
+    opacity var(--mobile-duration-fast) var(--mobile-ease-spring);
+}
+
+html body .mobile-system-page .mobile-system-bottom-nav :is(svg, .svg-icon) {
+  display: block;
+  flex: 0 0 23px;
+  width: 23px;
+  height: 23px;
+  margin: 0;
+  color: inherit;
+  fill: currentColor;
+}
+
+html body .mobile-system-page .mobile-system-bottom-nav span {
+  font-size: var(--mobile-font-label);
+  line-height: var(--mobile-line-label);
+  font-weight: var(--mobile-weight-bold);
+  white-space: nowrap;
+}
+
+html body .mobile-system-page .mobile-system-bottom-nav .active {
+  color: var(--mobile-color-primary);
+  background: linear-gradient(180deg, rgba(231, 242, 237, 0.9), rgba(231, 242, 237, 0.52));
+}
+
+html body .mobile-system-page .mobile-system-bottom-nav .active::before {
+  position: absolute;
+  top: -6px;
+  left: 50%;
+  width: 18px;
+  height: 3px;
+  border-radius: 0 0 3px 3px;
+  background: currentColor;
+  content: "";
+  transform: translateX(-50%);
+}
+
+.mobile-bottom-action-bar {
+  position: fixed;
+  z-index: 90;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+  gap: var(--mobile-space-2);
+  align-items: center;
+  padding:
+    var(--mobile-space-3)
+    calc(var(--mobile-safe-right) + var(--mobile-space-4))
+    calc(var(--mobile-safe-bottom) + var(--mobile-space-3))
+    calc(var(--mobile-safe-left) + var(--mobile-space-4));
+  border-top: 1px solid var(--mobile-color-line);
+  background: var(--mobile-color-surface);
+  box-shadow: 0 -10px 28px rgba(23, 33, 29, 0.075);
+}
+
+.mobile-bottom-action-bar--single {
+  grid-template-columns: 1fr;
+}
+
+.mobile-bottom-action-bar--split {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
+}
+
+.mobile-bottom-action-bar--triple {
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 0.9fr) minmax(0, 1.4fr);
+}
+
+.mobile-bottom-action-bar .mobile-button--primary {
+  width: 100%;
+}
+
+/* ---------------------------------------------------------------------------
+   Sheets / overlays
+--------------------------------------------------------------------------- */
+.mobile-system-sheet {
+  width: min(100%, 520px);
+  max-height: calc(
+    var(--mobile-viewport-height) - var(--mobile-safe-top) - var(--mobile-safe-bottom) - 24px
+  );
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--mobile-color-line);
+  border-radius: var(--mobile-radius-lg);
+  background: var(--mobile-color-surface);
+  box-shadow: var(--mobile-shadow-sheet);
+}
+
+.mobile-system-sheet__header,
+.mobile-system-sheet__footer {
+  flex: 0 0 auto;
+  background: var(--mobile-color-surface);
+}
+
+.mobile-system-sheet__header {
+  border-bottom: 1px solid var(--mobile-color-line);
+}
+
+.mobile-system-sheet__body {
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+  scroll-padding-bottom: calc(var(--mobile-control-height) + var(--mobile-keyboard-inset) + var(--mobile-space-6));
+}
+
+.mobile-system-sheet__footer {
+  padding-bottom: max(var(--mobile-space-3), var(--mobile-safe-bottom));
+  border-top: 1px solid var(--mobile-color-line);
+}
+
+/* ---------------------------------------------------------------------------
+   List rows, filters, section titles
+--------------------------------------------------------------------------- */
+.mobile-list-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--mobile-space-3);
+  align-items: start;
+  width: 100%;
+  min-height: 64px;
+  box-sizing: border-box;
+  padding: var(--mobile-space-3) var(--mobile-space-4);
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.mobile-list-row:active {
+  background: var(--mobile-color-primary-soft);
+}
+
+.mobile-list-row__title {
+  margin: 0;
+  color: var(--mobile-color-ink);
+  font-size: var(--mobile-font-body);
+  line-height: var(--mobile-line-body);
+  font-weight: var(--mobile-weight-semibold);
+  word-break: break-word;
+}
+
+.mobile-list-row__meta {
+  margin: 4px 0 0;
+  color: var(--mobile-color-muted);
+  font-size: var(--mobile-font-label);
+  line-height: var(--mobile-line-label);
+  word-break: break-word;
+}
+
+.mobile-list-row__status {
+  justify-self: end;
+  align-self: start;
+}
+
+.mobile-filter-chips {
+  display: flex;
+  gap: var(--mobile-space-2);
+  overflow-x: auto;
+  padding-bottom: 2px;
+  -webkit-overflow-scrolling: touch;
+}
+
+.mobile-filter-chips button {
+  flex: 0 0 auto;
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--mobile-color-line-strong);
+  border-radius: var(--mobile-radius-pill);
+  background: var(--mobile-color-surface);
+  color: var(--mobile-color-ink);
+  font-size: var(--mobile-font-label);
+  font-weight: var(--mobile-weight-semibold);
+  white-space: nowrap;
+}
+
+.mobile-filter-chips button.active,
+.mobile-filter-chips button[aria-pressed="true"] {
+  border-color: rgba(11, 107, 83, 0.28);
+  background: var(--mobile-color-primary-soft);
+  color: var(--mobile-color-primary);
+  box-shadow: 0 4px 12px rgba(11, 107, 83, 0.08);
+}
+
+.mobile-section-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--mobile-space-3);
+  margin: var(--mobile-space-5) 0 var(--mobile-space-3);
+}
+
+.mobile-section-title h2 {
+  margin: 0;
+  color: var(--mobile-color-ink);
+  font-size: var(--mobile-font-section);
+  line-height: var(--mobile-line-section);
+  font-weight: var(--mobile-weight-bold);
+}
+
+.mobile-section-title span,
+.mobile-section-title small {
+  color: var(--mobile-color-muted);
+  font-size: var(--mobile-font-label);
+  font-weight: var(--mobile-weight-medium);
+}
+
+.mobile-metric-value {
+  color: var(--mobile-color-ink);
+  font-size: var(--mobile-font-metric);
+  line-height: var(--mobile-line-metric);
+  font-weight: var(--mobile-weight-bold);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------------------------------------------------------------------------
+   Legacy glass class aliases — polished opaque surfaces, never visual noise
+--------------------------------------------------------------------------- */
+.glass-card,
+.glass-panel,
+.glass-action {
+  border: 1px solid rgba(203, 211, 206, 0.82);
+  background: var(--mobile-color-surface);
+  box-shadow: var(--mobile-shadow-card);
+}
+
+@keyframes mobile-surface-enter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+    filter: blur(3px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    filter: blur(0);
+  }
+}
+
+@keyframes mobile-topbar-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+    filter: blur(2px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    filter: blur(0);
+  }
+}
+
+@keyframes mobile-sheet-enter {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.99);
+    filter: blur(3px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+  }
+}
+
+@keyframes mobile-skeleton-scan {
+  from {
+    transform: translateX(-110%);
+  }
+
+  to {
+    transform: translateX(110%);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .mobile-system-page :where(.mobile-system-panel, .mobile-data-state) {
+    animation: mobile-surface-enter var(--mobile-duration-slow) var(--mobile-ease-spring) both;
+  }
+
+  .mobile-system-page .mobile-system-topbar {
+    animation: mobile-topbar-enter var(--mobile-duration) var(--mobile-ease-spring) both;
+  }
+
+  .mobile-system-sheet {
+    animation: mobile-sheet-enter var(--mobile-duration-slow) var(--mobile-ease-spring) both;
+    transform-origin: bottom center;
+  }
+
+  .mobile-data-state__skeleton span::after {
+    animation: mobile-skeleton-scan 1.35s linear infinite;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Focus, reduced motion, forced colors
+--------------------------------------------------------------------------- */
+:where(
+  .mobile-system-page,
+  .mobile-system-sheet,
+  .mobile-system-bottom-nav,
+  .mobile-bottom-action-bar
+) :where(button, a, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--mobile-color-primary);
+  outline-offset: 2px;
+  box-shadow: var(--mobile-focus-ring);
+}
+
+body.mobile-overlay-open .mobile-system-bottom-nav,
+body.mobile-overlay-open .mobile-bottom-action-bar {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+body.mobile-task-mode .mobile-system-bottom-nav,
+html body.mobile-task-mode .mobile-system-page .mobile-system-bottom-nav {
+  display: none;
+}
+
+@media (max-width: 360px) {
+  :root {
+    --mobile-space-4: 14px;
+    --mobile-space-5: 18px;
+    --mobile-space-6: 20px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mobile-system-page *,
+  .mobile-system-page *::before,
+  .mobile-system-page *::after,
+  .mobile-system-sheet *,
+  .mobile-system-sheet *::before,
+  .mobile-system-sheet *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+
+  .mobile-data-state__skeleton span::after {
+    animation: none !important;
+    opacity: 0.35;
+    transform: translateX(0);
+  }
+}
+
+@media (forced-colors: active) {
+  .mobile-button,
+  .mobile-system-control,
+  .mobile-state,
+  .mobile-data-state,
+  .mobile-status-chip {
+    border: 1px solid ButtonText;
+  }
+
+  :where(.mobile-system-page, .mobile-system-sheet)
+    :where(button, input, select, textarea):focus-visible {
+    outline: 2px solid Highlight;
+  }
+}

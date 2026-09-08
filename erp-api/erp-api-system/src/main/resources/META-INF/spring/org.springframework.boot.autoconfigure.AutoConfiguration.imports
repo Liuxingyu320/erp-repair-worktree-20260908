@@ -1,0 +1,3 @@
+com.erp.system.api.factory.RemoteUserFallbackFactory
+com.erp.system.api.factory.RemoteLogFallbackFactory
+com.erp.system.api.factory.RemoteFileFallbackFactory

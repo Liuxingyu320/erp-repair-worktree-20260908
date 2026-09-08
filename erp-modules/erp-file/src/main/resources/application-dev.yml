@@ -1,0 +1,50 @@
+file:
+  path: ./uploadPath
+  prefix: /file
+  domain: http://localhost:8080
+
+referer:
+  enabled: false
+  allowed-domains: 127.0.0.1,localhost
+
+minio:
+  enabled: ${MINIO_ENABLED:false}
+  url: ${MINIO_ENDPOINT:http://127.0.0.1:9000}
+  accessKey: ${MINIO_ACCESS_KEY:}
+  secretKey: ${MINIO_SECRET_KEY:}
+  bucketName: erp
+
+spring:
+  servlet:
+    multipart:
+      max-file-size: ${DRIVE_MAX_FILE_SIZE:104857600}
+      max-request-size: ${DRIVE_MAX_REQUEST_SIZE:115343360}
+  datasource:
+    dynamic:
+      datasource:
+        master:
+          driver-class-name: com.mysql.cj.jdbc.Driver
+          url: jdbc:mysql://127.0.0.1:3306/${MYSQL_DATABASE:BossERP_NEW}?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai
+          username: ${MYSQL_USERNAME:root}
+          password: ${MYSQL_PASSWORD:}
+
+drive:
+  enabled: ${DRIVE_ENABLED:false}
+  storage-type: ${DRIVE_STORAGE_TYPE:local}
+  local-path: ${DRIVE_LOCAL_PATH:./uploadPath/private/drive}
+  minio-bucket: ${DRIVE_MINIO_BUCKET:erp-drive-private}
+  max-file-size: ${DRIVE_MAX_FILE_SIZE:104857600}
+  personal-quota: ${DRIVE_PERSONAL_QUOTA:2147483648}
+  department-quota: ${DRIVE_DEPARTMENT_QUOTA:21474836480}
+  company-quota: ${DRIVE_COMPANY_QUOTA:107374182400}
+  quota-policy-enabled: ${DRIVE_QUOTA_POLICY_ENABLED:false}
+  organization-sync-enabled: ${DRIVE_ORGANIZATION_SYNC_ENABLED:false}
+  organization-sync-cron: ${DRIVE_ORGANIZATION_SYNC_CRON:0 */10 * * * *}
+  capacity-reservation-enabled: ${DRIVE_CAPACITY_RESERVATION_ENABLED:false}
+  upload-reservation-timeout-minutes: ${DRIVE_UPLOAD_RESERVATION_TIMEOUT_MINUTES:120}
+  upload-reservation-cleanup-cron: ${DRIVE_UPLOAD_RESERVATION_CLEANUP_CRON:0 */5 * * * *}
+  upload-reservation-cleanup-batch-size: ${DRIVE_UPLOAD_RESERVATION_CLEANUP_BATCH_SIZE:100}
+  trash-retention-days: ${DRIVE_TRASH_RETENTION_DAYS:30}
+  cleanup-cron: ${DRIVE_CLEANUP_CRON:0 30 2 * * *}
+  cleanup-zone: ${DRIVE_CLEANUP_ZONE:Asia/Shanghai}
+  health-cache-millis: ${DRIVE_HEALTH_CACHE_MILLIS:5000}

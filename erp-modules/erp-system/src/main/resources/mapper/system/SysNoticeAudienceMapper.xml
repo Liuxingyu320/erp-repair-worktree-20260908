@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.system.mapper.SysNoticeAudienceMapper">
+
+    <select id="selectByNoticeId" resultType="com.erp.system.domain.SysNoticeAudience">
+        select notice_id as noticeId, target_type as targetType, target_id as targetId,
+               include_children as includeChildren
+        from sys_notice_audience
+        where notice_id = #{noticeId}
+        order by target_type, target_id
+    </select>
+
+    <delete id="deleteByNoticeId">
+        delete from sys_notice_audience where notice_id = #{noticeId}
+    </delete>
+
+    <insert id="insertBatch">
+        insert into sys_notice_audience (notice_id, target_type, target_id, include_children)
+        values
+        <foreach collection="audiences" item="audience" separator=",">
+            (#{audience.noticeId}, #{audience.targetType}, #{audience.targetId}, #{audience.includeChildren})
+        </foreach>
+    </insert>
+
+    <select id="selectResolvedRecipients" resultType="com.erp.system.domain.vo.SysNoticeAudienceRecipientVo">
+        select distinct u.user_id as userId, u.dept_id as deptId,
+               coalesce(d.dept_name, '未分配组织') as deptName
+        from sys_user u
+        left join sys_dept d on d.dept_id = u.dept_id and d.del_flag = '0'
+        where u.del_flag = '0' and u.status = '0'
+          and (
+            <foreach collection="audiences" item="audience" separator=" or ">
+                <choose>
+                    <when test="audience.targetType == 'ALL'">
+                        1 = 1
+                    </when>
+                    <when test="audience.targetType == 'USER'">
+                        u.user_id = #{audience.targetId}
+                    </when>
+                    <when test="audience.targetType == 'ROLE'">
+                        exists (select 1 from sys_user_role ur
+                                where ur.user_id = u.user_id and ur.role_id = #{audience.targetId})
+                    </when>
+                    <when test="audience.targetType == 'DEPT' and audience.includeChildren">
+                        (u.dept_id = #{audience.targetId} or find_in_set(#{audience.targetId}, d.ancestors))
+                    </when>
+                    <otherwise>
+                        u.dept_id = #{audience.targetId}
+                    </otherwise>
+                </choose>
+            </foreach>
+          )
+        order by u.user_id
+    </select>
+
+    <select id="selectDepartmentOptions" resultType="com.erp.system.domain.vo.SysNoticeAudienceTargetVo">
+        select dept_id as id, dept_name as label,
+               concat('部门 / ', coalesce(dept_type, '未分类')) as description
+        from sys_dept
+        where del_flag = '0' and status = '0'
+        order by parent_id, order_num, dept_id
+    </select>
+
+    <select id="selectRoleOptions" resultType="com.erp.system.domain.vo.SysNoticeAudienceTargetVo">
+        select role_id as id, role_name as label, concat('角色 / ', role_key) as description
+        from sys_role
+        where del_flag = '0' and status = '0'
+        order by role_sort, role_id
+    </select>
+
+    <select id="selectUserOptions" resultType="com.erp.system.domain.vo.SysNoticeAudienceTargetVo">
+        select u.user_id as id, u.nick_name as label,
+               concat(coalesce(d.dept_name, '未分配组织'), ' / ', u.user_name) as description
+        from sys_user u
+        left join sys_dept d on d.dept_id = u.dept_id and d.del_flag = '0'
+        where u.del_flag = '0' and u.status = '0'
+        <if test="keyword != null and keyword != ''">
+            and (u.user_name like concat('%', #{keyword}, '%')
+                 or u.nick_name like concat('%', #{keyword}, '%')
+                 or d.dept_name like concat('%', #{keyword}, '%'))
+        </if>
+        order by u.user_id
+        limit #{limit}
+    </select>
+</mapper>

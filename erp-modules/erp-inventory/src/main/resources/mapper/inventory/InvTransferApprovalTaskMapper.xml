@@ -1,0 +1,171 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.inventory.mapper.InvTransferApprovalTaskMapper">
+
+    <resultMap type="InvTransferApprovalTask" id="InvTransferApprovalTaskResult">
+        <id property="taskId" column="task_id"/>
+        <result property="instanceId" column="instance_id"/>
+        <result property="transferId" column="transfer_id"/>
+        <result property="nodeOrder" column="node_order"/>
+        <result property="nodeName" column="node_name"/>
+        <result property="postId" column="post_id"/>
+        <result property="postCode" column="post_code"/>
+        <result property="postName" column="post_name"/>
+        <result property="candidateUserIds" column="candidate_user_ids"/>
+        <result property="candidateUserNames" column="candidate_user_names"/>
+        <result property="status" column="status"/>
+        <result property="approverId" column="approver_id"/>
+        <result property="approverName" column="approver_name"/>
+        <result property="approveTime" column="approve_time"/>
+        <result property="comment" column="comment"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateBy" column="update_by"/>
+        <result property="updateTime" column="update_time"/>
+        <result property="remark" column="remark"/>
+    </resultMap>
+
+    <insert id="insertTask" parameterType="InvTransferApprovalTask" useGeneratedKeys="true" keyProperty="taskId">
+        insert into inv_transfer_approval_task (
+            instance_id, transfer_id, node_order, node_name, post_id,
+            post_code, post_name, candidate_user_ids, candidate_user_names,
+            status, create_by, create_time, remark
+        ) values (
+            #{instanceId}, #{transferId}, #{nodeOrder}, #{nodeName}, #{postId},
+            #{postCode}, #{postName}, #{candidateUserIds}, #{candidateUserNames},
+            #{status}, #{createBy}, sysdate(), #{remark}
+        )
+    </insert>
+
+    <select id="selectTaskByIdForUpdate" parameterType="Long" resultMap="InvTransferApprovalTaskResult">
+        select task_id, instance_id, transfer_id, node_order, node_name, post_id,
+               post_code, post_name, candidate_user_ids, candidate_user_names,
+               status, approver_id, approver_name, approve_time, comment,
+               create_by, create_time, update_by, update_time, remark
+        from inv_transfer_approval_task
+        where task_id = #{taskId}
+        for update
+    </select>
+
+    <select id="selectPendingTasksByInstanceAndNodeForUpdate" resultMap="InvTransferApprovalTaskResult">
+        select task_id, instance_id, transfer_id, node_order, node_name, post_id,
+               post_code, post_name, candidate_user_ids, candidate_user_names,
+               status, approver_id, approver_name, approve_time, comment,
+               create_by, create_time, update_by, update_time, remark
+        from inv_transfer_approval_task
+        where instance_id = #{instanceId}
+          and node_order = #{nodeOrder}
+          and status = 'pending'
+        order by task_id asc
+        for update
+    </select>
+
+    <select id="selectTasksByInstanceAndNode" resultMap="InvTransferApprovalTaskResult">
+        select task_id, instance_id, transfer_id, node_order, node_name, post_id,
+               post_code, post_name, candidate_user_ids, candidate_user_names,
+               status, approver_id, approver_name, approve_time, comment,
+               create_by, create_time, update_by, update_time, remark
+        from inv_transfer_approval_task
+        where instance_id = #{instanceId}
+          and node_order = #{nodeOrder}
+        order by task_id asc
+    </select>
+
+    <select id="selectTasksByInstanceId" parameterType="Long" resultMap="InvTransferApprovalTaskResult">
+        select task_id, instance_id, transfer_id, node_order, node_name, post_id,
+               post_code, post_name, candidate_user_ids, candidate_user_names,
+               status, approver_id, approver_name, approve_time, comment,
+               create_by, create_time, update_by, update_time, remark
+        from inv_transfer_approval_task
+        where instance_id = #{instanceId}
+        order by node_order asc, task_id asc
+    </select>
+
+    <select id="selectTasksByInstanceIds" resultMap="InvTransferApprovalTaskResult">
+        select task_id, instance_id, transfer_id, node_order, node_name, post_id,
+               post_code, post_name, candidate_user_ids, candidate_user_names,
+               status, approver_id, approver_name, approve_time, comment,
+               create_by, create_time, update_by, update_time, remark
+        from inv_transfer_approval_task
+        where instance_id in
+        <foreach collection="instanceIds" item="instanceId" open="(" separator="," close=")">
+            #{instanceId}
+        </foreach>
+        order by instance_id asc, node_order asc, task_id asc
+    </select>
+
+    <select id="selectApprovalSummariesByTransferIds"
+            resultType="com.erp.inventory.domain.vo.InvTransferApprovalSummary">
+        select o.transfer_id as transferId,
+               case
+                   when o.status = 'cancelled' then 'cancelled'
+                   when o.status = 'draft' and i.status = 'closed' then 'not_started'
+                   when i.status = 'running' then 'in_progress'
+                   when i.status = 'rejected' then 'rejected'
+                   when i.status = 'approved' then 'approved'
+                   when i.status = 'closed' then 'cancelled'
+                   when i.instance_id is null and o.status = 'draft' then 'not_started'
+                   when i.instance_id is null then 'partial'
+                   else 'not_started'
+               end as state,
+               (select count(1)
+                  from inv_transfer_approval_instance ri
+                 where ri.transfer_id = o.transfer_id
+                   and ri.instance_id &lt;= i.instance_id) as roundNo,
+               i.current_node_order as currentNodeOrder,
+               t.node_name as currentNodeName,
+               t.candidate_user_ids as candidateUserIds,
+               t.candidate_user_names as candidateUserNames,
+               (select count(distinct all_task.node_order)
+                  from inv_transfer_approval_task all_task
+                 where all_task.instance_id = i.instance_id) as totalNodeCount,
+               (select count(distinct done_task.node_order)
+                  from inv_transfer_approval_task done_task
+                 where done_task.instance_id = i.instance_id
+                   and done_task.status = 'approved') as completedNodeCount
+        from inv_transfer_order o
+        left join inv_transfer_approval_instance i
+          on i.instance_id = coalesce(
+              o.approval_instance_id,
+              (select max(fallback_i.instance_id)
+                 from inv_transfer_approval_instance fallback_i
+                where fallback_i.transfer_id = o.transfer_id)
+          )
+         and i.transfer_id = o.transfer_id
+        left join inv_transfer_approval_task t
+          on t.instance_id = i.instance_id
+         and t.transfer_id = o.transfer_id
+         and t.node_order = i.current_node_order
+        where o.transfer_id in
+        <foreach collection="transferIds" item="transferId" open="(" separator="," close=")">
+            #{transferId}
+        </foreach>
+          and coalesce(o.approval_engine, 'LEGACY') = 'LEGACY'
+        order by o.transfer_id asc
+    </select>
+
+    <update id="skipPendingTasksByTransferId">
+        update inv_transfer_approval_task
+        set status = 'skipped',
+            update_by = #{updateBy},
+            update_time = sysdate(),
+            remark = left(concat_ws(
+                '；', nullif(trim(remark), ''), #{reason}
+            ), 500)
+        where transfer_id = #{transferId}
+          and status = 'pending'
+    </update>
+
+    <update id="updateTaskApproval" parameterType="InvTransferApprovalTask">
+        update inv_transfer_approval_task
+        set status = #{status},
+            approver_id = #{approverId},
+            approver_name = #{approverName},
+            approve_time = #{approveTime},
+            comment = #{comment},
+            update_by = #{updateBy},
+            update_time = sysdate()
+        where task_id = #{taskId}
+    </update>
+
+</mapper>

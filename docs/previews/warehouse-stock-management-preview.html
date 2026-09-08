@@ -1,0 +1,1340 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>仓库管理 - 库存管理预览</title>
+  <style>
+    :root {
+      --bg: #f8fafc;
+      --sidebar: #0f172a;
+      --sidebar-2: #111827;
+      --nav: #172033;
+      --text: #0f172a;
+      --muted: #64748b;
+      --subtle: #94a3b8;
+      --line: #e2e8f0;
+      --line-soft: #eef2f7;
+      --surface: #ffffff;
+      --surface-soft: #f8fafc;
+      --primary: #4f46e5;
+      --primary-soft: #eef2ff;
+      --green: #16a34a;
+      --green-soft: #dcfce7;
+      --amber: #d97706;
+      --amber-soft: #fef3c7;
+      --red: #dc2626;
+      --red-soft: #fee2e2;
+      --cyan: #0891b2;
+      --cyan-soft: #cffafe;
+      --radius: 14px;
+      --shadow: 0 8px 22px rgba(15, 23, 42, 0.06);
+      --font: Inter, "PingFang SC", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      min-height: 100%;
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font);
+      font-size: 14px;
+      -webkit-font-smoothing: antialiased;
+      text-rendering: optimizeLegibility;
+    }
+
+    button,
+    input,
+    select {
+      font: inherit;
+    }
+
+    button {
+      cursor: pointer;
+    }
+
+    .shell {
+      min-height: 100vh;
+      display: grid;
+      grid-template-columns: 200px minmax(0, 1fr);
+    }
+
+    .sidebar {
+      background: var(--sidebar);
+      color: #cbd5e1;
+      padding: 0 10px 18px;
+    }
+
+    .logo {
+      height: 54px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 0 8px;
+      color: #ffffff;
+      font-weight: 700;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .logo-mark {
+      width: 30px;
+      height: 30px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 7px;
+      background: #61dafb;
+      color: #172033;
+      font-size: 12px;
+      font-weight: 800;
+      flex: 0 0 auto;
+    }
+
+    .menu {
+      padding: 10px 0 0;
+    }
+
+    .menu-section {
+      margin-top: 8px;
+    }
+
+    .menu-title,
+    .menu-item {
+      min-height: 40px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 0 10px;
+      border-radius: 10px;
+      color: #cbd5e1;
+      white-space: nowrap;
+    }
+
+    .menu-title {
+      color: #ffffff;
+      background: rgba(148, 163, 184, 0.12);
+      font-weight: 700;
+    }
+
+    .menu-item {
+      margin: 4px 0 0 18px;
+      font-size: 13px;
+    }
+
+    .menu-item.active {
+      color: #ffffff;
+      background: rgba(79, 70, 229, 0.94);
+      box-shadow: inset 3px 0 0 #61dafb;
+    }
+
+    .menu-icon {
+      width: 16px;
+      height: 16px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      color: currentColor;
+      stroke: currentColor;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      fill: none;
+      flex: 0 0 auto;
+    }
+
+    .main {
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .topbar {
+      min-height: 96px;
+      background: #ffffff;
+      box-shadow: 0 2px 10px rgba(15, 23, 42, 0.05);
+      z-index: 1;
+    }
+
+    .toolbar {
+      height: 54px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+      padding: 0 18px;
+      color: #ffffff;
+      background: var(--nav);
+    }
+
+    .brand-line {
+      min-width: 0;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .hamburger {
+      display: none;
+      width: 34px;
+      height: 34px;
+      align-items: center;
+      justify-content: center;
+      border: 0;
+      border-radius: 10px;
+      color: #ffffff;
+      background: rgba(255, 255, 255, 0.08);
+    }
+
+    .crumb {
+      color: rgba(219, 234, 254, 0.78);
+      font-size: 13px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .toolbar-right {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex: 0 0 auto;
+    }
+
+    .shop-chip,
+    .user-chip {
+      height: 34px;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 0 10px;
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.08);
+      color: #e2e8f0;
+      white-space: nowrap;
+    }
+
+    .top-menu {
+      height: 42px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 0 18px;
+      border-bottom: 1px solid var(--line-soft);
+      overflow-x: auto;
+    }
+
+    .top-menu span {
+      height: 30px;
+      display: inline-flex;
+      align-items: center;
+      padding: 0 12px;
+      border-radius: 10px;
+      color: #475569;
+      font-size: 13px;
+      white-space: nowrap;
+    }
+
+    .top-menu span.active {
+      color: var(--primary);
+      background: var(--primary-soft);
+      font-weight: 700;
+    }
+
+    .app-container {
+      padding: 16px 20px 24px;
+    }
+
+    .page-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 12px;
+    }
+
+    .title-wrap {
+      min-width: 0;
+    }
+
+    .page-title {
+      margin: 0;
+      font-size: 20px;
+      line-height: 28px;
+      font-weight: 700;
+      letter-spacing: 0;
+    }
+
+    .page-meta {
+      margin-top: 4px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 20px;
+    }
+
+    .head-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    .metric {
+      min-height: 112px;
+      padding: 14px 16px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .metric-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .metric-label {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 20px;
+      font-weight: 700;
+    }
+
+    .metric-icon {
+      width: 34px;
+      height: 34px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 10px;
+      flex: 0 0 auto;
+    }
+
+    .metric-icon.primary {
+      color: var(--primary);
+      background: var(--primary-soft);
+    }
+
+    .metric-icon.green {
+      color: var(--green);
+      background: var(--green-soft);
+    }
+
+    .metric-icon.amber {
+      color: var(--amber);
+      background: var(--amber-soft);
+    }
+
+    .metric-icon.cyan {
+      color: var(--cyan);
+      background: var(--cyan-soft);
+    }
+
+    .metric-value {
+      margin-top: 12px;
+      display: flex;
+      align-items: baseline;
+      gap: 6px;
+      font-size: 26px;
+      line-height: 32px;
+      font-weight: 800;
+      color: #0f172a;
+      letter-spacing: 0;
+    }
+
+    .metric-unit {
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 500;
+    }
+
+    .metric-foot {
+      margin-top: 8px;
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 18px;
+    }
+
+    .section-grid {
+      display: grid;
+      grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    .panel {
+      padding: 15px 16px;
+    }
+
+    .panel-title {
+      margin: 0 0 12px;
+      font-size: 15px;
+      line-height: 22px;
+      font-weight: 700;
+    }
+
+    .shop-list {
+      display: grid;
+      gap: 9px;
+    }
+
+    .shop-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 12px;
+      align-items: center;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--line-soft);
+    }
+
+    .shop-row:last-child {
+      border-bottom: 0;
+    }
+
+    .shop-name {
+      min-width: 0;
+      font-weight: 700;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .shop-sub {
+      margin-top: 3px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 18px;
+    }
+
+    .shop-qty {
+      text-align: right;
+      font-weight: 800;
+      color: #0f172a;
+      white-space: nowrap;
+    }
+
+    .bar {
+      height: 6px;
+      margin-top: 8px;
+      overflow: hidden;
+      border-radius: 999px;
+      background: #e5e7eb;
+    }
+
+    .bar i {
+      display: block;
+      height: 100%;
+      border-radius: inherit;
+      background: var(--primary);
+    }
+
+    .insight-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .insight {
+      min-height: 104px;
+      padding: 12px 14px;
+      border: 1px solid var(--line-soft);
+      border-radius: 12px;
+      background: var(--surface-soft);
+    }
+
+    .insight h3 {
+      margin: 0;
+      color: #334155;
+      font-size: 13px;
+      line-height: 20px;
+    }
+
+    .insight strong {
+      display: block;
+      margin-top: 10px;
+      font-size: 22px;
+      line-height: 28px;
+      letter-spacing: 0;
+    }
+
+    .insight p {
+      margin: 6px 0 0;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 18px;
+    }
+
+    .search-card {
+      padding: 14px 16px;
+      margin-bottom: 12px;
+    }
+
+    .filter-form {
+      display: flex;
+      align-items: flex-end;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .field {
+      display: grid;
+      gap: 6px;
+    }
+
+    .field label {
+      color: #334155;
+      font-size: 13px;
+      line-height: 18px;
+      font-weight: 700;
+    }
+
+    .control {
+      width: 100%;
+      height: 34px;
+      border: 1px solid #cbd5e1;
+      border-radius: 10px;
+      background: #ffffff;
+      color: #0f172a;
+      padding: 0 11px;
+      outline: none;
+    }
+
+    .control:focus {
+      border-color: #6366f1;
+      box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.12);
+    }
+
+    .field.product {
+      width: 220px;
+    }
+
+    .field.shop {
+      width: 150px;
+    }
+
+    .field.warehouse,
+    .field.status {
+      width: 170px;
+    }
+
+    .button-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      height: 32px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 0 11px;
+      border: 1px solid #cbd5e1;
+      border-radius: 10px;
+      background: #ffffff;
+      color: #334155;
+      font-size: 12px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .btn.primary {
+      border-color: var(--primary);
+      background: var(--primary);
+      color: #ffffff;
+    }
+
+    .btn.text {
+      border-color: transparent;
+      background: transparent;
+      color: var(--primary);
+      padding: 0 4px;
+    }
+
+    .btn:focus-visible,
+    .tab:focus-visible {
+      outline: 3px solid rgba(99, 102, 241, 0.26);
+      outline-offset: 2px;
+    }
+
+    .table-card {
+      overflow: hidden;
+    }
+
+    .table-toolbar {
+      min-height: 54px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--line-soft);
+    }
+
+    .tabs {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      overflow-x: auto;
+    }
+
+    .tab {
+      height: 30px;
+      border: 1px solid transparent;
+      border-radius: 10px;
+      background: transparent;
+      color: #475569;
+      padding: 0 10px;
+      font-size: 13px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .tab.active {
+      color: var(--primary);
+      border-color: #c7d2fe;
+      background: var(--primary-soft);
+    }
+
+    .table-meta {
+      color: var(--muted);
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    .table-wrap {
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      min-width: 1120px;
+      border-collapse: collapse;
+    }
+
+    th,
+    td {
+      border-bottom: 1px solid var(--line-soft);
+      padding: 11px 12px;
+      text-align: left;
+      vertical-align: middle;
+      font-size: 13px;
+      line-height: 18px;
+      white-space: nowrap;
+    }
+
+    th {
+      height: 40px;
+      background: #f8fafc;
+      color: #334155;
+      font-weight: 700;
+    }
+
+    tbody tr:hover {
+      background: #fbfdff;
+    }
+
+    .number {
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .strong {
+      font-weight: 800;
+    }
+
+    .danger {
+      color: var(--red);
+      font-weight: 800;
+    }
+
+    .warning {
+      color: var(--amber);
+      font-weight: 800;
+    }
+
+    .success {
+      color: var(--green);
+      font-weight: 800;
+    }
+
+    .muted {
+      color: var(--muted);
+    }
+
+    .tag {
+      min-height: 24px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0 8px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .tag.mine {
+      color: var(--primary);
+      background: var(--primary-soft);
+    }
+
+    .tag.other {
+      color: var(--cyan);
+      background: var(--cyan-soft);
+    }
+
+    .tag.warn {
+      color: var(--amber);
+      background: var(--amber-soft);
+    }
+
+    .tag.empty {
+      color: var(--red);
+      background: var(--red-soft);
+    }
+
+    .pagination {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 8px;
+      padding: 14px 16px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .page-btn {
+      min-width: 30px;
+      height: 30px;
+      border: 1px solid var(--line);
+      border-radius: 9px;
+      background: #ffffff;
+      color: #475569;
+      font-weight: 700;
+    }
+
+    .page-btn.active {
+      border-color: var(--primary);
+      background: var(--primary);
+      color: #ffffff;
+    }
+
+    .empty-state {
+      display: none;
+      padding: 36px 16px;
+      color: var(--muted);
+      text-align: center;
+      border-bottom: 1px solid var(--line-soft);
+    }
+
+    .icon {
+      width: 14px;
+      height: 14px;
+      display: inline-block;
+      flex: 0 0 auto;
+      stroke: currentColor;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      fill: none;
+    }
+
+    @media (max-width: 1180px) {
+      .summary-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .section-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 820px) {
+      .shell {
+        grid-template-columns: 1fr;
+      }
+
+      .sidebar {
+        display: none;
+      }
+
+      .hamburger {
+        display: inline-flex;
+      }
+
+      .toolbar {
+        padding: 0 12px;
+      }
+
+      .crumb {
+        display: none;
+      }
+
+      .shop-chip {
+        max-width: 150px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .top-menu {
+        padding: 0 12px;
+      }
+
+      .app-container {
+        padding: 12px;
+      }
+
+      .page-head {
+        display: block;
+      }
+
+      .head-actions {
+        justify-content: flex-start;
+        margin-top: 10px;
+      }
+
+      .summary-grid,
+      .insight-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .filter-form {
+        align-items: stretch;
+      }
+
+      .field,
+      .field.product,
+      .field.shop,
+      .field.warehouse,
+      .field.status {
+        width: 100%;
+      }
+
+      .button-row {
+        width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <aside class="sidebar">
+      <div class="logo">
+        <span class="logo-mark">ERP</span>
+        <span>企业资源管理系统</span>
+      </div>
+      <nav class="menu" aria-label="主菜单">
+        <div class="menu-section">
+          <div class="menu-title">
+            <svg class="menu-icon" viewBox="0 0 24 24"><path d="M3 7h18M5 7v12h14V7M8 7V5h8v2"></path></svg>
+            仓库管理
+          </div>
+          <div class="menu-item">
+            <svg class="menu-icon" viewBox="0 0 24 24"><path d="M4 10l8-5 8 5v9H4z"></path><path d="M9 19v-6h6v6"></path></svg>
+            仓库档案
+          </div>
+          <div class="menu-item active">
+            <svg class="menu-icon" viewBox="0 0 24 24"><path d="M4 7h16v13H4z"></path><path d="M4 11h16M8 7V4h8v3"></path></svg>
+            库存管理
+          </div>
+          <div class="menu-item">
+            <svg class="menu-icon" viewBox="0 0 24 24"><path d="M7 7h10M7 12h10M7 17h6"></path></svg>
+            库存变动日志
+          </div>
+          <div class="menu-item">
+            <svg class="menu-icon" viewBox="0 0 24 24"><path d="M5 5h14v14H5z"></path><path d="M9 9h6M9 13h6M9 17h3"></path></svg>
+            库存盘点
+          </div>
+        </div>
+        <div class="menu-section">
+          <div class="menu-title">
+            <svg class="menu-icon" viewBox="0 0 24 24"><path d="M4 6h16v4H4zM4 14h16v4H4z"></path></svg>
+            进销存管理
+          </div>
+          <div class="menu-item">采购管理</div>
+          <div class="menu-item">销售管理</div>
+          <div class="menu-item">调拨管理</div>
+        </div>
+      </nav>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div class="toolbar">
+          <div class="brand-line">
+            <button class="hamburger" aria-label="展开菜单">
+              <svg class="icon" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"></path></svg>
+            </button>
+            <span class="crumb">仓库管理 / 库存管理</span>
+          </div>
+          <div class="toolbar-right">
+            <span class="shop-chip">
+              <svg class="icon" viewBox="0 0 24 24"><path d="M4 20V8l8-4 8 4v12"></path><path d="M9 20v-6h6v6"></path></svg>
+              华南中心仓
+            </span>
+            <span class="user-chip">
+              <svg class="icon" viewBox="0 0 24 24"><path d="M20 21a8 8 0 0 0-16 0"></path><circle cx="12" cy="7" r="4"></circle></svg>
+              仓库管理员
+            </span>
+          </div>
+        </div>
+        <div class="top-menu">
+          <span>首页</span>
+          <span>采购管理</span>
+          <span>销售管理</span>
+          <span class="active">仓库管理</span>
+          <span>系统管理</span>
+        </div>
+      </header>
+
+      <section class="app-container">
+        <div class="page-head">
+          <div class="title-wrap">
+            <h1 class="page-title">库存管理</h1>
+            <div class="page-meta">负责仓库：华南中心仓 #201，数据范围：本仓库存 + 授权店铺库存</div>
+          </div>
+          <div class="head-actions">
+            <button class="btn primary">
+              <svg class="icon" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><path d="M7 10l5 5 5-5"></path><path d="M12 15V3"></path></svg>
+              导出
+            </button>
+            <button class="btn">
+              <svg class="icon" viewBox="0 0 24 24"><path d="M4 4v6h6"></path><path d="M20 20v-6h-6"></path><path d="M20 9A8 8 0 0 0 6 5.3L4 10"></path><path d="M4 15a8 8 0 0 0 14 3.7L20 14"></path></svg>
+              刷新
+            </button>
+          </div>
+        </div>
+
+        <div class="summary-grid">
+          <article class="card metric">
+            <div class="metric-top">
+              <span class="metric-label">我的仓库存量</span>
+              <span class="metric-icon primary">
+                <svg class="icon" viewBox="0 0 24 24"><path d="M4 7h16v13H4z"></path><path d="M8 7V4h8v3"></path></svg>
+              </span>
+            </div>
+            <div class="metric-value">1,286 <span class="metric-unit">件</span></div>
+            <div class="metric-foot"><span>可用 1,116</span><span>锁定 170</span></div>
+          </article>
+          <article class="card metric">
+            <div class="metric-top">
+              <span class="metric-label">其他店铺库存</span>
+              <span class="metric-icon cyan">
+                <svg class="icon" viewBox="0 0 24 24"><path d="M3 21h18"></path><path d="M5 21V7l7-4 7 4v14"></path><path d="M9 21v-7h6v7"></path></svg>
+              </span>
+            </div>
+            <div class="metric-value">2,000 <span class="metric-unit">件</span></div>
+            <div class="metric-foot"><span>覆盖 6 个店铺</span><span>预警 4 项</span></div>
+          </article>
+          <article class="card metric">
+            <div class="metric-top">
+              <span class="metric-label">可用库存</span>
+              <span class="metric-icon green">
+                <svg class="icon" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"></path></svg>
+              </span>
+            </div>
+            <div class="metric-value">3,018 <span class="metric-unit">件</span></div>
+            <div class="metric-foot"><span>全范围汇总</span><span class="success">92%</span></div>
+          </article>
+          <article class="card metric">
+            <div class="metric-top">
+              <span class="metric-label">低库存预警</span>
+              <span class="metric-icon amber">
+                <svg class="icon" viewBox="0 0 24 24"><path d="M12 9v4"></path><path d="M12 17h.01"></path><path d="M10.3 3.9 2.8 17a2 2 0 0 0 1.7 3h15a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"></path></svg>
+              </span>
+            </div>
+            <div class="metric-value">7 <span class="metric-unit">项</span></div>
+            <div class="metric-foot"><span>缺货 2 项</span><span>低于安全量 5 项</span></div>
+          </article>
+        </div>
+
+        <div class="section-grid">
+          <article class="card panel">
+            <h2 class="panel-title">店铺库存汇总</h2>
+            <div class="shop-list">
+              <div class="shop-row">
+                <div>
+                  <div class="shop-name">华南中心仓</div>
+                  <div class="shop-sub">我的负责仓库 #201</div>
+                  <div class="bar"><i style="width: 72%"></i></div>
+                </div>
+                <div class="shop-qty">1,286</div>
+              </div>
+              <div class="shop-row">
+                <div>
+                  <div class="shop-name">总部店</div>
+                  <div class="shop-sub">店铺 #100</div>
+                  <div class="bar"><i style="width: 58%; background: var(--cyan)"></i></div>
+                </div>
+                <div class="shop-qty">1,030</div>
+              </div>
+              <div class="shop-row">
+                <div>
+                  <div class="shop-name">市场部门店</div>
+                  <div class="shop-sub">店铺 #108</div>
+                  <div class="bar"><i style="width: 18%; background: var(--amber)"></i></div>
+                </div>
+                <div class="shop-qty">324</div>
+              </div>
+              <div class="shop-row">
+                <div>
+                  <div class="shop-name">财务部门店</div>
+                  <div class="shop-sub">店铺 #109</div>
+                  <div class="bar"><i style="width: 8%; background: var(--red)"></i></div>
+                </div>
+                <div class="shop-qty">146</div>
+              </div>
+            </div>
+          </article>
+
+          <article class="card panel">
+            <h2 class="panel-title">库存风险概览</h2>
+            <div class="insight-grid">
+              <div class="insight">
+                <h3>锁定库存占比</h3>
+                <strong>8.1%</strong>
+                <p>调拨与销售出库占用为主</p>
+              </div>
+              <div class="insight">
+                <h3>跨店铺可调拨</h3>
+                <strong>518 件</strong>
+                <p>总部店与华南中心仓库存充足</p>
+              </div>
+              <div class="insight">
+                <h3>最近变动</h3>
+                <strong>24 笔</strong>
+                <p>采购入库 9 笔，调拨出库 7 笔</p>
+              </div>
+            </div>
+          </article>
+        </div>
+
+        <section class="card search-card">
+          <form class="filter-form" id="filterForm">
+            <div class="field product">
+              <label for="productSearch">商品</label>
+              <input id="productSearch" class="control" type="search" placeholder="搜索商品名称/编码">
+            </div>
+            <div class="field shop">
+              <label for="shopFilter">店铺</label>
+              <select id="shopFilter" class="control">
+                <option value="">全部店铺</option>
+                <option value="华南中心仓">华南中心仓</option>
+                <option value="总部店">总部店</option>
+                <option value="市场部门店">市场部门店</option>
+                <option value="财务部门店">财务部门店</option>
+              </select>
+            </div>
+            <div class="field warehouse">
+              <label for="warehouseFilter">仓库</label>
+              <select id="warehouseFilter" class="control">
+                <option value="">全部仓库</option>
+                <option value="华南中心仓">华南中心仓 #201</option>
+                <option value="总部前置仓">总部前置仓 #100</option>
+                <option value="市场临时仓">市场临时仓 #108</option>
+              </select>
+            </div>
+            <div class="field status">
+              <label for="statusFilter">库存状态</label>
+              <select id="statusFilter" class="control">
+                <option value="">全部状态</option>
+                <option value="正常">正常</option>
+                <option value="低库存">低库存</option>
+                <option value="缺货">缺货</option>
+              </select>
+            </div>
+            <div class="button-row">
+              <button class="btn primary" type="submit">
+                <svg class="icon" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg>
+                查询
+              </button>
+              <button class="btn" type="button" id="resetBtn">
+                <svg class="icon" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7"></path><path d="M3 4v6h6"></path></svg>
+                重置
+              </button>
+              <button class="btn" type="button">
+                <svg class="icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><path d="M14 2v6h6"></path><path d="M8 13h8M8 17h8M8 9h2"></path></svg>
+                变动日志
+              </button>
+            </div>
+          </form>
+        </section>
+
+        <section class="card table-card">
+          <div class="table-toolbar">
+            <div class="tabs" role="tablist" aria-label="库存范围">
+              <button class="tab active" type="button" data-scope="all">全部库存</button>
+              <button class="tab" type="button" data-scope="mine">我的仓库</button>
+              <button class="tab" type="button" data-scope="other">其他店铺</button>
+              <button class="tab" type="button" data-scope="warning">预警库存</button>
+            </div>
+            <div class="table-meta" id="tableMeta">共 8 条，已显示 8 条</div>
+          </div>
+          <div class="table-wrap">
+            <table aria-label="库存明细">
+              <thead>
+                <tr>
+                  <th>商品编码</th>
+                  <th>商品名称</th>
+                  <th>店铺</th>
+                  <th>仓库</th>
+                  <th>范围</th>
+                  <th class="number">当前库存</th>
+                  <th class="number">锁定库存</th>
+                  <th class="number">可用库存</th>
+                  <th class="number">成本价</th>
+                  <th class="number">库存总成本</th>
+                  <th>最后入库</th>
+                  <th>最后出库</th>
+                  <th>状态</th>
+                  <th>操作</th>
+                </tr>
+              </thead>
+              <tbody id="stockBody">
+                <tr data-scope="mine" data-status="正常" data-shop="华南中心仓" data-warehouse="华南中心仓" data-product="P-100 Phase6测试商品">
+                  <td>P-100</td>
+                  <td class="strong">Phase6测试商品</td>
+                  <td>华南中心仓</td>
+                  <td>华南中心仓 #201</td>
+                  <td><span class="tag mine">我的仓库</span></td>
+                  <td class="number strong">780</td>
+                  <td class="number">92</td>
+                  <td class="number success">688</td>
+                  <td class="number">20.00</td>
+                  <td class="number">15,600.00</td>
+                  <td>2026-06-04 09:20</td>
+                  <td>2026-06-04 15:42</td>
+                  <td><span class="tag mine">正常</span></td>
+                  <td><button class="btn text" type="button">查看</button></td>
+                </tr>
+                <tr data-scope="other" data-status="正常" data-shop="总部店" data-warehouse="总部前置仓" data-product="P-100 Phase6测试商品">
+                  <td>P-100</td>
+                  <td class="strong">Phase6测试商品</td>
+                  <td>总部店</td>
+                  <td>总部前置仓 #100</td>
+                  <td><span class="tag other">其他店铺</span></td>
+                  <td class="number strong">1,030</td>
+                  <td class="number">118</td>
+                  <td class="number success">912</td>
+                  <td class="number">20.00</td>
+                  <td class="number">20,600.00</td>
+                  <td>2026-06-04 11:12</td>
+                  <td>2026-06-04 16:03</td>
+                  <td><span class="tag mine">正常</span></td>
+                  <td><button class="btn text" type="button">查看</button></td>
+                </tr>
+                <tr data-scope="mine warning" data-status="低库存" data-shop="华南中心仓" data-warehouse="华南中心仓" data-product="P-201 1234567">
+                  <td>P-201</td>
+                  <td class="strong">1234567</td>
+                  <td>华南中心仓</td>
+                  <td>华南中心仓 #201</td>
+                  <td><span class="tag mine">我的仓库</span></td>
+                  <td class="number warning">18</td>
+                  <td class="number">3</td>
+                  <td class="number warning">15</td>
+                  <td class="number">0.00</td>
+                  <td class="number">0.00</td>
+                  <td>2026-06-03 18:09</td>
+                  <td>2026-06-04 13:31</td>
+                  <td><span class="tag warn">低库存</span></td>
+                  <td><button class="btn text" type="button">查看</button></td>
+                </tr>
+                <tr data-scope="other warning" data-status="缺货" data-shop="市场部门店" data-warehouse="市场临时仓" data-product="P-201 1234567">
+                  <td>P-201</td>
+                  <td class="strong">1234567</td>
+                  <td>市场部门店</td>
+                  <td>市场临时仓 #108</td>
+                  <td><span class="tag other">其他店铺</span></td>
+                  <td class="number danger">0</td>
+                  <td class="number">0</td>
+                  <td class="number danger">0</td>
+                  <td class="number">0.00</td>
+                  <td class="number">0.00</td>
+                  <td>-</td>
+                  <td>2026-06-04 10:18</td>
+                  <td><span class="tag empty">缺货</span></td>
+                  <td><button class="btn text" type="button">查看</button></td>
+                </tr>
+                <tr data-scope="other" data-status="正常" data-shop="财务部门店" data-warehouse="财务周转仓" data-product="P-301 门店调拨样品">
+                  <td>P-301</td>
+                  <td class="strong">门店调拨样品</td>
+                  <td>财务部门店</td>
+                  <td>财务周转仓 #109</td>
+                  <td><span class="tag other">其他店铺</span></td>
+                  <td class="number strong">146</td>
+                  <td class="number">9</td>
+                  <td class="number success">137</td>
+                  <td class="number">20.00</td>
+                  <td class="number">2,920.00</td>
+                  <td>2026-06-02 17:20</td>
+                  <td>2026-06-04 12:05</td>
+                  <td><span class="tag mine">正常</span></td>
+                  <td><button class="btn text" type="button">查看</button></td>
+                </tr>
+                <tr data-scope="mine" data-status="正常" data-shop="华南中心仓" data-warehouse="华南中心仓" data-product="P-401 采购质检合格品">
+                  <td>P-401</td>
+                  <td class="strong">采购质检合格品</td>
+                  <td>华南中心仓</td>
+                  <td>华南中心仓 #201</td>
+                  <td><span class="tag mine">我的仓库</span></td>
+                  <td class="number strong">488</td>
+                  <td class="number">75</td>
+                  <td class="number success">413</td>
+                  <td class="number">32.50</td>
+                  <td class="number">15,860.00</td>
+                  <td>2026-06-04 08:44</td>
+                  <td>2026-06-04 14:19</td>
+                  <td><span class="tag mine">正常</span></td>
+                  <td><button class="btn text" type="button">查看</button></td>
+                </tr>
+                <tr data-scope="other warning" data-status="低库存" data-shop="市场部门店" data-warehouse="市场临时仓" data-product="P-502 让步接收品">
+                  <td>P-502</td>
+                  <td class="strong">让步接收品</td>
+                  <td>市场部门店</td>
+                  <td>市场临时仓 #108</td>
+                  <td><span class="tag other">其他店铺</span></td>
+                  <td class="number warning">27</td>
+                  <td class="number">4</td>
+                  <td class="number warning">23</td>
+                  <td class="number">50.00</td>
+                  <td class="number">1,350.00</td>
+                  <td>2026-06-01 10:52</td>
+                  <td>2026-06-04 15:08</td>
+                  <td><span class="tag warn">低库存</span></td>
+                  <td><button class="btn text" type="button">查看</button></td>
+                </tr>
+                <tr data-scope="other" data-status="正常" data-shop="总部店" data-warehouse="总部前置仓" data-product="P-603 销售出库常用品">
+                  <td>P-603</td>
+                  <td class="strong">销售出库常用品</td>
+                  <td>总部店</td>
+                  <td>总部前置仓 #100</td>
+                  <td><span class="tag other">其他店铺</span></td>
+                  <td class="number strong">797</td>
+                  <td class="number">67</td>
+                  <td class="number success">730</td>
+                  <td class="number">18.80</td>
+                  <td class="number">14,983.60</td>
+                  <td>2026-06-04 10:10</td>
+                  <td>2026-06-04 17:18</td>
+                  <td><span class="tag mine">正常</span></td>
+                  <td><button class="btn text" type="button">查看</button></td>
+                </tr>
+              </tbody>
+            </table>
+            <div class="empty-state" id="emptyState">暂无匹配库存</div>
+          </div>
+          <div class="pagination">
+            <span>每页 10 条</span>
+            <button class="page-btn" type="button" aria-label="上一页">‹</button>
+            <button class="page-btn active" type="button">1</button>
+            <button class="page-btn" type="button" aria-label="下一页">›</button>
+          </div>
+        </section>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    const tabs = Array.from(document.querySelectorAll(".tab"));
+    const rows = Array.from(document.querySelectorAll("#stockBody tr"));
+    const meta = document.getElementById("tableMeta");
+    const emptyState = document.getElementById("emptyState");
+    const productSearch = document.getElementById("productSearch");
+    const shopFilter = document.getElementById("shopFilter");
+    const warehouseFilter = document.getElementById("warehouseFilter");
+    const statusFilter = document.getElementById("statusFilter");
+    const resetBtn = document.getElementById("resetBtn");
+    const filterForm = document.getElementById("filterForm");
+    let activeScope = "all";
+
+    function includesText(value, keyword) {
+      return String(value || "").toLowerCase().includes(String(keyword || "").toLowerCase());
+    }
+
+    function rowMatches(row) {
+      const scope = row.dataset.scope || "";
+      const status = row.dataset.status || "";
+      const shop = row.dataset.shop || "";
+      const warehouse = row.dataset.warehouse || "";
+      const product = row.dataset.product || "";
+      const keyword = productSearch.value.trim();
+
+      const scopeMatched = activeScope === "all" || scope.split(" ").includes(activeScope);
+      const productMatched = !keyword || includesText(product, keyword);
+      const shopMatched = !shopFilter.value || shop === shopFilter.value;
+      const warehouseMatched = !warehouseFilter.value || warehouse === warehouseFilter.value;
+      const statusMatched = !statusFilter.value || status === statusFilter.value;
+
+      return scopeMatched && productMatched && shopMatched && warehouseMatched && statusMatched;
+    }
+
+    function applyFilters() {
+      let visible = 0;
+      rows.forEach(row => {
+        const matched = rowMatches(row);
+        row.style.display = matched ? "" : "none";
+        if (matched) visible += 1;
+      });
+      meta.textContent = "共 " + rows.length + " 条，已显示 " + visible + " 条";
+      emptyState.style.display = visible === 0 ? "block" : "none";
+    }
+
+    tabs.forEach(tab => {
+      tab.addEventListener("click", () => {
+        tabs.forEach(item => item.classList.remove("active"));
+        tab.classList.add("active");
+        activeScope = tab.dataset.scope;
+        applyFilters();
+      });
+    });
+
+    [productSearch, shopFilter, warehouseFilter, statusFilter].forEach(control => {
+      control.addEventListener("input", applyFilters);
+      control.addEventListener("change", applyFilters);
+    });
+
+    filterForm.addEventListener("submit", event => {
+      event.preventDefault();
+      applyFilters();
+    });
+
+    resetBtn.addEventListener("click", () => {
+      productSearch.value = "";
+      shopFilter.value = "";
+      warehouseFilter.value = "";
+      statusFilter.value = "";
+      activeScope = "all";
+      tabs.forEach(item => item.classList.toggle("active", item.dataset.scope === "all"));
+      applyFilters();
+    });
+
+    applyFilters();
+  </script>
+</body>
+</html>

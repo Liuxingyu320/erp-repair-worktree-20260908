@@ -1,0 +1,165 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.inventory.mapper.InvDeptScopeMapper">
+
+    <select id="selectSubDeptIds" resultType="java.lang.Long">
+        select dept_id
+        from sys_dept
+        where dept_id = #{deptId}
+           or find_in_set(#{deptId}, ancestors)
+    </select>
+
+    <select id="selectRelatedDeptIds" resultType="java.lang.Long">
+        select d.dept_id
+        from sys_dept d
+             inner join sys_dept current_dept on current_dept.dept_id = #{deptId}
+        where d.dept_id = current_dept.dept_id
+           or find_in_set(#{deptId}, d.ancestors)
+           or find_in_set(d.dept_id, current_dept.ancestors)
+    </select>
+
+    <select id="selectActiveRelatedDeptIdsForReplenishment"
+            resultType="java.lang.Long">
+        select d.dept_id
+        from sys_dept current_dept
+             inner join sys_dept d on (
+                 d.dept_id = current_dept.dept_id
+                 or find_in_set(current_dept.dept_id, d.ancestors)
+                 or find_in_set(d.dept_id, current_dept.ancestors)
+             )
+        where current_dept.dept_id = #{deptId}
+          and current_dept.del_flag = '0'
+          and current_dept.status = '0'
+          and current_dept.dept_type = 'WAREHOUSE'
+          and d.del_flag = '0'
+          and d.status = '0'
+        order by d.dept_id
+    </select>
+
+    <select id="selectAncestorDeptIds" resultType="java.lang.Long">
+        select ancestor.dept_id
+        from sys_dept current_dept
+             inner join sys_dept ancestor on find_in_set(ancestor.dept_id, current_dept.ancestors)
+        where current_dept.dept_id = #{deptId}
+          and ancestor.dept_id &lt;&gt; 0
+          and ancestor.del_flag = '0'
+          and ancestor.status = '0'
+        order by find_in_set(ancestor.dept_id, current_dept.ancestors) desc
+    </select>
+
+    <!--
+      Keep this expression aligned with
+      SysDeptMapper.selectReplenishmentSourceWarehouseList and
+      InvTransferReservationMapper.selectWarehouseReplenishmentRouteForUpdate.
+      The raw first business-root id is returned even if that row is missing,
+      disabled or deleted; callers validate the root row separately.
+    -->
+    <select id="selectRawBusinessRootDeptId" resultType="java.lang.Long">
+        select cast(
+            case
+                when d.ancestors is null or d.ancestors = '' or d.ancestors = '0'
+                    then d.dept_id
+                when d.ancestors like '0,%'
+                    then substring_index(substring_index(d.ancestors, ',', 2), ',', -1)
+                else substring_index(d.ancestors, ',', 1)
+            end as unsigned
+        )
+        from sys_dept d
+        where d.dept_id = #{deptId}
+    </select>
+
+    <select id="selectUserStoreScopeDeptIds" resultType="java.lang.Long">
+        select d.dept_id
+        from sys_user_shop us
+             inner join sys_dept scope_dept on scope_dept.dept_id = us.dept_id
+             inner join sys_dept d on (
+                d.dept_id = scope_dept.dept_id
+                or find_in_set(scope_dept.dept_id, d.ancestors)
+             )
+        where us.user_id = #{userId}
+          and scope_dept.del_flag = '0'
+          and scope_dept.status = '0'
+          and scope_dept.dept_type in ('GROUP', 'COMPANY', 'STORE', 'WAREHOUSE')
+          and d.del_flag = '0'
+          and d.status = '0'
+          and d.dept_type = 'STORE'
+        group by d.dept_id, d.parent_id, d.order_num
+        order by d.parent_id, d.order_num, d.dept_id
+    </select>
+
+    <select id="selectAllStoreDeptIds" resultType="java.lang.Long">
+        select d.dept_id
+        from sys_dept d
+        where d.del_flag = '0'
+          and d.status = '0'
+          and d.dept_type = 'STORE'
+        order by d.parent_id, d.order_num, d.dept_id
+    </select>
+
+    <select id="selectUserAuthorizedInventoryDeptIds" resultType="java.lang.Long">
+        select distinct target_dept.dept_id
+        from sys_user_shop us
+             inner join sys_dept scope_dept on scope_dept.dept_id = us.dept_id
+             inner join sys_dept target_dept on (
+                 target_dept.dept_id = scope_dept.dept_id
+                 or find_in_set(scope_dept.dept_id, target_dept.ancestors)
+             )
+        where us.user_id = #{userId}
+          and scope_dept.del_flag = '0'
+          and scope_dept.status = '0'
+          and scope_dept.dept_type in ('GROUP', 'COMPANY', 'STORE', 'WAREHOUSE')
+          and target_dept.del_flag = '0'
+          and target_dept.status = '0'
+          and target_dept.dept_type in ('STORE', 'WAREHOUSE')
+        order by target_dept.dept_id
+    </select>
+
+    <select id="selectAllActiveInventoryDeptIds" resultType="java.lang.Long">
+        select dept_id
+        from sys_dept
+        where del_flag = '0'
+          and status = '0'
+          and dept_type in ('STORE', 'WAREHOUSE')
+        order by dept_id
+    </select>
+
+    <select id="countDeptInScope" resultType="int">
+        select count(1)
+        from sys_dept
+        where dept_id = #{targetDeptId}
+          and (dept_id = #{scopeDeptId} or find_in_set(#{scopeDeptId}, ancestors))
+    </select>
+
+    <select id="countUserShopScope" resultType="int">
+        select count(1)
+        from sys_user_shop us
+             inner join sys_dept scope_dept on scope_dept.dept_id = us.dept_id
+             inner join sys_dept target_dept on target_dept.dept_id = #{deptId}
+        where us.user_id = #{userId}
+          and scope_dept.del_flag = '0'
+          and scope_dept.status = '0'
+          and scope_dept.dept_type in ('GROUP', 'COMPANY', 'STORE', 'WAREHOUSE')
+          and target_dept.del_flag = '0'
+          and target_dept.status = '0'
+          and target_dept.dept_type in ('STORE', 'WAREHOUSE')
+          and (
+              target_dept.dept_id = scope_dept.dept_id
+              or find_in_set(scope_dept.dept_id, target_dept.ancestors)
+          )
+    </select>
+
+    <select id="selectDeptNameById" resultType="java.lang.String">
+        select dept_name
+        from sys_dept
+        where dept_id = #{deptId}
+    </select>
+
+    <select id="selectDeptTypeById" resultType="java.lang.String">
+        select dept_type
+        from sys_dept
+        where dept_id = #{deptId}
+          and del_flag = '0'
+          and status = '0'
+    </select>
+
+</mapper>

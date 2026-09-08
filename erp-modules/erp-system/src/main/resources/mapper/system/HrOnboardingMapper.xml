@@ -1,0 +1,591 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.system.mapper.HrOnboardingMapper">
+
+    <resultMap id="HrOnboardingResult" type="com.erp.system.domain.HrOnboarding">
+        <id property="onboardingId" column="onboarding_id" />
+        <result property="onboardingNo" column="onboarding_no" />
+        <result property="status" column="status" />
+        <result property="version" column="version" />
+        <result property="employeeName" column="employee_name" />
+        <result property="phoneNumber" column="phone_number" />
+        <result property="employeeNo" column="employee_no" />
+        <result property="targetDeptId" column="target_dept_id" />
+        <result property="targetStoreId" column="target_store_id" />
+        <result property="targetPostId" column="target_post_id" />
+        <result property="directSupervisorUserId" column="direct_supervisor_user_id" />
+        <result property="ownerUserId" column="owner_user_id" />
+        <result property="ownerName" column="owner_name" />
+        <result property="companyName" column="company_name" />
+        <result property="deptLevel1Name" column="dept_level1_name" />
+        <result property="deptLevel2Name" column="dept_level2_name" />
+        <result property="deptLevel3Name" column="dept_level3_name" />
+        <result property="storeName" column="store_name" />
+        <result property="positionName" column="position_name" />
+        <result property="departmentSupervisor" column="department_supervisor" />
+        <result property="jobGrade" column="job_grade" />
+        <result property="employeeCategory" column="employee_category" />
+        <result property="sex" column="sex" />
+        <result property="birthDate" column="birth_date" />
+        <result property="idType" column="id_type" />
+        <result property="idNumber" column="id_number" />
+        <result property="registeredResidence" column="registered_residence" />
+        <result property="currentAddress" column="current_address" />
+        <result property="maritalStatus" column="marital_status" />
+        <result property="ethnicity" column="ethnicity" />
+        <result property="emergencyContact" column="emergency_contact" />
+        <result property="emergencyContactRelation" column="emergency_contact_relation" />
+        <result property="emergencyContactPhone" column="emergency_contact_phone" />
+        <result property="expectedEntryDate" column="expected_entry_date" />
+        <result property="actualEntryDate" column="actual_entry_date" />
+        <result property="workLocation" column="work_location" />
+        <result property="workCityLevel" column="work_city_level" />
+        <result property="bankName" column="bank_name" />
+        <result property="bankAccount" column="bank_account" />
+        <result property="contractType" column="contract_type" />
+        <result property="socialType" column="social_type" />
+        <result property="probationPeriod" column="probation_period" />
+        <result property="legalEntity" column="legal_entity" />
+        <result property="sourceType" column="source_type" />
+        <result property="linkedUserId" column="linked_user_id" />
+        <result property="preferredConflictAction" column="preferred_conflict_action" />
+        <result property="preferredBindUserId" column="preferred_bind_user_id" />
+        <result property="accountConfigurationStatus" column="account_configuration_status" />
+        <result property="accountRiskCode" column="account_risk_code" />
+        <result property="cancelReason" column="cancel_reason" />
+        <result property="cancelledByUserId" column="cancelled_by_user_id" />
+        <result property="cancelledBy" column="cancelled_by" />
+        <result property="cancelledTime" column="cancelled_time" />
+        <result property="confirmedByUserId" column="confirmed_by_user_id" />
+        <result property="confirmedBy" column="confirmed_by" />
+        <result property="confirmedTime" column="confirmed_time" />
+        <result property="confirmIdempotencyKey" column="confirm_idempotency_key" />
+        <result property="createBy" column="create_by" />
+        <result property="createTime" column="create_time" />
+        <result property="updateBy" column="update_by" />
+        <result property="updateTime" column="update_time" />
+        <result property="remark" column="remark" />
+    </resultMap>
+
+    <resultMap id="HrOnboardingSummaryResult" type="com.erp.system.domain.vo.HrOnboardingSummaryVo">
+        <result property="todayArrivalCount" column="today_arrival_count" />
+        <result property="pendingConfirmCount" column="pending_confirm_count" />
+        <result property="accountConfigurationRiskCount" column="account_configuration_risk_count" />
+    </resultMap>
+
+    <resultMap id="HrOnboardingTodayTaskResult" type="com.erp.system.domain.HrOnboarding"
+            extends="HrOnboardingResult">
+        <result property="phoneNumberMasked" column="phone_number_masked" />
+        <result property="readinessMissingCount" column="readiness_missing_count" />
+        <result property="markReadyAllowed" column="mark_ready_allowed" />
+    </resultMap>
+
+    <resultMap id="ScopedUserOptionResult" type="com.erp.system.api.domain.SysUser">
+        <id property="userId" column="user_id" />
+        <result property="nickName" column="nick_name" />
+    </resultMap>
+
+    <resultMap id="ScopedOwnerOptionResult" type="com.erp.system.domain.vo.HrOnboardingOwnerOptionVo">
+        <id property="userId" column="user_id" />
+        <result property="label" column="label" />
+        <result property="deptId" column="dept_id" />
+        <result property="deptName" column="dept_name" />
+        <result property="deptPath" column="dept_path" />
+        <result property="employeeNo" column="employee_no" />
+        <result property="phoneMasked" column="phone_masked" />
+    </resultMap>
+
+    <select id="selectScopedUserOptions" parameterType="com.erp.system.api.domain.SysUser"
+            resultMap="ScopedUserOptionResult">
+        select u.user_id, u.nick_name
+        from sys_user u
+        join sys_dept d on d.dept_id = u.dept_id
+        <where>
+            and u.del_flag = '0'
+            and u.status = #{status}
+            ${params.dataScope}
+        </where>
+        order by u.nick_name asc, u.user_id asc
+    </select>
+
+    <select id="selectScopedOwnerOptions"
+            parameterType="com.erp.system.domain.vo.HrOnboardingOwnerQuery"
+            resultMap="ScopedOwnerOptionResult">
+        select u.user_id,
+               u.nick_name as label,
+               u.dept_id,
+               d.dept_name,
+               (
+                   select group_concat(path_dept.dept_name
+                           order by find_in_set(path_dept.dept_id, concat(d.ancestors, ',', d.dept_id))
+                           separator ' / ')
+                   from sys_dept path_dept
+                   where path_dept.del_flag = '0'
+                     and find_in_set(path_dept.dept_id, concat(d.ancestors, ',', d.dept_id))
+               ) as dept_path,
+               p.employee_no,
+               case
+                   when u.phonenumber is null or u.phonenumber = '' then null
+                   when char_length(u.phonenumber) &lt; 7 then '***'
+                   else concat(left(u.phonenumber, 3), '****', right(u.phonenumber, 4))
+               end as phone_masked
+        from sys_user u
+        join sys_dept d on d.dept_id = u.dept_id
+        left join sys_user_profile p on p.user_id = u.user_id
+        <where>
+            and u.del_flag = '0'
+            and u.status = '0'
+            and d.del_flag = '0'
+            and d.status = '0'
+            ${params.dataScope}
+            <choose>
+                <when test="userIds != null and !userIds.isEmpty()
+                        and ((keyword != null and keyword != '') or deptId != null)">
+                    and (
+                        u.user_id in
+                        <foreach collection="userIds" item="userId" open="(" separator="," close=")">
+                            #{userId}
+                        </foreach>
+                        or (
+                            1 = 1
+                            <if test="keyword != null and keyword != ''">
+                                and (
+                                    u.nick_name like concat('%', #{keyword}, '%')
+                                    or p.employee_no like concat('%', #{keyword}, '%')
+                                    or u.phonenumber like concat('%', #{keyword}, '%')
+                                )
+                            </if>
+                            <if test="deptId != null">
+                                and (
+                                    u.dept_id = #{deptId}
+                                    <if test="includeChildren">
+                                        or find_in_set(#{deptId}, d.ancestors)
+                                    </if>
+                                )
+                            </if>
+                        )
+                    )
+                </when>
+                <otherwise>
+                    <if test="keyword != null and keyword != ''">
+                        and (
+                            u.nick_name like concat('%', #{keyword}, '%')
+                            or p.employee_no like concat('%', #{keyword}, '%')
+                            or u.phonenumber like concat('%', #{keyword}, '%')
+                        )
+                    </if>
+                    <if test="deptId != null">
+                        and (
+                            u.dept_id = #{deptId}
+                            <if test="includeChildren">
+                                or find_in_set(#{deptId}, d.ancestors)
+                            </if>
+                        )
+                    </if>
+                </otherwise>
+            </choose>
+        </where>
+        order by
+        <if test="userIds != null and !userIds.isEmpty()">
+            case
+            <foreach collection="userIds" item="userId" index="index">
+                when u.user_id = #{userId} then #{index}
+            </foreach>
+            else 999 end,
+        </if>
+        u.nick_name asc, u.user_id asc
+    </select>
+
+    <select id="selectOnboardingList" parameterType="com.erp.system.domain.vo.HrOnboardingQuery"
+            resultMap="HrOnboardingResult">
+        select o.*, owner.nick_name as owner_name
+        from hr_onboarding o
+        join sys_dept d on d.dept_id = o.target_dept_id
+        left join sys_user owner on owner.user_id = o.owner_user_id
+        <where>
+            <if test="onboardingId != null">and o.onboarding_id = #{onboardingId}</if>
+            <if test="linkedUserId != null">and o.linked_user_id = #{linkedUserId}</if>
+            <if test="keyword != null and keyword != ''">
+                and (o.employee_name like concat('%', #{keyword}, '%')
+                    or o.phone_number like concat('%', #{keyword}, '%')
+                    or o.position_name like concat('%', #{keyword}, '%')
+                    or d.dept_name like concat('%', #{keyword}, '%')
+                    or o.company_name like concat('%', #{keyword}, '%')
+                    or o.dept_level1_name like concat('%', #{keyword}, '%')
+                    or o.dept_level2_name like concat('%', #{keyword}, '%')
+                    or o.dept_level3_name like concat('%', #{keyword}, '%')
+                    or o.store_name like concat('%', #{keyword}, '%'))
+            </if>
+            <if test="status != null and status != ''">and o.status = #{status}</if>
+            <if test="targetDeptId != null">and o.target_dept_id = #{targetDeptId}</if>
+            <if test="targetStoreId != null">and o.target_store_id = #{targetStoreId}</if>
+            <if test="employeeCategory != null and employeeCategory != ''">
+                and o.employee_category = #{employeeCategory}
+            </if>
+            <if test="ownerUserId != null">and o.owner_user_id = #{ownerUserId}</if>
+            <if test="expectedEntryDateFrom != null">
+                and o.expected_entry_date &gt;= #{expectedEntryDateFrom}
+            </if>
+            <if test="expectedEntryDateTo != null">
+                and o.expected_entry_date &lt;= #{expectedEntryDateTo}
+            </if>
+            ${params.dataScope}
+        </where>
+        order by o.expected_entry_date asc, o.onboarding_id desc
+    </select>
+
+    <select id="selectOnboardingSummary" parameterType="com.erp.system.domain.vo.HrOnboardingQuery"
+            resultMap="HrOnboardingSummaryResult">
+        select coalesce(sum(case
+                   when o.expected_entry_date &gt;= #{summaryDate}
+                    and o.expected_entry_date &lt; date_add(#{summaryDate}, interval 1 day)
+                   then 1 else 0 end), 0) as today_arrival_count,
+               coalesce(sum(case when o.status = 'READY' then 1 else 0 end), 0) as pending_confirm_count,
+               coalesce(sum(case when o.account_risk_code is not null
+                    and trim(o.account_risk_code) &lt;&gt; '' then 1 else 0 end), 0)
+                    as account_configuration_risk_count
+        from hr_onboarding o
+        join sys_dept d on d.dept_id = o.target_dept_id
+        <where>
+            <if test="onboardingId != null">and o.onboarding_id = #{onboardingId}</if>
+            <if test="keyword != null and keyword != ''">
+                and (o.employee_name like concat('%', #{keyword}, '%')
+                    or o.phone_number like concat('%', #{keyword}, '%')
+                    or o.position_name like concat('%', #{keyword}, '%')
+                    or d.dept_name like concat('%', #{keyword}, '%')
+                    or o.company_name like concat('%', #{keyword}, '%')
+                    or o.dept_level1_name like concat('%', #{keyword}, '%')
+                    or o.dept_level2_name like concat('%', #{keyword}, '%')
+                    or o.dept_level3_name like concat('%', #{keyword}, '%')
+                    or o.store_name like concat('%', #{keyword}, '%'))
+            </if>
+            <if test="status != null and status != ''">and o.status = #{status}</if>
+            <if test="targetDeptId != null">and o.target_dept_id = #{targetDeptId}</if>
+            <if test="targetStoreId != null">and o.target_store_id = #{targetStoreId}</if>
+            <if test="employeeCategory != null and employeeCategory != ''">
+                and o.employee_category = #{employeeCategory}
+            </if>
+            <if test="ownerUserId != null">and o.owner_user_id = #{ownerUserId}</if>
+            <if test="expectedEntryDateFrom != null">
+                and o.expected_entry_date &gt;= #{expectedEntryDateFrom}
+            </if>
+            <if test="expectedEntryDateTo != null">
+                and o.expected_entry_date &lt;= #{expectedEntryDateTo}
+            </if>
+            ${params.dataScope}
+        </where>
+    </select>
+
+    <select id="selectTodayOnboardingTasks" parameterType="com.erp.system.domain.vo.HrOnboardingQuery"
+            resultMap="HrOnboardingTodayTaskResult">
+        select task.onboarding_id, task.onboarding_no, task.employee_name, task.phone_number_masked,
+               task.target_dept_id, task.target_store_id, task.target_post_id,
+               task.company_name, task.dept_level1_name, task.dept_level2_name, task.dept_level3_name,
+               task.store_name, task.position_name, task.employee_category, task.expected_entry_date,
+               task.status, task.owner_user_id, task.owner_name, task.version, task.account_risk_code,
+               task.readiness_missing_count,
+               case when task.readiness_missing_count = 0 and task.derived_blocking_count = 0
+                    then 1 else 0 end as mark_ready_allowed
+        from (
+        select o.onboarding_id, o.onboarding_no, o.employee_name,
+               case when o.phone_number is null then null
+                    when o.phone_number = '' then ''
+                    when char_length(o.phone_number) &lt;= 7 then repeat('*', char_length(o.phone_number))
+                    else concat(left(o.phone_number, 3), repeat('*', char_length(o.phone_number) - 7),
+                                right(o.phone_number, 4)) end as phone_number_masked,
+               o.target_dept_id, o.target_store_id, o.target_post_id,
+               o.company_name, o.dept_level1_name, o.dept_level2_name, o.dept_level3_name,
+               o.store_name, o.position_name, o.employee_category, o.expected_entry_date,
+               o.status, o.owner_user_id, owner.nick_name as owner_name, o.version,
+               o.account_risk_code,
+               (case when nullif(trim(o.employee_name), '') is null then 1 else 0 end
+                + case when nullif(trim(o.phone_number), '') is null then 1 else 0 end
+                + case when o.expected_entry_date is null then 1 else 0 end
+                + case when o.target_dept_id is null then 1 else 0 end
+                + case when o.target_post_id is null then 1 else 0 end
+                + case when nullif(trim(o.employee_category), '') is null then 1 else 0 end
+                + case when o.owner_user_id is null then 1 else 0 end
+                + case when o.target_store_id is null then 1 else 0 end
+                + case when nullif(trim(o.job_grade), '') is null then 1 else 0 end
+                + case when o.direct_supervisor_user_id is null then 1 else 0 end
+                + case when nullif(trim(o.sex), '') is null then 1 else 0 end
+                + case when nullif(trim(o.id_type), '') is null then 1 else 0 end
+                + case when nullif(trim(o.id_number), '') is null then 1 else 0 end
+                + case when nullif(trim(o.registered_residence), '') is null then 1 else 0 end
+                + case when nullif(trim(o.current_address), '') is null then 1 else 0 end
+                + case when nullif(trim(o.work_location), '') is null then 1 else 0 end)
+                    as readiness_missing_count,
+               (case when nullif(trim(o.company_name), '') is null then 1 else 0 end
+                + case when (nullif(trim(o.dept_level1_name), '') is not null
+                              or nullif(trim(o.dept_level2_name), '') is not null
+                              or nullif(trim(o.dept_level3_name), '') is not null)
+                             and nullif(trim(o.department_supervisor), '') is null then 1 else 0 end
+                + case when o.target_store_id is not null and nullif(trim(o.store_name), '') is null
+                       then 1 else 0 end
+                + case when o.target_post_id is not null and nullif(trim(o.position_name), '') is null
+                       then 1 else 0 end) as derived_blocking_count
+        from hr_onboarding o
+        join sys_dept d on d.dept_id = o.target_dept_id
+        left join sys_user owner on owner.user_id = o.owner_user_id
+        <where>
+            and o.expected_entry_date &gt;= #{summaryDate}
+            and o.expected_entry_date &lt; date_add(#{summaryDate}, interval 1 day)
+            <if test="onboardingId != null">and o.onboarding_id = #{onboardingId}</if>
+            <if test="keyword != null and keyword != ''">
+                and (o.employee_name like concat('%', #{keyword}, '%')
+                    or o.phone_number like concat('%', #{keyword}, '%')
+                    or o.position_name like concat('%', #{keyword}, '%')
+                    or d.dept_name like concat('%', #{keyword}, '%')
+                    or o.company_name like concat('%', #{keyword}, '%')
+                    or o.dept_level1_name like concat('%', #{keyword}, '%')
+                    or o.dept_level2_name like concat('%', #{keyword}, '%')
+                    or o.dept_level3_name like concat('%', #{keyword}, '%')
+                    or o.store_name like concat('%', #{keyword}, '%'))
+            </if>
+            <if test="status != null and status != ''">and o.status = #{status}</if>
+            <if test="targetDeptId != null">and o.target_dept_id = #{targetDeptId}</if>
+            <if test="targetStoreId != null">and o.target_store_id = #{targetStoreId}</if>
+            <if test="employeeCategory != null and employeeCategory != ''">
+                and o.employee_category = #{employeeCategory}
+            </if>
+            <if test="ownerUserId != null">and o.owner_user_id = #{ownerUserId}</if>
+            <if test="expectedEntryDateFrom != null">
+                and o.expected_entry_date &gt;= #{expectedEntryDateFrom}
+            </if>
+            <if test="expectedEntryDateTo != null">
+                and o.expected_entry_date &lt;= #{expectedEntryDateTo}
+            </if>
+            ${params.dataScope}
+        </where>
+        ) task
+        order by task.expected_entry_date asc, task.onboarding_id desc
+    </select>
+
+    <select id="selectScopedByLinkedUserIds" resultMap="HrOnboardingResult">
+        select o.*
+        from hr_onboarding o
+        join sys_dept d on d.dept_id = o.target_dept_id
+        where o.linked_user_id in
+        <foreach collection="userIds" item="userId" open="(" separator="," close=")">
+            #{userId}
+        </foreach>
+        ${query.params.dataScope}
+        order by o.linked_user_id asc, o.onboarding_id desc
+    </select>
+
+    <select id="selectScopedOnboardingByIdForUpdate"
+            parameterType="com.erp.system.domain.vo.HrOnboardingQuery" resultMap="HrOnboardingResult">
+        select o.*, owner.nick_name as owner_name
+        from hr_onboarding o
+        join sys_dept d on d.dept_id = o.target_dept_id
+        left join sys_user owner on owner.user_id = o.owner_user_id
+        where o.onboarding_id = #{onboardingId}
+        ${params.dataScope}
+        for update
+    </select>
+
+    <select id="selectConflictCandidates" resultMap="HrOnboardingResult">
+        select o.*
+        from hr_onboarding o
+        <choose>
+            <when test="(phone != null and phone != '') or (idNumber != null and idNumber != '')
+                    or (employeeNo != null and employeeNo != '')">
+                <trim prefix="where" prefixOverrides="or">
+                    <if test="phone != null and phone != ''">or o.phone_number = #{phone}</if>
+                    <if test="idNumber != null and idNumber != ''">or o.id_number = #{idNumber}</if>
+                    <if test="employeeNo != null and employeeNo != ''">or o.employee_no = #{employeeNo}</if>
+                </trim>
+            </when>
+            <otherwise>where 1 = 0</otherwise>
+        </choose>
+        order by o.onboarding_id desc
+    </select>
+
+    <select id="selectScopedConflictCandidates" resultMap="HrOnboardingResult">
+        select o.*
+        from hr_onboarding o
+        join sys_dept d on d.dept_id = o.target_dept_id
+        <where>
+        <if test="query.onboardingId != null">o.onboarding_id &lt;&gt; #{query.onboardingId}</if>
+        <choose>
+            <when test="(phone != null and phone != '') or (idNumber != null and idNumber != '')
+                    or (employeeNo != null and employeeNo != '')">
+                <if test="query.onboardingId != null">and</if> (
+                    <trim prefixOverrides="or">
+                        <if test="phone != null and phone != ''">or o.phone_number = #{phone}</if>
+                        <if test="idNumber != null and idNumber != ''">or o.id_number = #{idNumber}</if>
+                        <if test="employeeNo != null and employeeNo != ''">or o.employee_no = #{employeeNo}</if>
+                    </trim>
+                )
+            </when>
+            <otherwise><if test="query.onboardingId != null">and</if> 1 = 0</otherwise>
+        </choose>
+        ${query.params.dataScope}
+        </where>
+        order by o.onboarding_id desc
+    </select>
+
+    <select id="selectScopedConflictCandidatesBatch" resultMap="HrOnboardingResult">
+        select distinct o.* from hr_onboarding o join sys_dept d on d.dept_id=o.target_dept_id
+        where (
+        <foreach collection="identities" item="identity" separator=" or ">
+          <trim prefix="(" suffix=")" prefixOverrides="or">
+            <if test="identity.phoneNumber != null and identity.phoneNumber != ''">or o.phone_number=#{identity.phoneNumber}</if>
+            <if test="identity.idNumber != null and identity.idNumber != ''">or o.id_number=#{identity.idNumber}</if>
+            <if test="identity.employeeNo != null and identity.employeeNo != ''">or o.employee_no=#{identity.employeeNo}</if>
+          </trim>
+        </foreach>)
+        ${query.params.dataScope}
+        order by o.onboarding_id desc
+    </select>
+
+    <select id="selectGlobalOpenIdentitySetForUpdate" resultMap="HrOnboardingResult">
+        select o.onboarding_id, o.status
+        from hr_onboarding o FORCE INDEX (PRIMARY)
+        where o.status in ('DRAFT', 'READY')
+        <choose>
+            <when test="(phone != null and phone != '') or (idNumber != null and idNumber != '')
+                    or (employeeNo != null and employeeNo != '')">
+                and (
+                    <trim prefixOverrides="or">
+                        <if test="phone != null and phone != ''">or o.phone_number = #{phone}</if>
+                        <if test="idNumber != null and idNumber != ''">or o.id_number = #{idNumber}</if>
+                        <if test="employeeNo != null and employeeNo != ''">or o.employee_no = #{employeeNo}</if>
+                    </trim>
+                )
+            </when>
+            <otherwise>and 1 = 0</otherwise>
+        </choose>
+        order by o.onboarding_id asc
+        for update
+    </select>
+
+    <insert id="insertOnboarding" parameterType="com.erp.system.domain.HrOnboarding"
+            useGeneratedKeys="true" keyProperty="onboardingId">
+        insert into hr_onboarding (
+            onboarding_no, status, version, employee_name, phone_number, employee_no,
+            target_dept_id, target_store_id, target_post_id, direct_supervisor_user_id, owner_user_id,
+            company_name, dept_level1_name, dept_level2_name, dept_level3_name, store_name,
+            position_name, department_supervisor, job_grade, employee_category, sex, birth_date,
+            id_type, id_number, registered_residence, current_address, marital_status, ethnicity,
+            emergency_contact, emergency_contact_relation, emergency_contact_phone,
+            expected_entry_date, actual_entry_date, work_location, work_city_level, bank_name,
+            bank_account, contract_type, social_type, probation_period, legal_entity, source_type,
+            linked_user_id, preferred_conflict_action, preferred_bind_user_id,
+            account_configuration_status, account_risk_code, cancel_reason, cancelled_by_user_id,
+            cancelled_by, cancelled_time, confirmed_by_user_id, confirmed_by, confirmed_time,
+            confirm_idempotency_key, create_by, update_by, remark
+        ) values (
+            #{onboardingNo}, coalesce(#{status}, 'DRAFT'), coalesce(#{version}, 0),
+            #{employeeName}, #{phoneNumber}, #{employeeNo}, #{targetDeptId}, #{targetStoreId},
+            #{targetPostId}, #{directSupervisorUserId}, #{ownerUserId}, #{companyName},
+            #{deptLevel1Name}, #{deptLevel2Name}, #{deptLevel3Name}, #{storeName},
+            #{positionName}, #{departmentSupervisor}, #{jobGrade}, #{employeeCategory}, #{sex},
+            #{birthDate}, #{idType}, #{idNumber}, #{registeredResidence}, #{currentAddress},
+            #{maritalStatus}, #{ethnicity}, #{emergencyContact}, #{emergencyContactRelation},
+            #{emergencyContactPhone}, #{expectedEntryDate}, #{actualEntryDate}, #{workLocation},
+            #{workCityLevel}, #{bankName}, #{bankAccount}, #{contractType}, #{socialType},
+            #{probationPeriod}, #{legalEntity}, coalesce(#{sourceType}, 'MANUAL'), #{linkedUserId},
+            #{preferredConflictAction}, #{preferredBindUserId}, #{accountConfigurationStatus},
+            #{accountRiskCode}, #{cancelReason}, #{cancelledByUserId}, #{cancelledBy},
+            #{cancelledTime}, #{confirmedByUserId}, #{confirmedBy}, #{confirmedTime},
+            #{confirmIdempotencyKey}, #{createBy}, #{updateBy}, #{remark}
+        )
+    </insert>
+
+    <update id="updateOnboardingByVersion" parameterType="com.erp.system.domain.HrOnboarding">
+        update hr_onboarding
+        set employee_name = #{employeeName},
+            phone_number = #{phoneNumber},
+            target_dept_id = #{targetDeptId},
+            target_store_id = #{targetStoreId},
+            target_post_id = #{targetPostId},
+            direct_supervisor_user_id = #{directSupervisorUserId},
+            owner_user_id = #{ownerUserId},
+            company_name = #{companyName},
+            dept_level1_name = #{deptLevel1Name},
+            dept_level2_name = #{deptLevel2Name},
+            dept_level3_name = #{deptLevel3Name},
+            store_name = #{storeName},
+            position_name = #{positionName},
+            department_supervisor = #{departmentSupervisor},
+            job_grade = #{jobGrade},
+            employee_category = #{employeeCategory},
+            sex = #{sex},
+            birth_date = #{birthDate},
+            id_type = #{idType},
+            id_number = #{idNumber},
+            registered_residence = #{registeredResidence},
+            current_address = #{currentAddress},
+            marital_status = #{maritalStatus},
+            ethnicity = #{ethnicity},
+            emergency_contact = #{emergencyContact},
+            emergency_contact_relation = #{emergencyContactRelation},
+            emergency_contact_phone = #{emergencyContactPhone},
+            expected_entry_date = #{expectedEntryDate},
+            work_location = #{workLocation},
+            work_city_level = #{workCityLevel},
+            bank_name = #{bankName},
+            bank_account = #{bankAccount},
+            contract_type = #{contractType},
+            social_type = #{socialType},
+            probation_period = #{probationPeriod},
+            legal_entity = #{legalEntity},
+            update_by = #{updateBy},
+            update_time = sysdate(),
+            remark = #{remark},
+            version = version + 1
+        where onboarding_id = #{onboardingId}
+          and version = #{version}
+          and status = 'DRAFT'
+    </update>
+
+    <update id="confirmOnboardingByVersion" parameterType="com.erp.system.domain.HrOnboarding">
+        update hr_onboarding
+        set status = 'CONFIRMED',
+            employee_no = #{employeeNo},
+            actual_entry_date = #{actualEntryDate},
+            birth_date = #{birthDate},
+            linked_user_id = #{linkedUserId},
+            confirm_idempotency_key = #{confirmIdempotencyKey},
+            account_configuration_status = #{accountConfigurationStatus},
+            account_risk_code = #{accountRiskCode},
+            confirmed_by_user_id = #{confirmedByUserId},
+            confirmed_by = #{confirmedBy},
+            confirmed_time = sysdate(),
+            update_by = #{updateBy},
+            update_time = sysdate(),
+            version = version + 1
+        where onboarding_id = #{onboardingId}
+          and version = #{version}
+          and status = 'READY'
+    </update>
+
+    <update id="updateOnboardingStatusByVersion">
+        update hr_onboarding
+        set status = #{toStatus},
+            <choose>
+                <when test="toStatus == 'CANCELLED'">
+                    cancel_reason = #{cancelReason},
+                    cancelled_by_user_id = #{operatorUserId},
+                    cancelled_by = #{operator},
+                    cancelled_time = sysdate(),
+                </when>
+                <when test="fromStatus == 'CANCELLED' and toStatus == 'DRAFT'">
+                    cancel_reason = null,
+                    cancelled_by_user_id = null,
+                    cancelled_by = null,
+                    cancelled_time = null,
+                </when>
+            </choose>
+            update_by = #{operator},
+            update_time = sysdate(),
+            version = version + 1
+        where onboarding_id = #{onboardingId}
+          and status = #{fromStatus}
+          and version = #{version}
+    </update>
+
+</mapper>

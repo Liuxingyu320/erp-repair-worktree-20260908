@@ -1,0 +1,179 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.inventory.mapper.InvLegacyApprovalMapper">
+
+    <sql id="legacyInstanceUnion">
+        select 'LEGACY' engine_mode,
+               'INV_TRANSFER' business_code,
+               instance.instance_id legacy_instance_id,
+               cast(instance.transfer_id as char) business_id,
+               transfer_order.order_no business_no,
+               (select count(1)
+                  from inv_transfer_approval_instance round_instance
+                 where round_instance.transfer_id = instance.transfer_id
+                   and round_instance.instance_id &lt;= instance.instance_id) business_round,
+               upper(instance.status) status,
+               instance.current_node_order current_node_order,
+               (select min(current_task.node_name)
+                  from inv_transfer_approval_task current_task
+                 where current_task.instance_id = instance.instance_id
+                   and current_task.node_order = instance.current_node_order
+                   and current_task.status = 'pending') current_node_name,
+               applicant.user_id applicant_user_id,
+               transfer_order.create_by applicant_name,
+               case when transfer_order.transfer_type = 'store_return'
+                    then transfer_order.from_dept_id
+                    else transfer_order.to_dept_id end anchor_dept_id,
+               case when transfer_order.transfer_type = 'store_return'
+                    then transfer_order.from_dept_name
+                    else transfer_order.to_dept_name end anchor_dept_name,
+               instance.create_time started_time,
+               case when instance.status = 'running' then null
+                    else instance.update_time end finished_time
+        from inv_transfer_approval_instance instance
+        join inv_transfer_order transfer_order
+          on transfer_order.transfer_id = instance.transfer_id
+        left join sys_user applicant
+          on applicant.user_name = transfer_order.create_by
+
+        union all
+
+        select 'LEGACY' engine_mode,
+               'INV_STOCK_CHECK' business_code,
+               instance.instance_id legacy_instance_id,
+               cast(instance.check_id as char) business_id,
+               instance.check_no business_no,
+               instance.round_no business_round,
+               upper(instance.status) status,
+               1 current_node_order,
+               case when instance.status = 'running'
+                    then '运营总监' else null end current_node_name,
+               instance.submitted_user_id applicant_user_id,
+               instance.submitted_by applicant_name,
+               instance.shop_dept_id anchor_dept_id,
+               anchor_dept.dept_name anchor_dept_name,
+               coalesce(instance.submitted_time, instance.create_time) started_time,
+               instance.finished_time finished_time
+        from inv_stock_check_approval_instance instance
+        left join sys_dept anchor_dept
+          on anchor_dept.dept_id = instance.shop_dept_id
+    </sql>
+
+    <sql id="legacyInstanceFilter">
+        <where>
+            <if test="query.businessCode != null and query.businessCode != ''">
+                and legacy.business_code = #{query.businessCode}
+            </if>
+            <if test="query.businessId != null and query.businessId != ''">
+                and legacy.business_id = #{query.businessId}
+            </if>
+            <if test="query.status != null and query.status != ''">
+                and legacy.status = upper(#{query.status})
+            </if>
+        </where>
+    </sql>
+
+    <select id="countInstances" resultType="long">
+        select count(1)
+        from (<include refid="legacyInstanceUnion"/>) legacy
+        <include refid="legacyInstanceFilter"/>
+    </select>
+
+    <select id="selectInstances"
+            resultType="com.erp.approval.api.domain.LegacyApprovalInstanceSummary">
+        select legacy.engine_mode engineMode,
+               legacy.business_code businessCode,
+               legacy.legacy_instance_id legacyInstanceId,
+               legacy.business_id businessId,
+               legacy.business_no businessNo,
+               legacy.business_round businessRound,
+               legacy.status status,
+               legacy.current_node_order currentNodeOrder,
+               legacy.current_node_name currentNodeName,
+               legacy.applicant_user_id applicantUserId,
+               legacy.applicant_name applicantName,
+               legacy.anchor_dept_id anchorDeptId,
+               legacy.anchor_dept_name anchorDeptName,
+               legacy.started_time startedTime,
+               legacy.finished_time finishedTime
+        from (<include refid="legacyInstanceUnion"/>) legacy
+        <include refid="legacyInstanceFilter"/>
+        order by legacy.started_time desc, legacy.legacy_instance_id desc
+        limit #{offset}, #{limit}
+    </select>
+
+    <select id="selectInstance"
+            resultType="com.erp.approval.api.domain.LegacyApprovalInstanceSummary">
+        select legacy.engine_mode engineMode,
+               legacy.business_code businessCode,
+               legacy.legacy_instance_id legacyInstanceId,
+               legacy.business_id businessId,
+               legacy.business_no businessNo,
+               legacy.business_round businessRound,
+               legacy.status status,
+               legacy.current_node_order currentNodeOrder,
+               legacy.current_node_name currentNodeName,
+               legacy.applicant_user_id applicantUserId,
+               legacy.applicant_name applicantName,
+               legacy.anchor_dept_id anchorDeptId,
+               legacy.anchor_dept_name anchorDeptName,
+               legacy.started_time startedTime,
+               legacy.finished_time finishedTime
+        from (<include refid="legacyInstanceUnion"/>) legacy
+        where legacy.business_code = #{businessCode}
+          and legacy.legacy_instance_id = #{legacyInstanceId}
+        limit 1
+    </select>
+
+    <select id="selectTasks"
+            resultType="com.erp.approval.api.domain.LegacyApprovalTaskSummary">
+        <choose>
+            <when test="businessCode == 'INV_TRANSFER'">
+                select task.task_id taskId,
+                       task.node_order nodeOrder,
+                       task.node_name nodeName,
+                       task.candidate_user_names candidateNames,
+                       upper(task.status) status,
+                       case when task.status = 'approved' then 'APPROVE'
+                            when task.status = 'rejected' then 'REJECT'
+                            else null end action,
+                       task.approver_id operatorUserId,
+                       task.approver_name operatorName,
+                       task.comment comment,
+                       task.approve_time actionTime
+                from inv_transfer_approval_task task
+                where task.instance_id = #{legacyInstanceId}
+                order by task.node_order, task.task_id
+            </when>
+            <when test="businessCode == 'INV_STOCK_CHECK'">
+                select task.task_id taskId,
+                       1 nodeOrder,
+                       '运营总监' nodeName,
+                       task.candidate_user_names candidateNames,
+                       upper(task.status) status,
+                       upper(task.action) action,
+                       task.approver_user_id operatorUserId,
+                       task.approver_name operatorName,
+                       task.approval_comment comment,
+                       task.approval_time actionTime
+                from inv_stock_check_approval_task task
+                where task.instance_id = #{legacyInstanceId}
+                order by task.task_id
+            </when>
+            <otherwise>
+                select cast(null as signed) taskId,
+                       cast(null as signed) nodeOrder,
+                       cast(null as char) nodeName,
+                       cast(null as char) candidateNames,
+                       cast(null as char) status,
+                       cast(null as char) action,
+                       cast(null as signed) operatorUserId,
+                       cast(null as char) operatorName,
+                       cast(null as char) comment,
+                       cast(null as datetime) actionTime
+                from dual where 1 = 0
+            </otherwise>
+        </choose>
+    </select>
+</mapper>

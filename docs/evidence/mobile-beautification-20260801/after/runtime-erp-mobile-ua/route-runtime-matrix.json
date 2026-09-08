@@ -1,0 +1,521 @@
+{
+  "generatedAt": "2026-08-01T11:11:59.360Z",
+  "viewport": {
+    "width": 390,
+    "height": 844
+  },
+  "results": [
+    {
+      "route": "/mobile/store",
+      "requestedUrl": "http://127.0.0.1:50904/mobile/store",
+      "finalUrl": "http://127.0.0.1:50904/login?redirect=%2Fmobile%2Fstore",
+      "finalPath": "/login",
+      "redirectedToLogin": true,
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/mobile/warehouse",
+      "requestedUrl": "http://127.0.0.1:50904/mobile/warehouse",
+      "finalUrl": "http://127.0.0.1:50904/login?redirect=%2Fmobile%2Fwarehouse",
+      "finalPath": "/login",
+      "redirectedToLogin": true,
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/mobile/inventory",
+      "requestedUrl": "http://127.0.0.1:50904/mobile/inventory",
+      "finalUrl": "http://127.0.0.1:50904/login?redirect=%2Fmobile%2Finventory",
+      "finalPath": "/login",
+      "redirectedToLogin": true,
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/mobile/hr",
+      "requestedUrl": "http://127.0.0.1:50904/mobile/hr",
+      "finalUrl": "http://127.0.0.1:50904/login?redirect=%2Fmobile%2Fstore",
+      "finalPath": "/login",
+      "redirectedToLogin": true,
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/mobile/mine",
+      "requestedUrl": "http://127.0.0.1:50904/mobile/mine",
+      "finalUrl": "http://127.0.0.1:50904/login?redirect=%2Fmobile%2Fmine",
+      "finalPath": "/login",
+      "redirectedToLogin": true,
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/mobile/todo",
+      "requestedUrl": "http://127.0.0.1:50904/mobile/todo",
+      "finalUrl": "http://127.0.0.1:50904/login?redirect=%2Fmobile%2Ftodo",
+      "finalPath": "/login",
+      "redirectedToLogin": true,
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/mobile/oa-purchase-approval",
+      "requestedUrl": "http://127.0.0.1:50904/mobile/oa-purchase-approval",
+      "finalUrl": "http://127.0.0.1:50904/login?redirect=%2Fmobile%2Ftodo",
+      "finalPath": "/login",
+      "redirectedToLogin": true,
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/mobile/reimbursement",
+      "requestedUrl": "http://127.0.0.1:50904/mobile/reimbursement",
+      "finalUrl": "http://127.0.0.1:50904/login?redirect=%2Fmobile%2Freimbursement",
+      "finalPath": "/login",
+      "redirectedToLogin": true,
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/mobile/notice",
+      "requestedUrl": "http://127.0.0.1:50904/mobile/notice",
+      "finalUrl": "http://127.0.0.1:50904/login?redirect=%2Fmobile%2Fnotice",
+      "finalPath": "/login",
+      "redirectedToLogin": true,
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/mobile/hr/onboarding",
+      "requestedUrl": "http://127.0.0.1:50904/mobile/hr/onboarding",
+      "finalUrl": "http://127.0.0.1:50904/login?redirect=%2Fmobile%2Fstore",
+      "finalPath": "/login",
+      "redirectedToLogin": true,
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/mobile/hr/onboarding/create",
+      "requestedUrl": "http://127.0.0.1:50904/mobile/hr/onboarding/create",
+      "finalUrl": "http://127.0.0.1:50904/login?redirect=%2Fmobile%2Fstore",
+      "finalPath": "/login",
+      "redirectedToLogin": true,
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/mobile/hr/onboarding/:id/edit",
+      "requestedUrl": "http://127.0.0.1:50904/mobile/hr/onboarding/1/edit",
+      "finalUrl": "http://127.0.0.1:50904/login?redirect=%2Fmobile%2Fstore",
+      "finalPath": "/login",
+      "redirectedToLogin": true,
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/mobile/hr/onboarding/:id",
+      "requestedUrl": "http://127.0.0.1:50904/mobile/hr/onboarding/1",
+      "finalUrl": "http://127.0.0.1:50904/login?redirect=%2Fmobile%2Fstore",
+      "finalPath": "/login",
+      "redirectedToLogin": true,
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/mobile/hr/employee",
+      "requestedUrl": "http://127.0.0.1:50904/mobile/hr/employee",
+      "finalUrl": "http://127.0.0.1:50904/login?redirect=%2Fmobile%2Fstore",
+      "finalPath": "/login",
+      "redirectedToLogin": true,
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/mobile/hr/completeness",
+      "requestedUrl": "http://127.0.0.1:50904/mobile/hr/completeness",
+      "finalUrl": "http://127.0.0.1:50904/login?redirect=%2Fmobile%2Fstore",
+      "finalPath": "/login",
+      "redirectedToLogin": true,
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/mobile/hr/health-certificate",
+      "requestedUrl": "http://127.0.0.1:50904/mobile/hr/health-certificate",
+      "finalUrl": "http://127.0.0.1:50904/login?redirect=%2Fmobile%2Fstore",
+      "finalPath": "/login",
+      "redirectedToLogin": true,
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/mobile/attendance",
+      "requestedUrl": "http://127.0.0.1:50904/mobile/attendance",
+      "finalUrl": "http://127.0.0.1:50904/login?redirect=%2Fmobile%2Fattendance",
+      "finalPath": "/login",
+      "redirectedToLogin": true,
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/mobile/salary",
+      "requestedUrl": "http://127.0.0.1:50904/mobile/salary",
+      "finalUrl": "http://127.0.0.1:50904/login?redirect=%2Fmobile%2Fsalary",
+      "finalPath": "/login",
+      "redirectedToLogin": true,
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/mobile/salary-scheme",
+      "requestedUrl": "http://127.0.0.1:50904/mobile/salary-scheme",
+      "finalUrl": "http://127.0.0.1:50904/login?redirect=%2Fmobile%2Fmine",
+      "finalPath": "/login",
+      "redirectedToLogin": true,
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/mobile/contract",
+      "requestedUrl": "http://127.0.0.1:50904/mobile/contract",
+      "finalUrl": "http://127.0.0.1:50904/login?redirect=%2Fmobile%2Fcontract",
+      "finalPath": "/login",
+      "redirectedToLogin": true,
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/mobile/sign-package",
+      "requestedUrl": "http://127.0.0.1:50904/mobile/sign-package",
+      "finalUrl": "http://127.0.0.1:50904/login?redirect=%2Fmobile%2Fsign-package",
+      "finalPath": "/login",
+      "redirectedToLogin": true,
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/mobile/onboard-data",
+      "requestedUrl": "http://127.0.0.1:50904/mobile/onboard-data",
+      "finalUrl": "http://127.0.0.1:50904/login?redirect=%2Fmobile%2Fsign-package",
+      "finalPath": "/login",
+      "redirectedToLogin": true,
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/mobile/sales",
+      "requestedUrl": "http://127.0.0.1:50904/mobile/sales",
+      "finalUrl": "http://127.0.0.1:50904/login?redirect=%2Fmobile%2Fsales",
+      "finalPath": "/login",
+      "redirectedToLogin": true,
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/mobile/purchase",
+      "requestedUrl": "http://127.0.0.1:50904/mobile/purchase",
+      "finalUrl": "http://127.0.0.1:50904/login?redirect=%2Fmobile%2Fpurchase",
+      "finalPath": "/login",
+      "redirectedToLogin": true,
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/mobile/purchase-return",
+      "requestedUrl": "http://127.0.0.1:50904/mobile/purchase-return",
+      "finalUrl": "http://127.0.0.1:50904/login?redirect=%2Fmobile%2Fpurchase-return",
+      "finalPath": "/login",
+      "redirectedToLogin": true,
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/mobile/stock",
+      "requestedUrl": "http://127.0.0.1:50904/mobile/stock",
+      "finalUrl": "http://127.0.0.1:50904/login?redirect=%2Fmobile%2Fstock",
+      "finalPath": "/login",
+      "redirectedToLogin": true,
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/mobile/product",
+      "requestedUrl": "http://127.0.0.1:50904/mobile/product",
+      "finalUrl": "http://127.0.0.1:50904/login?redirect=%2Fmobile%2Fproduct",
+      "finalPath": "/login",
+      "redirectedToLogin": true,
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/mobile/oe",
+      "requestedUrl": "http://127.0.0.1:50904/mobile/oe",
+      "finalUrl": "http://127.0.0.1:50904/login?redirect=%2Fmobile%2Foe",
+      "finalPath": "/login",
+      "redirectedToLogin": true,
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/mobile/gift",
+      "requestedUrl": "http://127.0.0.1:50904/mobile/gift",
+      "finalUrl": "http://127.0.0.1:50904/login?redirect=%2Fmobile%2Fgift",
+      "finalPath": "/login",
+      "redirectedToLogin": true,
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/mobile/category",
+      "requestedUrl": "http://127.0.0.1:50904/mobile/category",
+      "finalUrl": "http://127.0.0.1:50904/login?redirect=%2Fmobile%2Fmine",
+      "finalPath": "/login",
+      "redirectedToLogin": true,
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/mobile/customer",
+      "requestedUrl": "http://127.0.0.1:50904/mobile/customer",
+      "finalUrl": "http://127.0.0.1:50904/login?redirect=%2Fmobile%2Fcustomer",
+      "finalPath": "/login",
+      "redirectedToLogin": true,
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/mobile/supplier",
+      "requestedUrl": "http://127.0.0.1:50904/mobile/supplier",
+      "finalUrl": "http://127.0.0.1:50904/login?redirect=%2Fmobile%2Fsupplier",
+      "finalPath": "/login",
+      "redirectedToLogin": true,
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/mobile/stock-log",
+      "requestedUrl": "http://127.0.0.1:50904/mobile/stock-log",
+      "finalUrl": "http://127.0.0.1:50904/login?redirect=%2Fmobile%2Fstock-log",
+      "finalPath": "/login",
+      "redirectedToLogin": true,
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/mobile/stock-check",
+      "requestedUrl": "http://127.0.0.1:50904/mobile/stock-check",
+      "finalUrl": "http://127.0.0.1:50904/login?redirect=%2Fmobile%2Fstock-check",
+      "finalPath": "/login",
+      "redirectedToLogin": true,
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/mobile/transfer-records",
+      "requestedUrl": "http://127.0.0.1:50904/mobile/transfer-records",
+      "finalUrl": "http://127.0.0.1:50904/login?redirect=%2Fmobile%2Ftransfer-records",
+      "finalPath": "/login",
+      "redirectedToLogin": true,
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/mobile/sales-return",
+      "requestedUrl": "http://127.0.0.1:50904/mobile/sales-return",
+      "finalUrl": "http://127.0.0.1:50904/login?redirect=%2Fmobile%2Fsales-return",
+      "finalPath": "/login",
+      "redirectedToLogin": true,
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/mobile/replenishment",
+      "requestedUrl": "http://127.0.0.1:50904/mobile/replenishment",
+      "finalUrl": "http://127.0.0.1:50904/login?redirect=%2Fmobile%2Freplenishment",
+      "finalPath": "/login",
+      "redirectedToLogin": true,
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/mobile/outbound",
+      "requestedUrl": "http://127.0.0.1:50904/mobile/outbound",
+      "finalUrl": "http://127.0.0.1:50904/login?redirect=%2Fmobile%2Foutbound",
+      "finalPath": "/login",
+      "redirectedToLogin": true,
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/mobile/transfer",
+      "requestedUrl": "http://127.0.0.1:50904/mobile/transfer",
+      "finalUrl": "http://127.0.0.1:50904/login?redirect=%2Fmobile%2Ftransfer",
+      "finalPath": "/login",
+      "redirectedToLogin": true,
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/mobile/transfer-approval",
+      "requestedUrl": "http://127.0.0.1:50904/mobile/transfer-approval",
+      "finalUrl": "http://127.0.0.1:50904/login?redirect=%2Fmobile%2Ftransfer-approval",
+      "finalPath": "/login",
+      "redirectedToLogin": true,
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/mobile/transfer-rules",
+      "requestedUrl": "http://127.0.0.1:50904/mobile/transfer-rules",
+      "finalUrl": "http://127.0.0.1:50904/login?redirect=%2Fmobile%2Fmine",
+      "finalPath": "/login",
+      "redirectedToLogin": true,
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/mobile/drive",
+      "requestedUrl": "http://127.0.0.1:50904/mobile/drive",
+      "finalUrl": "http://127.0.0.1:50904/login?redirect=%2Fmobile%2Fmine",
+      "finalPath": "/login",
+      "redirectedToLogin": true,
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/mobile/profile",
+      "requestedUrl": "http://127.0.0.1:50904/mobile/profile",
+      "finalUrl": "http://127.0.0.1:50904/login?redirect=%2Fmobile%2Fprofile",
+      "finalPath": "/login",
+      "redirectedToLogin": true,
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/mobile/fixed-asset-repair",
+      "requestedUrl": "http://127.0.0.1:50904/mobile/fixed-asset-repair",
+      "finalUrl": "http://127.0.0.1:50904/login?redirect=%2Fmobile%2Ffixed-asset-repair",
+      "finalPath": "/login",
+      "redirectedToLogin": true,
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/mobile/system-user",
+      "requestedUrl": "http://127.0.0.1:50904/mobile/system-user",
+      "finalUrl": "http://127.0.0.1:50904/login?redirect=%2Fmobile%2Fmine",
+      "finalPath": "/login",
+      "redirectedToLogin": true,
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/mobile/system-role",
+      "requestedUrl": "http://127.0.0.1:50904/mobile/system-role",
+      "finalUrl": "http://127.0.0.1:50904/login?redirect=%2Fmobile%2Fmine",
+      "finalPath": "/login",
+      "redirectedToLogin": true,
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/mobile/system-post",
+      "requestedUrl": "http://127.0.0.1:50904/mobile/system-post",
+      "finalUrl": "http://127.0.0.1:50904/login?redirect=%2Fmobile%2Fmine",
+      "finalPath": "/login",
+      "redirectedToLogin": true,
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/mobile/system-dept",
+      "requestedUrl": "http://127.0.0.1:50904/mobile/system-dept",
+      "finalUrl": "http://127.0.0.1:50904/login?redirect=%2Fmobile%2Fmine",
+      "finalPath": "/login",
+      "redirectedToLogin": true,
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/mobile/system-menu",
+      "requestedUrl": "http://127.0.0.1:50904/mobile/system-menu",
+      "finalUrl": "http://127.0.0.1:50904/login?redirect=%2Fmobile%2Fmine",
+      "finalPath": "/login",
+      "redirectedToLogin": true,
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/mobile/user-shop",
+      "requestedUrl": "http://127.0.0.1:50904/mobile/user-shop",
+      "finalUrl": "http://127.0.0.1:50904/login?redirect=%2Fmobile%2Fmine",
+      "finalPath": "/login",
+      "redirectedToLogin": true,
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/mobile/system-config",
+      "requestedUrl": "http://127.0.0.1:50904/mobile/system-config",
+      "finalUrl": "http://127.0.0.1:50904/login?redirect=%2Fmobile%2Fmine",
+      "finalPath": "/login",
+      "redirectedToLogin": true,
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/mobile/system-dict-type",
+      "requestedUrl": "http://127.0.0.1:50904/mobile/system-dict-type",
+      "finalUrl": "http://127.0.0.1:50904/login?redirect=%2Fmobile%2Fmine",
+      "finalPath": "/login",
+      "redirectedToLogin": true,
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/mobile/system-dict-data",
+      "requestedUrl": "http://127.0.0.1:50904/mobile/system-dict-data",
+      "finalUrl": "http://127.0.0.1:50904/login?redirect=%2Fmobile%2Fmine",
+      "finalPath": "/login",
+      "redirectedToLogin": true,
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/mobile/system-logininfor",
+      "requestedUrl": "http://127.0.0.1:50904/mobile/system-logininfor",
+      "finalUrl": "http://127.0.0.1:50904/login?redirect=%2Fmobile%2Fmine",
+      "finalPath": "/login",
+      "redirectedToLogin": true,
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/mobile/system-operlog",
+      "requestedUrl": "http://127.0.0.1:50904/mobile/system-operlog",
+      "finalUrl": "http://127.0.0.1:50904/login?redirect=%2Fmobile%2Fmine",
+      "finalPath": "/login",
+      "redirectedToLogin": true,
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/mobile/monitor-job",
+      "requestedUrl": "http://127.0.0.1:50904/mobile/monitor-job",
+      "finalUrl": "http://127.0.0.1:50904/login?redirect=%2Fmobile%2Fmine",
+      "finalPath": "/login",
+      "redirectedToLogin": true,
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/mobile/monitor-job-log",
+      "requestedUrl": "http://127.0.0.1:50904/mobile/monitor-job-log",
+      "finalUrl": "http://127.0.0.1:50904/login?redirect=%2Fmobile%2Fmine",
+      "finalPath": "/login",
+      "redirectedToLogin": true,
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/mobile/monitor-online",
+      "requestedUrl": "http://127.0.0.1:50904/mobile/monitor-online",
+      "finalUrl": "http://127.0.0.1:50904/login?redirect=%2Fmobile%2Fmine",
+      "finalPath": "/login",
+      "redirectedToLogin": true,
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/credential/change-password",
+      "requestedUrl": "http://127.0.0.1:50904/credential/change-password",
+      "finalUrl": "http://127.0.0.1:50904/login?redirect=%2Fcredential%2Fchange-password",
+      "finalPath": "/login",
+      "redirectedToLogin": true,
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/complete-profile",
+      "requestedUrl": "http://127.0.0.1:50904/complete-profile",
+      "finalUrl": "http://127.0.0.1:50904/login?redirect=%2Fcomplete-profile",
+      "finalPath": "/login",
+      "redirectedToLogin": true,
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/select-shop",
+      "requestedUrl": "http://127.0.0.1:50904/select-shop",
+      "finalUrl": "http://127.0.0.1:50904/login?redirect=%2Fselect-shop",
+      "finalPath": "/login",
+      "redirectedToLogin": true,
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/401",
+      "requestedUrl": "http://127.0.0.1:50904/401",
+      "finalUrl": "http://127.0.0.1:50904/login?redirect=%2F401",
+      "finalPath": "/login",
+      "redirectedToLogin": true,
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/404",
+      "requestedUrl": "http://127.0.0.1:50904/404",
+      "finalUrl": "http://127.0.0.1:50904/login?redirect=%2F404",
+      "finalPath": "/login",
+      "redirectedToLogin": true,
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/lock",
+      "requestedUrl": "http://127.0.0.1:50904/lock",
+      "finalUrl": "http://127.0.0.1:50904/login?redirect=%2Flock",
+      "finalPath": "/login",
+      "redirectedToLogin": true,
+      "horizontalOverflow": false
+    }
+  ]
+}

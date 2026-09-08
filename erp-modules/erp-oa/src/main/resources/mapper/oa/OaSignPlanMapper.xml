@@ -1,0 +1,293 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.oa.mapper.OaSignPlanMapper">
+
+    <resultMap id="OaSignPlanResult" type="com.erp.oa.domain.OaSignPlan">
+        <id property="planId" column="plan_id"/>
+        <result property="planName" column="plan_name"/>
+        <result property="scenario" column="scenario"/>
+        <result property="postName" column="post_name"/>
+        <result property="employmentType" column="employment_type"/>
+        <result property="socialType" column="social_type"/>
+        <result property="servicePersonType" column="service_person_type"/>
+        <result property="insuranceType" column="insurance_type"/>
+        <result property="postLevelSnapshot" column="post_level_snapshot"/>
+        <result property="salaryVersion" column="salary_version"/>
+        <result property="entryDate" column="entry_date"/>
+        <result property="contractStartDate" column="contract_start_date"/>
+        <result property="contractEndDate" column="contract_end_date"/>
+        <result property="probationStartDate" column="probation_start_date"/>
+        <result property="probationEndDate" column="probation_end_date"/>
+        <result property="baseSalary" column="base_salary"/>
+        <result property="postSalary" column="post_salary"/>
+        <result property="fieldAllowance" column="field_allowance"/>
+        <result property="salaryTotal" column="salary_total"/>
+        <result property="shopDeptId" column="shop_dept_id"/>
+        <result property="legalEntityId" column="legal_entity_id"/>
+        <result property="legalEntityName" column="legal_entity_name"/>
+        <result property="ruleJson" column="rule_json"/>
+        <result property="defaultValuesJson" column="default_values_json"/>
+        <result property="signDeadlineDays" column="sign_deadline_days"/>
+        <result property="reminderPolicyJson" column="reminder_policy_json"/>
+        <result property="autoSendConditionJson" column="auto_send_condition_json"/>
+        <result property="status" column="status"/>
+        <result property="sortOrder" column="sort_order"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateBy" column="update_by"/>
+        <result property="updateTime" column="update_time"/>
+        <result property="remark" column="remark"/>
+    </resultMap>
+
+    <resultMap id="OaSignPlanTemplateResult" type="com.erp.oa.domain.OaSignPlanTemplate">
+        <id property="id" column="id"/>
+        <result property="planId" column="plan_id"/>
+        <result property="templateId" column="template_id"/>
+        <result property="templateType" column="template_type"/>
+        <result property="sortOrder" column="sort_order"/>
+        <result property="createTime" column="create_time"/>
+        <association property="template" javaType="com.erp.oa.domain.OaSignTemplate">
+            <id property="templateId" column="t_template_id"/>
+            <result property="templateType" column="t_template_type"/>
+            <result property="templateName" column="t_template_name"/>
+            <result property="templateVersion" column="t_template_version"/>
+            <result property="scenario" column="t_scenario"/>
+            <result property="employmentType" column="t_employment_type"/>
+            <result property="socialType" column="t_social_type"/>
+            <result property="postLevelScope" column="t_post_level_scope"/>
+            <result property="salaryVersion" column="t_salary_version"/>
+            <result property="fileUrl" column="t_file_url"/>
+            <result property="fileName" column="t_file_name"/>
+            <result property="fileSize" column="t_file_size"/>
+            <result property="fileHash" column="t_file_hash"/>
+            <result property="requiredPlaceholders" column="t_required_placeholders"/>
+            <result property="optionalPlaceholders" column="t_optional_placeholders"/>
+            <result property="employeeVisible" column="t_employee_visible"/>
+            <result property="readConfirmationRequired" column="t_read_confirmation_required"/>
+            <result property="employeeSignRequired" column="t_employee_sign_required"/>
+            <result property="signaturePositionJson" column="t_signature_position_json"/>
+            <result property="companySealPositionJson" column="t_company_seal_position_json"/>
+            <result property="companySealRequired" column="t_company_seal_required"/>
+            <result property="matchConditionJson" column="t_match_condition_json"/>
+            <result property="sortOrder" column="t_sort_order"/>
+            <result property="status" column="t_status"/>
+            <result property="createBy" column="t_create_by"/>
+            <result property="createTime" column="t_create_time"/>
+            <result property="updateBy" column="t_update_by"/>
+            <result property="updateTime" column="t_update_time"/>
+            <result property="remark" column="t_remark"/>
+        </association>
+    </resultMap>
+
+    <resultMap id="OaSignTemplateResult" type="com.erp.oa.domain.OaSignTemplate">
+        <id property="templateId" column="template_id"/>
+        <result property="templateType" column="template_type"/>
+        <result property="templateName" column="template_name"/>
+        <result property="templateVersion" column="template_version"/>
+        <result property="scenario" column="scenario"/>
+        <result property="employmentType" column="employment_type"/>
+        <result property="socialType" column="social_type"/>
+        <result property="postLevelScope" column="post_level_scope"/>
+        <result property="salaryVersion" column="salary_version"/>
+        <result property="fileUrl" column="file_url"/>
+        <result property="fileName" column="file_name"/>
+        <result property="fileSize" column="file_size"/>
+        <result property="fileHash" column="file_hash"/>
+        <result property="requiredPlaceholders" column="required_placeholders"/>
+        <result property="optionalPlaceholders" column="optional_placeholders"/>
+        <result property="employeeVisible" column="employee_visible"/>
+        <result property="readConfirmationRequired" column="read_confirmation_required"/>
+        <result property="employeeSignRequired" column="employee_sign_required"/>
+        <result property="signaturePositionJson" column="signature_position_json"/>
+        <result property="companySealPositionJson" column="company_seal_position_json"/>
+        <result property="companySealRequired" column="company_seal_required"/>
+        <result property="matchConditionJson" column="match_condition_json"/>
+        <result property="sortOrder" column="sort_order"/>
+        <result property="status" column="status"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateBy" column="update_by"/>
+        <result property="updateTime" column="update_time"/>
+        <result property="remark" column="remark"/>
+    </resultMap>
+
+    <sql id="baseColumns">
+        plan_id, plan_name, scenario, post_name, employment_type, social_type,
+        service_person_type, insurance_type, post_level_snapshot, salary_version,
+        entry_date, contract_start_date, contract_end_date, probation_start_date,
+        probation_end_date, base_salary, post_salary, field_allowance, salary_total,
+        shop_dept_id, legal_entity_id, legal_entity_name, rule_json, default_values_json,
+        sign_deadline_days, reminder_policy_json, auto_send_condition_json,
+        status, sort_order, create_by, create_time, update_by, update_time, remark
+    </sql>
+
+    <sql id="templateColumns">
+        pt.id, pt.plan_id, pt.template_id, pt.template_type, pt.sort_order, pt.create_time
+    </sql>
+
+    <insert id="insertOaSignPlan" parameterType="com.erp.oa.domain.OaSignPlan" useGeneratedKeys="true" keyProperty="planId">
+        insert into oa_sign_plan (
+            plan_name, scenario, post_name, employment_type, social_type,
+            service_person_type, insurance_type, post_level_snapshot, salary_version,
+            entry_date, contract_start_date, contract_end_date, probation_start_date,
+            probation_end_date, base_salary, post_salary, field_allowance, salary_total,
+            shop_dept_id, legal_entity_id, legal_entity_name, rule_json, default_values_json,
+            sign_deadline_days, reminder_policy_json, auto_send_condition_json,
+            status, sort_order, create_by, create_time, remark
+        ) values (
+            #{planName}, #{scenario}, #{postName}, #{employmentType}, #{socialType},
+            #{servicePersonType}, #{insuranceType}, #{postLevelSnapshot}, #{salaryVersion},
+            #{entryDate}, #{contractStartDate}, #{contractEndDate}, #{probationStartDate},
+            #{probationEndDate}, #{baseSalary}, #{postSalary}, #{fieldAllowance}, #{salaryTotal},
+            #{shopDeptId}, #{legalEntityId}, #{legalEntityName}, #{ruleJson}, #{defaultValuesJson},
+            #{signDeadlineDays}, #{reminderPolicyJson}, #{autoSendConditionJson},
+            #{status}, #{sortOrder}, #{createBy}, sysdate(), #{remark}
+        )
+    </insert>
+
+    <update id="updateOaSignPlan" parameterType="com.erp.oa.domain.OaSignPlan">
+        update oa_sign_plan
+        <set>
+            <if test="planName != null and planName != ''">plan_name = #{planName},</if>
+            <if test="scenario != null and scenario != ''">scenario = #{scenario},</if>
+            <if test="postName != null">post_name = #{postName},</if>
+            <if test="employmentType != null">employment_type = #{employmentType},</if>
+            <if test="socialType != null">social_type = #{socialType},</if>
+            <if test="servicePersonType != null">service_person_type = #{servicePersonType},</if>
+            <if test="insuranceType != null">insurance_type = #{insuranceType},</if>
+            <if test="postLevelSnapshot != null">post_level_snapshot = #{postLevelSnapshot},</if>
+            <if test="salaryVersion != null">salary_version = #{salaryVersion},</if>
+            <if test="entryDate != null">entry_date = #{entryDate},</if>
+            <if test="contractStartDate != null">contract_start_date = #{contractStartDate},</if>
+            <if test="contractEndDate != null">contract_end_date = #{contractEndDate},</if>
+            <if test="probationStartDate != null">probation_start_date = #{probationStartDate},</if>
+            <if test="probationEndDate != null">probation_end_date = #{probationEndDate},</if>
+            <if test="baseSalary != null">base_salary = #{baseSalary},</if>
+            <if test="postSalary != null">post_salary = #{postSalary},</if>
+            <if test="fieldAllowance != null">field_allowance = #{fieldAllowance},</if>
+            <if test="salaryTotal != null">salary_total = #{salaryTotal},</if>
+            <if test="shopDeptId != null">shop_dept_id = #{shopDeptId},</if>
+            <if test="legalEntityId != null">legal_entity_id = #{legalEntityId},</if>
+            <if test="legalEntityName != null">legal_entity_name = #{legalEntityName},</if>
+            <if test="ruleJson != null">rule_json = #{ruleJson},</if>
+            <if test="defaultValuesJson != null">default_values_json = #{defaultValuesJson},</if>
+            <if test="signDeadlineDays != null">sign_deadline_days = #{signDeadlineDays},</if>
+            <if test="reminderPolicyJson != null">reminder_policy_json = #{reminderPolicyJson},</if>
+            <if test="autoSendConditionJson != null">auto_send_condition_json = #{autoSendConditionJson},</if>
+            <if test="status != null and status != ''">status = #{status},</if>
+            <if test="sortOrder != null">sort_order = #{sortOrder},</if>
+            <if test="updateBy != null and updateBy != ''">update_by = #{updateBy},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            update_time = sysdate()
+        </set>
+        where plan_id = #{planId}
+    </update>
+
+    <select id="selectOaSignPlanById" resultMap="OaSignPlanResult">
+        select <include refid="baseColumns"/>
+        from oa_sign_plan
+        where plan_id = #{planId}
+    </select>
+
+    <select id="selectOaSignPlanList" parameterType="com.erp.oa.domain.OaSignPlan" resultMap="OaSignPlanResult">
+        select <include refid="baseColumns"/>
+        from oa_sign_plan
+        <where>
+            <if test="planName != null and planName != ''">
+                and plan_name like concat('%', #{planName}, '%')
+            </if>
+            <if test="scenario != null and scenario != ''">
+                and (scenario = #{scenario}
+                     or (lower(#{scenario}) = 'renewal' and lower(trim(scenario)) = 'renew'))
+            </if>
+            <if test="postName != null and postName != ''">
+                and post_name = #{postName}
+            </if>
+            <if test="employmentType != null and employmentType != ''">
+                and employment_type = #{employmentType}
+            </if>
+            <if test="status != null and status != ''">
+                and status = #{status}
+            </if>
+            <!-- 0 is the reserved scope for the single HR-owned global plan catalog. -->
+            and shop_dept_id = 0
+        </where>
+        order by sort_order asc, plan_id desc
+    </select>
+
+    <delete id="deletePlanTemplatesByPlanId">
+        delete from oa_sign_plan_template where plan_id = #{planId}
+    </delete>
+
+    <insert id="batchInsertPlanTemplates" parameterType="java.util.List">
+        insert into oa_sign_plan_template (
+            plan_id, template_id, template_type, sort_order, create_time
+        )
+        <choose>
+            <when test="list != null and list.size() > 0">
+                values
+                <foreach collection="list" item="item" separator=",">
+                    (#{item.planId}, #{item.templateId}, #{item.templateType}, #{item.sortOrder}, sysdate())
+                </foreach>
+            </when>
+            <otherwise>
+                select null, null, null, null, sysdate() where 1 = 0
+            </otherwise>
+        </choose>
+    </insert>
+
+    <select id="selectPlanTemplatesByPlanId" resultMap="OaSignPlanTemplateResult">
+        select <include refid="templateColumns"/>,
+               t.template_id as t_template_id,
+               t.template_type as t_template_type,
+               t.template_name as t_template_name,
+               t.template_version as t_template_version,
+               t.scenario as t_scenario,
+               t.employment_type as t_employment_type,
+               t.social_type as t_social_type,
+               t.post_level_scope as t_post_level_scope,
+               t.salary_version as t_salary_version,
+               t.file_url as t_file_url,
+               t.file_name as t_file_name,
+               t.file_size as t_file_size,
+               t.file_hash as t_file_hash,
+               t.required_placeholders as t_required_placeholders,
+               t.optional_placeholders as t_optional_placeholders,
+               t.employee_visible as t_employee_visible,
+               t.read_confirmation_required as t_read_confirmation_required,
+               t.employee_sign_required as t_employee_sign_required,
+               t.signature_position_json as t_signature_position_json,
+               t.company_seal_position_json as t_company_seal_position_json,
+               t.company_seal_required as t_company_seal_required,
+               t.match_condition_json as t_match_condition_json,
+               t.sort_order as t_sort_order,
+               t.status as t_status,
+               t.create_by as t_create_by,
+               t.create_time as t_create_time,
+               t.update_by as t_update_by,
+               t.update_time as t_update_time,
+               t.remark as t_remark
+        from oa_sign_plan_template pt
+             left join oa_sign_template t on t.template_id = pt.template_id
+        where pt.plan_id = #{planId}
+        order by pt.sort_order asc, pt.id asc
+    </select>
+
+    <select id="selectActiveTemplatesByPlanId" resultMap="OaSignTemplateResult">
+        select t.template_id, t.template_type, t.template_name, t.template_version, t.scenario,
+               t.employment_type, t.social_type, t.post_level_scope, t.salary_version,
+               t.file_url, t.file_name, t.file_size, t.file_hash, t.required_placeholders,
+               t.optional_placeholders, t.employee_visible, t.read_confirmation_required,
+               t.employee_sign_required, t.signature_position_json,
+               t.company_seal_position_json, t.company_seal_required,
+               t.match_condition_json, t.sort_order, t.status,
+               t.create_by, t.create_time, t.update_by, t.update_time, t.remark
+        from oa_sign_plan_template pt
+             inner join oa_sign_template t on t.template_id = pt.template_id
+        where pt.plan_id = #{planId}
+          and t.status = '0'
+        order by pt.sort_order asc, t.sort_order asc, t.template_id desc
+    </select>
+</mapper>

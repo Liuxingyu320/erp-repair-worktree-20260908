@@ -1,0 +1,619 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.oa.attendance.leave.AttendanceLeaveMapper">
+
+    <resultMap id="leaveTypeResult"
+            type="com.erp.oa.attendance.leave.AttendanceLeaveModels$LeaveType">
+        <id property="leaveTypeId" column="leave_type_id"/>
+        <result property="typeCode" column="type_code"/>
+        <result property="typeName" column="type_name"/>
+        <result property="unitMode" column="unit_mode"/>
+        <result property="payPolicy" column="pay_policy"/>
+        <result property="paidRatio" column="paid_ratio"/>
+        <result property="balanceRequired" column="balance_required"/>
+        <result property="attachmentRequired" column="attachment_required"/>
+        <result property="attachmentThresholdMinutes" column="attachment_threshold_minutes"/>
+        <result property="minMinutes" column="min_minutes"/>
+        <result property="stepMinutes" column="step_minutes"/>
+        <result property="maxMinutesPerRequest" column="max_minutes_per_request"/>
+        <result property="allowCrossDay" column="allow_cross_day"/>
+        <result property="approvalRequired" column="approval_required"/>
+        <result property="sortNo" column="sort_no"/>
+        <result property="status" column="status"/>
+        <result property="rowVersion" column="row_version"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateBy" column="update_by"/>
+        <result property="updateTime" column="update_time"/>
+        <result property="remark" column="remark"/>
+    </resultMap>
+
+    <sql id="leaveTypeColumns">
+        leave_type_id, type_code, type_name, unit_mode, pay_policy, paid_ratio,
+        balance_required, attachment_required, attachment_threshold_minutes,
+        min_minutes, step_minutes, max_minutes_per_request, allow_cross_day,
+        approval_required, sort_no, status, row_version, create_by, create_time,
+        update_by, update_time, remark
+    </sql>
+
+    <select id="selectLeaveTypes" resultMap="leaveTypeResult">
+        select <include refid="leaveTypeColumns"/>
+        from oa_attendance_leave_type
+        <where>
+            <if test="status != null and status != ''">status = #{status}</if>
+        </where>
+        order by sort_no, leave_type_id
+    </select>
+
+    <select id="selectLeaveTypeById" resultMap="leaveTypeResult">
+        select <include refid="leaveTypeColumns"/>
+        from oa_attendance_leave_type
+        where leave_type_id = #{leaveTypeId}
+    </select>
+
+    <insert id="insertLeaveType"
+            parameterType="com.erp.oa.attendance.leave.AttendanceLeaveModels$LeaveType"
+            useGeneratedKeys="true" keyProperty="leaveTypeId">
+        insert into oa_attendance_leave_type (
+            type_code, type_name, unit_mode, pay_policy, paid_ratio,
+            balance_required, attachment_required, attachment_threshold_minutes,
+            min_minutes, step_minutes, max_minutes_per_request, allow_cross_day,
+            approval_required, sort_no, status, row_version, create_by,
+            create_time, remark
+        ) values (
+            #{typeCode}, #{typeName}, #{unitMode}, #{payPolicy}, #{paidRatio},
+            #{balanceRequired}, #{attachmentRequired},
+            #{attachmentThresholdMinutes}, #{minMinutes}, #{stepMinutes},
+            #{maxMinutesPerRequest}, #{allowCrossDay}, #{approvalRequired},
+            #{sortNo}, #{status}, 0, #{createBy}, now(), #{remark}
+        )
+    </insert>
+
+    <update id="updateLeaveType"
+            parameterType="com.erp.oa.attendance.leave.AttendanceLeaveModels$LeaveType">
+        update oa_attendance_leave_type
+        set type_name = #{typeName}, unit_mode = #{unitMode},
+            pay_policy = #{payPolicy}, paid_ratio = #{paidRatio},
+            balance_required = #{balanceRequired},
+            attachment_required = #{attachmentRequired},
+            attachment_threshold_minutes = #{attachmentThresholdMinutes},
+            min_minutes = #{minMinutes}, step_minutes = #{stepMinutes},
+            max_minutes_per_request = #{maxMinutesPerRequest},
+            allow_cross_day = #{allowCrossDay},
+            approval_required = #{approvalRequired}, sort_no = #{sortNo},
+            row_version = row_version + 1, update_by = #{updateBy},
+            update_time = now(), remark = #{remark}
+        where leave_type_id = #{leaveTypeId}
+          and row_version = #{rowVersion}
+    </update>
+
+    <update id="updateLeaveTypeStatus">
+        update oa_attendance_leave_type
+        set status = #{status}, row_version = row_version + 1,
+            update_by = #{updateBy}, update_time = now()
+        where leave_type_id = #{leaveTypeId}
+          and row_version = #{rowVersion}
+    </update>
+
+    <select id="selectActiveEmployeeNameInShop" resultType="java.lang.String">
+        select u.nick_name
+        from sys_user u
+        join sys_user_profile p on p.user_id = u.user_id
+        join sys_dept target_dept on target_dept.dept_id = #{shopId}
+        where u.user_id = #{userId} and u.status = '0' and u.del_flag = '0'
+          and p.employee_status in ('试用', '正式', '在职', '待离职')
+          and target_dept.status = '0' and target_dept.del_flag = '0'
+          and target_dept.dept_type = 'STORE'
+          and (
+            exists (
+              select 1 from sys_dept employee_dept
+              where employee_dept.dept_id = u.dept_id
+                and employee_dept.status = '0'
+                and employee_dept.del_flag = '0'
+                and (employee_dept.dept_id = target_dept.dept_id
+                     or find_in_set(target_dept.dept_id,
+                                    employee_dept.ancestors))
+            )
+            or exists (
+              select 1 from sys_user_shop us
+              where us.user_id = u.user_id
+                and us.dept_id = target_dept.dept_id
+            )
+          )
+        limit 1
+    </select>
+
+    <resultMap id="leaveRequestResult"
+            type="com.erp.oa.attendance.leave.AttendanceLeaveModels$LeaveRequest">
+        <id property="leaveRequestId" column="leave_request_id"/>
+        <result property="leaveRequestNo" column="leave_request_no"/>
+        <result property="clientRequestId" column="client_request_id"/>
+        <result property="clientRequestFingerprint"
+                column="client_request_fingerprint"/>
+        <result property="userId" column="user_id"/>
+        <result property="userName" column="user_name"/>
+        <result property="shopId" column="shop_id"/>
+        <result property="leaveTypeId" column="leave_type_id"/>
+        <result property="leaveTypeCode" column="leave_type_code"/>
+        <result property="leaveTypeName" column="leave_type_name"/>
+        <result property="startTime" column="start_time"/>
+        <result property="endTime" column="end_time"/>
+        <result property="totalMinutes" column="total_minutes"/>
+        <result property="reason" column="reason"/>
+        <result property="status" column="status"/>
+        <result property="businessRound" column="business_round"/>
+        <result property="approvalInstanceId" column="approval_instance_id"/>
+        <result property="rowVersion" column="row_version"/>
+        <result property="lastApprovalEventKey" column="last_approval_event_key"/>
+        <result property="submittedAt" column="submitted_at"/>
+        <result property="approvedAt" column="approved_at"/>
+        <result property="rejectedAt" column="rejected_at"/>
+        <result property="cancelledAt" column="cancelled_at"/>
+        <result property="attachmentCount" column="attachment_count"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateBy" column="update_by"/>
+        <result property="updateTime" column="update_time"/>
+        <result property="remark" column="remark"/>
+    </resultMap>
+
+    <sql id="leaveRequestSelect">
+        select r.leave_request_id, r.leave_request_no, r.client_request_id,
+               r.client_request_fingerprint, r.user_id, r.user_name,
+               r.shop_id, r.leave_type_id, t.type_code leave_type_code,
+               t.type_name leave_type_name, r.start_time, r.end_time,
+               r.total_minutes, r.reason, r.status, r.business_round,
+               r.approval_instance_id, r.row_version,
+               r.last_approval_event_key, r.submitted_at, r.approved_at,
+               r.rejected_at, r.cancelled_at, r.create_by, r.create_time,
+               r.update_by, r.update_time, r.remark,
+               (select count(*) from oa_attendance_leave_attachment a
+                where a.leave_request_id = r.leave_request_id) attachment_count
+        from oa_attendance_leave_request r
+        join oa_attendance_leave_type t
+          on t.leave_type_id = r.leave_type_id
+    </sql>
+
+    <insert id="insertLeaveRequest"
+            parameterType="com.erp.oa.attendance.leave.AttendanceLeaveModels$LeaveRequest"
+            useGeneratedKeys="true" keyProperty="leaveRequestId">
+        insert into oa_attendance_leave_request (
+            leave_request_no, client_request_id, client_request_fingerprint,
+            user_id, user_name, shop_id, leave_type_id,
+            start_time, end_time, total_minutes, reason, status,
+            business_round, approval_instance_id, row_version,
+            last_approval_event_key, create_by, create_time, remark
+        ) values (
+            #{leaveRequestNo}, #{clientRequestId},
+            #{clientRequestFingerprint}, #{userId}, #{userName}, #{shopId},
+            #{leaveTypeId}, #{startTime}, #{endTime}, #{totalMinutes},
+            #{reason}, #{status}, 0, null, 0, null, #{createBy}, now(),
+            #{remark}
+        )
+    </insert>
+
+    <update id="updateLeaveDraft"
+            parameterType="com.erp.oa.attendance.leave.AttendanceLeaveModels$LeaveRequest">
+        update oa_attendance_leave_request
+        set leave_type_id = #{leaveTypeId}, start_time = #{startTime},
+            end_time = #{endTime}, total_minutes = #{totalMinutes},
+            reason = #{reason}, row_version = row_version + 1,
+            update_by = #{updateBy}, update_time = now()
+        where leave_request_id = #{leaveRequestId}
+          and user_id = #{userId} and shop_id = #{shopId}
+          and status in ('DRAFT', 'RETURNED')
+          and row_version = #{rowVersion}
+    </update>
+
+    <select id="selectLeaveRequestById" resultMap="leaveRequestResult">
+        <include refid="leaveRequestSelect"/>
+        where r.leave_request_id = #{leaveRequestId}
+    </select>
+
+    <select id="selectLeaveRequestByIdForUpdate" resultMap="leaveRequestResult">
+        <include refid="leaveRequestSelect"/>
+        where r.leave_request_id = #{leaveRequestId}
+        for update
+    </select>
+
+    <select id="selectLeaveRequestByClientRequestId"
+            resultMap="leaveRequestResult">
+        <include refid="leaveRequestSelect"/>
+        where r.user_id = #{userId} and r.shop_id = #{shopId}
+          and r.client_request_id = #{clientRequestId}
+        limit 1
+    </select>
+
+    <select id="selectLeaveRequestByClientRequestIdForUpdate"
+            resultMap="leaveRequestResult">
+        <include refid="leaveRequestSelect"/>
+        where r.user_id = #{userId} and r.shop_id = #{shopId}
+          and r.client_request_id = #{clientRequestId}
+        limit 1
+        for update
+    </select>
+
+    <select id="selectLeaveRequestsByUser" resultMap="leaveRequestResult">
+        <include refid="leaveRequestSelect"/>
+        where r.user_id = #{userId} and r.shop_id = #{shopId}
+        <if test="status != null and status != ''">and r.status = #{status}</if>
+        <if test="dateFrom != null">and r.end_time &gt;= #{dateFrom}</if>
+        <if test="dateTo != null">and r.start_time &lt; date_add(#{dateTo}, interval 1 day)</if>
+        order by r.start_time desc, r.leave_request_id desc
+    </select>
+
+    <select id="selectLeaveRequestsByShop" resultMap="leaveRequestResult">
+        <include refid="leaveRequestSelect"/>
+        where r.shop_id = #{shopId}
+        <if test="userId != null">and r.user_id = #{userId}</if>
+        <if test="status != null and status != ''">and r.status = #{status}</if>
+        <if test="dateFrom != null">and r.end_time &gt;= #{dateFrom}</if>
+        <if test="dateTo != null">and r.start_time &lt; date_add(#{dateTo}, interval 1 day)</if>
+        order by r.start_time desc, r.leave_request_id desc
+    </select>
+
+    <select id="countOverlappingLeave" resultType="int">
+        select count(*)
+        from oa_attendance_leave_request
+        where user_id = #{userId}
+          and leave_request_id != coalesce(#{excludeId}, -1)
+          and status in ('DRAFT', 'SUBMITTING', 'PENDING', 'APPROVED', 'RETURNED')
+          and start_time &lt; #{endTime} and end_time &gt; #{startTime}
+    </select>
+
+    <select id="selectScheduleRefs" resultType="com.erp.oa.attendance.leave.AttendanceLeaveModels$ScheduleRef">
+        select schedule_id scheduleId, shop_id shopId,
+               business_date businessDate,
+               timestamp(business_date, start_time_snapshot) scheduleStart,
+               timestamp(
+                 case when cross_day_snapshot = 1
+                           or end_time_snapshot &lt;= start_time_snapshot
+                      then date_add(business_date, interval 1 day)
+                      else business_date end,
+                 end_time_snapshot) scheduleEnd
+        from oa_attendance_schedule
+        where user_id = #{userId}
+          and shop_id = #{shopId}
+          and business_date between date_sub(#{dateFrom}, interval 1 day)
+                                and #{dateTo}
+          and status in ('PUBLISHED', 'CHANGED')
+        order by business_date, schedule_id
+    </select>
+
+    <select id="calculateScheduledWorkMinutes" resultType="int">
+        select coalesce(sum(timestampdiff(minute,
+                 greatest(#{startTime}, date_add(
+                   timestamp(s.business_date, '00:00:00'),
+                   interval ss.start_minute_offset minute)),
+                 least(#{endTime}, date_add(
+                   timestamp(s.business_date, '00:00:00'),
+                   interval ss.end_minute_offset minute)))), 0)
+        from oa_attendance_schedule s
+        join oa_attendance_schedule_segment_snapshot ss
+          on ss.schedule_id = s.schedule_id
+         and ss.segment_type = 'WORK'
+        where s.user_id = #{userId} and s.shop_id = #{shopId}
+          and s.status in ('PUBLISHED', 'CHANGED')
+          and s.business_date between date_sub(date(#{startTime}), interval 1 day)
+                                  and date(#{endTime})
+          and date_add(timestamp(s.business_date, '00:00:00'),
+                interval ss.start_minute_offset minute) &lt; #{endTime}
+          and date_add(timestamp(s.business_date, '00:00:00'),
+                interval ss.end_minute_offset minute) &gt; #{startTime}
+    </select>
+
+    <select id="countOverlappingPublishedSchedules" resultType="int">
+        select count(*)
+        from oa_attendance_schedule s
+        where s.user_id = #{userId} and s.shop_id = #{shopId}
+          and s.status in ('PUBLISHED', 'CHANGED')
+          and timestamp(s.business_date, s.start_time_snapshot) &lt; #{endTime}
+          and timestamp(
+                case when s.cross_day_snapshot = 1
+                           or s.end_time_snapshot &lt;= s.start_time_snapshot
+                     then date_add(s.business_date, interval 1 day)
+                     else s.business_date end,
+                s.end_time_snapshot) &gt; #{startTime}
+    </select>
+
+    <delete id="deleteLeaveSegments">
+        delete from oa_attendance_leave_segment
+        where leave_request_id = #{leaveRequestId}
+    </delete>
+
+    <insert id="insertLeaveSegment"
+            parameterType="com.erp.oa.attendance.leave.AttendanceLeaveModels$LeaveSegment"
+            useGeneratedKeys="true" keyProperty="leaveSegmentId">
+        insert into oa_attendance_leave_segment (
+            leave_request_id, business_date, start_time, end_time,
+            total_minutes, paid_minutes, unpaid_minutes, schedule_id,
+            segment_status, create_time
+        ) values (
+            #{leaveRequestId}, #{businessDate}, #{startTime}, #{endTime},
+            #{totalMinutes}, #{paidMinutes}, #{unpaidMinutes}, #{scheduleId},
+            #{segmentStatus}, now()
+        )
+    </insert>
+
+    <select id="selectLeaveSegments"
+            resultType="com.erp.oa.attendance.leave.AttendanceLeaveModels$LeaveSegment">
+        select leave_segment_id leaveSegmentId, leave_request_id leaveRequestId,
+               business_date businessDate, start_time startTime,
+               end_time endTime, total_minutes totalMinutes,
+               paid_minutes paidMinutes, unpaid_minutes unpaidMinutes,
+               schedule_id scheduleId, segment_status segmentStatus,
+               create_time createTime
+        from oa_attendance_leave_segment
+        where leave_request_id = #{leaveRequestId}
+        order by business_date, start_time, leave_segment_id
+    </select>
+
+    <resultMap id="attachmentResult"
+            type="com.erp.oa.attendance.leave.AttendanceLeaveModels$LeaveAttachment">
+        <id property="attachmentId" column="attachment_id"/>
+        <result property="leaveRequestId" column="leave_request_id"/>
+        <result property="originalName" column="original_name"/>
+        <result property="storagePath" column="storage_path"/>
+        <result property="contentType" column="content_type"/>
+        <result property="fileExtension" column="file_extension"/>
+        <result property="fileSize" column="file_size"/>
+        <result property="sha256" column="sha256"/>
+        <result property="uploadedBy" column="uploaded_by"/>
+        <result property="createTime" column="create_time"/>
+    </resultMap>
+
+    <sql id="attachmentColumns">
+        attachment_id, leave_request_id, original_name, storage_path,
+        content_type, file_extension, file_size, sha256, uploaded_by, create_time
+    </sql>
+
+    <insert id="insertLeaveAttachment"
+            parameterType="com.erp.oa.attendance.leave.AttendanceLeaveModels$LeaveAttachment"
+            useGeneratedKeys="true" keyProperty="attachmentId">
+        insert into oa_attendance_leave_attachment (
+            leave_request_id, original_name, storage_path, content_type,
+            file_extension, file_size, sha256, uploaded_by, create_time
+        ) values (
+            #{leaveRequestId}, #{originalName}, #{storagePath}, #{contentType},
+            #{fileExtension}, #{fileSize}, #{sha256}, #{uploadedBy}, now()
+        )
+    </insert>
+
+    <select id="selectLeaveAttachmentById" resultMap="attachmentResult">
+        select <include refid="attachmentColumns"/>
+        from oa_attendance_leave_attachment
+        where attachment_id = #{attachmentId}
+    </select>
+
+    <select id="selectLeaveAttachmentByHash" resultMap="attachmentResult">
+        select <include refid="attachmentColumns"/>
+        from oa_attendance_leave_attachment
+        where leave_request_id = #{leaveRequestId} and sha256 = #{sha256}
+        limit 1
+    </select>
+
+    <select id="selectLeaveAttachments" resultMap="attachmentResult">
+        select <include refid="attachmentColumns"/>
+        from oa_attendance_leave_attachment
+        where leave_request_id = #{leaveRequestId}
+        order by create_time, attachment_id
+    </select>
+
+    <select id="countLeaveAttachments" resultType="int">
+        select count(*) from oa_attendance_leave_attachment
+        where leave_request_id = #{leaveRequestId}
+    </select>
+
+    <delete id="deleteLeaveAttachment">
+        delete from oa_attendance_leave_attachment
+        where attachment_id = #{attachmentId}
+          and leave_request_id = #{leaveRequestId}
+    </delete>
+
+    <update id="markLeaveSubmitting">
+        update oa_attendance_leave_request
+        set status = 'SUBMITTING', business_round = #{businessRound},
+            approval_instance_id = null, last_approval_event_key = null,
+            submitted_at = now(), row_version = row_version + 1,
+            update_by = #{updateBy}, update_time = now()
+        where leave_request_id = #{leaveRequestId}
+          and status = #{expectedStatus} and row_version = #{expectedVersion}
+    </update>
+
+    <update id="markLeaveAutoApproved">
+        update oa_attendance_leave_request
+        set status = 'APPROVED', approved_at = now(), submitted_at = now(),
+            row_version = row_version + 1, update_by = #{updateBy},
+            update_time = now()
+        where leave_request_id = #{leaveRequestId}
+          and status = #{expectedStatus} and row_version = #{expectedVersion}
+    </update>
+
+    <update id="invalidateDayResultsForLeaveRequest">
+        update oa_attendance_day_result d
+        join oa_attendance_schedule s on s.schedule_id = d.schedule_id
+        join oa_attendance_leave_request r
+          on r.leave_request_id = #{leaveRequestId}
+         and r.user_id = s.user_id and r.shop_id = s.shop_id
+        set d.settled_at = null,
+            d.result_status = 'PENDING',
+            d.exception_codes = 'LEAVE_REQUEST_REVIEW_REQUIRED',
+            d.row_version = d.row_version + 1,
+            d.calculated_at = now(),
+            d.update_by = #{updateBy}, d.update_time = now()
+        where s.status in ('PUBLISHED', 'CHANGED')
+          and timestamp(s.business_date, s.start_time_snapshot) &lt; r.end_time
+          and timestamp(
+                case when s.cross_day_snapshot = 1
+                     then date_add(s.business_date, interval 1 day)
+                     else s.business_date end,
+                s.end_time_snapshot) &gt; r.start_time
+    </update>
+
+    <update id="finalizeLeaveApprovalStart">
+        update oa_attendance_leave_request
+        set status = 'PENDING', approval_instance_id = #{instanceId},
+            row_version = row_version + 1, update_by = #{updateBy},
+            update_time = now()
+        where leave_request_id = #{leaveRequestId}
+          and status = 'SUBMITTING'
+          and business_round = #{businessRound}
+          and row_version = #{expectedVersion}
+          and approval_instance_id is null
+    </update>
+
+    <update id="cancelLeaveDraft">
+        update oa_attendance_leave_request
+        set status = 'CANCELLED', cancelled_at = now(), remark = #{reason},
+            row_version = row_version + 1, update_by = #{updateBy},
+            update_time = now()
+        where leave_request_id = #{leaveRequestId}
+          and status = #{expectedStatus} and row_version = #{expectedVersion}
+    </update>
+
+    <resultMap id="outboxResult"
+            type="com.erp.oa.attendance.leave.AttendanceLeaveModels$ApprovalOutbox">
+        <id property="outboxId" column="outbox_id"/>
+        <result property="leaveRequestId" column="leave_request_id"/>
+        <result property="businessRound" column="business_round"/>
+        <result property="idempotencyKey" column="idempotency_key"/>
+        <result property="requestJson" column="request_json"/>
+        <result property="status" column="status"/>
+        <result property="attemptCount" column="attempt_count"/>
+        <result property="nextRetryAt" column="next_retry_at"/>
+        <result property="claimToken" column="claim_token"/>
+        <result property="claimedAt" column="claimed_at"/>
+        <result property="lastHttpStatus" column="last_http_status"/>
+        <result property="lastErrorCode" column="last_error_code"/>
+        <result property="lastError" column="last_error"/>
+        <result property="remoteInstanceId" column="remote_instance_id"/>
+        <result property="remoteStatus" column="remote_status"/>
+        <result property="remoteBusinessRound" column="remote_business_round"/>
+        <result property="requestRowVersion" column="request_row_version"/>
+        <result property="rowVersion" column="row_version"/>
+        <result property="remoteSucceededAt" column="remote_succeeded_at"/>
+        <result property="completedAt" column="completed_at"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateTime" column="update_time"/>
+    </resultMap>
+
+    <sql id="outboxColumns">
+        outbox_id, leave_request_id, business_round, idempotency_key,
+        request_json, status, attempt_count, next_retry_at, claim_token,
+        claimed_at, last_http_status, last_error_code, last_error,
+        remote_instance_id, remote_status, remote_business_round,
+        request_row_version, row_version, remote_succeeded_at, completed_at,
+        create_by, create_time, update_time
+    </sql>
+
+    <insert id="insertApprovalOutbox"
+            parameterType="com.erp.oa.attendance.leave.AttendanceLeaveModels$ApprovalOutbox"
+            useGeneratedKeys="true" keyProperty="outboxId">
+        insert ignore into oa_attendance_leave_approval_start_outbox (
+            leave_request_id, business_round, idempotency_key, request_json,
+            status, attempt_count, next_retry_at, request_row_version,
+            row_version, create_by, create_time, update_time
+        ) values (
+            #{leaveRequestId}, #{businessRound}, #{idempotencyKey},
+            #{requestJson}, #{status}, 0, null, #{requestRowVersion},
+            0, #{createBy}, now(), now()
+        )
+    </insert>
+
+    <select id="selectApprovalOutboxById" resultMap="outboxResult">
+        select <include refid="outboxColumns"/>
+        from oa_attendance_leave_approval_start_outbox
+        where outbox_id = #{outboxId}
+    </select>
+
+    <select id="selectApprovalOutboxByIdForUpdate" resultMap="outboxResult">
+        select <include refid="outboxColumns"/>
+        from oa_attendance_leave_approval_start_outbox
+        where outbox_id = #{outboxId}
+        for update
+    </select>
+
+    <select id="selectApprovalOutboxByRound" resultMap="outboxResult">
+        select <include refid="outboxColumns"/>
+        from oa_attendance_leave_approval_start_outbox
+        where leave_request_id = #{leaveRequestId}
+          and business_round = #{businessRound}
+        limit 1
+    </select>
+
+    <select id="selectDueApprovalOutboxes" resultMap="outboxResult">
+        select <include refid="outboxColumns"/>
+        from oa_attendance_leave_approval_start_outbox
+        where (status in ('PENDING', 'RETRY')
+               and (next_retry_at is null or next_retry_at &lt;= #{dueAt}))
+           or status = 'REMOTE_SUCCEEDED'
+           or (status = 'PROCESSING' and claimed_at &lt;= #{staleClaimedBefore})
+        order by case status when 'REMOTE_SUCCEEDED' then 0
+                     when 'PROCESSING' then 1 when 'RETRY' then 2 else 3 end,
+                 coalesce(next_retry_at, create_time), outbox_id
+        limit #{limit}
+    </select>
+
+    <update id="claimApprovalOutbox">
+        update oa_attendance_leave_approval_start_outbox
+        set status = 'PROCESSING', attempt_count = attempt_count + 1,
+            next_retry_at = null, claim_token = #{claimToken},
+            claimed_at = now(), row_version = row_version + 1,
+            update_time = now()
+        where outbox_id = #{outboxId}
+          and status = #{expectedStatus}
+          and row_version = #{expectedVersion}
+    </update>
+
+    <update id="markApprovalRemoteSucceeded">
+        update oa_attendance_leave_approval_start_outbox
+        set status = 'REMOTE_SUCCEEDED',
+            remote_instance_id = #{remoteInstanceId},
+            remote_status = #{remoteStatus},
+            remote_business_round = #{remoteBusinessRound},
+            remote_succeeded_at = now(), last_http_status = #{lastHttpStatus},
+            last_error_code = null, last_error = null,
+            claim_token = null, claimed_at = null,
+            row_version = row_version + 1, update_time = now()
+        where outbox_id = #{outboxId}
+          and status = #{expectedStatus}
+          and row_version = #{expectedVersion}
+    </update>
+
+    <update id="markApprovalRetry">
+        update oa_attendance_leave_approval_start_outbox
+        set status = 'RETRY', next_retry_at = #{nextRetryAt},
+            last_http_status = #{lastHttpStatus},
+            last_error_code = #{lastErrorCode}, last_error = #{lastError},
+            claim_token = null, claimed_at = null,
+            row_version = row_version + 1, update_time = now()
+        where outbox_id = #{outboxId}
+          and status = #{expectedStatus}
+          and row_version = #{expectedVersion}
+    </update>
+
+    <update id="markApprovalFailed">
+        update oa_attendance_leave_approval_start_outbox
+        set status = 'FAILED', next_retry_at = null,
+            last_http_status = #{lastHttpStatus},
+            last_error_code = #{lastErrorCode}, last_error = #{lastError},
+            claim_token = null, claimed_at = null,
+            row_version = row_version + 1, update_time = now()
+        where outbox_id = #{outboxId}
+          and status = #{expectedStatus}
+          and row_version = #{expectedVersion}
+    </update>
+
+    <update id="markApprovalCompleted">
+        update oa_attendance_leave_approval_start_outbox
+        set status = 'COMPLETED', completed_at = now(), next_retry_at = null,
+            last_error_code = null, last_error = null,
+            claim_token = null, claimed_at = null,
+            row_version = row_version + 1, update_time = now()
+        where outbox_id = #{outboxId}
+          and status = #{expectedStatus}
+          and row_version = #{expectedVersion}
+    </update>
+</mapper>

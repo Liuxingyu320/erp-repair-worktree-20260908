@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.oa.mapper.OaSalaryEmployeeMapper">
+
+    <resultMap id="OaSalaryEmployeeResult" type="OaSalaryEmployee">
+        <id property="userId" column="user_id"/>
+        <result property="userName" column="user_name"/>
+        <result property="deptId" column="dept_id"/>
+        <result property="shopDeptId" column="shop_dept_id"/>
+        <result property="baseSalary" column="base_salary"/>
+        <result property="postSalary" column="post_salary"/>
+        <result property="fieldAllowance" column="field_allowance"/>
+        <result property="performanceSalary" column="performance_salary"/>
+        <result property="salaryTotal" column="salary_total"/>
+    </resultMap>
+
+    <select id="selectSalaryEmployeesByShopDeptId" resultMap="OaSalaryEmployeeResult">
+        select u.user_id,
+               u.user_name,
+               u.dept_id,
+               #{shopDeptId} as shop_dept_id,
+               p.base_salary, p.post_salary, p.field_allowance,
+               p.performance_salary, p.salary_total
+        from sys_user u
+        left join sys_user_profile p on p.user_id = u.user_id
+        where u.del_flag = '0'
+          and u.status = '0'
+          and (
+              u.dept_id = #{shopDeptId}
+              or exists (
+                  select 1
+                  from sys_user_shop us
+                  where us.user_id = u.user_id
+                    and us.dept_id = #{shopDeptId}
+              )
+          )
+        order by u.user_id asc
+    </select>
+</mapper>

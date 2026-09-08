@@ -1,0 +1,269 @@
+{
+  "schemaVersion": 1,
+  "releaseId": "sign-original-placement-export-20260809",
+  "status": "development",
+  "deployable": false,
+  "deploymentAuthorized": false,
+  "approvalState": "awaiting-project-manager-review",
+  "approvalRecord": null,
+  "baselineCommit": "b408b7054a481fac692878fcdc24e7ea5bc9cc68",
+  "baselineCommitSemantics": "build-baseline-only-dirty-worktree-not-reproducible-by-commit",
+  "workingTreeReproducible": false,
+  "sourceFileList": "scripts/sign-original-placement-export-release-files-20260809.list",
+  "sourceFileCount": 60,
+  "sourceHashAlgorithm": "sha256",
+  "sourceHashPolicy": "per-file-fail-closed-with-recorded-git-status",
+  "sourceHashExclusions": [
+    {
+      "file": "scripts/sign-original-placement-export-release-20260809.json",
+      "reason": "self-referential manifest; schema, exact source scope and every other file hash are verified fail-closed"
+    }
+  ],
+  "pinnedBuildInputs": {
+    "scope": "cross-release-reactor-build-inputs-not-rev06-business-source",
+    "reactor": "./mvnw -pl erp-modules/erp-oa -am clean package",
+    "fileCount": 15,
+    "files": [
+      {"file": "pom.xml", "sha256": "31a9adfa8430cd07cc27eb7c7bd77fb369d3acf5894afb17146e2f8f080cb1f3", "gitStatus": " M"},
+      {"file": "erp-common/pom.xml", "sha256": "1e49c4cda20b1e1b47920713d2836f08eccbf2063d8b0dbfbfb66be067bc8185", "gitStatus": ".."},
+      {"file": "erp-common/erp-common-core/pom.xml", "sha256": "19d672d6706df11091ec93c61629f93fa16843e7d6bb932fa495e64df32b3c99", "gitStatus": ".."},
+      {"file": "erp-api/pom.xml", "sha256": "7a765bf2ccbf93da7d59fa1aeee160a3f164faa22351e4da579e0c15e82f54f9", "gitStatus": " M"},
+      {"file": "erp-api/erp-api-system/pom.xml", "sha256": "810c1a2486fade11fe408b924ac6678c665a468978badbf83c0e33130261785c", "gitStatus": ".."},
+      {"file": "erp-common/erp-common-redis/pom.xml", "sha256": "5950e17a46b8dc001ec9537f7036182b60436b2c154638edac8c6e734d633bb5", "gitStatus": ".."},
+      {"file": "erp-common/erp-common-security/pom.xml", "sha256": "b7890f5a3cd579638cc3eacd07e844bffa6d7ffd7748710e88ccf290afd3dd61", "gitStatus": ".."},
+      {"file": "erp-common/erp-common-log/pom.xml", "sha256": "5519987f7c0ffecae43f0a8e51152a32a945935b0371e7ea1fb113d22b4278a9", "gitStatus": ".."},
+      {"file": "erp-common/erp-common-swagger/pom.xml", "sha256": "9ab26959cb36334755fff4e1c292e552f066d174729b45581518bd242bc72888", "gitStatus": ".."},
+      {"file": "erp-common/erp-common-datascope/pom.xml", "sha256": "12751844ed7316f8f74d6929d29183b73ced6cd124ebb8270f3aa29709650ef8", "gitStatus": ".."},
+      {"file": "erp-common/erp-common-datasource/pom.xml", "sha256": "d187ffe439b5b700af4b405de20709f3006506b1fa791507610b586842f89fa8", "gitStatus": ".."},
+      {"file": "erp-api/erp-api-oa/pom.xml", "sha256": "bdd30b0fec881023f2645b58ef3b2227ac6ab45f3973a0bab1c848cf27d1bf58", "gitStatus": ".."},
+      {"file": "erp-api/erp-api-approval/pom.xml", "sha256": "f0ceb4b499e38de47105071ff4dd48fd19a18ab5f5431a28cb20bbd189fe9823", "gitStatus": ".."},
+      {"file": "erp-modules/pom.xml", "sha256": "73fe629151926d25a82ec71a2de6d7f051031bbfbe547e2d432d5023e2196104", "gitStatus": " M"},
+      {"file": "erp-modules/erp-oa/pom.xml", "sha256": "9c2aa3e801a4371b18050f7a5f4742217b8609b307f47bedc4230b6f37890f76", "gitStatus": " M"}
+    ]
+  },
+  "migrationList": "scripts/sign-original-placement-export-migrations-20260809.list",
+  "migrationCount": 1,
+  "executionPolicy": "manual-approved-maintenance-window",
+  "migrations": [
+    {
+      "file": "erp_oa_sign_labor_contract_placement_v7_20260809.sql",
+      "sourceFile": "sql/erp_oa_sign_labor_contract_placement_v7_20260809.sql",
+      "dockerDbFile": "docker/mysql/db/erp_oa_sign_labor_contract_placement_v7_20260809.sql",
+      "runtimeResourceFile": "erp-modules/erp-oa/src/main/resources/db/migration/erp_oa_sign_labor_contract_placement_v7_20260809.sql",
+      "sha256": "829ae042311b6b4bc14f5969062951f4991fdc84340a60272a9e103bf35f1584",
+      "creates": [
+        "two immutable PUBLISHED plan-version snapshots when absent"
+      ],
+      "updates": [
+        "matching_status for the two reviewed source/candidate pairs only"
+      ],
+      "backupTables": [
+        "oa_sign_plan_version",
+        "oa_sign_plan_version_template"
+      ],
+      "packageOrDocumentWrites": false,
+      "idempotent": true,
+      "rollbackFile": "scripts/sign-original-placement-export-rollback-20260809.sql"
+    }
+  ],
+  "pinnedResources": {
+    "exactV7Template": "erp-modules/erp-oa/src/main/resources/oa/sign/templates/onboard-20260721-v7/09_ONBOARD_LABOR_CONTRACT.docx",
+    "exactV7TemplateSha256": "1226728ec0e703d513efda83dc5578ee4cdd65cb3e7d0e7cb5afee813f466558",
+    "placementProfile": "erp-modules/erp-oa/src/main/resources/oa/sign/labor-contract-placement-profiles-v1.json",
+    "placementProfileSha256": "53365e079c5b31b2b376830317f407d74a1db51e23d601d2131978967a071582",
+    "representativeEvidence": "erp-modules/erp-oa/src/main/resources/oa/sign/evidence/legal-entity-4-representative-20260719-v1.json",
+    "representativeEvidenceSha256": "2c034d093388966bca6b2349e21e1f66d46add19acaf601fd41284e54d454c9e"
+  },
+  "artifactAttestation": {
+    "candidateEvidenceRequired": true,
+    "installedEvidenceRequiredWhileStopped": true,
+    "candidateEvidenceFile": "candidate-artifact.json",
+    "installedEvidenceFile": "installed-artifact.json",
+    "expectedShaPolicy": "installed artifact bytes must equal the candidate SHA recorded before the maintenance stop",
+    "buildPolicy": "wrapper executes the fixed clean OA build with the cross-release build-info properties and also injects a separately attested provenance entry",
+    "buildInfoProperties": {
+      "build.commit": "baselineCommit",
+      "build.releaseId": "releaseId",
+      "build.approvedPatchSha256": "sourceSnapshotSha256",
+      "build.approvedSourceManifestSha256": "manifestSha256"
+    },
+    "provenanceEntry": "META-INF/erp-sign-placement-release.properties",
+    "buildMetadataUnsetAllowed": false,
+    "requiredJarEntries": [
+      "com/erp/oa/service/impl/OaSignDocumentService.class",
+      "com/erp/oa/service/impl/OaSignLaborAnchorPlacementResolver.class",
+      "com/erp/oa/service/impl/OaSignPackageServiceImpl.class",
+      "com/erp/oa/service/impl/OaPdfPageNumberService.class",
+      "com/erp/oa/service/impl/OaSignLaborPlacementProfileRegistry.class",
+      "com/erp/oa/service/impl/OaSignPlacementPolicyService.class",
+      "com/erp/oa/service/impl/OaSignPlanVersionFingerprint.class",
+      "com/erp/oa/service/impl/OaSignedPdfService.class",
+      "oa/sign/labor-contract-placement-profiles-v1.json",
+      "oa/sign/templates/onboard-20260721-v7/09_ONBOARD_LABOR_CONTRACT.docx",
+      "META-INF/build-info.properties",
+      "META-INF/erp-sign-placement-release.properties"
+    ]
+  },
+  "readOnlyRouteSmoke": {
+    "requiredHttpMethod": "GET",
+    "minimumRouteCount": 2,
+    "exactPaths": [
+      "/signPackage/scope/options",
+      "/signPackage/template/types"
+    ],
+    "sameOriginAsOaHealthUrl": true,
+    "authenticatedBearerHeaderFileRequired": true,
+    "browserCookieAllowed": false,
+    "successfulJsonContractRequired": true,
+    "responseBodyPersisted": false
+  },
+  "databaseIdentityAttestation": {
+    "requiredBeforeMigration": true,
+    "requiredAfterMigration": true,
+    "cliAndJdbcMustMatchExactly": true,
+    "nonCredentialFields": [
+      "serverUuid",
+      "serverHostname",
+      "serverPort",
+      "databaseName"
+    ]
+  },
+  "gateOrder": [
+    "VERIFY_SOURCE_MANIFEST_AND_CODE_COMPATIBILITY",
+    "VERIFY_EXACT_V7_SOURCE_DOCX_SHA256",
+    "BUILD_AND_RECORD_CANDIDATE_OA_ARTIFACT_SHA256",
+    "STOP_PACKAGE_WRITES_AND_OA_SERVICE",
+    "INSTALL_AND_ATTEST_OA_ARTIFACT_WHILE_STOPPED",
+    "RUN_READ_ONLY_PREFLIGHT_AND_JAVA_DB_GATE_PRE_SKIP_ZERO",
+    "APPLY_IMMUTABLE_MIGRATION_ONCE",
+    "RUN_JAVA_DB_GATE_POST_SKIP_ZERO",
+    "START_OA_SERVICE",
+    "VERIFY_OA_HEALTH_UP",
+    "VERIFY_READ_ONLY_SIGNING_ROUTES"
+  ],
+  "maintenanceWindow": {
+    "newPackageCreationMustBeBlocked": true,
+    "oaServiceMustBeStoppedBeforePreflight": true,
+    "preflightMustBeRepeatedAfterStop": true,
+    "exactV7RuntimeBytesMustBeRenderedByDeploymentRuntime": true,
+    "normalAndDatabaseMaxLayoutsMustPass": true,
+    "partialMatchingSwitchAllowed": false
+  },
+  "rollbackPolicy": {
+    "candidatePackageCountMustEqual": 0,
+    "allowedBeforeCandidateUseOnly": true,
+    "sourceEnabledCountAfterRollback": 2,
+    "candidateEnabledCountAfterRollback": 0,
+    "otherEnabledCountAfterRollback": 0,
+    "automaticDestructiveSchemaRollback": false
+  },
+  "historicalCoverage": {
+    "localSignedConfirmedLaborContractDocumentCount": 0,
+    "zeroSamplesClaim": "not-verified",
+    "goldenAuditScope": "one hash-bound audited historical layout only",
+    "unknownTemplateOrFileFingerprintPolicy": "fail-closed",
+    "productionRequirement": "every signed-confirmed labor-contract group must pass the read-only formal export dry-run before deployment"
+  },
+  "inFlightCoverage": {
+    "localNonTerminalLaborPackageCount": 2,
+    "localSupportedGroup": "exact-v7 APPENDED COMPANY_FIRST PREPARED_NOT_SENT",
+    "businessRowsModifiedByVerifier": 0,
+    "unknownOrIncompleteGroupPolicy": "fail-closed"
+  },
+  "scratchEvidence": {
+    "file": "docs/releases/evidence/sign-original-placement-export-20260809-scratch.json",
+    "sha256": "05ed60f80274863890a9e99441efc1c2df13618f0d1effc8192cec835364827b",
+    "mysqlVersion": "8.0.45",
+    "forwardExecutions": 2,
+    "rollbackExecutions": 2,
+    "negativeScenarios": 6,
+    "schemasDropped": true
+  },
+  "controlledGoldenAudit": {
+    "environmentVariable": "ERP_SIGN_GOLDEN_FIXTURE_DIR",
+    "ordinaryTestBehaviorWhenMissing": "skipped-and-explicitly-not-counted-as-passed",
+    "fixtureIncludedInRelease": false,
+    "realPiiPdfIncludedInRelease": false,
+    "redactedQaIncludedInRelease": false,
+    "originalArchiveSha256": "731db734f3fe4dc73a2e18aafadacd5df78e53347209e7b0020ac5f942c6cc69"
+  },
+  "privacyAndScope": {
+    "forbiddenSourcePaths": [
+      "output/",
+      "tmp/pdfs/sign-export-audit/",
+      "target/",
+      "dist/",
+      "node_modules/",
+      "drive/",
+      "cloud-drive/",
+      "pds/",
+      ".env"
+    ],
+    "fullIdentityDocumentNumberAllowed": false,
+    "credentialsAllowed": false,
+    "driveFilesAllowed": false,
+    "productionWritePerformedByThisDevelopmentTask": false,
+    "deploymentPerformedByThisDevelopmentTask": false
+  },
+  "sourceFiles": [
+    {"file": ".gitignore", "sha256": "99acbc032d8b994d18c005a398a164334abc14c5fe05b12e76fe922072415845", "gitStatus": " M"},
+    {"file": "docker/mysql/db/erp_oa_sign_labor_contract_placement_v7_20260809.sql", "sha256": "829ae042311b6b4bc14f5969062951f4991fdc84340a60272a9e103bf35f1584", "gitStatus": "??"},
+    {"file": "docs/releases/evidence/sign-original-placement-export-20260809-scratch.json", "sha256": "05ed60f80274863890a9e99441efc1c2df13618f0d1effc8192cec835364827b", "gitStatus": "??"},
+    {"file": "erp-modules/erp-oa/src/main/java/com/erp/oa/constant/OaSignTemplateType.java", "sha256": "be21ec1ab2f9ada025d3a1f456e7640306f85456efe45f16130d750be653ea0b", "gitStatus": " M"},
+    {"file": "erp-modules/erp-oa/src/main/java/com/erp/oa/controller/OaSignPackageController.java", "sha256": "9052854923c70667714fdce3a9c0a62249f24b88e3639187ba019ac856aa7928", "gitStatus": " M"},
+    {"file": "erp-modules/erp-oa/src/main/java/com/erp/oa/domain/OaSignPackage.java", "sha256": "eca6ea35af7fdccf60ae1d0b8b76044699442e925e2918378a57ad4aa435ea24", "gitStatus": " M"},
+    {"file": "erp-modules/erp-oa/src/main/java/com/erp/oa/domain/OaSignPackageDocument.java", "sha256": "8f0c7e8485a8aa62c53d3082c54ecdc46836772757e1d006f42eb198c2af104e", "gitStatus": " M"},
+    {"file": "erp-modules/erp-oa/src/main/java/com/erp/oa/domain/OaSignPlanVersionTemplate.java", "sha256": "f4af85b6167327d32be4b704b9a0ed23e867e8b6845f135f77d239ac62813ffa", "gitStatus": " M"},
+    {"file": "erp-modules/erp-oa/src/main/java/com/erp/oa/domain/OaSignTemplate.java", "sha256": "1151ec619f485d77949a25f410f43981805cfcc2d024930d910eedab07ea103a", "gitStatus": " M"},
+    {"file": "erp-modules/erp-oa/src/main/java/com/erp/oa/domain/vo/OaSignPackageFile.java", "sha256": "a1189dd6e196917a0acd16702d49ac8ebe80d6b0b85e36ae34a26c2f8ace7801", "gitStatus": " M"},
+    {"file": "erp-modules/erp-oa/src/main/java/com/erp/oa/domain/vo/SignedPdfResult.java", "sha256": "4f374d63a58b0e1cee6fb8b59867605588ece5f1d47479b87347c0a9594191d2", "gitStatus": " M"},
+    {"file": "erp-modules/erp-oa/src/main/java/com/erp/oa/service/IOaSignPackageService.java", "sha256": "876f6afa6a8a4b939a39da216cc5bada39f48c60c078833f07aeeb8c7c90a736", "gitStatus": " M"},
+    {"file": "erp-modules/erp-oa/src/main/java/com/erp/oa/service/impl/OaSignDocumentService.java", "sha256": "8cba35d2417183117b03a5aeed16a8131754bee59b5a19a4d679f519cb64d83d", "gitStatus": " M"},
+    {"file": "erp-modules/erp-oa/src/main/java/com/erp/oa/service/impl/OaSignLaborAnchorPlacementResolver.java", "sha256": "5d7e8f71ad046aa37e548ffbd265301c25ef1f8a0427d001911d18644f0d607b", "gitStatus": "??"},
+    {"file": "erp-modules/erp-oa/src/main/java/com/erp/oa/service/impl/OaSignLaborPlacementProfileRegistry.java", "sha256": "a7507a58e5bd08df642ea3f80ebd0da0c3c262ca936733b364bf02a150a4bdac", "gitStatus": "??"},
+    {"file": "erp-modules/erp-oa/src/main/java/com/erp/oa/service/impl/OaSignPackagePreflightValidator.java", "sha256": "6b92b3bc973f0931e58bc433927ddb121e98d90e9d82cb93749943f028fe2eb3", "gitStatus": " M"},
+    {"file": "erp-modules/erp-oa/src/main/java/com/erp/oa/service/impl/OaSignPackageServiceImpl.java", "sha256": "fdb8bf3169d8a87c4287122b61a8905cd6dda16bde813b8e06c04e710dcb7c8d", "gitStatus": " M"},
+    {"file": "erp-modules/erp-oa/src/main/java/com/erp/oa/service/impl/OaPdfPageNumberService.java", "sha256": "9298beea6583c12d8cfb5efbeee52b27fc53535226cb2289bb5280b8450b925a", "gitStatus": "??"},
+    {"file": "erp-modules/erp-oa/src/main/java/com/erp/oa/service/impl/OaSignPlacementPolicyService.java", "sha256": "0050b4d0123fb460ffa9baa751050773572e0b2c1b5237c61973716f4b68c6c0", "gitStatus": "??"},
+    {"file": "erp-modules/erp-oa/src/main/java/com/erp/oa/service/impl/OaSignPlanVersionFingerprint.java", "sha256": "d7d3c116214f052015ff3e1b783c65cfe402d658a531fbef911fdaa5c42878f2", "gitStatus": "??"},
+    {"file": "erp-modules/erp-oa/src/main/java/com/erp/oa/service/impl/OaSignPlanVersionServiceImpl.java", "sha256": "0321514df2f3f655f5146e29993916be7b11da50c9d7d7a65f2a0b8b656aff69", "gitStatus": " M"},
+    {"file": "erp-modules/erp-oa/src/main/java/com/erp/oa/service/impl/OaSignedPdfService.java", "sha256": "8a393842d657e178a13f76a69b2f41d86965e3654af9adba5550d7f5b7eda57a", "gitStatus": " M"},
+    {"file": "erp-modules/erp-oa/src/main/resources/db/migration/erp_oa_sign_labor_contract_placement_v7_20260809.sql", "sha256": "829ae042311b6b4bc14f5969062951f4991fdc84340a60272a9e103bf35f1584", "gitStatus": "??"},
+    {"file": "erp-modules/erp-oa/src/main/resources/mapper/oa/OaSignPackageDocumentMapper.xml", "sha256": "685bd0746f45022e7ce739d0007a3aa175b9a3b24f2f56febba7c1cc84a17a86", "gitStatus": " M"},
+    {"file": "erp-modules/erp-oa/src/main/resources/mapper/oa/OaSignPackageMapper.xml", "sha256": "e2b69f2b6d895da4d39803f86bf8d87d15aa79a51359f494b683ff15ecb53c23", "gitStatus": " M"},
+    {"file": "erp-modules/erp-oa/src/main/resources/mapper/oa/OaSignPlanVersionMapper.xml", "sha256": "22d7b976c954dfb56bbc9d862c5356e8cd7541706b601c9ff0a8ca4bbd10b26e", "gitStatus": " M"},
+    {"file": "erp-modules/erp-oa/src/main/resources/mapper/oa/OaSignTemplateMapper.xml", "sha256": "bd8aeaa113df87062dfafdd3579ab58b53a9f30792893983a547f8493510627a", "gitStatus": " M"},
+    {"file": "erp-modules/erp-oa/src/main/resources/oa/sign/evidence/legal-entity-4-representative-20260719-v1.json", "sha256": "2c034d093388966bca6b2349e21e1f66d46add19acaf601fd41284e54d454c9e", "gitStatus": "??"},
+    {"file": "erp-modules/erp-oa/src/main/resources/oa/sign/labor-contract-placement-profiles-v1.json", "sha256": "53365e079c5b31b2b376830317f407d74a1db51e23d601d2131978967a071582", "gitStatus": "??"},
+    {"file": "erp-modules/erp-oa/src/main/resources/oa/sign/templates/onboard-20260721-v7/09_ONBOARD_LABOR_CONTRACT.docx", "sha256": "1226728ec0e703d513efda83dc5578ee4cdd65cb3e7d0e7cb5afee813f466558", "gitStatus": "??"},
+    {"file": "erp-modules/erp-oa/src/test/java/com/erp/oa/constant/OaSignTemplateTypeTest.java", "sha256": "555b687e23f74a99414e9838b53a0694449e1612dc00cc89d3a8112745c1d0d3", "gitStatus": " M"},
+    {"file": "erp-modules/erp-oa/src/test/java/com/erp/oa/controller/OaSignPackageControllerTest.java", "sha256": "57b1966c91a5852800bd88cee55cc2ba86e1d9e4877b00007198947232da9b21", "gitStatus": " M"},
+    {"file": "erp-modules/erp-oa/src/test/java/com/erp/oa/mapper/OaSignLaborPlacementReleaseMigrationTest.java", "sha256": "17d4e9a13f832b887ee178e96abb3241fb8fcd44f000c10bf0e1f4835fe3cc30", "gitStatus": "??"},
+    {"file": "erp-modules/erp-oa/src/test/java/com/erp/oa/service/impl/OaSignDocumentServiceTest.java", "sha256": "a6c74ab9521e66b6d3755e8ecb2ee32361edbb591907085d31bf73bd9aea6b32", "gitStatus": " M"},
+    {"file": "erp-modules/erp-oa/src/test/java/com/erp/oa/service/impl/OaSignFinalFileAndIdempotencyTest.java", "sha256": "d3f6214e2d297b2612d9a07279a04c0d1bfe2c607206106ed6deb8ee5c83b471", "gitStatus": "??"},
+    {"file": "erp-modules/erp-oa/src/test/java/com/erp/oa/service/impl/OaSignGoldenFixture.java", "sha256": "82de602ec0936fc480ab64ecd066c273005a9910b1867b68add3855a7a9fc15f", "gitStatus": "??"},
+    {"file": "erp-modules/erp-oa/src/test/java/com/erp/oa/service/impl/OaSignLaborPlacementDatabaseVerifierTest.java", "sha256": "9c9a2303191fb604c41e9d14774fdf1447963f3c1f6fbf87dc43e8bd77234c52", "gitStatus": "??"},
+    {"file": "erp-modules/erp-oa/src/test/java/com/erp/oa/service/impl/OaSignPackagePreflightValidatorTest.java", "sha256": "a0cb122231cbdd114ae0e9cafeec0e5bf4be67531b1abe8368666ca28a98b192", "gitStatus": " M"},
+    {"file": "erp-modules/erp-oa/src/test/java/com/erp/oa/service/impl/OaSignPackageServiceImplTest.java", "sha256": "dbcf0e4622c73c2617b745cbcc06b221bd41fbbc0293c4b32f3aae0927bb403c", "gitStatus": " M"},
+    {"file": "erp-modules/erp-oa/src/test/java/com/erp/oa/service/impl/OaPdfPageNumberServiceTest.java", "sha256": "ec87e59d51bce03bbd1508efe75a81563b4d3a299dcdba274cb64508e365e8a1", "gitStatus": "??"},
+    {"file": "erp-modules/erp-oa/src/test/java/com/erp/oa/service/impl/OaSignPlacementPolicyServiceTest.java", "sha256": "bcd6435318244de7518a46205cec5afafd48388974b64975eb45e17de9968a44", "gitStatus": "??"},
+    {"file": "erp-modules/erp-oa/src/test/java/com/erp/oa/service/impl/OaSignPlanVersionFingerprintTest.java", "sha256": "773cd40a03ac6903bd7cbb9cc720ae3fd36cd7861e29493fcd66ab97cfbc8d6b", "gitStatus": "??"},
+    {"file": "erp-modules/erp-oa/src/test/java/com/erp/oa/service/impl/OaSignPlanVersionServiceImplTest.java", "sha256": "ba60c2ea6e1844737dab238017be1b4c006db3e0ff1ede7bace7eed71a1bf3bd", "gitStatus": " M"},
+    {"file": "erp-modules/erp-oa/src/test/java/com/erp/oa/service/impl/OaSignedPdfServiceTest.java", "sha256": "085ce978447c04656e969d3f4d78f5f497fa8e224fff9aa412899495a02c5d6e", "gitStatus": " M"},
+    {"file": "erp-modules/erp-oa/src/test/resources/oa/sign/release/labor-placement-plan-snapshots-v1.json", "sha256": "ba2c98b4cc278fd2ce89c6fdd85b0718d341f55ccd6d4a61312952009110c8a9", "gitStatus": "??"},
+    {"file": "erp-ui/src/api/oa/signPackage.js", "sha256": "08e684d3318cb04a52a5507eefeb4509ef79f9af251442ceca52c6681cb81f96", "gitStatus": " M"},
+    {"file": "erp-ui/src/views/mobile/signPackage/index.vue", "sha256": "684082de53d202281f05d150e5bde1396223860c86b0b6506de429c9dac86c3c", "gitStatus": " M"},
+    {"file": "erp-ui/src/views/oa/signPackage/index.vue", "sha256": "7c7dc4c4e8432ec8cab4e53c83b4512fde765363d7718b1ad67b5f8ede604e03", "gitStatus": " M"},
+    {"file": "erp-ui/test/signOriginalPlacementExportRelease.test.js", "sha256": "58b92c44dca24b4094dad9289b508f7d160ee4b33af8ce0ed2a834ba93e2cdef", "gitStatus": "??"},
+    {"file": "erp-ui/test/signPackageDesktopExport.test.js", "sha256": "95a29fe81fccafbf311e144fd0960eacdb0ea3325ff7fc5651302ec7ed0cac48", "gitStatus": "??"},
+    {"file": "erp-ui/test/signPackageMobilePreview.test.js", "sha256": "99143be3fd2d20045c4aaa624e97338328f3ff970a5721b2f2d27a245c751a6c", "gitStatus": "??"},
+    {"file": "erp-ui/test/signPackageModule.test.js", "sha256": "d239ba74d13cc570f360ceee94e79b226dbded7a213b37f60bbb102e2b0cc0be", "gitStatus": " M"},
+    {"file": "scripts/release-sign-original-placement-export-20260809.sh", "sha256": "cc334e36dce4c532bc8a4629444db36b62a14f807853b6765e06704775822ca0", "gitStatus": "??"},
+    {"file": "scripts/sign-original-placement-export-migrations-20260809.list", "sha256": "ef2315826b753671b40daee6f501bc7e87b4d9f7fbec094f9c18eab1583a3ba3", "gitStatus": "??"},
+    {"file": "scripts/sign-original-placement-export-preflight-20260809.sql", "sha256": "cecc871b45b53fd764c5a8071b063677821708d86745b51dd656b5e51faaa816", "gitStatus": "??"},
+    {"file": "scripts/sign-original-placement-export-release-files-20260809.list", "sha256": "c06d934f952220aed6bdf6cca8c2584938e4c319254e507b7b25e0766bdc6cc9", "gitStatus": "??"},
+    {"file": "scripts/sign-original-placement-export-rollback-20260809.sql", "sha256": "64ff9d3fcacb78531e927bb529978d0587de4bf897df757af0ac8ca9fc2a893d", "gitStatus": "??"},
+    {"file": "scripts/verify-sign-original-placement-export-release.sh", "sha256": "c28836685e64adabc8fe3f62a920f0666288d6b9d3ee047bd18f362f8c141702", "gitStatus": "??"},
+    {"file": "sql/erp_oa_sign_labor_contract_placement_v7_20260809.sql", "sha256": "829ae042311b6b4bc14f5969062951f4991fdc84340a60272a9e103bf35f1584", "gitStatus": "??"}
+  ]
+}

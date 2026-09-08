@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.inventory.mapper.InvInboundRecordMapper">
+
+    <resultMap type="InvInboundRecord" id="InvInboundRecordResult">
+        <id property="inboundId" column="inbound_id"/>
+        <result property="purchaseOrderId" column="purchase_order_id"/>
+        <result property="purchaseDetailId" column="purchase_detail_id"/>
+        <result property="orderNo" column="order_no"/>
+        <result property="itemType" column="item_type"/>
+        <result property="itemId" column="item_id"/>
+        <result property="productId" column="product_id"/>
+        <result property="shopDeptId" column="shop_dept_id"/>
+        <result property="warehouseId" column="warehouse_id"/>
+        <result property="receiptBatchId" column="receipt_batch_id"/>
+        <result property="receiptBatchDetailId" column="receipt_batch_detail_id"/>
+        <result property="qualityInspectionId" column="quality_inspection_id"/>
+        <result property="quantity" column="quantity"/>
+        <result property="inspectedQuantity" column="inspected_quantity"/>
+        <result property="acceptedQuantity" column="accepted_quantity"/>
+        <result property="rejectedQuantity" column="rejected_quantity"/>
+        <result property="concessionQuantity" column="concession_quantity"/>
+        <result property="qcResult" column="qc_result"/>
+        <result property="qcUser" column="qc_user"/>
+        <result property="qcTime" column="qc_time"/>
+        <result property="qcRemark" column="qc_remark"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="remark" column="remark"/>
+    </resultMap>
+
+    <select id="selectInvInboundRecordByOrderId" parameterType="Long" resultMap="InvInboundRecordResult">
+        select inbound_id, purchase_order_id, purchase_detail_id, order_no, item_type, item_id,
+               product_id, shop_dept_id, warehouse_id, receipt_batch_id, receipt_batch_detail_id,
+               quality_inspection_id, quantity, inspected_quantity, accepted_quantity,
+               rejected_quantity, concession_quantity,
+               qc_result, qc_user, qc_time, qc_remark, create_by, create_time, remark
+        from inv_inbound_record
+        where purchase_order_id = #{orderId}
+    </select>
+
+    <select id="selectPendingInvInboundRecordByOrderId" parameterType="Long" resultMap="InvInboundRecordResult">
+        select inbound_id, purchase_order_id, purchase_detail_id, order_no, item_type, item_id,
+               product_id, shop_dept_id, warehouse_id, receipt_batch_id, receipt_batch_detail_id,
+               quality_inspection_id, quantity, inspected_quantity, accepted_quantity,
+               rejected_quantity, concession_quantity,
+               qc_result, qc_user, qc_time, qc_remark, create_by, create_time, remark
+        from inv_inbound_record
+        where purchase_order_id = #{orderId}
+          and (qc_result is null or qc_result = 'pending')
+    </select>
+
+    <select id="selectByBatchDetailIdForUpdate" resultMap="InvInboundRecordResult">
+        select inbound_id, purchase_order_id, purchase_detail_id, order_no, item_type, item_id,
+               product_id, shop_dept_id, warehouse_id, receipt_batch_id, receipt_batch_detail_id,
+               quality_inspection_id, quantity, inspected_quantity, accepted_quantity,
+               rejected_quantity, concession_quantity,
+               qc_result, qc_user, qc_time, qc_remark, create_by, create_time, remark
+        from inv_inbound_record
+        where receipt_batch_detail_id = #{batchDetailId}
+        for update
+    </select>
+
+    <insert id="insertInvInboundRecord" parameterType="InvInboundRecord" useGeneratedKeys="true" keyProperty="inboundId">
+        insert into inv_inbound_record (
+            purchase_order_id, purchase_detail_id, order_no, item_type, item_id,
+            product_id, shop_dept_id, warehouse_id, receipt_batch_id, receipt_batch_detail_id,
+            quality_inspection_id, quantity, inspected_quantity, accepted_quantity,
+            rejected_quantity, concession_quantity,
+            qc_result, qc_user, qc_time, qc_remark, create_by, create_time, remark
+        ) values (
+            #{purchaseOrderId}, #{purchaseDetailId}, #{orderNo}, coalesce(#{itemType}, 'product'), coalesce(#{itemId}, #{productId}),
+            #{productId}, #{shopDeptId}, #{warehouseId}, #{receiptBatchId}, #{receiptBatchDetailId},
+            #{qualityInspectionId}, #{quantity}, #{inspectedQuantity}, #{acceptedQuantity},
+            #{rejectedQuantity}, #{concessionQuantity},
+            #{qcResult}, #{qcUser}, #{qcTime}, #{qcRemark}, #{createBy}, sysdate(), #{remark}
+        )
+    </insert>
+
+    <update id="updateInvInboundRecord" parameterType="InvInboundRecord">
+        update inv_inbound_record
+        <set>
+            <if test="warehouseId != null">warehouse_id = #{warehouseId},</if>
+            <if test="qualityInspectionId != null">quality_inspection_id = #{qualityInspectionId},</if>
+            <if test="inspectedQuantity != null">inspected_quantity = #{inspectedQuantity},</if>
+            <if test="acceptedQuantity != null">accepted_quantity = #{acceptedQuantity},</if>
+            <if test="rejectedQuantity != null">rejected_quantity = #{rejectedQuantity},</if>
+            <if test="concessionQuantity != null">concession_quantity = #{concessionQuantity},</if>
+            <if test="qcResult != null">qc_result = #{qcResult},</if>
+            <if test="qcUser != null">qc_user = #{qcUser},</if>
+            <if test="qcTime != null">qc_time = #{qcTime},</if>
+            <if test="qcRemark != null">qc_remark = #{qcRemark},</if>
+            <if test="remark != null">remark = #{remark},</if>
+        </set>
+        where inbound_id = #{inboundId}
+    </update>
+
+    <delete id="deleteByOrderId" parameterType="Long">
+        delete from inv_inbound_record where purchase_order_id = #{orderId}
+    </delete>
+
+    <delete id="deleteRejectedByOrderId" parameterType="Long">
+        delete from inv_inbound_record
+        where purchase_order_id = #{orderId}
+          and qc_result = 'rejected'
+          and receipt_batch_id is null
+    </delete>
+
+</mapper>

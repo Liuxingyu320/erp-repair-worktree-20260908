@@ -1,0 +1,112 @@
+{
+  "schemaVersion": 1,
+  "releaseId": "new-business-20260714",
+  "candidateCommit": "0000000000000000000000000000000000000000",
+  "runId": "gray-20260714-001",
+  "completedAt": "2026-07-14T20:00:00+08:00",
+  "phases": [
+    {
+      "name": "single-store-single-warehouse",
+      "stores": ["storeA"],
+      "warehouses": ["warehouseA"],
+      "status": "passed",
+      "reviewer": "灰度验收人",
+      "completedAt": "2026-07-14T19:00:00+08:00"
+    },
+    {
+      "name": "second-store-isolation",
+      "stores": ["storeA", "storeB"],
+      "warehouses": ["warehouseA", "warehouseB"],
+      "status": "passed",
+      "reviewer": "灰度验收人",
+      "completedAt": "2026-07-14T20:00:00+08:00"
+    }
+  ],
+  "featureChanges": [
+    {
+      "key": "feature.hr.health-certificate.enabled",
+      "previousValue": "false",
+      "newValue": "true",
+      "scope": "灰度角色与试点门店",
+      "operator": "配置操作人",
+      "reason": "健康证验收通过",
+      "ticket": "CHG-001",
+      "auditRecordId": 1,
+      "changedAt": "2026-07-14T18:00:00+08:00"
+    },
+    {
+      "key": "feature.inventory.transfer-discrepancy.enabled",
+      "previousValue": "false",
+      "newValue": "true",
+      "scope": "灰度角色、试点门店与仓库",
+      "operator": "配置操作人",
+      "reason": "先开放调拨差异闭环",
+      "ticket": "CHG-003",
+      "auditRecordId": 3,
+      "changedAt": "2026-07-14T18:20:00+08:00"
+    },
+    {
+      "key": "feature.inventory.store-return.enabled",
+      "previousValue": "false",
+      "newValue": "true",
+      "scope": "灰度角色、试点门店与仓库",
+      "operator": "配置操作人",
+      "reason": "差异闭环稳定后开放返仓",
+      "ticket": "CHG-004",
+      "auditRecordId": 4,
+      "changedAt": "2026-07-14T18:30:00+08:00"
+    },
+    {
+      "key": "feature.inventory.customer-service-card.enabled",
+      "previousValue": "false",
+      "newValue": "true",
+      "scope": "灰度门店角色",
+      "operator": "配置操作人",
+      "reason": "最后开放客户服务卡写入口",
+      "ticket": "CHG-007",
+      "auditRecordId": 7,
+      "changedAt": "2026-07-14T19:00:00+08:00"
+    }
+  ],
+  "monitoring": {
+    "candidateRulesSha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "loadedAt": "2026-07-14T17:30:00+08:00",
+    "operator": "监控操作人",
+    "loadEvidence": {
+      "path": "../../output/gray/prometheus-rules-alerts.json",
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "status": "passed"
+    }
+  },
+  "reconciliation": {
+    "before": {
+      "path": "../../output/gray/reconciliation-before.json",
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "status": "passed"
+    },
+    "after": {
+      "path": "../../output/gray/reconciliation-after.json",
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "status": "passed"
+    }
+  },
+  "rollbackDrill": {
+    "newEntryDisabled": true,
+    "inFlightCompleted": true,
+    "reconciliationStayedClean": true,
+    "evidence": {
+      "path": "../../output/gray/rollback-drill.txt",
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "status": "passed"
+    },
+    "reviewer": "回滚演练验收人",
+    "completedAt": "2026-07-14T20:00:00+08:00"
+  },
+  "signoff": {
+    "businessOwner": "业务负责人",
+    "operationsOwner": "运维负责人",
+    "releaseOwner": "发布负责人",
+    "approvedAt": "2026-07-14T20:00:00+08:00",
+    "decision": "approved"
+  }
+}

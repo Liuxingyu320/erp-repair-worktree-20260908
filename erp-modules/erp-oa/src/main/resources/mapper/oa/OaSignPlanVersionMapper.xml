@@ -1,0 +1,300 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.oa.mapper.OaSignPlanVersionMapper">
+
+    <resultMap id="SourcePlanResult" type="com.erp.oa.domain.OaSignPlan">
+        <id property="planId" column="plan_id"/>
+        <result property="planName" column="plan_name"/>
+        <result property="scenario" column="scenario"/>
+        <result property="postName" column="post_name"/>
+        <result property="employmentType" column="employment_type"/>
+        <result property="socialType" column="social_type"/>
+        <result property="servicePersonType" column="service_person_type"/>
+        <result property="insuranceType" column="insurance_type"/>
+        <result property="postLevelSnapshot" column="post_level_snapshot"/>
+        <result property="salaryVersion" column="salary_version"/>
+        <result property="entryDate" column="entry_date"/>
+        <result property="contractStartDate" column="contract_start_date"/>
+        <result property="contractEndDate" column="contract_end_date"/>
+        <result property="probationStartDate" column="probation_start_date"/>
+        <result property="probationEndDate" column="probation_end_date"/>
+        <result property="baseSalary" column="base_salary"/>
+        <result property="postSalary" column="post_salary"/>
+        <result property="fieldAllowance" column="field_allowance"/>
+        <result property="salaryTotal" column="salary_total"/>
+        <result property="shopDeptId" column="shop_dept_id"/>
+        <result property="legalEntityId" column="legal_entity_id"/>
+        <result property="legalEntityName" column="legal_entity_name"/>
+        <result property="ruleJson" column="rule_json"/>
+        <result property="defaultValuesJson" column="default_values_json"/>
+        <result property="signDeadlineDays" column="sign_deadline_days"/>
+        <result property="reminderPolicyJson" column="reminder_policy_json"/>
+        <result property="autoSendConditionJson" column="auto_send_condition_json"/>
+        <result property="status" column="status"/>
+        <result property="sortOrder" column="sort_order"/>
+    </resultMap>
+
+    <resultMap id="SourcePlanBindingResult" type="com.erp.oa.domain.OaSignPlanTemplate">
+        <id property="id" column="id"/>
+        <result property="planId" column="plan_id"/>
+        <result property="templateId" column="template_id"/>
+        <result property="templateType" column="template_type"/>
+        <result property="sortOrder" column="sort_order"/>
+    </resultMap>
+
+    <resultMap id="SourceTemplateResult" type="com.erp.oa.domain.OaSignTemplate">
+        <id property="templateId" column="template_id"/>
+        <result property="templateType" column="template_type"/>
+        <result property="templateName" column="template_name"/>
+        <result property="templateVersion" column="template_version"/>
+        <result property="scenario" column="scenario"/>
+        <result property="employmentType" column="employment_type"/>
+        <result property="socialType" column="social_type"/>
+        <result property="postLevelScope" column="post_level_scope"/>
+        <result property="salaryVersion" column="salary_version"/>
+        <result property="fileUrl" column="file_url"/>
+        <result property="fileName" column="file_name"/>
+        <result property="fileSize" column="file_size"/>
+        <result property="fileHash" column="file_hash"/>
+        <result property="requiredPlaceholders" column="required_placeholders"/>
+        <result property="optionalPlaceholders" column="optional_placeholders"/>
+        <result property="employeeVisible" column="employee_visible"/>
+        <result property="readConfirmationRequired" column="read_confirmation_required"/>
+        <result property="employeeSignRequired" column="employee_sign_required"/>
+        <result property="signaturePositionJson" column="signature_position_json"/>
+        <result property="companySealPositionJson" column="company_seal_position_json"/>
+        <result property="companySealRequired" column="company_seal_required"/>
+        <result property="matchConditionJson" column="match_condition_json"/>
+        <result property="sortOrder" column="sort_order"/>
+        <result property="status" column="status"/>
+    </resultMap>
+
+    <resultMap id="PlanVersionResult" type="com.erp.oa.domain.OaSignPlanVersion">
+        <id property="versionId" column="version_id"/>
+        <result property="planId" column="plan_id"/>
+        <result property="planName" column="plan_name"/>
+        <result property="versionNo" column="version_no"/>
+        <result property="scenario" column="scenario"/>
+        <result property="shopDeptId" column="shop_dept_id"/>
+        <result property="legalEntityId" column="legal_entity_id"/>
+        <result property="legalEntityName" column="legal_entity_name"/>
+        <result property="ruleJson" column="rule_json"/>
+        <result property="defaultValuesJson" column="default_values_json"/>
+        <result property="signDeadlineDays" column="sign_deadline_days"/>
+        <result property="reminderPolicyJson" column="reminder_policy_json"/>
+        <result property="autoSendConditionJson" column="auto_send_condition_json"/>
+        <result property="publishStatus" column="publish_status"/>
+        <result property="matchingStatus" column="matching_status"/>
+        <result property="publishedByUserId" column="published_by_user_id"/>
+        <result property="publishedBy" column="published_by"/>
+        <result property="publishedTime" column="published_time"/>
+        <result property="versionHash" column="version_hash"/>
+        <result property="createTime" column="create_time"/>
+    </resultMap>
+
+    <resultMap id="PlanVersionTemplateResult" type="com.erp.oa.domain.OaSignPlanVersionTemplate">
+        <id property="id" column="id"/>
+        <result property="planVersionId" column="plan_version_id"/>
+        <result property="templateId" column="template_id"/>
+        <result property="templateVersion" column="template_version"/>
+        <result property="templateType" column="template_type"/>
+        <result property="templateName" column="template_name"/>
+        <result property="sourceFileUrl" column="source_file_url"/>
+        <result property="sourceFileHash" column="source_file_hash"/>
+        <result property="requiredPlaceholders" column="required_placeholders"/>
+        <result property="sortOrder" column="sort_order"/>
+        <result property="employeeVisible" column="employee_visible"/>
+        <result property="readConfirmationRequired" column="read_confirmation_required"/>
+        <result property="employeeSignRequired" column="employee_sign_required"/>
+        <result property="signaturePositionJson" column="signature_position_json"/>
+        <result property="companySealPositionJson" column="company_seal_position_json"/>
+        <result property="companySealRequired" column="company_seal_required"/>
+        <result property="matchConditionJson" column="match_condition_json"/>
+        <result property="createTime" column="create_time"/>
+    </resultMap>
+
+    <sql id="sourcePlanColumns">
+        plan_id, plan_name, scenario, post_name, employment_type, social_type,
+        service_person_type, insurance_type, post_level_snapshot, salary_version,
+        entry_date, contract_start_date, contract_end_date, probation_start_date,
+        probation_end_date, base_salary, post_salary, field_allowance, salary_total,
+        shop_dept_id, legal_entity_id, legal_entity_name, rule_json, default_values_json,
+        sign_deadline_days, reminder_policy_json, auto_send_condition_json, status, sort_order
+    </sql>
+
+    <sql id="planVersionColumns">
+        version_id, plan_id, plan_name, version_no, scenario, shop_dept_id,
+        legal_entity_id, legal_entity_name, rule_json, default_values_json,
+        sign_deadline_days, reminder_policy_json, auto_send_condition_json,
+        publish_status, matching_status, published_by_user_id, published_by,
+        published_time, version_hash, create_time
+    </sql>
+
+    <sql id="planVersionTemplateColumns">
+        id, plan_version_id, template_id, template_version, template_type, template_name,
+        source_file_url, source_file_hash, required_placeholders, sort_order,
+        employee_visible, read_confirmation_required, employee_sign_required,
+        signature_position_json, company_seal_position_json, company_seal_required,
+        match_condition_json, create_time
+    </sql>
+
+    <select id="lockPlanById" resultMap="SourcePlanResult">
+        select <include refid="sourcePlanColumns"/>
+        from oa_sign_plan
+        where plan_id = #{planId}
+        for update
+    </select>
+
+    <select id="lockPlanTemplateBindings" resultMap="SourcePlanBindingResult">
+        select id, plan_id, template_id, template_type, sort_order
+        from oa_sign_plan_template
+        where plan_id = #{planId}
+        order by id asc
+        for update
+    </select>
+
+    <select id="lockTemplatesByIds" resultMap="SourceTemplateResult">
+        select template_id, template_type, template_name, template_version,
+               scenario, employment_type, social_type, post_level_scope, salary_version,
+               file_url, file_name, file_size, file_hash, required_placeholders,
+               optional_placeholders, employee_visible, read_confirmation_required,
+               employee_sign_required, signature_position_json,
+               company_seal_position_json, company_seal_required,
+               match_condition_json, sort_order, status
+        from oa_sign_template
+        where template_id in
+        <foreach collection="templateIds" item="templateId" open="(" separator="," close=")">
+            #{templateId}
+        </foreach>
+        order by template_id asc
+        for update
+    </select>
+
+    <select id="selectByPlanIdAndVersionHash" resultMap="PlanVersionResult">
+        select <include refid="planVersionColumns"/>
+        from oa_sign_plan_version
+        where plan_id = #{planId}
+          and version_hash = #{versionHash}
+        limit 1
+    </select>
+
+    <select id="selectNextVersionNo" resultType="java.lang.Integer">
+        select coalesce(max(version_no), 0) + 1
+        from oa_sign_plan_version
+        where plan_id = #{planId}
+    </select>
+
+    <insert id="insertPlanVersion" parameterType="com.erp.oa.domain.OaSignPlanVersion"
+            useGeneratedKeys="true" keyProperty="versionId">
+        insert into oa_sign_plan_version (
+            plan_id, plan_name, version_no, scenario, shop_dept_id,
+            legal_entity_id, legal_entity_name, rule_json, default_values_json,
+            sign_deadline_days, reminder_policy_json, auto_send_condition_json,
+            publish_status, matching_status, published_by_user_id, published_by,
+            published_time, version_hash, create_time
+        ) values (
+            #{planId}, #{planName}, #{versionNo}, #{scenario}, #{shopDeptId},
+            #{legalEntityId}, #{legalEntityName}, #{ruleJson}, #{defaultValuesJson},
+            #{signDeadlineDays}, #{reminderPolicyJson}, #{autoSendConditionJson},
+            #{publishStatus}, #{matchingStatus}, #{publishedByUserId}, #{publishedBy},
+            #{publishedTime}, #{versionHash}, sysdate()
+        )
+    </insert>
+
+    <insert id="batchInsertPlanVersionTemplates" parameterType="java.util.List">
+        insert into oa_sign_plan_version_template (
+            plan_version_id, template_id, template_version, template_type, template_name,
+            source_file_url, source_file_hash, required_placeholders, sort_order,
+            employee_visible, read_confirmation_required, employee_sign_required,
+            signature_position_json, company_seal_position_json, company_seal_required,
+            match_condition_json, create_time
+        )
+        <choose>
+            <when test="list != null and list.size() > 0">
+                values
+                <foreach collection="list" item="item" separator=",">
+                    (#{item.planVersionId}, #{item.templateId}, #{item.templateVersion},
+                     #{item.templateType}, #{item.templateName}, #{item.sourceFileUrl},
+                     #{item.sourceFileHash}, #{item.requiredPlaceholders}, #{item.sortOrder},
+                     #{item.employeeVisible}, #{item.readConfirmationRequired},
+                     #{item.employeeSignRequired}, #{item.signaturePositionJson},
+                     #{item.companySealPositionJson}, #{item.companySealRequired},
+                     #{item.matchConditionJson}, sysdate())
+                </foreach>
+            </when>
+            <otherwise>
+                select null, null, null, null, null, null, null, null, null,
+                       null, null, null, null, null, null, null, sysdate() where 1 = 0
+            </otherwise>
+        </choose>
+    </insert>
+
+    <select id="selectPlanVersionById" resultMap="PlanVersionResult">
+        select <include refid="planVersionColumns"/>
+        from oa_sign_plan_version
+        where version_id = #{versionId}
+    </select>
+
+    <select id="selectPlanVersionsByIds" resultMap="PlanVersionResult">
+        select <include refid="planVersionColumns"/>
+        from oa_sign_plan_version
+        where version_id in
+        <foreach collection="versionIds" item="versionId" open="(" separator="," close=")">
+            #{versionId}
+        </foreach>
+    </select>
+
+    <select id="selectPublishedMatchingCandidates" resultMap="PlanVersionResult">
+        select <include refid="planVersionColumns"/>
+        from oa_sign_plan_version
+        where (scenario = #{scenario}
+               or (upper(#{scenario}) = 'RENEWAL' and upper(trim(scenario)) = 'RENEW'))
+          and shop_dept_id = 0
+          and publish_status = 'PUBLISHED'
+          and matching_status = 'ENABLED'
+        order by version_id asc
+    </select>
+
+    <select id="lockPlanVersionById" resultMap="PlanVersionResult">
+        select <include refid="planVersionColumns"/>
+        from oa_sign_plan_version
+        where version_id = #{versionId}
+        for update
+    </select>
+
+    <select id="selectTemplatesByVersionId" resultMap="PlanVersionTemplateResult">
+        select <include refid="planVersionTemplateColumns"/>
+        from oa_sign_plan_version_template
+        where plan_version_id = #{versionId}
+        order by sort_order asc, template_type asc, id asc
+    </select>
+
+    <select id="selectTemplatesByVersionIds" resultMap="PlanVersionTemplateResult">
+        select <include refid="planVersionTemplateColumns"/>
+        from oa_sign_plan_version_template
+        where plan_version_id in
+        <foreach collection="versionIds" item="versionId" open="(" separator="," close=")">
+            #{versionId}
+        </foreach>
+        order by plan_version_id asc, sort_order asc, template_type asc, id asc
+    </select>
+
+    <update id="disableForNewMatching">
+        update oa_sign_plan_version
+        set matching_status = 'DISABLED'
+        where version_id = #{versionId}
+          and publish_status = 'PUBLISHED'
+          and matching_status = 'ENABLED'
+    </update>
+
+    <update id="disableOtherPublishedMatchingVersions">
+        update oa_sign_plan_version
+        set matching_status = 'DISABLED'
+        where plan_id = #{planId}
+          and version_id &lt;&gt; #{keepVersionId}
+          and publish_status = 'PUBLISHED'
+          and matching_status = 'ENABLED'
+    </update>
+</mapper>

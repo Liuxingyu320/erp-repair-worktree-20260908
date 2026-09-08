@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.inventory.mapper.InvTransferShipmentDetailMapper">
+
+    <resultMap type="InvTransferShipmentDetail" id="InvTransferShipmentDetailResult">
+        <id property="shipmentDetailId" column="shipment_detail_id"/>
+        <result property="shipmentId" column="shipment_id"/>
+        <result property="transferId" column="transfer_id"/>
+        <result property="transferDetailId" column="transfer_detail_id"/>
+        <result property="itemType" column="item_type"/>
+        <result property="itemId" column="item_id"/>
+        <result property="itemCode" column="item_code"/>
+        <result property="itemName" column="item_name"/>
+        <result property="productId" column="product_id"/>
+        <result property="productName" column="product_name"/>
+        <result property="plannedQuantity" column="planned_quantity"/>
+        <result property="shippedQuantity" column="shipped_quantity"/>
+        <result property="receivedQuantity" column="received_quantity"/>
+        <result property="costPrice" column="cost_price"/>
+    </resultMap>
+
+    <sql id="selectInvTransferShipmentDetailVo">
+        select shipment_detail_id, shipment_id, transfer_id, transfer_detail_id,
+               item_type, item_id, item_code, item_name,
+               product_id, product_name, planned_quantity, shipped_quantity, received_quantity, cost_price
+        from inv_transfer_shipment_detail
+    </sql>
+
+    <select id="selectByShipmentId" parameterType="Long" resultMap="InvTransferShipmentDetailResult">
+        <include refid="selectInvTransferShipmentDetailVo"/>
+        where shipment_id = #{shipmentId}
+        order by shipment_detail_id asc
+    </select>
+
+    <select id="selectByTransferId" parameterType="Long" resultMap="InvTransferShipmentDetailResult">
+        <include refid="selectInvTransferShipmentDetailVo"/>
+        where transfer_id = #{transferId}
+        order by shipment_id asc, shipment_detail_id asc
+    </select>
+
+    <insert id="insertShipmentDetail" parameterType="InvTransferShipmentDetail"
+            useGeneratedKeys="true" keyProperty="shipmentDetailId">
+        insert into inv_transfer_shipment_detail (
+            shipment_id, transfer_id, transfer_detail_id,
+            item_type, item_id, item_code, item_name,
+            product_id, product_name, planned_quantity,
+            shipped_quantity, received_quantity, cost_price
+        ) values (
+            #{shipmentId}, #{transferId}, #{transferDetailId},
+            coalesce(#{itemType}, 'product'),
+            coalesce(#{itemId}, #{productId}), #{itemCode}, #{itemName},
+            #{productId}, #{productName}, #{plannedQuantity},
+            #{shippedQuantity}, #{receivedQuantity}, #{costPrice}
+        )
+    </insert>
+
+    <insert id="batchInsertShipmentDetail" parameterType="list">
+        insert into inv_transfer_shipment_detail (
+            shipment_id, transfer_id, transfer_detail_id, item_type, item_id, item_code, item_name,
+            product_id, product_name,
+            planned_quantity, shipped_quantity, received_quantity, cost_price
+        ) values
+        <foreach collection="list" item="item" separator=",">
+            (
+                #{item.shipmentId}, #{item.transferId}, #{item.transferDetailId},
+                coalesce(#{item.itemType}, 'product'), coalesce(#{item.itemId}, #{item.productId}), #{item.itemCode}, #{item.itemName},
+                #{item.productId}, #{item.productName},
+                #{item.plannedQuantity}, #{item.shippedQuantity}, #{item.receivedQuantity}, #{item.costPrice}
+            )
+        </foreach>
+    </insert>
+
+    <update id="updateReceivedQuantity" parameterType="InvTransferShipmentDetail">
+        update inv_transfer_shipment_detail
+        set received_quantity = #{receivedQuantity}
+        where shipment_detail_id = #{shipmentDetailId}
+    </update>
+
+</mapper>

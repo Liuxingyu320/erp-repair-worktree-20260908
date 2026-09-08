@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.inventory.mapper.InvProductCategoryMapper">
+
+    <resultMap type="InvProductCategory" id="InvProductCategoryResult">
+        <id property="categoryId" column="category_id"/>
+        <result property="parentId" column="parent_id"/>
+        <result property="ancestors" column="ancestors"/>
+        <result property="categoryName" column="category_name"/>
+        <result property="categoryCode" column="category_code"/>
+        <result property="orderNum" column="order_num"/>
+        <result property="shopDeptId" column="shop_dept_id"/>
+        <result property="status" column="status"/>
+        <result property="delFlag" column="del_flag"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateBy" column="update_by"/>
+        <result property="updateTime" column="update_time"/>
+        <result property="remark" column="remark"/>
+    </resultMap>
+
+    <sql id="selectInvProductCategoryVo">
+        select category_id, parent_id, ancestors, category_name, category_code,
+               order_num, shop_dept_id, status, del_flag,
+               create_by, create_time, update_by, update_time, remark
+        from inv_product_category
+    </sql>
+
+    <select id="selectInvProductCategoryList" parameterType="InvProductCategory" resultMap="InvProductCategoryResult">
+        <include refid="selectInvProductCategoryVo"/>
+        where del_flag = '0'
+        <if test="categoryName != null and categoryName != ''">and category_name like concat('%', #{categoryName}, '%')</if>
+        <if test="status != null and status != ''">and status = #{status}</if>
+        <if test="shopDeptId != null">and shop_dept_id = #{shopDeptId}</if>
+        <if test="params.scopeDeptIds != null">and shop_dept_id in <foreach collection="params.scopeDeptIds" item="deptId" open="(" close=")" separator=",">#{deptId}</foreach></if>
+        order by order_num
+    </select>
+
+    <select id="selectInvProductCategoryById" parameterType="Long" resultMap="InvProductCategoryResult">
+        <include refid="selectInvProductCategoryVo"/>
+        where category_id = #{categoryId} and del_flag = '0'
+    </select>
+
+    <select id="countCategoryCodeByShop" resultType="int">
+        select count(1)
+        from inv_product_category
+        where del_flag = '0'
+          and category_code = #{categoryCode}
+        <if test="shopDeptId != null">and shop_dept_id = #{shopDeptId}</if>
+        <if test="excludeCategoryId != null">and category_id != #{excludeCategoryId}</if>
+    </select>
+
+    <select id="countChildCategory" parameterType="Long" resultType="int">
+        select count(1)
+        from inv_product_category
+        where del_flag = '0'
+          and parent_id = #{categoryId}
+    </select>
+
+    <select id="countProductByCategoryId" parameterType="Long" resultType="int">
+        select count(1)
+        from inv_product
+        where del_flag = '0'
+          and category_id = #{categoryId}
+    </select>
+
+    <insert id="insertInvProductCategory" parameterType="InvProductCategory" useGeneratedKeys="true" keyProperty="categoryId">
+        insert into inv_product_category (
+            parent_id, ancestors, category_name, category_code, order_num,
+            shop_dept_id, status, del_flag, create_by, create_time, remark
+        ) values (
+            #{parentId}, #{ancestors}, #{categoryName}, #{categoryCode}, #{orderNum},
+            #{shopDeptId}, #{status}, '0', #{createBy}, sysdate(), #{remark}
+        )
+    </insert>
+
+    <update id="updateInvProductCategory" parameterType="InvProductCategory">
+        update inv_product_category
+        <set>
+            <if test="categoryName != null">category_name = #{categoryName},</if>
+            <if test="categoryCode != null">category_code = #{categoryCode},</if>
+            <if test="parentId != null">parent_id = #{parentId},</if>
+            <if test="ancestors != null">ancestors = #{ancestors},</if>
+            <if test="orderNum != null">order_num = #{orderNum},</if>
+            <if test="status != null">status = #{status},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            update_by = #{updateBy}, update_time = sysdate()
+        </set>
+        where category_id = #{categoryId}
+    </update>
+
+    <delete id="deleteInvProductCategoryById" parameterType="Long">
+        update inv_product_category set del_flag = '2' where category_id = #{categoryId}
+    </delete>
+
+</mapper>

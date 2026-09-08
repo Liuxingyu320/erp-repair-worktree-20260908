@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "evidenceId": "legal-entity-4-representative-20260719-v1",
+  "legalEntityId": 4,
+  "legalEntityName": "舟山茗汇文化传播有限公司",
+  "legalRepresentative": "杜翠香",
+  "effectiveFrom": "2026-07-19T11:34:42Z",
+  "effectiveUntil": "2026-08-09T00:00:00Z",
+  "sourceDescription": "从2026-07-22签约配置发布SQL中只读抽取的单一法律主体历史快照；不包含其他主体、账号、凭据或业务数据。",
+  "sourceArtifactSha256": "27d7ac8105faa64e6c4a61848c5a68fda539a79e1b4e12c715c2dcca37ec603a"
+}

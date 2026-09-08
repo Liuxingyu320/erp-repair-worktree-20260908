@@ -1,0 +1,142 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.system.mapper.SysHrLifecycleActionMapper">
+
+    <resultMap id="SysHrLifecycleActionResult" type="com.erp.system.domain.SysHrLifecycleAction">
+        <id property="actionId" column="action_id"/>
+        <result property="actionType" column="action_type"/>
+        <result property="employeeId" column="employee_id"/>
+        <result property="sourceType" column="source_type"/>
+        <result property="sourceBusinessId" column="source_business_id"/>
+        <result property="beforeSnapshotJson" column="before_snapshot_json"/>
+        <result property="afterSnapshotJson" column="after_snapshot_json"/>
+        <result property="effectiveDate" column="effective_date"/>
+        <result property="actualConfirmTime" column="actual_confirm_time"/>
+        <result property="businessStatus" column="business_status"/>
+        <result property="riskLevel" column="risk_level"/>
+        <result property="riskCodesJson" column="risk_codes_json"/>
+        <result property="riskDetail" column="risk_detail"/>
+        <result property="riskConfirmationJson" column="risk_confirmation_json"/>
+        <result property="historicalReason" column="historical_reason"/>
+        <result property="requestId" column="request_id"/>
+        <result property="version" column="version"/>
+        <result property="operatorType" column="operator_type"/>
+        <result property="operatorUserId" column="operator_user_id"/>
+        <result property="operatorName" column="operator_name"/>
+        <result property="operatorIp" column="operator_ip"/>
+        <result property="operatorUserAgent" column="operator_user_agent"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateTime" column="update_time"/>
+    </resultMap>
+
+    <sql id="actionColumns">
+        action_id, action_type, employee_id, source_type, source_business_id,
+        before_snapshot_json, after_snapshot_json, effective_date, actual_confirm_time, business_status,
+        risk_level, risk_codes_json, risk_detail, risk_confirmation_json, historical_reason,
+        request_id, version,
+        operator_type, operator_user_id, operator_name, operator_ip, operator_user_agent,
+        create_time, update_time
+    </sql>
+
+    <insert id="insertAction" parameterType="com.erp.system.domain.SysHrLifecycleAction"
+            useGeneratedKeys="true" keyProperty="actionId">
+        insert into sys_hr_lifecycle_action (
+            action_type, employee_id, source_type, source_business_id,
+            before_snapshot_json, after_snapshot_json, effective_date, actual_confirm_time, business_status,
+            risk_level, risk_codes_json, risk_detail, risk_confirmation_json, historical_reason,
+            request_id, version,
+            operator_type, operator_user_id, operator_name, operator_ip, operator_user_agent,
+            create_time, update_time
+        ) values (
+            #{actionType}, #{employeeId}, #{sourceType}, #{sourceBusinessId},
+            #{beforeSnapshotJson}, #{afterSnapshotJson}, #{effectiveDate}, #{actualConfirmTime}, #{businessStatus},
+            #{riskLevel}, #{riskCodesJson}, #{riskDetail}, #{riskConfirmationJson}, #{historicalReason},
+            #{requestId}, #{version},
+            #{operatorType}, #{operatorUserId}, #{operatorName}, #{operatorIp}, #{operatorUserAgent},
+            sysdate(), sysdate()
+        )
+    </insert>
+
+    <select id="selectById" resultMap="SysHrLifecycleActionResult">
+        select <include refid="actionColumns"/>
+        from sys_hr_lifecycle_action
+        where action_id = #{actionId}
+    </select>
+
+    <select id="selectByRequestId" resultMap="SysHrLifecycleActionResult">
+        select <include refid="actionColumns"/>
+        from sys_hr_lifecycle_action
+        where request_id = #{requestId}
+        limit 1
+    </select>
+
+    <select id="selectByRequestIdForUpdate" resultMap="SysHrLifecycleActionResult">
+        select <include refid="actionColumns"/>
+        from sys_hr_lifecycle_action
+        where request_id = #{requestId}
+        limit 1
+        for update
+    </select>
+
+    <select id="selectRenewalCycleActionsForUpdate" resultMap="SysHrLifecycleActionResult">
+        select <include refid="actionColumns"/>
+        from sys_hr_lifecycle_action
+        where employee_id = #{employeeId}
+          and source_type = 'HR_RENEWAL'
+          and source_business_id = #{sourceBusinessId}
+          and action_type in ('RENEWAL_DECISION', 'RENEWAL_CONFIRMED', 'RENEWAL_DECLINED')
+        order by action_id asc
+        for update
+    </select>
+
+    <select id="selectTransferActionsForUpdate" resultMap="SysHrLifecycleActionResult">
+        select <include refid="actionColumns"/>
+        from sys_hr_lifecycle_action
+        where employee_id = #{employeeId}
+          and action_type = 'TRANSFER_CONFIRMED'
+          and effective_date = #{effectiveDate}
+        order by action_id asc
+        for update
+    </select>
+
+    <select id="selectOffboardingActionsForUpdate" resultMap="SysHrLifecycleActionResult">
+        select <include refid="actionColumns"/>
+        from sys_hr_lifecycle_action
+        where employee_id = #{employeeId}
+          and action_type = 'OFFBOARD_CONFIRMED'
+          and effective_date = #{effectiveDate}
+        order by action_id asc
+        for update
+    </select>
+
+    <select id="selectConfirmedActionsWithoutOutbox"
+            resultMap="SysHrLifecycleActionResult">
+        select <include refid="actionColumns"/>
+        from sys_hr_lifecycle_action a
+        where (
+                (
+                    a.business_status = 'CONFIRMED'
+                    and a.action_type in (
+                        'ONBOARD_CONFIRMED', 'REGULARIZATION_CONFIRMED',
+                        'TRANSFER_CONFIRMED', 'RENEWAL_CONFIRMED',
+                        'OFFBOARD_CONFIRMED'
+                    )
+                )
+                or (
+                    a.action_type = 'RENEWAL_DECLINED'
+                    and a.business_status = 'DECLINED'
+                )
+              )
+          and not exists (
+                select 1
+                from sys_hr_sign_event_outbox o
+                where o.action_id = a.action_id
+                  and o.event_version = a.version
+              )
+        order by a.action_id asc
+        limit #{limit}
+    </select>
+
+</mapper>

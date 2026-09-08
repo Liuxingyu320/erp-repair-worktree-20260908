@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.oa.mapper.OaSalaryConfigMapper">
+
+    <resultMap id="OaSalaryConfigResult" type="OaSalaryConfig">
+        <id property="configId" column="config_id"/>
+        <result property="shopDeptId" column="shop_dept_id"/>
+        <result property="workStartTime" column="work_start_time"/>
+        <result property="workEndTime" column="work_end_time"/>
+        <result property="workHoursPerDay" column="work_hours_per_day"/>
+        <result property="latePenaltyPerMin" column="late_penalty_per_min"/>
+        <result property="earlyPenaltyPerMin" column="early_penalty_per_min"/>
+        <result property="absentPenaltyPerDay" column="absent_penalty_per_day"/>
+        <result property="overtimePayPerHour" column="overtime_pay_per_hour"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateBy" column="update_by"/>
+        <result property="updateTime" column="update_time"/>
+    </resultMap>
+
+    <sql id="baseColumns">
+        config_id, shop_dept_id, work_start_time, work_end_time, work_hours_per_day,
+        late_penalty_per_min, early_penalty_per_min, absent_penalty_per_day, overtime_pay_per_hour,
+        create_by, create_time, update_by, update_time
+    </sql>
+
+    <insert id="insertOaSalaryConfig" parameterType="OaSalaryConfig" useGeneratedKeys="true" keyProperty="configId">
+        insert into oa_salary_config (
+            shop_dept_id, work_start_time, work_end_time, work_hours_per_day,
+            late_penalty_per_min, early_penalty_per_min, absent_penalty_per_day, overtime_pay_per_hour,
+            create_by, create_time
+        ) values (
+            #{shopDeptId}, #{workStartTime}, #{workEndTime}, #{workHoursPerDay},
+            #{latePenaltyPerMin}, #{earlyPenaltyPerMin}, #{absentPenaltyPerDay}, #{overtimePayPerHour},
+            #{createBy}, sysdate()
+        )
+    </insert>
+
+    <update id="updateOaSalaryConfig" parameterType="OaSalaryConfig">
+        update oa_salary_config
+        <set>
+            <if test="workStartTime != null and workStartTime != ''">work_start_time = #{workStartTime},</if>
+            <if test="workEndTime != null and workEndTime != ''">work_end_time = #{workEndTime},</if>
+            <if test="workHoursPerDay != null">work_hours_per_day = #{workHoursPerDay},</if>
+            <if test="latePenaltyPerMin != null">late_penalty_per_min = #{latePenaltyPerMin},</if>
+            <if test="earlyPenaltyPerMin != null">early_penalty_per_min = #{earlyPenaltyPerMin},</if>
+            <if test="absentPenaltyPerDay != null">absent_penalty_per_day = #{absentPenaltyPerDay},</if>
+            <if test="overtimePayPerHour != null">overtime_pay_per_hour = #{overtimePayPerHour},</if>
+            <if test="updateBy != null and updateBy != ''">update_by = #{updateBy},</if>
+            update_time = sysdate()
+        </set>
+        where config_id = #{configId}
+    </update>
+
+    <select id="selectOaSalaryConfigById" resultMap="OaSalaryConfigResult">
+        select <include refid="baseColumns"/> from oa_salary_config where config_id = #{configId}
+    </select>
+
+    <select id="selectOaSalaryConfigByShopDeptId" resultMap="OaSalaryConfigResult">
+        select <include refid="baseColumns"/> from oa_salary_config where shop_dept_id = #{shopDeptId}
+    </select>
+
+</mapper>

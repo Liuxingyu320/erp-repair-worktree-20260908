@@ -1,0 +1,23 @@
+{
+  "viewports": [
+    {
+      "w": 320,
+      "h": 568
+    },
+    {
+      "w": 354,
+      "h": 766
+    },
+    {
+      "w": 375,
+      "h": 667
+    },
+    {
+      "w": 390,
+      "h": 844
+    }
+  ],
+  "keyboard": "--mobile-keyboard-inset + scroll-padding-bottom",
+  "safeArea": "--mobile-safe-top/right/bottom/left",
+  "bottomNav": "--mobile-bottom-nav-total + mobile-task-mode"
+}

@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.system.mapper.SysUserNotificationMapper">
+
+    <resultMap id="SysUserNotificationResult" type="SysUserNotification">
+        <id property="notificationId" column="notification_id" />
+        <result property="userId" column="user_id" />
+        <result property="channel" column="channel" />
+        <result property="businessKey" column="business_key" />
+        <result property="title" column="title" />
+        <result property="body" column="body" />
+        <result property="routeType" column="route_type" />
+        <result property="routeParams" column="route_params" />
+        <result property="readStatus" column="read_status" />
+        <result property="readTime" column="read_time" />
+        <result property="createTime" column="create_time" />
+    </resultMap>
+
+    <sql id="selectNotificationColumns">
+        select notification_id, user_id, channel, business_key, title, body,
+               route_type, route_params, read_status, read_time, create_time
+        from sys_user_notification
+    </sql>
+
+    <insert id="insertNotification" parameterType="SysUserNotification"
+            useGeneratedKeys="true" keyProperty="notificationId">
+        insert ignore into sys_user_notification (
+            user_id, channel, business_key, title, body, route_type, route_params,
+            read_status, create_time
+        ) values (
+            #{userId}, #{channel}, #{businessKey}, #{title}, #{body}, #{routeType}, #{routeParams},
+            #{readStatus}, sysdate()
+        )
+    </insert>
+
+    <select id="selectByUserAndBusinessKey" resultMap="SysUserNotificationResult">
+        <include refid="selectNotificationColumns" />
+        where user_id = #{userId}
+          and business_key = #{businessKey}
+        limit 1
+    </select>
+
+    <select id="selectByUserId" resultMap="SysUserNotificationResult">
+        <include refid="selectNotificationColumns" />
+        where user_id = #{userId}
+        order by notification_id desc
+    </select>
+
+    <select id="countUnreadByUserId" resultType="long">
+        select count(1)
+        from sys_user_notification
+        where user_id = #{userId}
+          and read_status = '0'
+    </select>
+
+    <update id="markRead">
+        update sys_user_notification
+        set read_status = '1',
+            read_time = sysdate()
+        where notification_id = #{notificationId}
+          and user_id = #{userId}
+          and read_status = '0'
+    </update>
+
+</mapper>

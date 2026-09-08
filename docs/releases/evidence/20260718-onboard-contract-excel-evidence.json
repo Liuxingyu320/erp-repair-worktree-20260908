@@ -1,0 +1,87 @@
+{
+  "schemaVersion": 2,
+  "releaseId": "onboard-contract-excel-20260718",
+  "status": "evidence-pending",
+  "containsPii": false,
+  "binding": {
+    "candidateCommit": null,
+    "approvedPatchSha256": null,
+    "approvedSourceManifestSha256": null,
+    "sourceApprovalSha256": null,
+    "oaJarSha256": null,
+    "systemJarSha256": null,
+    "frontendTreeSha256": null
+  },
+  "gates": {
+    "nativeMySqlRehearsal": {
+      "status": "pending",
+      "evidenceId": null,
+      "evidenceSha256": null,
+      "subject": null,
+      "approvedBy": null,
+      "approvedRole": null,
+      "approvedAt": null,
+      "environment": null
+    },
+    "templateHrLegalApproval": {
+      "status": "pending",
+      "evidenceId": null,
+      "evidenceSha256": null,
+      "subject": null,
+      "approvedBy": null,
+      "approvedRole": null,
+      "approvedAt": null,
+      "environment": null
+    },
+    "templateRegistrationAndPlanPublish": {
+      "status": "pending",
+      "evidenceId": null,
+      "evidenceSha256": null,
+      "subject": null,
+      "approvedBy": null,
+      "approvedRole": null,
+      "approvedAt": null,
+      "environment": null
+    },
+    "isolatedThreePersonUat": {
+      "status": "pending",
+      "evidenceId": null,
+      "evidenceSha256": null,
+      "subject": null,
+      "approvedBy": null,
+      "approvedRole": null,
+      "approvedAt": null,
+      "environment": null
+    },
+    "selected27WorkbookUat": {
+      "status": "pending",
+      "evidenceId": null,
+      "evidenceSha256": null,
+      "subject": null,
+      "approvedBy": null,
+      "approvedRole": null,
+      "approvedAt": null,
+      "environment": null
+    },
+    "finalPdfHashAuditEvidence": {
+      "status": "pending",
+      "evidenceId": null,
+      "evidenceSha256": null,
+      "subject": null,
+      "approvedBy": null,
+      "approvedRole": null,
+      "approvedAt": null,
+      "environment": null
+    },
+    "oneScopeGrayApproval": {
+      "status": "pending",
+      "evidenceId": null,
+      "evidenceSha256": null,
+      "subject": null,
+      "approvedBy": null,
+      "approvedRole": null,
+      "approvedAt": null,
+      "environment": null
+    }
+  }
+}

@@ -1,0 +1,376 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.erp</groupId>
+    <artifactId>erp</artifactId>
+    <version>3.6.8</version>
+    <packaging>pom</packaging>
+
+    <name>erp</name>
+    <url>https://example.com</url>
+    <description>ERP microservice system</description>
+
+    <properties>
+        <erp.version>3.6.8</erp.version>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+        <java.version>17</java.version>
+        <maven.enforcer.version>3.6.3</maven.enforcer.version>
+        <spring-boot.version>4.0.3</spring-boot.version>
+        <spring-cloud.version>2025.1.0</spring-cloud.version>
+        <spring-cloud-alibaba.version>2025.1.0.0</spring-cloud-alibaba.version>
+        <spring-boot-admin.version>4.0.2</spring-boot-admin.version>
+        <mybatis-spring-boot.version>4.0.1</mybatis-spring-boot.version>
+        <kaptcha.version>2.3.3</kaptcha.version>
+        <pagehelper.boot.version>2.1.0</pagehelper.boot.version>
+        <druid.version>1.2.28</druid.version>
+        <dynamic-ds.version>4.5.0</dynamic-ds.version>
+        <commons.io.version>2.21.0</commons.io.version>
+        <fastjson.version>2.0.61</fastjson.version>
+        <jjwt.version>0.9.1</jjwt.version>
+        <minio.version>8.2.2</minio.version>
+        <poi.version>4.1.2</poi.version>
+        <springdoc.version>3.0.2</springdoc.version>
+        <transmittable-thread-local.version>2.14.5</transmittable-thread-local.version>
+        <owasp.java.html.sanitizer.version>20260313.1</owasp.java.html.sanitizer.version>
+        <argLine></argLine>
+        <mockito.agent.argLine></mockito.agent.argLine>
+        <build.commit>UNSET</build.commit>
+        <build.releaseId>UNSET</build.releaseId>
+        <build.approvedPatchSha256>UNSET</build.approvedPatchSha256>
+        <build.approvedSourceManifestSha256>UNSET</build.approvedSourceManifestSha256>
+    </properties>
+
+    <modules>
+        <module>erp-common</module>
+        <module>erp-api</module>
+        <module>erp-auth</module>
+        <module>erp-gateway</module>
+        <module>erp-visual</module>
+        <module>erp-modules</module>
+    </modules>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>org.springframework.cloud</groupId>
+                <artifactId>spring-cloud-dependencies</artifactId>
+                <version>${spring-cloud.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+
+            <dependency>
+                <groupId>com.alibaba.cloud</groupId>
+                <artifactId>spring-cloud-alibaba-dependencies</artifactId>
+                <version>${spring-cloud-alibaba.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+
+            <dependency>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-dependencies</artifactId>
+                <version>${spring-boot.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+
+            <dependency>
+                <groupId>org.springdoc</groupId>
+                <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+                <version>${springdoc.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>pro.fessional</groupId>
+                <artifactId>kaptcha</artifactId>
+                <version>${kaptcha.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>com.github.pagehelper</groupId>
+                <artifactId>pagehelper-spring-boot-starter</artifactId>
+                <version>${pagehelper.boot.version}</version>
+                <exclusions>
+                    <exclusion>
+                        <artifactId>mybatis-spring</artifactId>
+                        <groupId>org.mybatis</groupId>
+                    </exclusion>
+                </exclusions>
+            </dependency>
+
+            <dependency>
+                <groupId>org.mybatis.spring.boot</groupId>
+                <artifactId>mybatis-spring-boot-starter</artifactId>
+                <version>${mybatis-spring-boot.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>commons-io</groupId>
+                <artifactId>commons-io</artifactId>
+                <version>${commons.io.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>org.apache.poi</groupId>
+                <artifactId>poi-ooxml</artifactId>
+                <version>${poi.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>com.alibaba.fastjson2</groupId>
+                <artifactId>fastjson2</artifactId>
+                <version>${fastjson.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>io.jsonwebtoken</groupId>
+                <artifactId>jjwt</artifactId>
+                <version>${jjwt.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>com.alibaba</groupId>
+                <artifactId>transmittable-thread-local</artifactId>
+                <version>${transmittable-thread-local.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>com.googlecode.owasp-java-html-sanitizer</groupId>
+                <artifactId>owasp-java-html-sanitizer</artifactId>
+                <version>${owasp.java.html.sanitizer.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>com.erp</groupId>
+                <artifactId>erp-common-core</artifactId>
+                <version>${erp.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>com.erp</groupId>
+                <artifactId>erp-common-swagger</artifactId>
+                <version>${erp.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>com.erp</groupId>
+                <artifactId>erp-common-security</artifactId>
+                <version>${erp.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>com.erp</groupId>
+                <artifactId>erp-common-sensitive</artifactId>
+                <version>${erp.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>com.erp</groupId>
+                <artifactId>erp-common-datascope</artifactId>
+                <version>${erp.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>com.erp</groupId>
+                <artifactId>erp-common-datasource</artifactId>
+                <version>${erp.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>com.erp</groupId>
+                <artifactId>erp-common-seata</artifactId>
+                <version>${erp.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>com.erp</groupId>
+                <artifactId>erp-common-log</artifactId>
+                <version>${erp.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>com.erp</groupId>
+                <artifactId>erp-common-redis</artifactId>
+                <version>${erp.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>com.erp</groupId>
+                <artifactId>erp-api-system</artifactId>
+                <version>${erp.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>com.erp</groupId>
+                <artifactId>erp-api-approval</artifactId>
+                <version>${erp.version}</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-bootstrap</artifactId>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.11.0</version>
+                <configuration>
+                    <parameters>true</parameters>
+                    <release>${java.version}</release>
+                    <encoding>${project.build.sourceEncoding}</encoding>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-enforcer-plugin</artifactId>
+                <version>${maven.enforcer.version}</version>
+                <executions>
+                    <execution>
+                        <id>enforce-build-toolchain</id>
+                        <goals>
+                            <goal>enforce</goal>
+                        </goals>
+                        <configuration>
+                            <rules>
+                                <requireJavaVersion>
+                                    <version>[17,18)</version>
+                                    <message>ERP 必须使用 JDK 17 构建；请设置 JAVA_HOME 后重试。</message>
+                                </requireJavaVersion>
+                                <requireMavenVersion>
+                                    <version>[3.9.16,3.9.17)</version>
+                                    <message>请使用仓库内 ./mvnw（Maven 3.9.16）构建。</message>
+                                </requireMavenVersion>
+                            </rules>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+        <pluginManagement>
+            <plugins>
+                <plugin>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-maven-plugin</artifactId>
+                    <version>${spring-boot.version}</version>
+                    <executions>
+                        <execution>
+                            <id>build-info</id>
+                            <goals>
+                                <goal>build-info</goal>
+                            </goals>
+                            <configuration>
+                                <additionalProperties>
+                                    <commit>${build.commit}</commit>
+                                    <releaseId>${build.releaseId}</releaseId>
+                                    <approvedPatchSha256>${build.approvedPatchSha256}</approvedPatchSha256>
+                                    <approvedSourceManifestSha256>${build.approvedSourceManifestSha256}</approvedSourceManifestSha256>
+                                </additionalProperties>
+                            </configuration>
+                        </execution>
+                        <execution>
+                            <goals>
+                                <goal>repackage</goal>
+                            </goals>
+                        </execution>
+                    </executions>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+    </build>
+
+    <profiles>
+        <profile>
+            <id>new-business-mysql-it</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-failsafe-plugin</artifactId>
+                        <version>3.5.4</version>
+                        <configuration>
+                            <argLine>@{argLine} ${mockito.agent.argLine}</argLine>
+                            <!--
+                              Spring Boot repackage replaces the project artifact
+                              with an executable JAR whose classes live under
+                              BOOT-INF/classes. Failsafe cannot load application
+                              types from that layout as a regular classpath JAR,
+                              so integration tests must use the compiler output.
+                            -->
+                            <classesDirectory>${project.build.outputDirectory}</classesDirectory>
+                            <includes>
+                                <include>**/*IT.java</include>
+                            </includes>
+                            <failIfNoTests>false</failIfNoTests>
+                        </configuration>
+                        <executions>
+                            <execution>
+                                <goals>
+                                    <goal>integration-test</goal>
+                                    <goal>verify</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.codehaus.mojo</groupId>
+                        <artifactId>exec-maven-plugin</artifactId>
+                        <version>3.5.0</version>
+                        <inherited>false</inherited>
+                        <executions>
+                            <execution>
+                                <id>verify-new-business-mysql-it-contract</id>
+                                <phase>validate</phase>
+                                <goals>
+                                    <goal>exec</goal>
+                                </goals>
+                                <configuration>
+                                    <executable>bash</executable>
+                                    <arguments>
+                                        <argument>${maven.multiModuleProjectDirectory}/scripts/verify-new-business-it-contract.sh</argument>
+                                    </arguments>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
+
+    <repositories>
+        <repository>
+            <id>public</id>
+            <name>aliyun nexus</name>
+            <url>https://maven.aliyun.com/repository/public</url>
+            <releases>
+                <enabled>true</enabled>
+            </releases>
+        </repository>
+    </repositories>
+
+    <pluginRepositories>
+        <pluginRepository>
+            <id>public</id>
+            <name>aliyun nexus</name>
+            <url>https://maven.aliyun.com/repository/public</url>
+            <releases>
+                <enabled>true</enabled>
+            </releases>
+            <snapshots>
+                <enabled>false</enabled>
+            </snapshots>
+        </pluginRepository>
+    </pluginRepositories>
+</project>

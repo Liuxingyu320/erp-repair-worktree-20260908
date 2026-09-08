@@ -1,0 +1,147 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.oa.mapper.OaSignTemplateMapper">
+
+    <resultMap id="OaSignTemplateResult" type="OaSignTemplate">
+        <id property="templateId" column="template_id"/>
+        <result property="templateType" column="template_type"/>
+        <result property="templateName" column="template_name"/>
+        <result property="templateVersion" column="template_version"/>
+        <result property="scenario" column="scenario"/>
+        <result property="employmentType" column="employment_type"/>
+        <result property="socialType" column="social_type"/>
+        <result property="postLevelScope" column="post_level_scope"/>
+        <result property="salaryVersion" column="salary_version"/>
+        <result property="fileUrl" column="file_url"/>
+        <result property="fileName" column="file_name"/>
+        <result property="fileSize" column="file_size"/>
+        <result property="fileHash" column="file_hash"/>
+        <result property="requiredPlaceholders" column="required_placeholders"/>
+        <result property="optionalPlaceholders" column="optional_placeholders"/>
+        <result property="employeeVisible" column="employee_visible"/>
+        <result property="readConfirmationRequired" column="read_confirmation_required"/>
+        <result property="employeeSignRequired" column="employee_sign_required"/>
+        <result property="signaturePositionJson" column="signature_position_json"/>
+        <result property="companySealPositionJson" column="company_seal_position_json"/>
+        <result property="companySealRequired" column="company_seal_required"/>
+        <result property="matchConditionJson" column="match_condition_json"/>
+        <result property="sortOrder" column="sort_order"/>
+        <result property="status" column="status"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateBy" column="update_by"/>
+        <result property="updateTime" column="update_time"/>
+        <result property="remark" column="remark"/>
+    </resultMap>
+
+    <sql id="baseColumns">
+        template_id, template_type, template_name, template_version, scenario,
+        employment_type, social_type, post_level_scope, salary_version,
+        file_url, file_name, file_size, file_hash, required_placeholders,
+        optional_placeholders, employee_visible, read_confirmation_required,
+        employee_sign_required, signature_position_json,
+        company_seal_position_json, company_seal_required,
+        match_condition_json, sort_order, status,
+        create_by, create_time, update_by, update_time, remark
+    </sql>
+
+    <insert id="insertOaSignTemplate" parameterType="OaSignTemplate" useGeneratedKeys="true" keyProperty="templateId">
+        insert into oa_sign_template (
+            template_type, template_name, template_version, scenario, employment_type,
+            social_type, post_level_scope, salary_version, file_url, file_name,
+            file_size, file_hash, required_placeholders, optional_placeholders,
+            employee_visible, read_confirmation_required, employee_sign_required,
+            signature_position_json, company_seal_position_json, company_seal_required,
+            match_condition_json, sort_order, status, create_by, create_time, remark
+        ) values (
+            #{templateType}, #{templateName}, #{templateVersion}, #{scenario}, #{employmentType},
+            #{socialType}, #{postLevelScope}, #{salaryVersion}, #{fileUrl}, #{fileName},
+            #{fileSize}, #{fileHash}, #{requiredPlaceholders}, #{optionalPlaceholders},
+            #{employeeVisible}, #{readConfirmationRequired}, #{employeeSignRequired},
+            #{signaturePositionJson}, #{companySealPositionJson}, #{companySealRequired},
+            #{matchConditionJson}, #{sortOrder}, #{status}, #{createBy}, sysdate(), #{remark}
+        )
+    </insert>
+
+    <update id="updateOaSignTemplate" parameterType="OaSignTemplate">
+        update oa_sign_template
+        <set>
+            <if test="templateType != null and templateType != ''">template_type = #{templateType},</if>
+            <if test="templateName != null and templateName != ''">template_name = #{templateName},</if>
+            <if test="templateVersion != null">template_version = #{templateVersion},</if>
+            <if test="scenario != null">scenario = #{scenario},</if>
+            <if test="employmentType != null">employment_type = #{employmentType},</if>
+            <if test="socialType != null">social_type = #{socialType},</if>
+            <if test="postLevelScope != null">post_level_scope = #{postLevelScope},</if>
+            <if test="salaryVersion != null">salary_version = #{salaryVersion},</if>
+            <if test="fileUrl != null and fileUrl != ''">file_url = #{fileUrl},</if>
+            <if test="fileName != null">file_name = #{fileName},</if>
+            <if test="fileSize != null">file_size = #{fileSize},</if>
+            <if test="fileHash != null">file_hash = #{fileHash},</if>
+            <if test="requiredPlaceholders != null">required_placeholders = #{requiredPlaceholders},</if>
+            <if test="optionalPlaceholders != null">optional_placeholders = #{optionalPlaceholders},</if>
+            <if test="employeeVisible != null">employee_visible = #{employeeVisible},</if>
+            <if test="readConfirmationRequired != null">read_confirmation_required = #{readConfirmationRequired},</if>
+            <if test="employeeSignRequired != null">employee_sign_required = #{employeeSignRequired},</if>
+            <if test="signaturePositionJson != null">signature_position_json = #{signaturePositionJson},</if>
+            <if test="companySealPositionJson != null">company_seal_position_json = #{companySealPositionJson},</if>
+            <if test="companySealRequired != null">company_seal_required = #{companySealRequired},</if>
+            <if test="matchConditionJson != null">match_condition_json = #{matchConditionJson},</if>
+            <if test="sortOrder != null">sort_order = #{sortOrder},</if>
+            <if test="status != null and status != ''">status = #{status},</if>
+            <if test="updateBy != null and updateBy != ''">update_by = #{updateBy},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            update_time = sysdate()
+        </set>
+        where template_id = #{templateId}
+    </update>
+
+    <select id="selectOaSignTemplateById" resultMap="OaSignTemplateResult">
+        select <include refid="baseColumns"/>
+        from oa_sign_template
+        where template_id = #{templateId}
+    </select>
+
+    <select id="selectOaSignTemplateList" parameterType="OaSignTemplate" resultMap="OaSignTemplateResult">
+        select <include refid="baseColumns"/>
+        from oa_sign_template
+        <where>
+            <if test="templateType != null and templateType != ''">
+                and template_type = #{templateType}
+            </if>
+            <if test="templateName != null and templateName != ''">
+                and template_name like concat('%', #{templateName}, '%')
+            </if>
+            <if test="scenario != null and scenario != ''">
+                and scenario = #{scenario}
+            </if>
+            <if test="status != null and status != ''">
+                and status = #{status}
+            </if>
+        </where>
+        order by sort_order asc, template_id desc
+    </select>
+
+    <select id="selectMatchedActiveTemplates" parameterType="OaSignPackage" resultMap="OaSignTemplateResult">
+        select <include refid="baseColumns"/>
+        from oa_sign_template
+        <where>
+            status = '0'
+            <if test="scenario != null and scenario != ''">
+                and (scenario = #{scenario} or scenario is null or scenario = '')
+            </if>
+            <if test="employmentType != null and employmentType != ''">
+                and (employment_type = #{employmentType} or employment_type is null or employment_type = '')
+            </if>
+            <if test="socialType != null and socialType != ''">
+                and (social_type = #{socialType} or social_type is null or social_type = '')
+            </if>
+            <if test="salaryVersion != null and salaryVersion != ''">
+                and (salary_version = #{salaryVersion} or salary_version is null or salary_version = '')
+            </if>
+        </where>
+        order by sort_order asc, template_id desc
+    </select>
+</mapper>

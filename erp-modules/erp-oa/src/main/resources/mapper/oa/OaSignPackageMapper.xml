@@ -1,0 +1,1466 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.oa.mapper.OaSignPackageMapper">
+
+    <resultMap id="OaSignPackageResult" type="com.erp.oa.domain.OaSignPackage">
+        <id property="packageId" column="package_id"/>
+        <result property="packageNo" column="package_no"/>
+        <result property="employeeId" column="employee_id"/>
+        <result property="employeeNameSnapshot" column="employee_name_snapshot"/>
+        <result property="employeePhoneSnapshot" column="employee_phone_snapshot"/>
+        <result property="employeeIdCardSnapshot" column="employee_id_card_snapshot"/>
+        <result property="employeeAddressSnapshot" column="employee_address_snapshot"/>
+        <result property="deptIdSnapshot" column="dept_id_snapshot"/>
+        <result property="deptNameSnapshot" column="dept_name_snapshot"/>
+        <result property="shopDeptId" column="shop_dept_id"/>
+        <result property="shopDeptName" column="shop_dept_name"/>
+        <result property="legalEntityIdSnapshot" column="legal_entity_id_snapshot"/>
+        <result property="legalEntityCodeSnapshot" column="legal_entity_code_snapshot"/>
+        <result property="legalEntityNameSnapshot" column="legal_entity_name_snapshot"/>
+        <result property="legalEntitySourceDeptId" column="legal_entity_source_dept_id"/>
+        <result property="legalEntityResolveMode" column="legal_entity_resolve_mode"/>
+        <result property="legalEntityCreditCodeSnapshot" column="legal_entity_credit_code_snapshot"/>
+        <result property="legalEntityAddressSnapshot" column="legal_entity_address_snapshot"/>
+        <result property="legalRepresentativeSnapshot" column="legal_representative_snapshot"/>
+        <result property="legalEntityPhoneSnapshot" column="legal_entity_phone_snapshot"/>
+        <result property="legalEntityOverrideReason" column="legal_entity_override_reason"/>
+        <result property="sealIdSnapshot" column="seal_id_snapshot"/>
+        <result property="sealNameSnapshot" column="seal_name_snapshot"/>
+        <result property="sealImageUrlSnapshot" column="seal_image_url_snapshot"/>
+        <result property="sealImageHashSnapshot" column="seal_image_hash_snapshot"/>
+        <result property="sourcePlanId" column="source_plan_id"/>
+        <result property="sourcePlanName" column="source_plan_name"/>
+        <result property="recommendedCompanySnapshot" column="recommended_company_snapshot"/>
+        <result property="recommendedLegalRepresentativeSnapshot" column="recommended_legal_representative_snapshot"/>
+        <result property="recommendedRegisteredAddressSnapshot" column="recommended_registered_address_snapshot"/>
+        <result property="scenario" column="scenario"/>
+        <result property="employmentType" column="employment_type"/>
+        <result property="contractTermCodeSnapshot" column="contract_term_code_snapshot"/>
+        <result property="socialType" column="social_type"/>
+        <result property="servicePersonType" column="service_person_type"/>
+        <result property="insuranceType" column="insurance_type"/>
+        <result property="postNameSnapshot" column="post_name_snapshot"/>
+        <result property="postLevelSnapshot" column="post_level_snapshot"/>
+        <result property="salaryVersion" column="salary_version"/>
+        <result property="entryDate" column="entry_date"/>
+        <result property="contractStartDate" column="contract_start_date"/>
+        <result property="contractEndDate" column="contract_end_date"/>
+        <result property="previousContractEndDate" column="previous_contract_end_date"/>
+        <result property="previousEmploymentType" column="previous_employment_type"/>
+        <result property="previousLegalEntityIdSnapshot" column="previous_legal_entity_id_snapshot"/>
+        <result property="previousRenewalCount" column="previous_renewal_count"/>
+        <result property="renewalCount" column="renewal_count"/>
+        <result property="probationStartDate" column="probation_start_date"/>
+        <result property="probationEndDate" column="probation_end_date"/>
+        <result property="actualRegularizationDate" column="actual_regularization_date"/>
+        <result property="transferEffectiveDate" column="transfer_effective_date"/>
+        <result property="historicalSupplement" column="historical_supplement"/>
+        <result property="beforeDeptNameSnapshot" column="before_dept_name_snapshot"/>
+        <result property="beforePostNameSnapshot" column="before_post_name_snapshot"/>
+        <result property="workStartDate" column="work_start_date"/>
+        <result property="studentStatusSnapshot" column="student_status_snapshot"/>
+        <result property="retirementStatusSnapshot" column="retirement_status_snapshot"/>
+        <result property="incomeStartYearMonth" column="income_start_year_month"/>
+        <result property="workEndDate" column="work_end_date"/>
+        <result property="leaveDate" column="leave_date"/>
+        <result property="leaveReason" column="leave_reason"/>
+        <result property="offboardingType" column="offboarding_type"/>
+        <result property="salarySettlementStatus" column="salary_settlement_status"/>
+        <result property="assetHandoverStatus" column="asset_handover_status"/>
+        <result property="nonCompeteDecision" column="non_compete_decision"/>
+        <result property="compensationAmount" column="compensation_amount"/>
+        <result property="compensationNote" column="compensation_note"/>
+        <result property="baseSalary" column="base_salary"/>
+        <result property="postSalary" column="post_salary"/>
+        <result property="fieldAllowance" column="field_allowance"/>
+        <result property="performanceSalary" column="performance_salary"/>
+        <result property="salaryTotal" column="salary_total"/>
+        <result property="status" column="status"/>
+        <result property="voidReason" column="void_reason"/>
+        <result property="sentTime" column="sent_time"/>
+        <result property="viewedTime" column="viewed_time"/>
+        <result property="signedTime" column="signed_time"/>
+        <result property="initialSignedTime" column="initial_signed_time"/>
+        <result property="signingSequence" column="signing_sequence"/>
+        <result property="signatureSampleFileUrl" column="signature_sample_file_url"/>
+        <result property="signatureSampleHash" column="signature_sample_hash"/>
+        <result property="signatureSampleTime" column="signature_sample_time"/>
+        <result property="companyFrozenTime" column="company_frozen_time"/>
+        <result property="documentVersion" column="document_version"/>
+        <result property="finalDocumentVersion" column="final_document_version"/>
+        <result property="finalDocumentRootHash" column="final_document_root_hash"/>
+        <result property="finalGeneratedTime" column="final_generated_time"/>
+        <result property="finalConfirmedTime" column="final_confirmed_time"/>
+        <result property="finalConfirmationStatus" column="final_confirmation_status"/>
+        <result property="finalArchiveRootHash" column="final_archive_root_hash"/>
+        <result property="finalEvidenceGeneratedTime" column="final_evidence_generated_time"/>
+        <result property="signDeadline" column="sign_deadline"/>
+        <result property="deadlinePolicySource" column="deadline_policy_source"/>
+        <result property="deadlineDaysSnapshot" column="deadline_days_snapshot"/>
+        <result property="terminalTime" column="terminal_time"/>
+        <result property="terminalReasonCode" column="terminal_reason_code"/>
+        <result property="terminalReasonDetail" column="terminal_reason_detail"/>
+        <result property="resolutionStatus" column="resolution_status"/>
+        <result property="resolvedBy" column="resolved_by"/>
+        <result property="resolvedTime" column="resolved_time"/>
+        <result property="resolutionReasonCode" column="resolution_reason_code"/>
+        <result property="resolutionReasonDetail" column="resolution_reason_detail"/>
+        <result property="reissueOfPackageId" column="reissue_of_package_id"/>
+        <result property="reissuedToPackageId" column="reissued_to_package_id"/>
+        <result property="version" column="version"/>
+        <result property="taskId" column="task_id"/>
+        <result property="confirmStatus" column="confirm_status"/>
+        <result property="planVersionId" column="plan_version_id"/>
+        <result property="documentCount" column="document_count"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateBy" column="update_by"/>
+        <result property="updateTime" column="update_time"/>
+        <result property="remark" column="remark"/>
+    </resultMap>
+
+    <resultMap id="OaSignReminderCandidateResult" type="com.erp.oa.domain.vo.OaSignReminderCandidate">
+        <id property="packageId" column="package_id"/>
+        <result property="taskId" column="task_id"/>
+        <result property="employeeId" column="employee_id"/>
+        <result property="assignedHrUserId" column="assigned_hr_user_id"/>
+        <result property="shopDeptId" column="shop_dept_id"/>
+        <result property="packageStatus" column="package_status"/>
+        <result property="reminderStage" column="reminder_stage"/>
+        <result property="activeDocumentVersion" column="active_document_version"/>
+        <result property="signDeadline" column="sign_deadline"/>
+        <result property="reminderBeforeHours" column="reminder_before_hours"/>
+    </resultMap>
+
+    <resultMap id="OaOnboardPackageFactResult" type="com.erp.oa.domain.vo.OaOnboardPackageFact">
+        <id property="employeeId" column="employee_id"/>
+        <result property="latestPackageId" column="latest_package_id"/>
+        <result property="latestTaskId" column="latest_task_id"/>
+        <result property="latestStatus" column="latest_status"/>
+        <result property="latestShopDeptId" column="latest_shop_dept_id"/>
+        <result property="signedPackageId" column="signed_package_id"/>
+        <result property="signedTaskId" column="signed_task_id"/>
+        <result property="signedShopDeptId" column="signed_shop_dept_id"/>
+        <result property="signedEvidenceComplete" column="signed_evidence_complete"/>
+    </resultMap>
+
+    <sql id="baseColumns">
+        package_id, package_no, employee_id, employee_name_snapshot,
+        employee_phone_snapshot, employee_id_card_snapshot, employee_address_snapshot, dept_id_snapshot,
+        dept_name_snapshot, shop_dept_id, shop_dept_name, legal_entity_id_snapshot,
+        legal_entity_code_snapshot, legal_entity_name_snapshot, legal_entity_source_dept_id,
+        legal_entity_resolve_mode, legal_entity_credit_code_snapshot, legal_entity_address_snapshot,
+        legal_representative_snapshot, legal_entity_phone_snapshot, legal_entity_override_reason,
+        seal_id_snapshot, seal_name_snapshot, seal_image_url_snapshot, seal_image_hash_snapshot,
+        source_plan_id, source_plan_name, recommended_company_snapshot,
+        recommended_legal_representative_snapshot, recommended_registered_address_snapshot,
+        scenario, employment_type, contract_term_code_snapshot,
+        social_type, service_person_type, insurance_type, post_name_snapshot,
+        post_level_snapshot, salary_version, entry_date, contract_start_date,
+        contract_end_date, previous_contract_end_date, previous_employment_type,
+        previous_legal_entity_id_snapshot, previous_renewal_count, renewal_count,
+        probation_start_date, probation_end_date, actual_regularization_date,
+        transfer_effective_date, historical_supplement, before_dept_name_snapshot,
+        before_post_name_snapshot, work_start_date,
+        student_status_snapshot, retirement_status_snapshot, income_start_year_month,
+        work_end_date, leave_date, leave_reason, offboarding_type,
+        salary_settlement_status, asset_handover_status, non_compete_decision,
+        compensation_amount, compensation_note, base_salary, post_salary, field_allowance,
+        performance_salary, salary_total, status, void_reason, sent_time,
+        viewed_time, signed_time, initial_signed_time, signing_sequence,
+        signature_sample_file_url, signature_sample_hash, signature_sample_time,
+        company_frozen_time, document_version,
+        final_document_version, final_document_root_hash, final_generated_time,
+        final_confirmed_time, final_confirmation_status, final_archive_root_hash,
+        final_evidence_generated_time, sign_deadline,
+        deadline_policy_source, deadline_days_snapshot, terminal_time,
+        terminal_reason_code, terminal_reason_detail, resolution_status,
+        resolved_by, resolved_time, resolution_reason_code, resolution_reason_detail,
+        reissue_of_package_id, reissued_to_package_id, version,
+        task_id, confirm_status, plan_version_id,
+        create_by, create_time, update_by, update_time, remark
+    </sql>
+
+    <insert id="insertOaSignPackage" parameterType="com.erp.oa.domain.OaSignPackage" useGeneratedKeys="true" keyProperty="packageId">
+        insert into oa_sign_package (
+            package_no, employee_id, employee_name_snapshot, employee_phone_snapshot,
+            employee_id_card_snapshot, employee_address_snapshot, dept_id_snapshot, dept_name_snapshot, shop_dept_id,
+            shop_dept_name, legal_entity_id_snapshot, legal_entity_code_snapshot,
+            legal_entity_name_snapshot, legal_entity_source_dept_id, legal_entity_resolve_mode,
+            legal_entity_credit_code_snapshot, legal_entity_address_snapshot,
+            legal_representative_snapshot, legal_entity_phone_snapshot, legal_entity_override_reason,
+            seal_id_snapshot, seal_name_snapshot, seal_image_url_snapshot, seal_image_hash_snapshot,
+            source_plan_id, source_plan_name, recommended_company_snapshot,
+            recommended_legal_representative_snapshot, recommended_registered_address_snapshot, scenario,
+            employment_type, contract_term_code_snapshot, social_type, service_person_type,
+            insurance_type, post_name_snapshot, post_level_snapshot, salary_version, entry_date, contract_start_date,
+            contract_end_date, previous_contract_end_date, previous_employment_type,
+            previous_legal_entity_id_snapshot, previous_renewal_count, renewal_count,
+            probation_start_date, probation_end_date, actual_regularization_date,
+            transfer_effective_date, historical_supplement, before_dept_name_snapshot,
+            before_post_name_snapshot,
+            work_start_date, student_status_snapshot, retirement_status_snapshot,
+            income_start_year_month, work_end_date,
+            leave_date, leave_reason, offboarding_type, salary_settlement_status,
+            asset_handover_status, non_compete_decision, compensation_amount,
+            compensation_note, base_salary, post_salary, field_allowance,
+            performance_salary, salary_total, status,
+            void_reason, sent_time, viewed_time, signed_time, initial_signed_time,
+            signing_sequence, signature_sample_file_url, signature_sample_hash,
+            signature_sample_time, company_frozen_time, document_version,
+            final_document_version, final_document_root_hash, final_generated_time,
+            final_confirmed_time, final_confirmation_status, final_archive_root_hash,
+            final_evidence_generated_time, sign_deadline,
+            deadline_policy_source, deadline_days_snapshot, terminal_time,
+            terminal_reason_code, terminal_reason_detail, resolution_status,
+            resolved_by, resolved_time, resolution_reason_code, resolution_reason_detail,
+            reissue_of_package_id, reissued_to_package_id, version,
+            task_id, confirm_status, plan_version_id,
+            create_by, create_time, remark
+        ) values (
+            #{packageNo}, #{employeeId}, #{employeeNameSnapshot}, #{employeePhoneSnapshot},
+            #{employeeIdCardSnapshot}, #{employeeAddressSnapshot}, #{deptIdSnapshot}, #{deptNameSnapshot}, #{shopDeptId},
+            #{shopDeptName}, #{legalEntityIdSnapshot}, #{legalEntityCodeSnapshot},
+            #{legalEntityNameSnapshot}, #{legalEntitySourceDeptId}, #{legalEntityResolveMode},
+            #{legalEntityCreditCodeSnapshot}, #{legalEntityAddressSnapshot},
+            #{legalRepresentativeSnapshot}, #{legalEntityPhoneSnapshot}, #{legalEntityOverrideReason},
+            #{sealIdSnapshot}, #{sealNameSnapshot}, #{sealImageUrlSnapshot}, #{sealImageHashSnapshot},
+            #{sourcePlanId}, #{sourcePlanName}, #{recommendedCompanySnapshot},
+            #{recommendedLegalRepresentativeSnapshot}, #{recommendedRegisteredAddressSnapshot}, #{scenario},
+            #{employmentType}, #{contractTermCodeSnapshot}, #{socialType}, #{servicePersonType},
+            #{insuranceType}, #{postNameSnapshot}, #{postLevelSnapshot}, #{salaryVersion}, #{entryDate}, #{contractStartDate},
+            #{contractEndDate}, #{previousContractEndDate}, #{previousEmploymentType},
+            #{previousLegalEntityIdSnapshot}, #{previousRenewalCount}, #{renewalCount},
+            #{probationStartDate}, #{probationEndDate}, #{actualRegularizationDate},
+            #{transferEffectiveDate}, coalesce(#{historicalSupplement}, 0), #{beforeDeptNameSnapshot},
+            #{beforePostNameSnapshot},
+            #{workStartDate}, #{studentStatusSnapshot}, #{retirementStatusSnapshot},
+            #{incomeStartYearMonth}, #{workEndDate},
+            #{leaveDate}, #{leaveReason}, #{offboardingType}, #{salarySettlementStatus},
+            #{assetHandoverStatus}, #{nonCompeteDecision}, #{compensationAmount},
+            #{compensationNote}, #{baseSalary}, #{postSalary}, #{fieldAllowance}, #{performanceSalary},
+            #{salaryTotal}, #{status},
+            #{voidReason}, #{sentTime}, #{viewedTime}, #{signedTime}, #{initialSignedTime},
+            #{signingSequence}, #{signatureSampleFileUrl}, #{signatureSampleHash},
+            #{signatureSampleTime}, #{companyFrozenTime}, #{documentVersion},
+            #{finalDocumentVersion}, #{finalDocumentRootHash}, #{finalGeneratedTime},
+            #{finalConfirmedTime}, #{finalConfirmationStatus}, #{finalArchiveRootHash},
+            #{finalEvidenceGeneratedTime}, #{signDeadline},
+            #{deadlinePolicySource}, #{deadlineDaysSnapshot}, #{terminalTime},
+            #{terminalReasonCode}, #{terminalReasonDetail}, #{resolutionStatus},
+            #{resolvedBy}, #{resolvedTime}, #{resolutionReasonCode}, #{resolutionReasonDetail},
+            #{reissueOfPackageId}, #{reissuedToPackageId}, #{version},
+            #{taskId}, #{confirmStatus}, #{planVersionId}, #{createBy}, sysdate(), #{remark}
+        )
+    </insert>
+
+    <update id="updateOaSignPackage" parameterType="com.erp.oa.domain.OaSignPackage">
+        update oa_sign_package
+        <set>
+            <if test="packageNo != null">package_no = #{packageNo},</if>
+            <if test="employeeId != null">employee_id = #{employeeId},</if>
+            <if test="employeeNameSnapshot != null">employee_name_snapshot = #{employeeNameSnapshot},</if>
+            <if test="employeePhoneSnapshot != null">employee_phone_snapshot = #{employeePhoneSnapshot},</if>
+            <if test="employeeIdCardSnapshot != null">employee_id_card_snapshot = #{employeeIdCardSnapshot},</if>
+            <if test="employeeAddressSnapshot != null">employee_address_snapshot = #{employeeAddressSnapshot},</if>
+            <if test="deptIdSnapshot != null">dept_id_snapshot = #{deptIdSnapshot},</if>
+            <if test="deptNameSnapshot != null">dept_name_snapshot = #{deptNameSnapshot},</if>
+            <if test="shopDeptId != null">shop_dept_id = #{shopDeptId},</if>
+            <if test="shopDeptName != null">shop_dept_name = #{shopDeptName},</if>
+            <if test="legalEntityIdSnapshot != null">legal_entity_id_snapshot = #{legalEntityIdSnapshot},</if>
+            <if test="legalEntityCodeSnapshot != null">legal_entity_code_snapshot = #{legalEntityCodeSnapshot},</if>
+            <if test="legalEntityNameSnapshot != null">legal_entity_name_snapshot = #{legalEntityNameSnapshot},</if>
+            <if test="legalEntitySourceDeptId != null">legal_entity_source_dept_id = #{legalEntitySourceDeptId},</if>
+            <if test="legalEntityResolveMode != null">legal_entity_resolve_mode = #{legalEntityResolveMode},</if>
+            <if test="legalEntityCreditCodeSnapshot != null">legal_entity_credit_code_snapshot = #{legalEntityCreditCodeSnapshot},</if>
+            <if test="legalEntityAddressSnapshot != null">legal_entity_address_snapshot = #{legalEntityAddressSnapshot},</if>
+            <if test="legalRepresentativeSnapshot != null">legal_representative_snapshot = #{legalRepresentativeSnapshot},</if>
+            <if test="legalEntityPhoneSnapshot != null">legal_entity_phone_snapshot = #{legalEntityPhoneSnapshot},</if>
+            <if test="legalEntityOverrideReason != null">legal_entity_override_reason = #{legalEntityOverrideReason},</if>
+            <if test="sealIdSnapshot != null">seal_id_snapshot = #{sealIdSnapshot},</if>
+            <if test="sealNameSnapshot != null">seal_name_snapshot = #{sealNameSnapshot},</if>
+            <if test="sealImageUrlSnapshot != null">seal_image_url_snapshot = #{sealImageUrlSnapshot},</if>
+            <if test="sealImageHashSnapshot != null">seal_image_hash_snapshot = #{sealImageHashSnapshot},</if>
+            <if test="sourcePlanId != null">source_plan_id = #{sourcePlanId},</if>
+            <if test="sourcePlanName != null">source_plan_name = #{sourcePlanName},</if>
+            <if test="recommendedCompanySnapshot != null">recommended_company_snapshot = #{recommendedCompanySnapshot},</if>
+            <if test="recommendedLegalRepresentativeSnapshot != null">recommended_legal_representative_snapshot = #{recommendedLegalRepresentativeSnapshot},</if>
+            <if test="recommendedRegisteredAddressSnapshot != null">recommended_registered_address_snapshot = #{recommendedRegisteredAddressSnapshot},</if>
+            <if test="scenario != null">scenario = #{scenario},</if>
+            <if test="employmentType != null">employment_type = #{employmentType},</if>
+            <if test="contractTermCodeSnapshot != null">contract_term_code_snapshot = #{contractTermCodeSnapshot},</if>
+            <if test="socialType != null">social_type = #{socialType},</if>
+            <if test="servicePersonType != null">service_person_type = #{servicePersonType},</if>
+            <if test="insuranceType != null">insurance_type = #{insuranceType},</if>
+            <if test="postNameSnapshot != null">post_name_snapshot = #{postNameSnapshot},</if>
+            <if test="postLevelSnapshot != null">post_level_snapshot = #{postLevelSnapshot},</if>
+            <if test="salaryVersion != null">salary_version = #{salaryVersion},</if>
+            <if test="entryDate != null">entry_date = #{entryDate},</if>
+            <if test="contractStartDate != null">contract_start_date = #{contractStartDate},</if>
+            <if test="contractEndDate != null">contract_end_date = #{contractEndDate},</if>
+            <if test="previousContractEndDate != null">previous_contract_end_date = #{previousContractEndDate},</if>
+            <if test="previousEmploymentType != null">previous_employment_type = #{previousEmploymentType},</if>
+            <if test="previousLegalEntityIdSnapshot != null">previous_legal_entity_id_snapshot = #{previousLegalEntityIdSnapshot},</if>
+            <if test="previousRenewalCount != null">previous_renewal_count = #{previousRenewalCount},</if>
+            <if test="renewalCount != null">renewal_count = #{renewalCount},</if>
+            <if test="probationStartDate != null">probation_start_date = #{probationStartDate},</if>
+            <if test="probationEndDate != null">probation_end_date = #{probationEndDate},</if>
+            <if test="actualRegularizationDate != null">actual_regularization_date = #{actualRegularizationDate},</if>
+            <if test="transferEffectiveDate != null">transfer_effective_date = #{transferEffectiveDate},</if>
+            <if test="historicalSupplement != null">historical_supplement = #{historicalSupplement},</if>
+            <if test="beforeDeptNameSnapshot != null">before_dept_name_snapshot = #{beforeDeptNameSnapshot},</if>
+            <if test="beforePostNameSnapshot != null">before_post_name_snapshot = #{beforePostNameSnapshot},</if>
+            <if test="workStartDate != null">work_start_date = #{workStartDate},</if>
+            <if test="studentStatusSnapshot != null">student_status_snapshot = #{studentStatusSnapshot},</if>
+            <if test="retirementStatusSnapshot != null">retirement_status_snapshot = #{retirementStatusSnapshot},</if>
+            <if test="incomeStartYearMonth != null">income_start_year_month = #{incomeStartYearMonth},</if>
+            <if test="workEndDate != null">work_end_date = #{workEndDate},</if>
+            <if test="leaveDate != null">leave_date = #{leaveDate},</if>
+            <if test="leaveReason != null">leave_reason = #{leaveReason},</if>
+            <if test="offboardingType != null">offboarding_type = #{offboardingType},</if>
+            <if test="salarySettlementStatus != null">salary_settlement_status = #{salarySettlementStatus},</if>
+            <if test="assetHandoverStatus != null">asset_handover_status = #{assetHandoverStatus},</if>
+            <if test="nonCompeteDecision != null">non_compete_decision = #{nonCompeteDecision},</if>
+            <if test="compensationAmount != null">compensation_amount = #{compensationAmount},</if>
+            <if test="compensationNote != null">compensation_note = #{compensationNote},</if>
+            <if test="baseSalary != null">base_salary = #{baseSalary},</if>
+            <if test="postSalary != null">post_salary = #{postSalary},</if>
+            <if test="fieldAllowance != null">field_allowance = #{fieldAllowance},</if>
+            <if test="performanceSalary != null">performance_salary = #{performanceSalary},</if>
+            <if test="salaryTotal != null">salary_total = #{salaryTotal},</if>
+            <if test="status != null and status != ''">status = #{status},</if>
+            <if test="voidReason != null">void_reason = #{voidReason},</if>
+            <if test="sentTime != null">sent_time = #{sentTime},</if>
+            <if test="viewedTime != null">viewed_time = #{viewedTime},</if>
+            <if test="signedTime != null">signed_time = #{signedTime},</if>
+            <if test="initialSignedTime != null">initial_signed_time = #{initialSignedTime},</if>
+            <if test="signingSequence != null">signing_sequence = #{signingSequence},</if>
+            <if test="signatureSampleFileUrl != null">signature_sample_file_url = #{signatureSampleFileUrl},</if>
+            <if test="signatureSampleHash != null">signature_sample_hash = #{signatureSampleHash},</if>
+            <if test="signatureSampleTime != null">signature_sample_time = #{signatureSampleTime},</if>
+            <if test="companyFrozenTime != null">company_frozen_time = #{companyFrozenTime},</if>
+            <if test="documentVersion != null">document_version = #{documentVersion},</if>
+            <if test="finalDocumentVersion != null">final_document_version = #{finalDocumentVersion},</if>
+            <if test="finalDocumentRootHash != null">final_document_root_hash = #{finalDocumentRootHash},</if>
+            <if test="finalGeneratedTime != null">final_generated_time = #{finalGeneratedTime},</if>
+            <if test="finalConfirmedTime != null">final_confirmed_time = #{finalConfirmedTime},</if>
+            <if test="finalConfirmationStatus != null">final_confirmation_status = #{finalConfirmationStatus},</if>
+            <if test="finalArchiveRootHash != null">final_archive_root_hash = #{finalArchiveRootHash},</if>
+            <if test="finalEvidenceGeneratedTime != null">final_evidence_generated_time = #{finalEvidenceGeneratedTime},</if>
+            <if test="signDeadline != null">sign_deadline = #{signDeadline},</if>
+            <if test="version != null">version = #{version},</if>
+            <if test="taskId != null">task_id = #{taskId},</if>
+            <if test="confirmStatus != null">confirm_status = #{confirmStatus},</if>
+            <if test="planVersionId != null">plan_version_id = #{planVersionId},</if>
+            <if test="updateBy != null and updateBy != ''">update_by = #{updateBy},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            update_time = sysdate()
+        </set>
+        where package_id = #{packageId}
+    </update>
+
+    <update id="updateDraftOaSignPackage" parameterType="com.erp.oa.domain.OaSignPackage">
+        update oa_sign_package
+        set employee_id = #{employeeId},
+            employee_name_snapshot = #{employeeNameSnapshot},
+            employee_phone_snapshot = #{employeePhoneSnapshot},
+            employee_id_card_snapshot = #{employeeIdCardSnapshot},
+            employee_address_snapshot = #{employeeAddressSnapshot},
+            dept_id_snapshot = #{deptIdSnapshot},
+            dept_name_snapshot = #{deptNameSnapshot},
+            shop_dept_id = #{shopDeptId},
+            shop_dept_name = #{shopDeptName},
+            signing_sequence = #{signingSequence},
+            signature_sample_file_url = #{signatureSampleFileUrl},
+            signature_sample_hash = #{signatureSampleHash},
+            signature_sample_time = #{signatureSampleTime},
+            legal_entity_id_snapshot = #{legalEntityIdSnapshot},
+            legal_entity_code_snapshot = #{legalEntityCodeSnapshot},
+            legal_entity_name_snapshot = #{legalEntityNameSnapshot},
+            source_plan_id = #{sourcePlanId},
+            source_plan_name = #{sourcePlanName},
+            scenario = #{scenario},
+            employment_type = #{employmentType},
+            contract_term_code_snapshot = #{contractTermCodeSnapshot},
+            social_type = #{socialType},
+            service_person_type = #{servicePersonType},
+            insurance_type = #{insuranceType},
+            post_name_snapshot = #{postNameSnapshot},
+            post_level_snapshot = #{postLevelSnapshot},
+            salary_version = #{salaryVersion},
+            entry_date = #{entryDate},
+            contract_start_date = #{contractStartDate},
+            contract_end_date = #{contractEndDate},
+            previous_contract_end_date = #{previousContractEndDate},
+            previous_employment_type = #{previousEmploymentType},
+            previous_legal_entity_id_snapshot = #{previousLegalEntityIdSnapshot},
+            previous_renewal_count = #{previousRenewalCount},
+            renewal_count = #{renewalCount},
+            probation_start_date = #{probationStartDate},
+            probation_end_date = #{probationEndDate},
+            actual_regularization_date = #{actualRegularizationDate},
+            transfer_effective_date = #{transferEffectiveDate},
+            historical_supplement = coalesce(#{historicalSupplement}, 0),
+            before_dept_name_snapshot = #{beforeDeptNameSnapshot},
+            before_post_name_snapshot = #{beforePostNameSnapshot},
+            work_start_date = #{workStartDate},
+            student_status_snapshot = #{studentStatusSnapshot},
+            retirement_status_snapshot = #{retirementStatusSnapshot},
+            income_start_year_month = #{incomeStartYearMonth},
+            work_end_date = #{workEndDate},
+            leave_date = #{leaveDate},
+            leave_reason = #{leaveReason},
+            offboarding_type = #{offboardingType},
+            salary_settlement_status = #{salarySettlementStatus},
+            asset_handover_status = #{assetHandoverStatus},
+            non_compete_decision = #{nonCompeteDecision},
+            compensation_amount = #{compensationAmount},
+            compensation_note = #{compensationNote},
+            base_salary = #{baseSalary},
+            post_salary = #{postSalary},
+            field_allowance = #{fieldAllowance},
+            performance_salary = #{performanceSalary},
+            salary_total = #{salaryTotal},
+            task_id = #{taskId},
+            confirm_status = #{confirmStatus},
+            plan_version_id = #{planVersionId},
+            document_version = null,
+            sent_time = null,
+            sign_deadline = null,
+            deadline_policy_source = null,
+            deadline_days_snapshot = null,
+            viewed_time = null,
+            signed_time = null,
+            status = 'draft',
+            update_by = #{updateBy},
+            update_time = sysdate(),
+            remark = #{remark}
+        where package_id = #{packageId}
+          and status = 'draft'
+          and (
+              (task_id is null and #{taskId} is null)
+              or exists (
+                  select 1
+                  from oa_sign_task t
+                  where t.task_id = #{taskId}
+                    and t.package_id = oa_sign_package.package_id
+                    and oa_sign_package.task_id = t.task_id
+                    and t.assigned_hr_user_id = #{params.assignedHrUserId}
+                    and t.status in ('NEW', 'NEEDS_DATA', 'FAILED')
+                    and t.confirmed_by is null
+                    and t.confirmed_time is null
+                    and t.confirmed_snapshot_hash is null
+                    and ((t.plan_version_id is null and #{planVersionId} is null)
+                         or t.plan_version_id = #{planVersionId})
+                    and (
+                        upper(t.scenario) != 'REGULARIZE'
+                        or oa_sign_package.actual_regularization_date
+                            &lt;=> #{actualRegularizationDate}
+                    )
+              )
+          )
+    </update>
+
+    <select id="selectOaSignPackageById" resultMap="OaSignPackageResult">
+        select <include refid="baseColumns"/>
+        from oa_sign_package
+        where package_id = #{packageId}
+    </select>
+
+    <select id="selectOaSignPackagesByIds" resultMap="OaSignPackageResult">
+        select <include refid="baseColumns"/>
+        from oa_sign_package
+        where package_id in
+        <foreach collection="packageIds" item="packageId" open="(" close=")" separator=",">
+            #{packageId}
+        </foreach>
+        order by package_id desc
+    </select>
+
+    <select id="lockOaSignPackageById" resultMap="OaSignPackageResult">
+        select <include refid="baseColumns"/>
+        from oa_sign_package
+        where package_id = #{packageId}
+        for update
+    </select>
+
+    <select id="selectPackageIdsByTaskId" resultType="long">
+        select package_id
+        from oa_sign_package
+        where task_id = #{taskId}
+        order by package_id
+        for update
+    </select>
+
+    <select id="countLifecycleReferences" resultType="int">
+        select count(*)
+        from oa_sign_package
+        where package_id != #{packageId}
+          and (reissue_of_package_id = #{packageId} or reissued_to_package_id = #{packageId})
+    </select>
+
+    <select id="selectOaSignPackageList" parameterType="com.erp.oa.domain.OaSignPackage" resultMap="OaSignPackageResult">
+        select <include refid="baseColumns"/>,
+               (select count(*)
+                from oa_sign_package_document document_count_row
+                where document_count_row.package_id = oa_sign_package.package_id) as document_count
+        from oa_sign_package
+        <where>
+            <if test="employeeNameSnapshot != null and employeeNameSnapshot != ''">
+                and employee_name_snapshot like concat('%', #{employeeNameSnapshot}, '%')
+            </if>
+            <if test="scenario != null and scenario != ''">
+                and (scenario = #{scenario}
+                     or (lower(#{scenario}) = 'renewal' and lower(trim(scenario)) = 'renew'))
+            </if>
+            <if test="status != null and status != ''">
+                and status = #{status}
+            </if>
+            <if test="shopDeptId != null">
+                and shop_dept_id = #{shopDeptId}
+            </if>
+            <if test="params.scopeDeptIds != null and params.scopeDeptIds.size() > 0">
+                and shop_dept_id in
+                <foreach collection="params.scopeDeptIds" item="scopeDeptId" open="(" close=")" separator=",">
+                    #{scopeDeptId}
+                </foreach>
+            </if>
+            and (
+                task_id is null
+                or exists (
+                    select 1
+                    from oa_sign_task owner_task
+                    where owner_task.task_id = oa_sign_package.task_id
+                      and owner_task.package_id = oa_sign_package.package_id
+                    <if test="params.assignedHrUserId != null">
+                      and owner_task.assigned_hr_user_id = #{params.assignedHrUserId}
+                    </if>
+                )
+            )
+        </where>
+        order by package_id desc
+    </select>
+
+    <select id="selectMyOaSignPackageList" parameterType="com.erp.oa.domain.OaSignPackage" resultMap="OaSignPackageResult">
+        select <include refid="baseColumns"/>,
+               (select count(*)
+                from oa_sign_package_document document_count_row
+                where document_count_row.package_id = oa_sign_package.package_id
+                  and document_count_row.employee_visible = 'Y') as document_count
+        from oa_sign_package
+        <where>
+            employee_id = #{employeeId}
+            <if test="status != null and status != ''">
+                and status = #{status}
+            </if>
+        </where>
+        order by package_id desc
+    </select>
+
+    <select id="selectLatestOnboardPackageFactsByEmployeeIds"
+            resultMap="OaOnboardPackageFactResult">
+        select facts.employee_id,
+               latest_package.package_id as latest_package_id,
+               latest_package.task_id as latest_task_id,
+               latest_package.status as latest_status,
+               latest_package.shop_dept_id as latest_shop_dept_id,
+               signed_package.package_id as signed_package_id,
+               signed_package.task_id as signed_task_id,
+               signed_package.shop_dept_id as signed_shop_dept_id,
+               case
+                   when signed_package.package_id is not null
+                        and signed_package.final_document_version is not null
+                        and trim(signed_package.final_document_version) != ''
+                        and signed_package.final_document_root_hash is not null
+                        and trim(signed_package.final_document_root_hash) != ''
+                        and signed_package.final_generated_time is not null
+                        and upper(trim(signed_package.final_confirmation_status)) = 'CONFIRMED'
+                   then 1 else 0
+               end as signed_evidence_complete
+        from (
+            select employee_id,
+                   max(package_id) as latest_package_id,
+                   max(case when lower(trim(status)) = 'signed' then package_id end) as signed_package_id
+            from oa_sign_package
+            where upper(trim(scenario)) = 'ONBOARD'
+              and employee_id in
+              <foreach collection="employeeIds" item="employeeId" open="(" close=")" separator=",">
+                  #{employeeId}
+              </foreach>
+            group by employee_id
+        ) facts
+        inner join oa_sign_package latest_package
+                on latest_package.package_id = facts.latest_package_id
+        left join oa_sign_package signed_package
+               on signed_package.package_id = facts.signed_package_id
+        order by facts.employee_id asc
+    </select>
+
+    <select id="selectOpenPackageByEmployeeAndPlan" resultMap="OaSignPackageResult">
+        select <include refid="baseColumns"/>
+        from oa_sign_package
+        where employee_id = #{employeeId}
+          and source_plan_id = #{sourcePlanId}
+          and shop_dept_id = #{shopDeptId}
+          and status in ('draft', 'pending_sign', 'part_viewed', 'pending_company', 'pending_final_confirm')
+        order by package_id desc
+        limit 1
+    </select>
+
+    <select id="selectOpenPackageByEmployeeAndPlanForUpdate" resultMap="OaSignPackageResult">
+        select <include refid="baseColumns"/>
+        from oa_sign_package
+        where employee_id = #{employeeId}
+          and source_plan_id = #{sourcePlanId}
+          and shop_dept_id = #{shopDeptId}
+          and status in ('draft', 'pending_sign', 'part_viewed', 'pending_company', 'pending_final_confirm')
+        order by package_id desc
+        limit 1
+        for update
+    </select>
+
+    <update id="updateStatusWithVersion">
+        update oa_sign_package
+        set status = #{targetStatus},
+            version = version + 1,
+            update_by = #{updateBy},
+            update_time = sysdate()
+        where package_id = #{packageId}
+          and status = #{currentStatus}
+          and version = #{expectedVersion}
+          and #{currentStatus} in ('pending_sign', 'part_viewed')
+          and #{targetStatus} = 'pending_company'
+          and #{transitionTime} is not null
+          and sign_deadline &gt; #{transitionTime}
+          and deadline_policy_source is not null
+          and trim(deadline_policy_source) != ''
+          and deadline_days_snapshot &gt; 0
+    </update>
+
+    <update id="markSentWithVersion">
+        update oa_sign_package
+        set task_id = #{taskId},
+            status = 'pending_sign',
+            sent_time = #{sentTime},
+            sign_deadline = #{signDeadline},
+            deadline_policy_source = #{deadlinePolicySource},
+            deadline_days_snapshot = #{deadlineDaysSnapshot},
+            document_version = #{documentVersion},
+            confirm_status = #{confirmStatus},
+            version = version + 1,
+            update_by = #{updateBy},
+            update_time = sysdate()
+        where package_id = #{packageId}
+          and status = #{currentStatus}
+          and version = #{expectedVersion}
+          and (
+              (#{taskId} is null and task_id is null)
+              or task_id = #{taskId}
+              or (
+                  task_id is null
+                  and #{taskId} is not null
+                  and exists (
+                      select 1
+                      from oa_sign_task t
+                      where t.task_id = #{taskId}
+                        and t.package_id = oa_sign_package.package_id
+                        and t.employee_id = oa_sign_package.employee_id
+                  )
+              )
+          )
+          and document_version = #{documentVersion}
+          and sent_time is null
+          and sign_deadline is null
+    </update>
+
+    <update id="markSignatureFirstSentWithVersion">
+        update oa_sign_package
+        set task_id = #{taskId},
+            status = 'pending_final_confirm',
+            sent_time = #{sentTime},
+            sign_deadline = #{signDeadline},
+            deadline_policy_source = #{deadlinePolicySource},
+            deadline_days_snapshot = #{deadlineDaysSnapshot},
+            confirm_status = #{confirmStatus},
+            final_confirmation_status = 'PENDING',
+            version = version + 1,
+            update_by = #{updateBy},
+            update_time = sysdate()
+        where package_id = #{packageId}
+          and task_id = #{taskId}
+          and status = 'draft'
+          and version = #{expectedVersion}
+          and document_version = #{documentVersion}
+          and signing_sequence = 'SIGNATURE_FIRST'
+          and signature_sample_file_url is not null
+          and signature_sample_hash is not null
+          and signature_sample_time is not null
+          and company_frozen_time is not null
+          and final_document_version = #{finalDocumentVersion}
+          and final_document_root_hash = #{finalDocumentRootHash}
+          and final_generated_time is not null
+          and sent_time is null
+          and sign_deadline is null
+    </update>
+
+    <update id="sendStagedShell">
+        update oa_sign_package
+        set status = 'pending_sign',
+            document_version = #{signPackage.documentVersion},
+            sent_time = #{signPackage.sentTime},
+            sign_deadline = #{signPackage.signDeadline},
+            deadline_policy_source = #{signPackage.deadlinePolicySource},
+            deadline_days_snapshot = #{signPackage.deadlineDaysSnapshot},
+            confirm_status = #{signPackage.confirmStatus},
+            version = version + 1,
+            update_by = #{signPackage.updateBy},
+            update_time = sysdate()
+        where package_id = #{signPackage.packageId}
+          and task_id = #{signPackage.taskId}
+          and status = 'draft'
+          and version = #{expectedVersion}
+          and signing_sequence = 'SIGNATURE_FIRST'
+          and #{signPackage.documentVersion} is not null
+          and trim(#{signPackage.documentVersion}) != ''
+          and #{signPackage.sentTime} is not null
+          and #{signPackage.signDeadline} &gt; #{signPackage.sentTime}
+          and #{signPackage.deadlinePolicySource} is not null
+          and trim(#{signPackage.deadlinePolicySource}) != ''
+          and #{signPackage.deadlineDaysSnapshot} &gt; 0
+          and document_version is null
+          and sent_time is null
+          and sign_deadline is null
+          and initial_signed_time is null
+          and signature_sample_file_url is null
+          and signature_sample_hash is null
+          and signature_sample_time is null
+          and company_frozen_time is null
+          and final_document_version is null
+          and final_document_root_hash is null
+          and final_generated_time is null
+          and final_confirmation_status is null
+    </update>
+
+    <update id="recordStagedEmployeeSignature">
+        update oa_sign_package
+        set status = 'pending_company',
+            signed_time = #{signPackage.signedTime},
+            initial_signed_time = #{signPackage.initialSignedTime},
+            signature_sample_file_url = #{signPackage.signatureSampleFileUrl},
+            signature_sample_hash = #{signPackage.signatureSampleHash},
+            signature_sample_time = #{signPackage.signatureSampleTime},
+            final_confirmation_status = 'WAITING_COMPANY',
+            version = version + 1,
+            update_by = #{signPackage.updateBy},
+            update_time = sysdate()
+        where package_id = #{signPackage.packageId}
+          and task_id = #{signPackage.taskId}
+          and status = #{currentStatus}
+          and #{currentStatus} in ('pending_sign', 'part_viewed')
+          and version = #{expectedVersion}
+          and signing_sequence = 'SIGNATURE_FIRST'
+          and document_version is not null
+          and trim(document_version) != ''
+          and sent_time is not null
+          and sign_deadline &gt;= #{signPackage.initialSignedTime}
+          and deadline_policy_source is not null
+          and trim(deadline_policy_source) != ''
+          and deadline_days_snapshot &gt; 0
+          and #{signPackage.signedTime} is not null
+          and #{signPackage.initialSignedTime} = #{signPackage.signedTime}
+          and #{signPackage.signatureSampleFileUrl} is not null
+          and trim(#{signPackage.signatureSampleFileUrl}) != ''
+          and #{signPackage.signatureSampleHash} is not null
+          and trim(#{signPackage.signatureSampleHash}) != ''
+          and #{signPackage.signatureSampleTime} = #{signPackage.initialSignedTime}
+          and signed_time is null
+          and initial_signed_time is null
+          and signature_sample_file_url is null
+          and signature_sample_hash is null
+          and signature_sample_time is null
+          and company_frozen_time is null
+          and final_document_version is null
+          and final_document_root_hash is null
+          and final_generated_time is null
+          and final_confirmation_status is null
+    </update>
+
+    <update id="prepareStagedFinalCandidate">
+        update oa_sign_package
+        set employee_address_snapshot = #{signPackage.employeeAddressSnapshot},
+            service_person_type = #{signPackage.servicePersonType},
+            insurance_type = #{signPackage.insuranceType},
+            student_status_snapshot = #{signPackage.studentStatusSnapshot},
+            retirement_status_snapshot = #{signPackage.retirementStatusSnapshot},
+            income_start_year_month = #{signPackage.incomeStartYearMonth},
+            historical_supplement = coalesce(#{signPackage.historicalSupplement}, 0),
+            legal_entity_id_snapshot = #{signPackage.legalEntityIdSnapshot},
+            legal_entity_code_snapshot = #{signPackage.legalEntityCodeSnapshot},
+            legal_entity_name_snapshot = #{signPackage.legalEntityNameSnapshot},
+            legal_entity_source_dept_id = #{signPackage.legalEntitySourceDeptId},
+            legal_entity_resolve_mode = #{signPackage.legalEntityResolveMode},
+            legal_entity_credit_code_snapshot = #{signPackage.legalEntityCreditCodeSnapshot},
+            legal_entity_address_snapshot = #{signPackage.legalEntityAddressSnapshot},
+            legal_representative_snapshot = #{signPackage.legalRepresentativeSnapshot},
+            legal_entity_phone_snapshot = #{signPackage.legalEntityPhoneSnapshot},
+            legal_entity_override_reason = #{signPackage.legalEntityOverrideReason},
+            seal_id_snapshot = #{signPackage.sealIdSnapshot},
+            seal_name_snapshot = #{signPackage.sealNameSnapshot},
+            seal_image_url_snapshot = #{signPackage.sealImageUrlSnapshot},
+            seal_image_hash_snapshot = #{signPackage.sealImageHashSnapshot},
+            company_frozen_time = #{signPackage.companyFrozenTime},
+            document_version = #{signPackage.documentVersion},
+            final_document_version = #{signPackage.finalDocumentVersion},
+            final_document_root_hash = #{signPackage.finalDocumentRootHash},
+            final_generated_time = #{signPackage.finalGeneratedTime},
+            final_confirmation_status = 'PREPARED_NOT_SENT',
+            final_archive_root_hash = null,
+            final_evidence_generated_time = null,
+            version = version + 1,
+            update_by = #{signPackage.updateBy},
+            update_time = sysdate()
+        where package_id = #{signPackage.packageId}
+          and task_id = #{signPackage.taskId}
+          and status = 'pending_company'
+          and version = #{expectedVersion}
+          and signing_sequence = 'SIGNATURE_FIRST'
+          and document_version = #{expectedDocumentVersion}
+          and sent_time is not null
+          and signed_time is not null
+          and initial_signed_time is not null
+          and signature_sample_file_url is not null
+          and signature_sample_hash is not null
+          and signature_sample_time is not null
+          and company_frozen_time is null
+          and final_document_version is null
+          and final_document_root_hash is null
+          and final_generated_time is null
+          and final_confirmation_status = 'WAITING_COMPANY'
+          and #{signPackage.legalEntityIdSnapshot} is not null
+          and #{signPackage.sealIdSnapshot} is not null
+          and #{signPackage.companyFrozenTime} is not null
+          and #{signPackage.documentVersion} is not null
+          and trim(#{signPackage.documentVersion}) != ''
+          and #{signPackage.finalDocumentVersion} is not null
+          and trim(#{signPackage.finalDocumentVersion}) != ''
+          and #{signPackage.finalDocumentRootHash} is not null
+          and trim(#{signPackage.finalDocumentRootHash}) != ''
+          and #{signPackage.finalGeneratedTime} is not null
+    </update>
+
+    <update id="sendStagedFinalCandidate">
+        update oa_sign_package
+        set status = 'pending_final_confirm',
+            sign_deadline = #{signPackage.signDeadline},
+            deadline_policy_source = #{signPackage.deadlinePolicySource},
+            deadline_days_snapshot = #{signPackage.deadlineDaysSnapshot},
+            confirm_status = #{signPackage.confirmStatus},
+            final_confirmation_status = 'PENDING',
+            version = version + 1,
+            update_by = #{signPackage.updateBy},
+            update_time = sysdate()
+        where package_id = #{signPackage.packageId}
+          and task_id = #{signPackage.taskId}
+          and status = 'pending_company'
+          and version = #{expectedVersion}
+          and signing_sequence = 'SIGNATURE_FIRST'
+          and final_confirmation_status = 'PREPARED_NOT_SENT'
+          and sent_time is not null
+          and signed_time is not null
+          and initial_signed_time is not null
+          and (
+              (
+                  signature_sample_file_url is not null
+                  and trim(signature_sample_file_url) != ''
+                  and signature_sample_hash is not null
+                  and trim(signature_sample_hash) != ''
+                  and signature_sample_time is not null
+                  and (
+                      select count(*)
+                      from oa_sign_file_evidence staged_sample
+                      where staged_sample.package_id = oa_sign_package.package_id
+                        and staged_sample.document_id is null
+                        and upper(trim(staged_sample.evidence_type)) = 'SIGNATURE_SAMPLE'
+                  ) = 1
+                  and exists (
+                      select 1
+                      from oa_sign_file_evidence staged_sample
+                      where staged_sample.package_id = oa_sign_package.package_id
+                        and staged_sample.document_id is null
+                        and upper(trim(staged_sample.evidence_type)) = 'SIGNATURE_SAMPLE'
+                        and staged_sample.document_version regexp '^SAMPLE-[1-9][0-9]*$'
+                        and lower(trim(staged_sample.file_hash)) = lower(trim(signature_sample_hash))
+                        and staged_sample.file_url is not null
+                        and trim(staged_sample.file_url) != ''
+                        and staged_sample.file_size &gt; 0
+                        and staged_sample.generated_time = signature_sample_time
+                  )
+              )
+              or
+              (
+                  signature_sample_file_url is null
+                  and signature_sample_hash is null
+                  and signature_sample_time is null
+                  and not exists (
+                      select 1
+                      from oa_sign_file_evidence orphan_sample
+                      where orphan_sample.package_id = oa_sign_package.package_id
+                        and upper(trim(orphan_sample.evidence_type)) = 'SIGNATURE_SAMPLE'
+                  )
+                  and exists (
+                      select 1
+                      from oa_sign_package_document legacy_signed_document
+                      where legacy_signed_document.package_id = oa_sign_package.package_id
+                        and upper(trim(legacy_signed_document.employee_visible)) = 'Y'
+                        and upper(trim(legacy_signed_document.employee_sign_required)) = 'Y'
+                  )
+                  and not exists (
+                      select 1
+                      from oa_sign_package_document legacy_signed_document
+                      where legacy_signed_document.package_id = oa_sign_package.package_id
+                        and upper(trim(legacy_signed_document.employee_visible)) = 'Y'
+                        and upper(trim(legacy_signed_document.employee_sign_required)) = 'Y'
+                        and (
+                            legacy_signed_document.signed is null
+                            or upper(trim(legacy_signed_document.signed)) != 'Y'
+                            or legacy_signed_document.status is null
+                            or lower(trim(legacy_signed_document.status)) != 'signed'
+                            or legacy_signed_document.document_version is null
+                            or trim(legacy_signed_document.document_version) = ''
+                            or legacy_signed_document.document_version != oa_sign_package.document_version
+                            or legacy_signed_document.signature_file_url is null
+                            or trim(legacy_signed_document.signature_file_url) = ''
+                            or legacy_signed_document.signature_hash is null
+                            or trim(legacy_signed_document.signature_hash) = ''
+                            or legacy_signed_document.signed_pdf_url is null
+                            or trim(legacy_signed_document.signed_pdf_url) = ''
+                            or legacy_signed_document.signed_pdf_hash is null
+                            or trim(legacy_signed_document.signed_pdf_hash) = ''
+                            or legacy_signed_document.certificate_file_url is null
+                            or trim(legacy_signed_document.certificate_file_url) = ''
+                            or legacy_signed_document.certificate_hash is null
+                            or trim(legacy_signed_document.certificate_hash) = ''
+                        )
+                  )
+                  and (
+                      select count(distinct lower(trim(legacy_signature_document.signature_hash)))
+                      from oa_sign_package_document legacy_signature_document
+                      where legacy_signature_document.package_id = oa_sign_package.package_id
+                        and upper(trim(legacy_signature_document.employee_visible)) = 'Y'
+                        and upper(trim(legacy_signature_document.employee_sign_required)) = 'Y'
+                  ) = 1
+                  and not exists (
+                      select 1
+                      from oa_sign_package_document legacy_evidence_document
+                      where legacy_evidence_document.package_id = oa_sign_package.package_id
+                        and upper(trim(legacy_evidence_document.employee_visible)) = 'Y'
+                        and upper(trim(legacy_evidence_document.employee_sign_required)) = 'Y'
+                        and (
+                            (
+                                select count(*)
+                                from oa_sign_file_evidence legacy_signature_evidence
+                                where legacy_signature_evidence.package_id = oa_sign_package.package_id
+                                  and legacy_signature_evidence.document_id = legacy_evidence_document.document_id
+                                  and legacy_signature_evidence.document_version = legacy_evidence_document.document_version
+                                  and upper(trim(legacy_signature_evidence.evidence_type)) = 'SIGNATURE_IMAGE'
+                                  and lower(trim(legacy_signature_evidence.file_hash)) = lower(trim(legacy_evidence_document.signature_hash))
+                                  and legacy_signature_evidence.file_url is not null
+                                  and trim(legacy_signature_evidence.file_url) != ''
+                                  and legacy_signature_evidence.file_size &gt; 0
+                                  and legacy_signature_evidence.generated_time is not null
+                            ) != 1
+                            or (
+                                select count(*)
+                                from oa_sign_file_evidence legacy_signed_pdf_evidence
+                                where legacy_signed_pdf_evidence.package_id = oa_sign_package.package_id
+                                  and legacy_signed_pdf_evidence.document_id = legacy_evidence_document.document_id
+                                  and legacy_signed_pdf_evidence.document_version = legacy_evidence_document.document_version
+                                  and upper(trim(legacy_signed_pdf_evidence.evidence_type)) = 'SIGNED_PDF'
+                                  and lower(trim(legacy_signed_pdf_evidence.file_hash)) = lower(trim(legacy_evidence_document.signed_pdf_hash))
+                                  and legacy_signed_pdf_evidence.file_url is not null
+                                  and trim(legacy_signed_pdf_evidence.file_url) != ''
+                                  and legacy_signed_pdf_evidence.file_size &gt; 0
+                                  and legacy_signed_pdf_evidence.generated_time is not null
+                            ) != 1
+                            or (
+                                select count(*)
+                                from oa_sign_file_evidence legacy_certificate_evidence
+                                where legacy_certificate_evidence.package_id = oa_sign_package.package_id
+                                  and legacy_certificate_evidence.document_id = legacy_evidence_document.document_id
+                                  and legacy_certificate_evidence.document_version = legacy_evidence_document.document_version
+                                  and upper(trim(legacy_certificate_evidence.evidence_type)) = 'SIGN_CERTIFICATE'
+                                  and lower(trim(legacy_certificate_evidence.file_hash)) = lower(trim(legacy_evidence_document.certificate_hash))
+                                  and legacy_certificate_evidence.file_url is not null
+                                  and trim(legacy_certificate_evidence.file_url) != ''
+                                  and legacy_certificate_evidence.file_size &gt; 0
+                                  and legacy_certificate_evidence.generated_time is not null
+                            ) != 1
+                        )
+                  )
+              )
+          )
+          and company_frozen_time is not null
+          and document_version = #{signPackage.documentVersion}
+          and final_document_version = #{signPackage.finalDocumentVersion}
+          and final_document_root_hash = #{signPackage.finalDocumentRootHash}
+          and final_generated_time is not null
+          and #{signPackage.signDeadline} &gt; sysdate()
+          and #{signPackage.deadlinePolicySource} is not null
+          and trim(#{signPackage.deadlinePolicySource}) != ''
+          and #{signPackage.deadlineDaysSnapshot} &gt; 0
+    </update>
+
+    <update id="markViewedWithVersion">
+        update oa_sign_package
+        set status = 'part_viewed',
+            viewed_time = coalesce(viewed_time, #{viewedTime}),
+            version = version + 1,
+            update_by = #{updateBy},
+            update_time = sysdate()
+        where package_id = #{packageId}
+          and status = #{currentStatus}
+          and version = #{expectedVersion}
+          and #{currentStatus} in ('pending_sign', 'part_viewed')
+          and #{viewedTime} is not null
+    </update>
+
+    <update id="markTerminalWithVersion">
+        update oa_sign_package
+        set status = #{targetStatus},
+            terminal_time = #{terminalTime},
+            terminal_reason_code = #{reasonCode},
+            terminal_reason_detail = #{reasonDetail},
+            resolution_status = 'OPEN',
+            resolved_by = null,
+            resolved_time = null,
+            resolution_reason_code = null,
+            resolution_reason_detail = null,
+            reissued_to_package_id = null,
+            version = version + 1,
+            update_by = #{updateBy},
+            update_time = sysdate()
+        where package_id = #{packageId}
+          and status = #{currentStatus}
+          and version = #{expectedVersion}
+          and #{currentStatus} in ('pending_sign', 'part_viewed', 'pending_final_confirm')
+          and #{targetStatus} in ('refused', 'expired')
+          and #{terminalTime} is not null
+          and #{reasonCode} is not null
+          and terminal_time is null
+          and sign_deadline is not null
+          and deadline_policy_source is not null
+          and trim(deadline_policy_source) != ''
+          and deadline_days_snapshot &gt; 0
+          and (
+              (
+                  #{targetStatus} = 'refused'
+                  and sign_deadline &gt; #{terminalTime}
+              )
+              or (
+                  #{targetStatus} = 'expired'
+                  and sign_deadline &lt;= #{terminalTime}
+              )
+          )
+          and (
+              #{targetStatus} != 'expired'
+              or not (
+                  #{currentStatus} in ('pending_sign', 'part_viewed')
+                  and upper(trim(signing_sequence)) = 'SIGNATURE_FIRST'
+                  and exists (
+                      select 1
+                      from oa_sign_onboard_import_row staged_row
+                      inner join oa_sign_onboard_data_request staged_request
+                              on staged_request.request_id = staged_row.data_request_id
+                             and staged_request.row_id = staged_row.row_id
+                             and staged_request.employee_id = oa_sign_package.employee_id
+                      where staged_row.package_id = oa_sign_package.package_id
+                        and staged_row.task_id = oa_sign_package.task_id
+                        and upper(trim(staged_request.signing_sequence)) = 'SIGNATURE_FIRST'
+                        and staged_request.status in (
+                            'SUBMITTED', 'APPROVED', 'PROFILE_SYNC_FAILED', 'COMPLETED'
+                        )
+                        and staged_request.signature_request_id is not null
+                        and trim(staged_request.signature_request_id) != ''
+                        and staged_request.signature_sample_hash is not null
+                        and trim(staged_request.signature_sample_hash) != ''
+                        and staged_request.signature_sample_bytes is not null
+                        and octet_length(staged_request.signature_sample_bytes) > 0
+                        and staged_request.signature_sample_time is not null
+                        and staged_request.signature_sample_time &lt;= oa_sign_package.sign_deadline
+                  )
+              )
+          )
+    </update>
+
+    <select id="selectExpiredCandidates" resultMap="OaSignPackageResult">
+        select <include refid="baseColumns"/>
+        from oa_sign_package
+        where status in ('pending_sign', 'part_viewed', 'pending_final_confirm')
+          and sign_deadline &lt;= #{dueTime}
+          and deadline_policy_source is not null
+          and trim(deadline_policy_source) != ''
+          and deadline_days_snapshot &gt; 0
+          and not (
+              status in ('pending_sign', 'part_viewed')
+              and upper(trim(signing_sequence)) = 'SIGNATURE_FIRST'
+              and exists (
+                  select 1
+                  from oa_sign_onboard_import_row staged_row
+                  inner join oa_sign_onboard_data_request staged_request
+                          on staged_request.request_id = staged_row.data_request_id
+                         and staged_request.row_id = staged_row.row_id
+                         and staged_request.employee_id = oa_sign_package.employee_id
+                  where staged_row.package_id = oa_sign_package.package_id
+                    and staged_row.task_id = oa_sign_package.task_id
+                    and upper(trim(staged_request.signing_sequence)) = 'SIGNATURE_FIRST'
+                    and staged_request.status in (
+                        'SUBMITTED', 'APPROVED', 'PROFILE_SYNC_FAILED', 'COMPLETED'
+                    )
+                    and staged_request.signature_request_id is not null
+                    and trim(staged_request.signature_request_id) != ''
+                    and staged_request.signature_sample_hash is not null
+                    and trim(staged_request.signature_sample_hash) != ''
+                    and staged_request.signature_sample_bytes is not null
+                    and octet_length(staged_request.signature_sample_bytes) > 0
+                    and staged_request.signature_sample_time is not null
+                    and staged_request.signature_sample_time &lt;= oa_sign_package.sign_deadline
+              )
+          )
+        order by sign_deadline asc, package_id asc
+        limit #{limit}
+    </select>
+
+    <select id="selectReminderCandidates" resultMap="OaSignReminderCandidateResult">
+        select p.package_id,
+               p.task_id,
+               p.employee_id,
+               t.assigned_hr_user_id,
+               p.shop_dept_id,
+               p.status as package_status,
+               case when p.status = 'pending_final_confirm' then 'FINAL' else 'INITIAL' end
+                   as reminder_stage,
+               case when p.status = 'pending_final_confirm'
+                    then p.final_document_version else p.document_version end
+                   as active_document_version,
+               p.sign_deadline,
+               cast(json_unquote(json_extract(
+                   if(json_valid(v.reminder_policy_json), v.reminder_policy_json, '{}'),
+                   concat('$.daysBefore[', reminder_offset.offset_index, ']')
+               )) as unsigned) * 24 as reminder_before_hours
+        from oa_sign_package p
+        inner join oa_sign_task t
+                on t.task_id = p.task_id
+               and t.package_id = p.package_id
+               and t.employee_id = p.employee_id
+               and t.shop_dept_id = p.shop_dept_id
+               and t.plan_version_id = p.plan_version_id
+        inner join oa_sign_plan_version v
+                on v.version_id = p.plan_version_id
+               and v.publish_status = 'PUBLISHED'
+        inner join (
+            select 0 as offset_index union all select 1 union all select 2 union all select 3
+            union all select 4 union all select 5 union all select 6 union all select 7
+        ) reminder_offset
+                on reminder_offset.offset_index &lt; json_length(json_extract(
+                    if(json_valid(v.reminder_policy_json), v.reminder_policy_json, '{}'),
+                    '$.daysBefore'
+                ))
+        where (
+                (p.status = 'pending_sign' and t.status = 'PENDING_SIGN')
+                or (p.status = 'part_viewed' and t.status = 'VIEWED')
+                or (p.status = 'pending_final_confirm' and t.status = 'PENDING_FINAL_CONFIRM')
+              )
+          and p.employee_id is not null
+          and p.employee_id &gt; 0
+          and t.assigned_hr_user_id is not null
+          and t.assigned_hr_user_id &gt; 0
+          and p.sign_deadline is not null
+          and t.sign_deadline = p.sign_deadline
+          and p.deadline_policy_source is not null
+          and trim(p.deadline_policy_source) != ''
+          and t.deadline_policy_source is not null
+          and trim(t.deadline_policy_source) != ''
+          and p.deadline_days_snapshot &gt; 0
+          and t.deadline_days_snapshot = p.deadline_days_snapshot
+          and (
+                (p.status in ('pending_sign', 'part_viewed')
+                    and p.document_version is not null and trim(p.document_version) != '')
+                or (p.status = 'pending_final_confirm'
+                    and p.final_document_version is not null
+                    and trim(p.final_document_version) != '')
+              )
+          and json_type(json_extract(
+                  if(json_valid(v.reminder_policy_json), v.reminder_policy_json, '{}'),
+                  '$.daysBefore'
+              )) = 'ARRAY'
+          and json_length(json_extract(
+                  if(json_valid(v.reminder_policy_json), v.reminder_policy_json, '{}'),
+                  '$.daysBefore'
+              )) between 1 and 8
+          and json_type(json_extract(
+                  if(json_valid(v.reminder_policy_json), v.reminder_policy_json, '{}'),
+                  concat('$.daysBefore[', reminder_offset.offset_index, ']')
+              )) = 'INTEGER'
+          and cast(json_unquote(json_extract(
+                  if(json_valid(v.reminder_policy_json), v.reminder_policy_json, '{}'),
+                  concat('$.daysBefore[', reminder_offset.offset_index, ']')
+              )) as unsigned) between 1 and 30
+          and p.sign_deadline &gt; #{scanTime}
+          and timestampadd(
+                  DAY,
+                  -cast(json_unquote(json_extract(
+                      if(json_valid(v.reminder_policy_json), v.reminder_policy_json, '{}'),
+                      concat('$.daysBefore[', reminder_offset.offset_index, ']')
+                  )) as signed),
+                  p.sign_deadline
+              ) &lt;= #{scanTime}
+          and (
+              select count(distinct notification.channel)
+              from oa_sign_notification_outbox notification
+              where notification.recipient_user_id = p.employee_id
+                and notification.channel in ('IN_APP', 'MOBILE_PUSH')
+                and BINARY notification.business_key = BINARY concat(
+                    'SIGN_REMINDER:', p.package_id, ':',
+                    case when p.status = 'pending_final_confirm' then 'FINAL' else 'INITIAL' end,
+                    ':', case when p.status = 'pending_final_confirm'
+                              then p.final_document_version else p.document_version end,
+                    ':', date_format(convert_tz(p.sign_deadline, '+08:00', '+00:00'),
+                                     '%Y-%m-%dT%H:%i:%sZ'),
+                    ':', cast(cast(json_unquote(json_extract(
+                        if(json_valid(v.reminder_policy_json), v.reminder_policy_json, '{}'),
+                        concat('$.daysBefore[', reminder_offset.offset_index, ']')
+                    )) as unsigned) * 24 as char), 'H'
+                )
+          ) &lt; 2
+        order by p.sign_deadline asc, p.package_id asc, reminder_before_hours desc
+        limit #{limit}
+    </select>
+
+    <update id="voidWithVersion">
+        update oa_sign_package
+        set status = 'voided',
+            void_reason = #{voidReason},
+            version = version + 1,
+            update_by = #{updateBy},
+            update_time = sysdate()
+        where package_id = #{packageId}
+          and status = #{currentStatus}
+          and version = #{expectedVersion}
+          and #{currentStatus} in (
+              'draft', 'pending_sign', 'part_viewed', 'pending_company',
+              'pending_final_confirm', 'failed'
+          )
+    </update>
+
+    <update id="updateResolutionWithVersion">
+        update oa_sign_package
+        set resolution_status = #{targetResolutionStatus},
+            resolved_by = #{resolvedBy},
+            resolved_time = #{resolvedTime},
+            resolution_reason_code = #{reasonCode},
+            resolution_reason_detail = #{reasonDetail},
+            reissued_to_package_id = #{reissuedToPackageId},
+            version = version + 1,
+            update_by = #{updateBy},
+            update_time = sysdate()
+        where package_id = #{packageId}
+          and status = #{currentStatus}
+          and version = #{expectedVersion}
+          and #{currentStatus} in ('refused', 'expired')
+          and resolution_status = #{currentResolutionStatus}
+          and #{currentResolutionStatus} = 'OPEN'
+          and #{targetResolutionStatus} in ('CLOSED', 'REISSUED')
+          and terminal_time is not null
+          and #{resolvedBy} is not null
+          and #{resolvedTime} is not null
+          and #{reasonCode} is not null
+          and reissued_to_package_id is null
+          and (
+              (#{targetResolutionStatus} = 'CLOSED' and #{reissuedToPackageId} is null)
+              or (#{targetResolutionStatus} = 'REISSUED' and #{reissuedToPackageId} is not null)
+          )
+    </update>
+
+    <update id="extendDeadlineWithVersion">
+        update oa_sign_package
+        set sign_deadline = #{signDeadline},
+            resolved_by = #{resolvedBy},
+            resolved_time = #{resolvedTime},
+            resolution_reason_code = #{reasonCode},
+            resolution_reason_detail = #{reasonDetail},
+            version = version + 1,
+            update_by = #{updateBy},
+            update_time = sysdate()
+        where package_id = #{packageId}
+          and status = #{currentStatus}
+          and version = #{expectedVersion}
+          and #{currentStatus} in ('pending_sign', 'part_viewed', 'pending_final_confirm')
+          and resolution_status &lt;=> #{currentResolutionStatus}
+          and #{currentResolutionStatus} is null
+          and sign_deadline &gt; sysdate()
+          and #{signDeadline} &gt; sign_deadline
+          and #{resolvedBy} is not null
+          and #{resolvedTime} is not null
+          and #{reasonCode} is not null
+    </update>
+
+    <update id="bindReissueSource">
+        update oa_sign_package
+        set reissue_of_package_id = #{reissueOfPackageId},
+            version = version + 1,
+            update_by = #{updateBy},
+            update_time = sysdate()
+        where package_id = #{packageId}
+          and status = 'draft'
+          and version = #{expectedVersion}
+          and reissue_of_package_id is null
+          and reissued_to_package_id is null
+          and terminal_time is null
+          and #{reissueOfPackageId} is not null
+          and #{reissueOfPackageId} != #{packageId}
+    </update>
+
+    <update id="updateTaskConfirmation">
+        update oa_sign_package
+        set task_id = #{taskId},
+            confirm_status = #{confirmStatus},
+            plan_version_id = #{planVersionId},
+            update_time = sysdate()
+        where package_id = #{packageId}
+    </update>
+
+    <update id="clearPendingCompanySelection">
+        update oa_sign_package
+        set legal_entity_id_snapshot = null,
+            legal_entity_code_snapshot = null,
+            legal_entity_name_snapshot = null,
+            legal_entity_source_dept_id = null,
+            legal_entity_resolve_mode = null,
+            legal_entity_credit_code_snapshot = null,
+            legal_entity_address_snapshot = null,
+            legal_representative_snapshot = null,
+            legal_entity_phone_snapshot = null,
+            legal_entity_override_reason = null,
+            seal_id_snapshot = null,
+            seal_name_snapshot = null,
+            seal_image_url_snapshot = null,
+            seal_image_hash_snapshot = null,
+            final_document_version = null,
+            final_document_root_hash = null,
+            final_generated_time = null,
+            final_confirmed_time = null,
+            final_confirmation_status = null,
+            final_archive_root_hash = null,
+            final_evidence_generated_time = null
+        where package_id = #{packageId} and status = 'draft'
+    </update>
+
+    <update id="updateOnboardPersonalFacts">
+        update oa_sign_package p
+        inner join oa_sign_task t
+                on t.task_id = p.task_id
+               and t.package_id = p.package_id
+        set p.student_status_snapshot = #{studentStatusSnapshot},
+            p.retirement_status_snapshot = #{retirementStatusSnapshot},
+            p.income_start_year_month = #{incomeStartYearMonth},
+            p.update_by = cast(#{assignedHrUserId} as char),
+            p.update_time = sysdate()
+        where p.package_id = #{packageId}
+          and p.status = 'draft'
+          and p.document_version is null
+          and p.initial_signed_time is null
+    </update>
+
+    <update id="updateFinalizedPackage">
+        update oa_sign_package
+        set legal_entity_id_snapshot = #{signPackage.legalEntityIdSnapshot},
+            legal_entity_code_snapshot = #{signPackage.legalEntityCodeSnapshot},
+            legal_entity_name_snapshot = #{signPackage.legalEntityNameSnapshot},
+            legal_entity_source_dept_id = #{signPackage.legalEntitySourceDeptId},
+            legal_entity_resolve_mode = #{signPackage.legalEntityResolveMode},
+            legal_entity_credit_code_snapshot = #{signPackage.legalEntityCreditCodeSnapshot},
+            legal_entity_address_snapshot = #{signPackage.legalEntityAddressSnapshot},
+            legal_representative_snapshot = #{signPackage.legalRepresentativeSnapshot},
+            legal_entity_phone_snapshot = #{signPackage.legalEntityPhoneSnapshot},
+            legal_entity_override_reason = #{signPackage.legalEntityOverrideReason},
+            seal_id_snapshot = #{signPackage.sealIdSnapshot},
+            seal_name_snapshot = #{signPackage.sealNameSnapshot},
+            seal_image_url_snapshot = #{signPackage.sealImageUrlSnapshot},
+            seal_image_hash_snapshot = #{signPackage.sealImageHashSnapshot},
+            signing_sequence = #{signPackage.signingSequence},
+            signature_sample_file_url = #{signPackage.signatureSampleFileUrl},
+            signature_sample_hash = #{signPackage.signatureSampleHash},
+            signature_sample_time = #{signPackage.signatureSampleTime},
+            company_frozen_time = #{signPackage.companyFrozenTime},
+            final_document_version = #{signPackage.finalDocumentVersion},
+            final_document_root_hash = #{signPackage.finalDocumentRootHash},
+            final_generated_time = #{signPackage.finalGeneratedTime},
+            final_confirmation_status = #{signPackage.finalConfirmationStatus},
+            signed_time = coalesce(#{signPackage.signedTime}, signed_time),
+            initial_signed_time = coalesce(#{signPackage.initialSignedTime}, initial_signed_time),
+            final_archive_root_hash = null,
+            final_evidence_generated_time = null,
+            sign_deadline = #{signPackage.signDeadline},
+            status = #{signPackage.status},
+            version = version + 1,
+            update_by = #{signPackage.updateBy},
+            update_time = sysdate()
+        where package_id = #{signPackage.packageId}
+          and status = #{currentStatus}
+          and version = #{expectedVersion}
+    </update>
+
+    <update id="updatePreparedFinalCandidate">
+        update oa_sign_package
+        set signing_sequence = #{signPackage.signingSequence},
+            signature_sample_file_url = #{signPackage.signatureSampleFileUrl},
+            signature_sample_hash = #{signPackage.signatureSampleHash},
+            signature_sample_time = #{signPackage.signatureSampleTime},
+            company_frozen_time = #{signPackage.companyFrozenTime},
+            final_document_version = #{signPackage.finalDocumentVersion},
+            final_document_root_hash = #{signPackage.finalDocumentRootHash},
+            final_generated_time = #{signPackage.finalGeneratedTime},
+            final_confirmation_status = #{signPackage.finalConfirmationStatus},
+            final_archive_root_hash = null,
+            final_evidence_generated_time = null,
+            version = version + 1,
+            update_by = #{signPackage.updateBy},
+            update_time = sysdate()
+        where package_id = #{signPackage.packageId}
+          and task_id = #{signPackage.taskId}
+          and status = 'draft'
+          and version = #{expectedVersion}
+          and document_version = #{expectedDocumentVersion}
+          and signing_sequence = 'SIGNATURE_FIRST'
+          and final_document_version is null
+          and final_document_root_hash is null
+          and final_generated_time is null
+          and sent_time is null
+    </update>
+
+    <update id="updateFinalConfirmed">
+        update oa_sign_package
+        set status = 'signed',
+            final_confirmation_status = 'CONFIRMED',
+            final_confirmed_time = #{confirmedTime},
+            final_archive_root_hash = #{finalArchiveRootHash},
+            final_evidence_generated_time = #{evidenceGeneratedTime},
+            version = version + 1,
+            update_by = #{updateBy},
+            update_time = sysdate()
+        where package_id = #{packageId}
+          and status = #{currentStatus}
+          and version = #{expectedVersion}
+          and #{confirmedTime} is not null
+          and sign_deadline &gt; #{confirmedTime}
+          and deadline_policy_source is not null
+          and trim(deadline_policy_source) != ''
+          and deadline_days_snapshot &gt; 0
+    </update>
+
+    <delete id="deleteOaSignPackageById">
+        delete from oa_sign_package where package_id = #{packageId}
+    </delete>
+</mapper>

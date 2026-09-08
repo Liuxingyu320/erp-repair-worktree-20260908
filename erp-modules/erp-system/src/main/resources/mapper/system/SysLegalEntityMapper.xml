@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.system.mapper.SysLegalEntityMapper">
+
+    <resultMap id="SysLegalEntityResult" type="com.erp.system.api.domain.SysLegalEntity">
+        <id property="legalEntityId" column="legal_entity_id"/>
+        <result property="legalEntityCode" column="legal_entity_code"/>
+        <result property="legalEntityName" column="legal_entity_name"/>
+        <result property="unifiedSocialCreditCode" column="unified_social_credit_code"/>
+        <result property="registeredAddress" column="registered_address"/>
+        <result property="legalRepresentative" column="legal_representative"/>
+        <result property="contactPhone" column="contact_phone"/>
+        <result property="status" column="status"/>
+        <result property="version" column="version"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateBy" column="update_by"/>
+        <result property="updateTime" column="update_time"/>
+        <result property="remark" column="remark"/>
+    </resultMap>
+
+    <sql id="legalEntityColumns">
+        legal_entity_id, legal_entity_code, legal_entity_name, unified_social_credit_code,
+        registered_address, legal_representative, contact_phone, status, version,
+        create_by, create_time, update_by, update_time, remark
+    </sql>
+
+    <select id="selectLegalEntityList" resultMap="SysLegalEntityResult">
+        select <include refid="legalEntityColumns"/> from sys_legal_entity
+        <where>
+            <if test="legalEntityCode != null and legalEntityCode != ''">
+                and legal_entity_code like concat('%', #{legalEntityCode}, '%')
+            </if>
+            <if test="legalEntityName != null and legalEntityName != ''">
+                and legal_entity_name like concat('%', #{legalEntityName}, '%')
+            </if>
+            <if test="status != null and status != ''">and status = #{status}</if>
+        </where>
+        order by status asc, legal_entity_name asc, legal_entity_id asc
+    </select>
+
+    <select id="selectActiveLegalEntities" resultMap="SysLegalEntityResult">
+        select <include refid="legalEntityColumns"/> from sys_legal_entity
+        where status = '0'
+        order by legal_entity_name asc, legal_entity_id asc
+    </select>
+
+    <select id="selectLegalEntityById" resultMap="SysLegalEntityResult">
+        select <include refid="legalEntityColumns"/> from sys_legal_entity
+        where legal_entity_id = #{legalEntityId}
+    </select>
+
+    <select id="selectLegalEntityByCode" resultMap="SysLegalEntityResult">
+        select <include refid="legalEntityColumns"/> from sys_legal_entity
+        where legal_entity_code = #{legalEntityCode} limit 1
+    </select>
+
+    <select id="selectLegalEntityByName" resultMap="SysLegalEntityResult">
+        select <include refid="legalEntityColumns"/> from sys_legal_entity
+        where legal_entity_name = #{legalEntityName} limit 1
+    </select>
+
+    <insert id="insertLegalEntity" parameterType="com.erp.system.api.domain.SysLegalEntity"
+            useGeneratedKeys="true" keyProperty="legalEntityId">
+        insert into sys_legal_entity (
+            legal_entity_code, legal_entity_name, unified_social_credit_code, registered_address,
+            legal_representative, contact_phone, status, version, create_by, create_time, remark
+        ) values (
+            #{legalEntityCode}, #{legalEntityName}, #{unifiedSocialCreditCode}, #{registeredAddress},
+            #{legalRepresentative}, #{contactPhone}, #{status}, 0, #{createBy}, sysdate(), #{remark}
+        )
+    </insert>
+
+    <update id="updateLegalEntity" parameterType="com.erp.system.api.domain.SysLegalEntity">
+        update sys_legal_entity
+        set legal_entity_code = #{legalEntityCode},
+            legal_entity_name = #{legalEntityName},
+            unified_social_credit_code = #{unifiedSocialCreditCode},
+            registered_address = #{registeredAddress},
+            legal_representative = #{legalRepresentative},
+            contact_phone = #{contactPhone},
+            status = #{status},
+            version = version + 1,
+            update_by = #{updateBy},
+            update_time = sysdate(),
+            remark = #{remark}
+        where legal_entity_id = #{legalEntityId}
+          and version = #{version}
+    </update>
+</mapper>

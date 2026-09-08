@@ -1,0 +1,15 @@
+# 基础镜像
+FROM eclipse-temurin:17-jre-jammy
+# author
+MAINTAINER erp
+
+# 挂载目录
+VOLUME /home/erp
+# 创建目录
+RUN mkdir -p /home/erp
+# 指定路径
+WORKDIR /home/erp
+# 复制jar文件到路径
+COPY ./jar/erp-visual-monitor.jar /home/erp/erp-visual-monitor.jar
+# 启动系统服务
+ENTRYPOINT ["java","-jar","erp-visual-monitor.jar"]

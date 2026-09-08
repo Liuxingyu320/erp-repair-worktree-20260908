@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.inventory.mapper.InvGiftMapper">
+
+    <resultMap type="InvGiftBox" id="InvGiftResult">
+        <id property="giftId" column="gift_id"/>
+        <result property="giftCode" column="gift_code"/>
+        <result property="categoryId" column="category_id"/>
+        <result property="categoryName" column="category_name"/>
+        <result property="giftName" column="gift_name"/>
+        <result property="grade" column="grade"/>
+        <result property="spec" column="spec"/>
+        <result property="productDescription" column="product_description"/>
+        <result property="replenishmentUnit" column="replenishment_unit"/>
+        <result property="costPrice" column="cost_price"/>
+        <result property="guidePrice1" column="guide_price_1"/>
+        <result property="guidePrice2" column="guide_price_2"/>
+        <result property="supplierName" column="supplier_name"/>
+        <result property="imageUrl" column="image_url"/>
+        <result property="status" column="status"/>
+        <result property="delFlag" column="del_flag"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateBy" column="update_by"/>
+        <result property="updateTime" column="update_time"/>
+        <result property="remark" column="remark"/>
+    </resultMap>
+
+    <sql id="selectInvGiftVo">
+        select g.gift_id, g.gift_code, g.category_id, c.category_name,
+               g.gift_name, g.grade, g.spec, g.product_description,
+               g.replenishment_unit, g.cost_price, g.guide_price_1, g.guide_price_2,
+               g.supplier_name, g.image_url, g.status, g.del_flag, g.create_by, g.create_time,
+               g.update_by, g.update_time, g.remark
+        from inv_gift_box g
+        left join inv_gift_category c on c.category_id = g.category_id and c.del_flag = '0'
+    </sql>
+
+    <select id="selectInvGiftList" parameterType="InvGiftBox" resultMap="InvGiftResult">
+        <include refid="selectInvGiftVo"/>
+        where g.del_flag = '0'
+        <if test="keyword != null and keyword != ''">
+            and (
+                g.gift_name like concat('%', #{keyword}, '%')
+                or g.gift_code like concat('%', #{keyword}, '%')
+                or g.grade like concat('%', #{keyword}, '%')
+                or g.spec like concat('%', #{keyword}, '%')
+                or g.supplier_name like concat('%', #{keyword}, '%')
+            )
+        </if>
+        <if test="giftName != null and giftName != ''">and g.gift_name like concat('%', #{giftName}, '%')</if>
+        <if test="giftCode != null and giftCode != ''">and g.gift_code = #{giftCode}</if>
+        <if test="grade != null and grade != ''">and g.grade = #{grade}</if>
+        <if test="spec != null and spec != ''">and g.spec like concat('%', #{spec}, '%')</if>
+        <if test="categoryId != null">and (g.category_id = #{categoryId} or find_in_set(#{categoryId}, c.ancestors))</if>
+        <if test="status != null and status != ''">and g.status = #{status}</if>
+        order by g.create_time desc, g.gift_id desc
+    </select>
+
+    <select id="selectInvGiftById" parameterType="Long" resultMap="InvGiftResult">
+        <include refid="selectInvGiftVo"/>
+        where g.gift_id = #{giftId} and g.del_flag = '0'
+    </select>
+
+    <select id="selectInvGiftByCode" resultMap="InvGiftResult">
+        <include refid="selectInvGiftVo"/>
+        where g.del_flag = '0' and g.gift_code = #{giftCode}
+        limit 1
+    </select>
+
+    <select id="selectInvGiftByNaturalKey" resultMap="InvGiftResult">
+        <include refid="selectInvGiftVo"/>
+        where g.del_flag = '0'
+          and g.category_id = #{categoryId}
+          and g.gift_name = #{giftName}
+          and ifnull(g.grade, '') = ifnull(#{grade}, '')
+          and ifnull(g.spec, '') = ifnull(#{spec}, '')
+        limit 1
+    </select>
+
+    <select id="countGiftCode" resultType="int">
+        select count(1)
+        from inv_gift_box
+        where del_flag = '0'
+          and gift_code = #{giftCode}
+        <if test="excludeGiftId != null">and gift_id != #{excludeGiftId}</if>
+    </select>
+
+    <insert id="insertInvGift" parameterType="InvGiftBox" useGeneratedKeys="true" keyProperty="giftId">
+        insert into inv_gift_box (
+            gift_code, category_id, gift_name, grade, spec, product_description,
+            replenishment_unit, cost_price, guide_price_1, guide_price_2, supplier_name, image_url,
+            status, del_flag, create_by, create_time, remark
+        ) values (
+            #{giftCode}, #{categoryId}, #{giftName}, #{grade}, #{spec}, #{productDescription},
+            #{replenishmentUnit}, #{costPrice}, #{guidePrice1}, #{guidePrice2}, #{supplierName}, #{imageUrl},
+            #{status}, '0', #{createBy}, sysdate(), #{remark}
+        )
+    </insert>
+
+    <update id="updateInvGift" parameterType="InvGiftBox">
+        update inv_gift_box
+        <set>
+            <if test="giftCode != null">gift_code = #{giftCode},</if>
+            <if test="categoryId != null">category_id = #{categoryId},</if>
+            <if test="giftName != null">gift_name = #{giftName},</if>
+            <if test="grade != null">grade = #{grade},</if>
+            <if test="spec != null">spec = #{spec},</if>
+            <if test="productDescription != null">product_description = #{productDescription},</if>
+            <if test="replenishmentUnit != null">replenishment_unit = #{replenishmentUnit},</if>
+            <if test="costPrice != null">cost_price = #{costPrice},</if>
+            <if test="guidePrice1 != null">guide_price_1 = #{guidePrice1},</if>
+            <if test="guidePrice2 != null">guide_price_2 = #{guidePrice2},</if>
+            <if test="supplierName != null">supplier_name = #{supplierName},</if>
+            <if test="imageUrl != null">image_url = #{imageUrl},</if>
+            <if test="status != null">status = #{status},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            update_by = #{updateBy}, update_time = sysdate()
+        </set>
+        where gift_id = #{giftId}
+    </update>
+
+    <update id="deleteInvGiftByIds" parameterType="Long">
+        update inv_gift_box set del_flag = '2' where gift_id in
+        <foreach collection="array" item="giftId" open="(" close=")" separator=",">
+            #{giftId}
+        </foreach>
+    </update>
+
+</mapper>

@@ -1,0 +1,203 @@
+# Tomcat
+server:
+  port: 8080
+
+# Spring
+spring: 
+  application:
+    # 应用名称
+    name: erp-gateway
+  profiles:
+    # 环境配置
+    active: dev
+  cloud:
+    nacos:
+      discovery:
+        # 服务注册地址
+        server-addr: 127.0.0.1:8848
+      config:
+        # 配置中心地址
+        server-addr: 127.0.0.1:8848
+    sentinel:
+      # 取消控制台懒加载
+      eager: true
+      transport:
+        # 控制台地址
+        dashboard: 127.0.0.1:8718
+      # nacos配置持久化
+      datasource:
+        ds1:
+          nacos:
+            server-addr: 127.0.0.1:8848
+            dataId: sentinel-erp-gateway
+            groupId: DEFAULT_GROUP
+            data-type: json
+            rule-type: gw-flow
+  config:
+    # 配置文件格式
+    file-extension: yml
+    import:
+      - optional:nacos:application-${spring.profiles.active}.${spring.config.file-extension}
+      - optional:nacos:${spring.application.name}-${spring.profiles.active}.${spring.config.file-extension}
+
+auth:
+  session:
+    mode: bearer
+    cookie-name: ERP_SESSION
+    csrf-cookie-name: XSRF-TOKEN
+    cookie-path: /
+    same-site: Lax
+    secure: true
+    csrf-enabled: true
+    require-origin: true
+    max-age: 720m
+    allowed-origins: []
+
+---
+# 本地无 Nacos 启动配置：--spring.profiles.active=local
+server:
+  port: ${LOCAL_TODO_GATEWAY_PORT:8080}
+
+spring:
+  config:
+    activate:
+      on-profile: local
+  jackson:
+    time-zone: GMT+8
+  data:
+    redis:
+      host: 127.0.0.1
+      port: 6379
+      password: ${REDIS_PASSWORD:}
+  cloud:
+    nacos:
+      discovery:
+        enabled: false
+      config:
+        enabled: false
+    gateway:
+      server:
+        webflux:
+          globalcors:
+            add-to-simple-url-handler-mapping: true
+            cors-configurations:
+              '[/**]':
+                allowedOrigins:
+                  - http://localhost:${LOCAL_TODO_UI_PORT:1025}
+                  - http://127.0.0.1:${LOCAL_TODO_UI_PORT:1025}
+                  - http://localhost:8088
+                  - http://127.0.0.1:8088
+                  - ${ERP_LOCAL_WEB_ORIGIN:http://192.168.182.64:8088}
+                  - http://192.168.182.148:1025
+                  - http://192.168.1.7:4173
+                allowedMethods:
+                  - GET
+                  - POST
+                  - PUT
+                  - PATCH
+                  - DELETE
+                  - OPTIONS
+                allowedHeaders: "*"
+                exposedHeaders:
+                  - X-ERP-CSRF-Required
+                allowCredentials: true
+          routes:
+            - id: erp-auth
+              uri: "http://127.0.0.1:${LOCAL_TODO_AUTH_PORT:9200}"
+              predicates:
+                - Path=/auth/**
+              filters:
+                - name: CacheRequestBody
+                  args:
+                    bodyClass: java.lang.String
+                - ValidateCodeFilter
+                - StripPrefix=1
+            - id: erp-system
+              uri: "http://127.0.0.1:${LOCAL_TODO_SYSTEM_PORT:9201}"
+              predicates:
+                - Path=/system/**
+              filters:
+                - StripPrefix=1
+            - id: erp-job
+              uri: http://127.0.0.1:9203
+              predicates:
+                - Path=/schedule/**
+              filters:
+                - StripPrefix=1
+            - id: erp-oa
+              uri: "http://127.0.0.1:${LOCAL_TODO_OA_PORT:9204}"
+              predicates:
+                - Path=/oa/**
+              filters:
+                - StripPrefix=1
+            - id: erp-file-api
+              uri: http://127.0.0.1:9300
+              predicates:
+                - Path=/file/upload,/file/delete
+              filters:
+                - StripPrefix=1
+            - id: erp-file-drive-api
+              uri: http://127.0.0.1:9300
+              predicates:
+                - Path=/file/drive/**
+              filters:
+                - StripPrefix=1
+            - id: erp-file-static
+              uri: http://127.0.0.1:9300
+              predicates:
+                - Path=/file/**
+            - id: erp-inventory
+              uri: "http://127.0.0.1:${LOCAL_TODO_INVENTORY_PORT:9205}"
+              predicates:
+                - Path=/inventory/**
+              filters:
+                - StripPrefix=1
+            - id: erp-approval
+              uri: http://127.0.0.1:9206
+              predicates:
+                - Path=/approval/**
+              filters:
+                - StripPrefix=1
+
+security:
+  browser-session:
+    enabled: ${ERP_NEW_2_BROWSER_SESSION_ENABLED:false}
+    csrf-secret: ${ERP_NEW_2_BROWSER_SESSION_CSRF_SECRET:}
+  captcha:
+    enabled: true
+    type: math
+  xss:
+    enabled: true
+    excludeUrls:
+      - /system/notice
+  ignore:
+    whites:
+      - /auth/login
+      - /auth/browser/login
+      - /auth/register
+      - /auth/passwordPolicy
+      - /code
+      - /auth/captchaImage
+      - /file/public/**
+    excludes:
+      - /file/upload
+      - /file/delete
+
+auth:
+  session:
+    mode: dual
+    secure: false
+    allowed-origins:
+      - http://localhost:${LOCAL_TODO_UI_PORT:1025}
+      - http://127.0.0.1:${LOCAL_TODO_UI_PORT:1025}
+      - http://localhost:8088
+      - http://127.0.0.1:8088
+      - ${ERP_LOCAL_WEB_ORIGIN:http://192.168.182.64:8088}
+      - http://192.168.182.148:1025
+      - http://192.168.1.7:4173
+
+springdoc:
+  api-docs:
+    enabled: ${SPRINGDOC_API_DOCS_ENABLED:false}
+  webjars:
+    prefix:

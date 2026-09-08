@@ -1,0 +1,401 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.oa.mapper.OaSignOnboardImportRowMapper">
+    <resultMap id="RowResult" type="com.erp.oa.domain.OaSignOnboardImportRow">
+        <id property="rowId" column="row_id"/>
+        <result property="batchId" column="batch_id"/>
+        <result property="sourceRowNumber" column="source_row_number"/>
+        <result property="rowHash" column="row_hash"/>
+        <result property="employeeId" column="employee_id"/>
+        <result property="matchType" column="match_type"/>
+        <result property="employeeNameMasked" column="employee_name_masked"/>
+        <result property="phoneMasked" column="phone_masked"/>
+        <result property="idNumberMasked" column="id_number_masked"/>
+        <result property="addressMasked" column="address_masked"/>
+        <result property="snapshotJson" column="snapshot_json"/>
+        <result property="status" column="status"/>
+        <result property="errorCodesJson" column="error_codes_json"/>
+        <result property="warningCodesJson" column="warning_codes_json"/>
+        <result property="missingFieldsJson" column="missing_fields_json"/>
+        <result property="warningConfirmed" column="warning_confirmed"/>
+        <result property="warningReason" column="warning_reason"/>
+        <result property="routeCode" column="route_code"/>
+        <result property="planVersionId" column="plan_version_id"/>
+        <result property="planVersionHash" column="plan_version_hash"/>
+        <result property="matchedLegalEntityId" column="matched_legal_entity_id"/>
+        <result property="companyMatchMode" column="company_match_mode"/>
+        <result property="companyMatchScore" column="company_match_score"/>
+        <result property="companySecondScore" column="company_second_score"/>
+        <result property="companyMatchPolicyVersion" column="company_match_policy_version"/>
+        <result property="companyMasterVersion" column="company_master_version"/>
+        <result property="deptLegalEntityId" column="dept_legal_entity_id"/>
+        <result property="companyDeptConflict" column="company_dept_conflict"/>
+        <result property="companyCandidatesJson" column="company_candidates_json"/>
+        <result property="recommendedSealId" column="recommended_seal_id"/>
+        <result property="sealRecommendationMode" column="seal_recommendation_mode"/>
+        <result property="sealCandidatesJson" column="seal_candidates_json"/>
+        <result property="dataRequestId" column="data_request_id"/>
+        <result property="taskId" column="task_id"/>
+        <result property="packageId" column="package_id"/>
+        <result property="historicalSupplement" column="historical_supplement"/>
+        <result property="historicalReason" column="historical_reason"/>
+        <result property="noExternalContractConfirmed" column="no_external_contract_confirmed"/>
+        <result property="generationRequestId" column="generation_request_id"/>
+        <result property="sourceEventVersion" column="source_event_version"/>
+        <result property="version" column="version"/>
+        <result property="generatedTime" column="generated_time"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateTime" column="update_time"/>
+    </resultMap>
+
+    <sql id="columns">
+        row_id, batch_id, source_row_number, row_hash, employee_id, match_type,
+        employee_name_masked, phone_masked, id_number_masked, address_masked, snapshot_json,
+        status, error_codes_json, warning_codes_json, missing_fields_json,
+        warning_confirmed, warning_reason, route_code, plan_version_id, plan_version_hash,
+        matched_legal_entity_id, company_match_mode, company_match_score, company_second_score,
+        company_match_policy_version, company_master_version, dept_legal_entity_id,
+        company_dept_conflict, company_candidates_json, recommended_seal_id,
+        seal_recommendation_mode, seal_candidates_json,
+        data_request_id, task_id, package_id, historical_supplement, historical_reason,
+        no_external_contract_confirmed, generation_request_id, source_event_version,
+        version, generated_time, create_time, update_time
+    </sql>
+
+    <insert id="insertRows">
+        insert into oa_sign_onboard_import_row (
+            batch_id, source_row_number, row_hash, employee_id, match_type,
+            employee_name_masked, phone_masked, id_number_masked, address_masked, snapshot_json,
+            status, error_codes_json, warning_codes_json, missing_fields_json,
+            warning_confirmed, warning_reason, route_code, plan_version_id, plan_version_hash,
+            matched_legal_entity_id, company_match_mode, company_match_score, company_second_score,
+            company_match_policy_version, company_master_version, dept_legal_entity_id,
+            company_dept_conflict, company_candidates_json, recommended_seal_id,
+            seal_recommendation_mode, seal_candidates_json,
+            data_request_id, task_id, package_id, historical_supplement, historical_reason,
+            no_external_contract_confirmed, generation_request_id, source_event_version,
+            version, generated_time, create_time, update_time
+        ) values
+        <foreach collection="rows" item="row" separator=",">
+            (#{row.batchId}, #{row.sourceRowNumber}, #{row.rowHash}, #{row.employeeId}, #{row.matchType},
+             #{row.employeeNameMasked}, #{row.phoneMasked}, #{row.idNumberMasked}, #{row.addressMasked}, #{row.snapshotJson},
+             #{row.status}, #{row.errorCodesJson}, #{row.warningCodesJson}, #{row.missingFieldsJson},
+             #{row.warningConfirmed}, #{row.warningReason}, #{row.routeCode}, #{row.planVersionId}, #{row.planVersionHash},
+             #{row.matchedLegalEntityId}, #{row.companyMatchMode}, #{row.companyMatchScore}, #{row.companySecondScore},
+             #{row.companyMatchPolicyVersion}, #{row.companyMasterVersion}, #{row.deptLegalEntityId},
+             #{row.companyDeptConflict}, #{row.companyCandidatesJson}, #{row.recommendedSealId},
+             #{row.sealRecommendationMode}, #{row.sealCandidatesJson},
+             #{row.dataRequestId}, #{row.taskId}, #{row.packageId}, #{row.historicalSupplement}, #{row.historicalReason},
+             #{row.noExternalContractConfirmed}, #{row.generationRequestId}, #{row.sourceEventVersion},
+             #{row.version}, #{row.generatedTime}, sysdate(), sysdate())
+        </foreach>
+    </insert>
+
+    <select id="selectById" resultMap="RowResult">
+        select <include refid="columns"/> from oa_sign_onboard_import_row where row_id = #{rowId}
+    </select>
+    <select id="selectByBatchId" resultMap="RowResult">
+        select <include refid="columns"/> from oa_sign_onboard_import_row
+        where batch_id = #{batchId} order by source_row_number, row_id
+    </select>
+    <select id="selectByTaskIds" resultMap="RowResult">
+        select <include refid="columns"/> from oa_sign_onboard_import_row
+        where task_id in
+        <foreach collection="taskIds" item="taskId" open="(" separator="," close=")">
+            #{taskId}
+        </foreach>
+        order by row_id desc
+    </select>
+    <select id="selectSignatureFirstCompanyWorkRows" resultMap="RowResult">
+        select r.*
+        from oa_sign_onboard_import_row r
+        inner join oa_sign_onboard_import_batch b on b.batch_id = r.batch_id
+        inner join oa_sign_onboard_data_request d
+            on d.request_id = r.data_request_id
+           and d.row_id = r.row_id
+           and d.employee_id = r.employee_id
+        left join oa_sign_task t
+            on t.task_id = r.task_id
+           and t.package_id = r.package_id
+        left join oa_sign_package p
+            on p.package_id = r.package_id
+           and p.task_id = r.task_id
+        where (
+              (r.task_id is null and r.package_id is null)
+              or (r.task_id is not null and r.package_id is not null
+                  and t.status = 'PENDING_COMPANY'
+                  and p.status = 'pending_company'
+                  and p.signing_sequence = 'SIGNATURE_FIRST')
+          )
+          and r.plan_version_id is not null
+          and upper(trim(d.signing_sequence)) = 'SIGNATURE_FIRST'
+          and d.status = 'COMPLETED'
+          and d.signature_request_id is not null
+          and d.signature_sample_hash is not null
+          and d.signature_sample_time is not null
+          and d.signature_sample_bytes is not null
+          and r.status not in ('GENERATING', 'GENERATED', 'SENT', 'PARTIAL_SENT')
+        <if test="assignedHrUserId != null">
+          and (r.task_id is null or t.assigned_hr_user_id = #{assignedHrUserId})
+        </if>
+        <if test="scopeDeptIds != null and !scopeDeptIds.isEmpty()">
+          and b.shop_dept_id in
+          <foreach collection="scopeDeptIds" item="deptId" open="(" separator="," close=")">
+              #{deptId}
+          </foreach>
+        </if>
+        order by b.batch_id desc, r.source_row_number asc, r.row_id asc
+        limit #{maxRows}
+    </select>
+    <select id="selectForGeneration" resultMap="RowResult">
+        select <include refid="columns"/> from oa_sign_onboard_import_row
+        where batch_id = #{batchId}
+        <if test="rowIds != null and !rowIds.isEmpty()">
+            and row_id in
+            <foreach collection="rowIds" item="rowId" open="(" separator="," close=")">#{rowId}</foreach>
+        </if>
+        order by source_row_number, row_id
+    </select>
+
+    <update id="updateEditableWithVersion" parameterType="com.erp.oa.domain.OaSignOnboardImportRow">
+        update oa_sign_onboard_import_row
+        set snapshot_json = #{snapshotJson}, status = #{status}, error_codes_json = #{errorCodesJson},
+            warning_codes_json = #{warningCodesJson}, missing_fields_json = #{missingFieldsJson},
+            warning_confirmed = #{warningConfirmed}, warning_reason = #{warningReason},
+            route_code = #{routeCode}, plan_version_id = #{planVersionId}, plan_version_hash = #{planVersionHash},
+            matched_legal_entity_id = #{matchedLegalEntityId}, company_match_mode = #{companyMatchMode},
+            company_match_score = #{companyMatchScore}, company_second_score = #{companySecondScore},
+            company_match_policy_version = #{companyMatchPolicyVersion},
+            company_master_version = #{companyMasterVersion}, dept_legal_entity_id = #{deptLegalEntityId},
+            company_dept_conflict = #{companyDeptConflict}, company_candidates_json = #{companyCandidatesJson},
+            recommended_seal_id = #{recommendedSealId}, seal_recommendation_mode = #{sealRecommendationMode},
+            seal_candidates_json = #{sealCandidatesJson},
+            historical_supplement = #{historicalSupplement}, historical_reason = #{historicalReason},
+            no_external_contract_confirmed = #{noExternalContractConfirmed},
+            address_masked = #{addressMasked}, version = version + 1, update_time = sysdate()
+        where row_id = #{rowId} and version = #{version}
+          and status not in ('GENERATING', 'GENERATED', 'SENT', 'PARTIAL_SENT')
+    </update>
+
+    <update id="bindCompanyWorkGenerationRequest">
+        update oa_sign_onboard_import_row
+        set generation_request_id = #{requestId}, version = version + 1, update_time = sysdate()
+        where row_id = #{rowId} and version = #{expectedVersion}
+          and task_id is null and package_id is null and status = 'READY_TO_GENERATE'
+          and matched_legal_entity_id = #{legalEntityId}
+          and recommended_seal_id = #{sealId}
+    </update>
+
+    <update id="linkDataRequest">
+        update oa_sign_onboard_import_row
+        set data_request_id = #{dataRequestId}, status = #{status}, version = version + 1, update_time = sysdate()
+        where row_id = #{rowId} and version = #{expectedVersion}
+          and (
+              task_id is null
+              or (
+                  task_id is not null and package_id is not null and data_request_id is not null
+                  and status in ('READY_TO_GENERATE', 'GENERATE_FAILED')
+              )
+          )
+          and status not in ('GENERATING', 'GENERATED')
+    </update>
+    <update id="linkStagedPackage">
+        update oa_sign_onboard_import_row
+        set data_request_id = #{dataRequestId}, task_id = #{taskId}, package_id = #{packageId},
+            source_event_version = coalesce(source_event_version, #{sourceEventVersion}),
+            status = #{status}, version = version + 1, update_time = sysdate()
+        where row_id = #{rowId} and version = #{expectedVersion}
+          and (data_request_id is null or data_request_id = #{dataRequestId})
+          and task_id is null and package_id is null
+          and (source_event_version is null or source_event_version = #{sourceEventVersion})
+          and #{dataRequestId} is not null and #{taskId} is not null and #{packageId} is not null
+          and #{sourceEventVersion} is not null and #{sourceEventVersion} &gt; 0
+          and status not in ('GENERATING', 'GENERATED', 'SENT', 'PARTIAL_SENT')
+    </update>
+    <update id="bindStagedCompanyWorkGenerationRequest">
+        update oa_sign_onboard_import_row
+        set generation_request_id = #{requestId}, version = version + 1, update_time = sysdate()
+        where row_id = #{rowId} and version = #{expectedVersion}
+          and task_id = #{taskId} and package_id = #{packageId}
+          and data_request_id is not null and status = 'READY_TO_GENERATE'
+          and matched_legal_entity_id = #{legalEntityId}
+          and recommended_seal_id = #{sealId}
+    </update>
+    <update id="updateStatus">
+        update oa_sign_onboard_import_row
+        set status = #{status}, version = version + 1, update_time = sysdate()
+        where row_id = #{rowId} and version = #{expectedVersion}
+    </update>
+    <update id="applyGenerationConfirmations">
+        update oa_sign_onboard_import_row
+        set no_external_contract_confirmed = coalesce(#{noExternalContractConfirmed}, no_external_contract_confirmed),
+            historical_supplement = coalesce(#{historicalSupplement}, historical_supplement),
+            historical_reason = case when #{historicalSupplement} = 1 then #{historicalReason} else historical_reason end,
+            warning_confirmed = coalesce(#{warningConfirmed}, warning_confirmed),
+            warning_reason = case when #{warningConfirmed} = 1 then #{warningReason} else warning_reason end,
+            version = version + 1, update_time = sysdate()
+        where row_id = #{rowId} and version = #{expectedVersion}
+          and (
+              task_id is null
+              or (
+                  task_id is not null and package_id is not null and data_request_id is not null
+                  and status in ('READY_TO_GENERATE', 'GENERATE_FAILED')
+              )
+          )
+          and status not in ('GENERATING', 'GENERATED')
+    </update>
+    <update id="claimGeneration">
+        update oa_sign_onboard_import_row
+        set status = 'GENERATING', generation_request_id = #{requestId},
+            source_event_version = coalesce(source_event_version, version),
+            version = version + 1, update_time = sysdate()
+        where row_id = #{rowId} and version = #{expectedVersion}
+          and task_id is null and status in ('READY_TO_GENERATE', 'GENERATE_FAILED')
+    </update>
+    <update id="claimTaskOnlyGeneration">
+        update oa_sign_onboard_import_row
+        set status = 'GENERATING', generation_request_id = #{requestId},
+            source_event_version = coalesce(source_event_version, version),
+            version = version + 1, update_time = sysdate()
+        where row_id = #{rowId} and version = #{expectedVersion}
+          and task_id = #{taskId} and package_id is null
+          and status in ('READY_TO_GENERATE', 'GENERATE_FAILED')
+    </update>
+    <update id="claimStagedGeneration">
+        update oa_sign_onboard_import_row
+        set status = 'GENERATING', generation_request_id = #{requestId},
+            source_event_version = coalesce(source_event_version, version),
+            version = version + 1, update_time = sysdate()
+        where row_id = #{rowId} and version = #{expectedVersion}
+          and task_id = #{taskId} and package_id = #{packageId}
+          and data_request_id is not null
+          and status in ('READY_TO_GENERATE', 'GENERATE_FAILED')
+    </update>
+    <update id="completeGeneration">
+        update oa_sign_onboard_import_row
+        set task_id = #{taskId}, package_id = #{packageId}, status = 'GENERATED',
+            generated_time = sysdate(), version = version + 1, update_time = sysdate()
+        where row_id = #{rowId} and version = #{expectedVersion} and status = 'GENERATING'
+          and generation_request_id = #{generationRequestId}
+    </update>
+    <update id="recoverCompletedGeneration">
+        update oa_sign_onboard_import_row r
+        inner join oa_sign_task t
+            on t.task_id = #{taskId}
+           and upper(trim(t.scenario)) = 'ONBOARD'
+           and t.employee_id = r.employee_id
+           and t.shop_dept_id = #{shopDeptId}
+           and upper(trim(t.source_type)) = 'MANUAL_SIGN_EXCEL_IMPORT'
+           and t.source_business_id = cast(r.row_id as char)
+           and t.source_event_version = cast(r.source_event_version as char)
+           and t.status = 'READY_TO_SEND'
+           and t.plan_version_id = r.plan_version_id
+           and t.package_id = #{packageId}
+        inner join oa_sign_package p
+            on p.package_id = t.package_id
+           and p.task_id = t.task_id
+           and p.employee_id = r.employee_id
+           and p.shop_dept_id = #{shopDeptId}
+           and p.plan_version_id = r.plan_version_id
+           and p.status = 'draft'
+        set r.task_id = t.task_id, r.package_id = t.package_id, r.status = 'GENERATED',
+            r.generated_time = sysdate(), r.version = r.version + 1, r.update_time = sysdate()
+        where r.row_id = #{rowId} and r.batch_id = #{batchId}
+          and r.version = #{expectedVersion} and r.status = 'GENERATING'
+          and r.generation_request_id = #{generationRequestId}
+          and (r.task_id is null or r.task_id = #{taskId})
+          and r.package_id is null
+    </update>
+    <update id="failGeneration">
+        update oa_sign_onboard_import_row
+        set status = #{status}, error_codes_json = #{errorCodesJson},
+            version = version + 1, update_time = sysdate()
+        where row_id = #{rowId} and version = #{expectedVersion} and status = 'GENERATING'
+          and generation_request_id = #{generationRequestId}
+    </update>
+    <update id="markSentByTaskId">
+        update oa_sign_onboard_import_row
+        set status = 'SENT', version = version + 1, update_time = sysdate()
+        where task_id = #{taskId} and status = 'GENERATED'
+    </update>
+    <update id="terminalizeStagedFirstStage">
+        update oa_sign_onboard_import_row r
+        inner join oa_sign_onboard_data_request d
+                on d.request_id = r.data_request_id
+               and d.row_id = r.row_id
+               and d.batch_id = r.batch_id
+               and d.employee_id = r.employee_id
+               and upper(trim(d.signing_sequence)) = 'SIGNATURE_FIRST'
+        inner join oa_sign_task t
+                on t.task_id = r.task_id
+               and t.package_id = r.package_id
+               and t.employee_id = r.employee_id
+               and upper(trim(t.scenario)) = 'ONBOARD'
+               and upper(trim(t.source_type)) = 'MANUAL_SIGN_EXCEL_IMPORT'
+               and t.source_business_id = cast(r.row_id as char)
+               and t.source_event_version = cast(r.source_event_version as char)
+        inner join oa_sign_package p
+                on p.package_id = r.package_id
+               and p.task_id = r.task_id
+               and p.employee_id = r.employee_id
+               and p.shop_dept_id = t.shop_dept_id
+               and p.plan_version_id = t.plan_version_id
+               and upper(trim(p.signing_sequence)) = 'SIGNATURE_FIRST'
+        set r.status = #{rowTerminalStatus},
+            r.version = r.version + 1,
+            r.update_time = sysdate()
+        where t.task_id = #{taskId}
+          and p.package_id = #{packageId}
+          and r.employee_id = #{employeeId}
+          and t.status = #{terminalTaskStatus}
+          and p.status = #{terminalPackageStatus}
+          and d.status = 'CANCELLED'
+          and (
+              (#{terminalTaskStatus} = 'REFUSED'
+                  and #{terminalPackageStatus} = 'refused'
+                  and #{rowTerminalStatus} = 'REFUSED')
+              or (#{terminalTaskStatus} = 'EXPIRED'
+                  and #{terminalPackageStatus} = 'expired'
+                  and #{rowTerminalStatus} = 'EXPIRED')
+          )
+          and r.status in (
+              'WAITING_EMPLOYEE_DATA', 'PENDING_HR_REVIEW',
+              'PROFILE_SYNC_APPLYING', 'PROFILE_SYNC_FAILED',
+              'READY_TO_GENERATE', 'GENERATE_FAILED'
+          )
+    </update>
+
+    <select id="selectBatchIdsByTaskOrPackage" resultType="long">
+        select distinct batch_id
+        from oa_sign_onboard_import_row
+        where task_id = #{taskId}
+           or (#{packageId} is not null and package_id = #{packageId})
+        order by batch_id
+    </select>
+
+    <select id="selectDataRequestIdsByTaskOrPackage" resultType="long">
+        select distinct data_request_id
+        from oa_sign_onboard_import_row
+        where data_request_id is not null
+          and (task_id = #{taskId}
+           or (#{packageId} is not null and package_id = #{packageId}))
+        order by data_request_id
+    </select>
+
+    <update id="unbindHardDeletedTask">
+        update oa_sign_onboard_import_row
+        set task_id = null,
+            package_id = null,
+            data_request_id = null,
+            status = case
+                when status in ('GENERATED', 'SENT', 'PARTIAL_SENT') then 'READY_TO_GENERATE'
+                else status
+            end,
+            generation_request_id = null,
+            generated_time = null,
+            version = version + 1,
+            update_time = sysdate()
+        where task_id = #{taskId}
+           or (#{packageId} is not null and package_id = #{packageId})
+    </update>
+</mapper>

@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "scope": "system-management-release-a",
+  "managedPermissions": [
+    { "permission": "system:user:resetPwd", "expectedStatus": "active", "owner": "系统管理负责人" },
+    { "permission": "system:config:query", "expectedStatus": "active", "owner": "系统管理负责人" },
+    { "permission": "system:operlog:query", "expectedStatus": "active", "owner": "安全审计负责人" },
+    { "permission": "system:logininfor:query", "expectedStatus": "disabled", "owner": "安全审计负责人" },
+    { "permission": "system:salary:import", "expectedStatus": "disabled", "owner": "薪资模块负责人" },
+    { "permission": "system:config:refresh", "expectedStatus": "active", "owner": "系统管理负责人" },
+    { "permission": "system:user:pii:read", "expectedStatus": "active", "owner": "数据安全负责人" },
+    { "permission": "system:user:pii:edit", "expectedStatus": "active", "owner": "数据安全负责人" },
+    { "permission": "system:user:pii:export", "expectedStatus": "active", "owner": "数据安全负责人" }
+  ],
+  "defaultDatabaseSources": {
+    "seed": "docker/mysql/seed/00_BossERP_NEW.sql",
+    "expand": "sql/erp_system_management_expand_20260714.sql",
+    "cutover": "sql/erp_system_management_permissions_20260714.sql"
+  }
+}

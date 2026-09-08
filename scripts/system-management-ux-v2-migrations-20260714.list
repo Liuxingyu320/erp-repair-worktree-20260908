@@ -1,0 +1,2 @@
+# Release B UX 灰度开关；只做兼容性插入，安全接口与并发保护不受开关控制。
+erp_system_management_ux_v2_20260714.sql

@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.file.drive.mapper.DriveCapacityMapper">
+
+    <resultMap id="CapacityResult" type="com.erp.file.drive.domain.DriveCapacityConfig">
+        <id property="configId" column="config_id" />
+        <result property="physicalCapacityBytes" column="physical_capacity_bytes" />
+        <result property="reservePercent" column="reserve_percent" />
+        <result property="publicPoolBytes" column="public_pool_bytes" />
+        <result property="personalPoolBytes" column="personal_pool_bytes" />
+        <result property="organizationPoolBytes" column="organization_pool_bytes" />
+        <result property="enforcementMode" column="enforcement_mode" />
+        <result property="version" column="version" />
+        <result property="createBy" column="create_by" />
+        <result property="createTime" column="create_time" />
+        <result property="updateBy" column="update_by" />
+        <result property="updateTime" column="update_time" />
+        <result property="remark" column="remark" />
+    </resultMap>
+
+    <sql id="CapacityColumns">
+        config_id, physical_capacity_bytes, reserve_percent, public_pool_bytes,
+        personal_pool_bytes, organization_pool_bytes, enforcement_mode, version,
+        create_by, create_time, update_by, update_time, remark
+    </sql>
+
+    <select id="selectConfig" resultMap="CapacityResult">
+        select <include refid="CapacityColumns" />
+        from drive_capacity_config
+        where config_id = #{configId}
+    </select>
+
+    <select id="selectConfigForUpdate" resultMap="CapacityResult">
+        select <include refid="CapacityColumns" />
+        from drive_capacity_config
+        where config_id = #{configId}
+        for update
+    </select>
+
+    <update id="updateConfig">
+        update drive_capacity_config
+        set physical_capacity_bytes = #{physicalCapacityBytes},
+            reserve_percent = #{reservePercent},
+            public_pool_bytes = #{publicPoolBytes},
+            personal_pool_bytes = #{personalPoolBytes},
+            organization_pool_bytes = #{organizationPoolBytes},
+            enforcement_mode = #{enforcementMode},
+            version = version + 1,
+            update_by = #{updateBy},
+            update_time = #{updateTime},
+            remark = #{remark}
+        where config_id = #{configId}
+          and version = #{version}
+    </update>
+
+</mapper>
+

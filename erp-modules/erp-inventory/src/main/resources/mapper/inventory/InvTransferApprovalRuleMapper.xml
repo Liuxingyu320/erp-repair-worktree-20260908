@@ -1,0 +1,144 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.inventory.mapper.InvTransferApprovalRuleMapper">
+
+    <resultMap type="InvTransferApprovalRule" id="InvTransferApprovalRuleResult">
+        <id property="ruleId" column="rule_id"/>
+        <result property="ruleName" column="rule_name"/>
+        <result property="documentType" column="document_type"/>
+        <result property="transferType" column="transfer_type"/>
+        <result property="scopeType" column="scope_type"/>
+        <result property="scopeId" column="scope_id"/>
+        <result property="conditionType" column="condition_type"/>
+        <result property="conditionOperator" column="condition_operator"/>
+        <result property="conditionValue" column="condition_value"/>
+        <result property="approvalMode" column="approval_mode"/>
+        <result property="requiredCount" column="required_count"/>
+        <result property="rejectAction" column="reject_action"/>
+        <result property="allowSelfApprove" column="allow_self_approve"/>
+        <result property="priority" column="priority"/>
+        <result property="status" column="status"/>
+        <result property="version" column="version"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateBy" column="update_by"/>
+        <result property="updateTime" column="update_time"/>
+        <result property="remark" column="remark"/>
+    </resultMap>
+
+    <sql id="selectInvTransferApprovalRuleVo">
+        select rule_id, rule_name, document_type, transfer_type, scope_type, scope_id,
+               condition_type, condition_operator, condition_value,
+               approval_mode, required_count, reject_action, allow_self_approve,
+               priority, status, version, create_by, create_time, update_by, update_time, remark
+        from inv_transfer_approval_rule
+    </sql>
+
+    <select id="selectRuleList" parameterType="InvTransferApprovalRule" resultMap="InvTransferApprovalRuleResult">
+        <include refid="selectInvTransferApprovalRuleVo"/>
+        <where>
+            <if test="ruleName != null and ruleName != ''">and rule_name like concat('%', #{ruleName}, '%')</if>
+            <if test="documentType != null and documentType != ''">and document_type = #{documentType}</if>
+            <if test="transferType != null and transferType != ''">and transfer_type = #{transferType}</if>
+            <if test="scopeType != null and scopeType != ''">and scope_type = #{scopeType}</if>
+            <if test="conditionType != null and conditionType != ''">and condition_type = #{conditionType}</if>
+            <if test="approvalMode != null and approvalMode != ''">and approval_mode = #{approvalMode}</if>
+            <if test="status != null and status != ''">and status = #{status}</if>
+            <if test="params.beginCreateTime != null and params.beginCreateTime != ''">and create_time &gt;= #{params.beginCreateTime}</if>
+            <if test="params.endCreateTime != null and params.endCreateTime != ''">and create_time &lt;= #{params.endCreateTime}</if>
+        </where>
+        order by priority asc, rule_id asc
+    </select>
+
+    <select id="selectRuleById" parameterType="Long" resultMap="InvTransferApprovalRuleResult">
+        <include refid="selectInvTransferApprovalRuleVo"/>
+        where rule_id = #{ruleId}
+    </select>
+
+    <select id="selectEnabledRulesForMatch" parameterType="InvTransferOrder" resultMap="InvTransferApprovalRuleResult">
+        <include refid="selectInvTransferApprovalRuleVo"/>
+        where status = '0'
+          and document_type = 'transfer'
+          and (
+              transfer_type = 'all'
+              <if test="transferType != null and transferType != ''">
+                  or transfer_type = #{transferType}
+              </if>
+          )
+          and (
+              scope_type = 'all'
+              <if test="fromDeptId != null">
+                  or (scope_type in ('from_dept', 'dept') and scope_id = #{fromDeptId})
+                  or (scope_type in ('region', 'area')
+                      and exists (
+                          select 1
+                          from sys_dept from_dept
+                          where from_dept.dept_id = #{fromDeptId}
+                            and (
+                                from_dept.dept_id = inv_transfer_approval_rule.scope_id
+                                or find_in_set(inv_transfer_approval_rule.scope_id, from_dept.ancestors)
+                            )
+                      ))
+              </if>
+              <if test="toDeptId != null">
+                  or (scope_type in ('to_dept', 'dept') and scope_id = #{toDeptId})
+                  or (scope_type in ('region', 'area')
+                      and exists (
+                          select 1
+                          from sys_dept to_dept
+                          where to_dept.dept_id = #{toDeptId}
+                            and (
+                                to_dept.dept_id = inv_transfer_approval_rule.scope_id
+                                or find_in_set(inv_transfer_approval_rule.scope_id, to_dept.ancestors)
+                            )
+                      ))
+              </if>
+          )
+        order by priority asc, rule_id asc
+    </select>
+
+    <insert id="insertRule" parameterType="InvTransferApprovalRule" useGeneratedKeys="true" keyProperty="ruleId">
+        insert into inv_transfer_approval_rule (
+            rule_name, document_type, transfer_type, scope_type, scope_id,
+            condition_type, condition_operator, condition_value,
+            approval_mode, required_count, reject_action, allow_self_approve,
+            priority, status, version, create_by, create_time, remark
+        ) values (
+            #{ruleName}, #{documentType}, #{transferType}, #{scopeType}, #{scopeId},
+            #{conditionType}, #{conditionOperator}, #{conditionValue},
+            #{approvalMode}, #{requiredCount}, #{rejectAction}, #{allowSelfApprove},
+            #{priority}, #{status}, 1, #{createBy}, sysdate(), #{remark}
+        )
+    </insert>
+
+    <update id="updateRule" parameterType="InvTransferApprovalRule">
+        update inv_transfer_approval_rule
+        set rule_name = #{ruleName},
+            document_type = #{documentType},
+            transfer_type = #{transferType},
+            scope_type = #{scopeType},
+            scope_id = #{scopeId},
+            condition_type = #{conditionType},
+            condition_operator = #{conditionOperator},
+            condition_value = #{conditionValue},
+            approval_mode = #{approvalMode},
+            required_count = #{requiredCount},
+            reject_action = #{rejectAction},
+            allow_self_approve = #{allowSelfApprove},
+            priority = #{priority},
+            status = #{status},
+            version = version + 1,
+            update_by = #{updateBy},
+            update_time = sysdate(),
+            remark = #{remark}
+        where rule_id = #{ruleId}
+          and version = #{version}
+    </update>
+
+    <delete id="deleteRuleByIdAndVersion">
+        delete from inv_transfer_approval_rule
+        where rule_id = #{ruleId}
+          and version = #{expectedVersion}
+    </delete>
+
+</mapper>

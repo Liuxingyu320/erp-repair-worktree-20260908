@@ -1,0 +1,334 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.inventory.mapper.InvTransferReceiptDiscrepancyAdjudicationExecutionMapper">
+
+    <resultMap id="ExecutionBoundaryResult"
+            type="com.erp.inventory.domain.transfer.InvTransferReceiptDiscrepancyAdjudicationExecutionBoundary">
+        <id property="caseId" column="discrepancy_case_id"/>
+        <result property="caseVersionAtPlan"
+                column="case_version_at_plan"/>
+        <result property="caseVersion" column="case_version"/>
+        <result property="caseStatus" column="case_status"/>
+        <result property="adjudicationId" column="adjudication_id"/>
+        <result property="decisionFingerprint"
+                column="decision_fingerprint"/>
+        <result property="discrepancyType" column="discrepancy_type"/>
+        <result property="discrepancyQuantity"
+                column="discrepancy_quantity"/>
+        <result property="sourceCostPrice" column="source_cost_price"/>
+        <result property="discrepancyAmount"
+                column="discrepancy_amount"/>
+        <result property="planStatus" column="plan_status"/>
+    </resultMap>
+
+    <resultMap id="LockedActionResult"
+            type="com.erp.inventory.domain.transfer.InvTransferReceiptDiscrepancyAdjudicationExecutionLockedAction">
+        <id property="actionId" column="adjudication_action_id"/>
+        <result property="adjudicationId" column="adjudication_id"/>
+        <result property="caseId" column="discrepancy_case_id"/>
+        <result property="sequence" column="action_sequence"/>
+        <result property="actionType" column="action_type"/>
+        <result property="coverageKind" column="coverage_kind"/>
+        <result property="quantity" column="action_quantity"/>
+        <result property="amount" column="action_amount"/>
+        <result property="responsibleParty" column="responsible_party"/>
+        <result property="executionStatus" column="execution_status"/>
+        <result property="executionVersion" column="execution_version"/>
+        <result property="effectReference"
+                column="execution_effect_reference"/>
+    </resultMap>
+
+    <resultMap id="StoredExecutionEventResult"
+            type="com.erp.inventory.domain.transfer.InvTransferReceiptDiscrepancyAdjudicationExecutionStoredEvent">
+        <id property="eventId" column="execution_event_id"/>
+        <result property="requestId" column="request_id"/>
+        <result property="caseId" column="discrepancy_case_id"/>
+        <result property="caseVersionBefore"
+                column="case_version_before"/>
+        <result property="caseVersionAfter" column="case_version_after"/>
+        <result property="caseStatusBefore"
+                column="case_status_before"/>
+        <result property="caseStatusAfter" column="case_status_after"/>
+        <result property="adjudicationId" column="adjudication_id"/>
+        <result property="decisionFingerprint"
+                column="decision_fingerprint"/>
+        <result property="planStatusBefore"
+                column="plan_status_before"/>
+        <result property="planStatusAfter" column="plan_status_after"/>
+        <result property="actionId" column="adjudication_action_id"/>
+        <result property="actionSequence" column="action_sequence"/>
+        <result property="actionType" column="action_type"/>
+        <result property="coverageKind" column="coverage_kind"/>
+        <result property="discrepancyType" column="discrepancy_type"/>
+        <result property="command" column="execution_command"/>
+        <result property="effectKind" column="effect_kind"/>
+        <result property="effectReference" column="effect_reference"/>
+        <result property="actionStatusBefore"
+                column="action_status_before"/>
+        <result property="actionStatusAfter"
+                column="action_status_after"/>
+        <result property="executionVersionBefore"
+                column="action_version_before"/>
+        <result property="executionVersionAfter"
+                column="action_version_after"/>
+        <result property="quantity" column="action_quantity"/>
+        <result property="sourceCostPrice" column="source_cost_price"/>
+        <result property="amount" column="action_amount"/>
+        <result property="responsibleParty" column="responsible_party"/>
+        <result property="requiredPermission"
+                column="required_permission"/>
+        <result property="executorUserId" column="executor_user_id"/>
+        <result property="executorName" column="executor_name"/>
+        <result property="eventFingerprint" column="event_fingerprint"/>
+        <result property="createTime" column="create_time"/>
+    </resultMap>
+
+    <select id="selectCaseIdForUpdate" resultType="java.lang.Long">
+        select discrepancy_case_id
+        from inv_transfer_receipt_discrepancy_case
+        where discrepancy_case_id = #{caseId}
+        for update
+    </select>
+
+    <select id="countCaseInScope" resultType="java.lang.Integer">
+        select count(1)
+        from inv_transfer_receipt_discrepancy_case c
+        inner join inv_transfer_order o
+                on o.transfer_id = c.transfer_id
+        where c.discrepancy_case_id = #{caseId}
+          and (
+              coalesce(nullif(o.from_warehouse_id, 0), o.from_dept_id)
+              in
+              <foreach collection="scopeDeptIds" item="deptId"
+                       open="(" separator="," close=")">
+                  #{deptId}
+              </foreach>
+              or coalesce(nullif(o.to_warehouse_id, 0), o.to_dept_id)
+              in
+              <foreach collection="scopeDeptIds" item="deptId"
+                       open="(" separator="," close=")">
+                  #{deptId}
+              </foreach>
+          )
+    </select>
+
+    <select id="selectBoundaryForUpdate"
+            resultMap="ExecutionBoundaryResult">
+        select c.discrepancy_case_id,
+               a.case_version_after as case_version_at_plan,
+               c.case_version, c.status as case_status,
+               a.adjudication_id, a.decision_fingerprint,
+               a.discrepancy_type, a.discrepancy_quantity,
+               a.source_cost_price, a.discrepancy_amount, a.plan_status
+        from inv_transfer_receipt_discrepancy_case c
+        inner join inv_transfer_receipt_discrepancy_adjudication a
+                on a.discrepancy_case_id = c.discrepancy_case_id
+        where c.discrepancy_case_id = #{caseId}
+          and a.adjudication_id = #{adjudicationId}
+          and a.fact_fingerprint = c.fact_fingerprint
+          and a.discrepancy_type = c.discrepancy_type
+          and a.discrepancy_quantity = c.discrepancy_quantity
+          and a.source_cost_price = c.source_cost_price
+          and a.discrepancy_amount = c.discrepancy_amount
+        for update
+    </select>
+
+    <select id="selectActionsForUpdate" resultMap="LockedActionResult">
+        select adjudication_action_id, adjudication_id,
+               discrepancy_case_id, action_sequence, action_type,
+               coverage_kind, action_quantity, action_amount,
+               responsible_party,
+               execution_status, execution_version,
+               execution_effect_reference
+        from inv_transfer_receipt_discrepancy_adjudication_action
+        where discrepancy_case_id = #{caseId}
+          and adjudication_id = #{adjudicationId}
+        order by action_sequence, adjudication_action_id
+        for update
+    </select>
+
+    <select id="selectEventByRequestIdForUpdate"
+            resultMap="StoredExecutionEventResult">
+        select execution_event_id, request_id, discrepancy_case_id,
+               case_version_before, case_version_after,
+               case_status_before, case_status_after, adjudication_id,
+               decision_fingerprint, plan_status_before,
+               plan_status_after, adjudication_action_id,
+               action_sequence, action_type, coverage_kind,
+               discrepancy_type,
+               execution_command, effect_kind, effect_reference,
+               action_status_before, action_status_after,
+               action_version_before, action_version_after,
+               action_quantity, source_cost_price, action_amount,
+               responsible_party,
+               required_permission, executor_user_id, executor_name,
+               event_fingerprint, create_time
+        from inv_transfer_receipt_discrepancy_adjudication_execution_event
+        where request_id = #{requestId}
+        for update
+    </select>
+
+    <insert id="insertExecutionEvent">
+        insert into
+            inv_transfer_receipt_discrepancy_adjudication_execution_event (
+            request_id, discrepancy_case_id, case_version_before,
+            case_version_after, case_status_before, case_status_after,
+            adjudication_id, decision_fingerprint, plan_status_before,
+            plan_status_after, adjudication_action_id, action_sequence,
+            action_type, coverage_kind, discrepancy_type,
+            execution_command,
+            effect_kind, effect_reference, action_status_before,
+            action_status_after, action_version_before,
+            action_version_after, action_quantity, source_cost_price,
+            action_amount, responsible_party, required_permission,
+            executor_user_id,
+            executor_name, event_fingerprint, create_by, create_time
+        )
+        select #{execution.requestId}, c.discrepancy_case_id,
+               #{execution.caseVersionBefore},
+               #{execution.caseVersionAfter},
+               #{execution.caseStatusBefore},
+               #{execution.caseStatusAfter}, a.adjudication_id,
+               #{execution.decisionFingerprint},
+               #{execution.planStatusBefore},
+               #{execution.planStatusAfter}, x.adjudication_action_id,
+               #{execution.actionSequence}, #{execution.actionType},
+               #{execution.coverageKind},
+               #{execution.discrepancyType}, #{execution.command},
+               #{execution.effectKind}, #{execution.effectReference},
+               #{execution.actionStatusBefore},
+               #{execution.actionStatusAfter},
+               #{execution.executionVersionBefore},
+               #{execution.executionVersionAfter},
+               #{execution.quantity}, #{execution.sourceCostPrice},
+               #{execution.amount},
+               #{execution.responsibleParty},
+               #{execution.requiredPermission},
+               #{execution.executorUserId}, #{execution.executorName},
+               #{execution.eventFingerprint}, #{execution.executorName},
+               #{execution.executedAt}
+        from inv_transfer_receipt_discrepancy_case c
+        inner join inv_transfer_receipt_discrepancy_adjudication a
+                on a.discrepancy_case_id = c.discrepancy_case_id
+               and a.adjudication_id = #{execution.adjudicationId}
+        inner join
+            inv_transfer_receipt_discrepancy_adjudication_action x
+                on x.discrepancy_case_id = c.discrepancy_case_id
+               and x.adjudication_id = a.adjudication_id
+               and x.adjudication_action_id = #{execution.actionId}
+        where c.discrepancy_case_id = #{execution.caseId}
+          and c.case_version = #{execution.caseVersionBefore}
+          and c.status = #{execution.caseStatusBefore}
+          and a.case_version_after &lt;= c.case_version
+          and a.decision_fingerprint = #{execution.decisionFingerprint}
+          and a.plan_status = #{execution.planStatusBefore}
+          and x.action_sequence = #{execution.actionSequence}
+          and x.action_type = #{execution.actionType}
+          and x.coverage_kind = #{execution.coverageKind}
+          and x.action_quantity = #{execution.quantity}
+          and x.action_amount = #{execution.amount}
+          and a.source_cost_price = #{execution.sourceCostPrice}
+          and x.responsible_party = #{execution.responsibleParty}
+          and x.execution_status = #{execution.actionStatusBefore}
+          and x.execution_version =
+              #{execution.executionVersionBefore}
+          and #{execution.caseVersionAfter} =
+              #{execution.caseVersionBefore} + 1
+          and #{execution.executionVersionAfter} =
+              #{execution.executionVersionBefore} + 1
+          and #{execution.requiredPermission} =
+              'inv:transfer:discrepancy:execute'
+          and (
+              (#{execution.command} = 'dispatch'
+               and x.execution_effect_reference is null)
+              or
+              (#{execution.command} = 'complete'
+               and x.execution_effect_reference =
+                   #{execution.effectReference})
+          )
+          and not exists (
+              select 1
+              from inv_transfer_receipt_discrepancy_adjudication_execution_event prior
+              where prior.request_id = #{execution.requestId}
+                 or (prior.adjudication_action_id = #{execution.actionId}
+                     and prior.action_version_before =
+                         #{execution.executionVersionBefore})
+          )
+    </insert>
+
+    <update id="transitionAction">
+        update inv_transfer_receipt_discrepancy_adjudication_action
+        set execution_status = #{execution.actionStatusAfter},
+            execution_version = #{execution.executionVersionAfter},
+            execution_effect_reference = #{execution.effectReference}
+        where adjudication_action_id = #{execution.actionId}
+          and adjudication_id = #{execution.adjudicationId}
+          and discrepancy_case_id = #{execution.caseId}
+          and execution_status = #{execution.actionStatusBefore}
+          and execution_version = #{execution.executionVersionBefore}
+          and (
+              (#{execution.command} = 'dispatch'
+               and execution_effect_reference is null)
+              or
+              (#{execution.command} = 'complete'
+               and execution_effect_reference =
+                   #{execution.effectReference})
+          )
+          and exists (
+              select 1
+              from inv_transfer_receipt_discrepancy_adjudication_execution_event event
+              where event.request_id = #{execution.requestId}
+                and event.adjudication_action_id =
+                    #{execution.actionId}
+                and event.event_fingerprint =
+                    #{execution.eventFingerprint}
+                and event.action_version_before =
+                    #{execution.executionVersionBefore}
+                and event.action_version_after =
+                    #{execution.executionVersionAfter}
+          )
+    </update>
+
+    <update id="transitionAdjudication">
+        update inv_transfer_receipt_discrepancy_adjudication
+        set plan_status = #{execution.planStatusAfter}
+        where adjudication_id = #{execution.adjudicationId}
+          and discrepancy_case_id = #{execution.caseId}
+          and decision_fingerprint = #{execution.decisionFingerprint}
+          and plan_status = #{execution.planStatusBefore}
+          and exists (
+              select 1
+              from inv_transfer_receipt_discrepancy_adjudication_execution_event event
+              where event.request_id = #{execution.requestId}
+                and event.adjudication_id = #{execution.adjudicationId}
+                and event.event_fingerprint =
+                    #{execution.eventFingerprint}
+                and event.plan_status_before =
+                    #{execution.planStatusBefore}
+                and event.plan_status_after =
+                    #{execution.planStatusAfter}
+          )
+    </update>
+
+    <update id="transitionCase">
+        update inv_transfer_receipt_discrepancy_case
+        set status = #{execution.caseStatusAfter},
+            case_version = #{execution.caseVersionAfter}
+        where discrepancy_case_id = #{execution.caseId}
+          and case_version = #{execution.caseVersionBefore}
+          and status = #{execution.caseStatusBefore}
+          and exists (
+              select 1
+              from inv_transfer_receipt_discrepancy_adjudication_execution_event event
+              where event.request_id = #{execution.requestId}
+                and event.discrepancy_case_id = #{execution.caseId}
+                and event.event_fingerprint =
+                    #{execution.eventFingerprint}
+                and event.case_version_before =
+                    #{execution.caseVersionBefore}
+                and event.case_version_after =
+                    #{execution.caseVersionAfter}
+          )
+    </update>
+
+</mapper>

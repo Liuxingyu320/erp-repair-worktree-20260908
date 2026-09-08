@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.oa.attendance.payroll.AttendancePayrollMapper">
+
+    <resultMap id="payrollDayResult"
+            type="com.erp.oa.attendance.domain.AttendanceModels$DayResult">
+        <id property="dayResultId" column="day_result_id"/>
+        <result property="scheduleId" column="schedule_id"/>
+        <result property="userId" column="user_id"/>
+        <result property="userName" column="user_name"/>
+        <result property="shopId" column="shop_id"/>
+        <result property="businessDate" column="business_date"/>
+        <result property="shiftId" column="shift_id"/>
+        <result property="scheduledMinutes" column="scheduled_minutes"/>
+        <result property="workedMinutes" column="worked_minutes"/>
+        <result property="paidLeaveMinutes" column="paid_leave_minutes"/>
+        <result property="unpaidLeaveMinutes" column="unpaid_leave_minutes"/>
+        <result property="absenceMinutes" column="absence_minutes"/>
+        <result property="lateMinutes" column="late_minutes"/>
+        <result property="earlyLeaveMinutes" column="early_leave_minutes"/>
+        <result property="rawOvertimeMinutes" column="raw_overtime_minutes"/>
+        <result property="timeCreditUsedMinutes" column="time_credit_used_minutes"/>
+        <result property="netOvertimeMinutes" column="net_overtime_minutes"/>
+        <result property="timeCreditOffsetMinutes" column="time_credit_offset_minutes"/>
+        <result property="netEarlyLeaveMinutes" column="net_early_leave_minutes"/>
+        <result property="resultStatus" column="result_status"/>
+        <result property="exceptionCodes" column="exception_codes"/>
+        <result property="firstInEventId" column="first_in_event_id"/>
+        <result property="lastOutEventId" column="last_out_event_id"/>
+        <result property="firstInCorrectionRequestId"
+                column="first_in_correction_request_id"/>
+        <result property="lastOutCorrectionRequestId"
+                column="last_out_correction_request_id"/>
+        <result property="calculationVersion" column="calculation_version"/>
+        <result property="calculatedAt" column="calculated_at"/>
+        <result property="settledAt" column="settled_at"/>
+        <result property="rowVersion" column="row_version"/>
+    </resultMap>
+
+    <select id="selectPublishedDayResultsForPayroll"
+            resultMap="payrollDayResult">
+        select d.day_result_id,
+               s.schedule_id,
+               s.user_id,
+               coalesce(d.user_name, s.user_name) user_name,
+               s.shop_id,
+               s.business_date,
+               s.shift_id,
+               coalesce(d.scheduled_minutes,
+                        s.standard_minutes_snapshot, 0) scheduled_minutes,
+               coalesce(d.worked_minutes, 0) worked_minutes,
+               coalesce(d.paid_leave_minutes, 0) paid_leave_minutes,
+               coalesce(d.unpaid_leave_minutes, 0) unpaid_leave_minutes,
+               coalesce(d.absence_minutes, 0) absence_minutes,
+               coalesce(d.late_minutes, 0) late_minutes,
+               coalesce(d.early_leave_minutes, 0) early_leave_minutes,
+               greatest(coalesce(d.worked_minutes, 0)
+                        - coalesce(d.scheduled_minutes,
+                                   s.standard_minutes_snapshot, 0), 0)
+                    raw_overtime_minutes,
+               coalesce(tc_source.used_minutes, 0)
+                    time_credit_used_minutes,
+               greatest(coalesce(d.worked_minutes, 0)
+                        - coalesce(d.scheduled_minutes,
+                                   s.standard_minutes_snapshot, 0), 0)
+                    - coalesce(tc_source.used_minutes, 0)
+                    net_overtime_minutes,
+               coalesce(tc_target.offset_minutes, 0)
+                    time_credit_offset_minutes,
+               coalesce(d.early_leave_minutes, 0)
+                    - coalesce(tc_target.offset_minutes, 0)
+                    net_early_leave_minutes,
+               case when d.day_result_id is null then 'MISSING_RESULT'
+                    else d.result_status end result_status,
+               case when d.day_result_id is null then 'MISSING_DAY_RESULT'
+                    else d.exception_codes end exception_codes,
+               d.first_in_event_id,
+               d.last_out_event_id,
+               d.first_in_correction_request_id,
+               d.last_out_correction_request_id,
+               d.calculation_version,
+               d.calculated_at,
+               d.settled_at,
+               d.row_version
+        from oa_attendance_schedule s
+        left join oa_attendance_day_result d
+          on d.schedule_id = s.schedule_id
+        left join (
+            select source_day_result_id,
+                   sum(case
+                     when adjustment_action = 'APPLY' then adjustment_minutes
+                     when adjustment_action = 'REVERSE' then -adjustment_minutes
+                     else 0 end) used_minutes
+            from oa_attendance_time_credit_adjustment
+            group by source_day_result_id
+        ) tc_source on tc_source.source_day_result_id = d.day_result_id
+        left join (
+            select target_day_result_id,
+                   sum(case
+                     when adjustment_action = 'APPLY' then adjustment_minutes
+                     when adjustment_action = 'REVERSE' then -adjustment_minutes
+                     else 0 end) offset_minutes
+            from oa_attendance_time_credit_adjustment
+            group by target_day_result_id
+        ) tc_target on tc_target.target_day_result_id = d.day_result_id
+        where s.shop_id = #{shopId}
+          and s.status = 'PUBLISHED'
+          and s.business_date between #{dateFrom} and #{dateTo}
+        order by s.business_date, s.user_id, s.schedule_id
+    </select>
+</mapper>

@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.inventory.mapper.InvTransferDetailMapper">
+
+    <resultMap type="InvTransferDetail" id="InvTransferDetailResult">
+        <id property="detailId" column="detail_id"/>
+        <result property="transferId" column="transfer_id"/>
+        <result property="itemType" column="item_type"/>
+        <result property="itemId" column="item_id"/>
+        <result property="itemCode" column="item_code"/>
+        <result property="itemName" column="item_name"/>
+        <result property="productId" column="product_id"/>
+        <result property="productName" column="product_name"/>
+        <result property="productCode" column="product_code"/>
+        <result property="quantity" column="quantity"/>
+        <result property="deliveredQuantity" column="delivered_quantity"/>
+        <result property="receivedQuantity" column="received_quantity"/>
+        <result property="costPrice" column="cost_price"/>
+        <result property="amount" column="amount"/>
+        <result property="unit" column="unit"/>
+        <result property="spec" column="spec"/>
+        <result property="grade" column="grade"/>
+        <result property="sortOrder" column="sort_order"/>
+        <result property="goodsCondition" column="goods_condition"/>
+        <result property="conditionNote" column="condition_note"/>
+        <result property="lotId" column="lot_id"/>
+        <result property="sourceLocationId" column="source_location_id"/>
+    </resultMap>
+
+    <sql id="selectInvTransferDetailVo">
+        select detail_id, transfer_id, item_type, item_id, item_code, item_name,
+               product_id, product_name, product_code,
+               quantity, delivered_quantity, received_quantity, cost_price, amount, unit, spec, grade, sort_order,
+               goods_condition, condition_note, lot_id, source_location_id
+        from inv_transfer_detail
+    </sql>
+
+    <select id="selectByTransferId" parameterType="Long" resultMap="InvTransferDetailResult">
+        <include refid="selectInvTransferDetailVo"/>
+        where transfer_id = #{transferId}
+        order by sort_order asc, detail_id asc
+    </select>
+
+    <select id="selectByTransferIdForUpdate" parameterType="Long" resultMap="InvTransferDetailResult">
+        <include refid="selectInvTransferDetailVo"/>
+        where transfer_id = #{transferId}
+        order by sort_order asc, detail_id asc
+        for update
+    </select>
+
+    <insert id="insertInvTransferDetail" parameterType="InvTransferDetail" useGeneratedKeys="true" keyProperty="detailId">
+        insert into inv_transfer_detail (
+            transfer_id, item_type, item_id, item_code, item_name,
+            product_id, product_name, product_code, quantity,
+            delivered_quantity, received_quantity, cost_price, amount, unit, spec, grade, sort_order,
+            goods_condition, condition_note, lot_id, source_location_id
+        ) values (
+            #{transferId}, coalesce(#{itemType}, 'product'), coalesce(#{itemId}, #{productId}), #{itemCode}, #{itemName},
+            #{productId}, #{productName}, #{productCode}, #{quantity},
+            #{deliveredQuantity}, #{receivedQuantity}, #{costPrice}, #{amount}, #{unit}, #{spec}, #{grade}, #{sortOrder},
+            #{goodsCondition}, #{conditionNote}, #{lotId}, #{sourceLocationId}
+        )
+    </insert>
+
+    <insert id="batchInsertInvTransferDetail" parameterType="list">
+        insert into inv_transfer_detail (
+            transfer_id, item_type, item_id, item_code, item_name,
+            product_id, product_name, product_code, quantity,
+            delivered_quantity, received_quantity, cost_price, amount, unit, spec, grade, sort_order,
+            goods_condition, condition_note, lot_id, source_location_id
+        ) values
+        <foreach collection="list" item="item" separator=",">
+            (
+                #{item.transferId}, coalesce(#{item.itemType}, 'product'), coalesce(#{item.itemId}, #{item.productId}), #{item.itemCode}, #{item.itemName},
+                #{item.productId}, #{item.productName}, #{item.productCode}, #{item.quantity},
+                #{item.deliveredQuantity}, #{item.receivedQuantity}, #{item.costPrice}, #{item.amount}, #{item.unit}, #{item.spec}, #{item.grade}, #{item.sortOrder},
+                #{item.goodsCondition}, #{item.conditionNote}, #{item.lotId}, #{item.sourceLocationId}
+            )
+        </foreach>
+    </insert>
+
+    <update id="updateDeliveredQuantity" parameterType="InvTransferDetail">
+        update inv_transfer_detail
+        set delivered_quantity = #{deliveredQuantity}
+        where detail_id = #{detailId}
+    </update>
+
+    <update id="decreaseDeliveredQuantity" parameterType="InvTransferDetail">
+        update inv_transfer_detail
+        set delivered_quantity = delivered_quantity - #{deliveredQuantity}
+        where detail_id = #{detailId}
+          and delivered_quantity &gt;= #{deliveredQuantity}
+    </update>
+
+    <update id="updateReceivedQuantity" parameterType="InvTransferDetail">
+        update inv_transfer_detail
+        set received_quantity = #{receivedQuantity}
+        where detail_id = #{detailId}
+    </update>
+
+    <delete id="deleteByTransferId" parameterType="Long">
+        delete from inv_transfer_detail where transfer_id = #{transferId}
+    </delete>
+
+</mapper>

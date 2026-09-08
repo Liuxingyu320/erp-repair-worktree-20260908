@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.system.mapper.HrSensitiveAccessLogMapper">
+    <insert id="insertSensitiveAccessLog" parameterType="com.erp.system.domain.HrSensitiveAccessLog"
+            useGeneratedKeys="true" keyProperty="accessLogId">
+        insert into hr_sensitive_access_log (
+            operator_user_id, operator_name, employee_user_id, field_key, export_scope,
+            action_type, request_ip, event_time, result, result_message, create_by, create_time
+        ) values (
+            #{operatorUserId}, #{operatorName}, #{employeeUserId}, #{fieldKey}, #{exportScope},
+            #{actionType}, #{requestIp}, coalesce(#{eventTime}, sysdate()), #{result}, #{resultMessage},
+            #{createBy}, sysdate()
+        )
+    </insert>
+</mapper>

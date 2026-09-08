@@ -1,0 +1,341 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.approval.mapper.ApprovalDefinitionMapper">
+
+    <resultMap id="ApprovalRuleResult" type="ApprovalRule">
+        <id property="ruleId" column="rule_id"/>
+        <result property="templateId" column="template_id"/>
+        <result property="ruleCode" column="rule_code"/>
+        <result property="ruleName" column="rule_name"/>
+        <result property="scopeType" column="scope_type"/>
+        <result property="scopeId" column="scope_id"/>
+        <result property="scopeName" column="scope_name"/>
+        <result property="businessSubtype" column="business_subtype"/>
+        <result property="ruleStatus" column="rule_status"/>
+        <result property="currentVersionId" column="current_version_id"/>
+        <result property="latestVersionNo" column="latest_version_no"/>
+        <result property="lockVersion" column="lock_version"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateBy" column="update_by"/>
+        <result property="updateTime" column="update_time"/>
+        <result property="remark" column="remark"/>
+    </resultMap>
+
+    <resultMap id="ApprovalRuleVersionResult" type="ApprovalRuleVersion">
+        <id property="versionId" column="version_id"/>
+        <result property="ruleId" column="rule_id"/>
+        <result property="versionNo" column="version_no"/>
+        <result property="versionStatus" column="version_status"/>
+        <result property="definitionSnapshot" column="definition_snapshot"/>
+        <result property="definitionChecksum" column="definition_checksum"/>
+        <result property="publishedByUserId" column="published_by_user_id"/>
+        <result property="publishedByName" column="published_by_name"/>
+        <result property="publishedTime" column="published_time"/>
+        <result property="lockVersion" column="lock_version"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateBy" column="update_by"/>
+        <result property="updateTime" column="update_time"/>
+        <result property="remark" column="remark"/>
+    </resultMap>
+
+    <resultMap id="ApprovalConditionResult" type="ApprovalRuleCondition">
+        <id property="conditionId" column="condition_id"/>
+        <result property="versionId" column="version_id"/>
+        <result property="conditionOrder" column="condition_order"/>
+        <result property="fieldCode" column="field_code"/>
+        <result property="operatorCode" column="operator_code"/>
+        <result property="valueType" column="value_type"/>
+        <result property="valueText" column="value_text"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateBy" column="update_by"/>
+        <result property="updateTime" column="update_time"/>
+        <result property="remark" column="remark"/>
+    </resultMap>
+
+    <resultMap id="ApprovalNodeResult" type="ApprovalVersionNode">
+        <id property="nodeId" column="node_id"/>
+        <result property="versionId" column="version_id"/>
+        <result property="nodeOrder" column="node_order"/>
+        <result property="nodeCode" column="node_code"/>
+        <result property="nodeName" column="node_name"/>
+        <result property="strategyType" column="strategy_type"/>
+        <result property="strategyCode" column="strategy_code"/>
+        <result property="strategyConfig" column="strategy_config"/>
+        <result property="approvalMode" column="approval_mode"/>
+        <result property="requiredCount" column="required_count"/>
+        <result property="missingPolicy" column="missing_policy"/>
+        <result property="selfPolicy" column="self_policy"/>
+        <result property="returnAllowed" column="return_allowed"/>
+        <result property="rejectAllowed" column="reject_allowed"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateBy" column="update_by"/>
+        <result property="updateTime" column="update_time"/>
+        <result property="remark" column="remark"/>
+    </resultMap>
+
+    <sql id="ruleColumns">
+        rule_id, template_id, rule_code, rule_name, scope_type, scope_id,
+        scope_name, business_subtype, rule_status, current_version_id,
+        latest_version_no, lock_version, create_by, create_time,
+        update_by, update_time, remark
+    </sql>
+
+    <sql id="versionColumns">
+        version_id, rule_id, version_no, version_status,
+        definition_snapshot, definition_checksum, published_by_user_id,
+        published_by_name, published_time, lock_version, create_by,
+        create_time, update_by, update_time, remark
+    </sql>
+
+    <select id="selectRuleList" parameterType="ApprovalRule"
+            resultMap="ApprovalRuleResult">
+        select <include refid="ruleColumns"/>
+        from approval_rule
+        <where>
+            <if test="templateId != null">and template_id = #{templateId}</if>
+            <if test="ruleCode != null and ruleCode != ''">and rule_code = #{ruleCode}</if>
+            <if test="ruleName != null and ruleName != ''">
+                and rule_name like concat('%', #{ruleName}, '%')
+            </if>
+            <if test="scopeType != null and scopeType != ''">and scope_type = #{scopeType}</if>
+            <if test="scopeId != null">and scope_id = #{scopeId}</if>
+            <if test="businessSubtype != null and businessSubtype != ''">
+                and business_subtype = #{businessSubtype}
+            </if>
+            <if test="ruleStatus != null and ruleStatus != ''">and rule_status = #{ruleStatus}</if>
+        </where>
+        order by template_id, rule_id
+    </select>
+
+    <select id="selectRuleById" parameterType="Long"
+            resultMap="ApprovalRuleResult">
+        select <include refid="ruleColumns"/>
+        from approval_rule
+        where rule_id = #{ruleId}
+    </select>
+
+    <select id="selectRuleVersionById" parameterType="Long"
+            resultMap="ApprovalRuleVersionResult">
+        select <include refid="versionColumns"/>
+        from approval_rule_version
+        where version_id = #{versionId}
+    </select>
+
+    <select id="selectRuleVersion" resultMap="ApprovalRuleVersionResult">
+        select <include refid="versionColumns"/>
+        from approval_rule_version
+        where rule_id = #{ruleId} and version_no = #{versionNo}
+    </select>
+
+    <select id="selectVersionsByRuleId" resultMap="ApprovalRuleVersionResult">
+        select <include refid="versionColumns"/>
+        from approval_rule_version
+        where rule_id = #{ruleId}
+        order by version_no desc
+    </select>
+
+    <select id="selectDraftVersionByRuleId" resultMap="ApprovalRuleVersionResult">
+        select <include refid="versionColumns"/>
+        from approval_rule_version
+        where rule_id = #{ruleId} and version_status = 'DRAFT'
+        order by version_no desc
+        limit 1
+    </select>
+
+    <select id="selectActiveRulesForMatch" resultMap="ApprovalRuleResult">
+        select <include refid="ruleColumns"/>
+        from approval_rule r
+        where r.template_id = #{templateId}
+          and r.rule_status = 'ACTIVE'
+          and r.current_version_id is not null
+          and (r.business_subtype = 'ALL'
+               or r.business_subtype = #{businessSubtype})
+          and (
+              r.scope_type = 'ALL'
+              or (r.scope_type = 'STORE' and r.scope_id = #{anchorDeptId})
+              or (r.scope_type = 'AREA' and exists (
+                  select 1 from sys_dept anchor
+                  where anchor.dept_id = #{anchorDeptId}
+                    and anchor.del_flag = '0' and anchor.status = '0'
+                    and (r.scope_id = anchor.dept_id
+                         or find_in_set(r.scope_id, anchor.ancestors))))
+          )
+        order by r.rule_id
+    </select>
+
+    <select id="selectActiveRulesByTemplateId" resultMap="ApprovalRuleResult">
+        select <include refid="ruleColumns"/>
+        from approval_rule
+        where template_id = #{templateId} and rule_status = 'ACTIVE'
+          and current_version_id is not null
+        order by rule_id
+    </select>
+
+    <select id="selectConditionsByVersionId" parameterType="Long"
+            resultMap="ApprovalConditionResult">
+        select condition_id, version_id, condition_order, field_code,
+               operator_code, value_type, value_text, create_by, create_time,
+               update_by, update_time, remark
+        from approval_rule_condition
+        where version_id = #{versionId}
+        order by condition_order, condition_id
+    </select>
+
+    <select id="selectNodesByVersionId" parameterType="Long"
+            resultMap="ApprovalNodeResult">
+        select node_id, version_id, node_order, node_code, node_name,
+               strategy_type, strategy_code, strategy_config, approval_mode,
+               required_count, missing_policy, self_policy, return_allowed,
+               reject_allowed, create_by, create_time, update_by,
+               update_time, remark
+        from approval_version_node
+        where version_id = #{versionId}
+        order by node_order, node_id
+    </select>
+
+    <select id="selectNodeById" resultMap="ApprovalNodeResult">
+        select node_id, version_id, node_order, node_code, node_name,
+               strategy_type, strategy_code, strategy_config, approval_mode,
+               required_count, missing_policy, self_policy, return_allowed,
+               reject_allowed, create_by, create_time, update_by,
+               update_time, remark
+        from approval_version_node
+        where node_id = #{nodeId}
+    </select>
+
+    <insert id="insertRule" parameterType="ApprovalRule"
+            useGeneratedKeys="true" keyProperty="ruleId">
+        insert into approval_rule (
+            template_id, rule_code, rule_name, scope_type, scope_id,
+            scope_name, business_subtype, rule_status, current_version_id,
+            latest_version_no, lock_version, create_by, create_time, remark
+        ) values (
+            #{templateId}, #{ruleCode}, #{ruleName}, #{scopeType}, #{scopeId},
+            #{scopeName}, #{businessSubtype}, #{ruleStatus},
+            #{currentVersionId}, #{latestVersionNo}, 0, #{createBy},
+            sysdate(), #{remark}
+        )
+    </insert>
+
+    <update id="updateRuleWithLock">
+        update approval_rule
+        set rule_name = #{rule.ruleName},
+            scope_type = #{rule.scopeType},
+            scope_id = #{rule.scopeId},
+            scope_name = #{rule.scopeName},
+            business_subtype = #{rule.businessSubtype},
+            rule_status = #{rule.ruleStatus},
+            current_version_id = #{rule.currentVersionId},
+            latest_version_no = #{rule.latestVersionNo},
+            lock_version = lock_version + 1,
+            update_by = #{rule.updateBy},
+            update_time = sysdate(),
+            remark = #{rule.remark}
+        where rule_id = #{rule.ruleId}
+          and lock_version = #{expectedVersion}
+    </update>
+
+    <insert id="insertRuleVersion" parameterType="ApprovalRuleVersion"
+            useGeneratedKeys="true" keyProperty="versionId">
+        insert into approval_rule_version (
+            rule_id, version_no, version_status, definition_snapshot,
+            definition_checksum, published_by_user_id, published_by_name,
+            published_time, lock_version, create_by, create_time, remark
+        ) values (
+            #{ruleId}, #{versionNo}, #{versionStatus}, #{definitionSnapshot},
+            #{definitionChecksum}, #{publishedByUserId}, #{publishedByName},
+            #{publishedTime}, 0, #{createBy}, sysdate(), #{remark}
+        )
+    </insert>
+
+    <update id="updateDraftVersionWithLock">
+        update approval_rule_version
+        set definition_snapshot = #{version.definitionSnapshot},
+            definition_checksum = #{version.definitionChecksum},
+            lock_version = lock_version + 1,
+            update_by = #{version.updateBy},
+            update_time = sysdate(),
+            remark = #{version.remark}
+        where version_id = #{version.versionId}
+          and version_status = 'DRAFT'
+          and lock_version = #{expectedVersion}
+    </update>
+
+    <update id="publishDraftVersionWithLock">
+        update approval_rule_version
+        set version_status = 'PUBLISHED',
+            definition_snapshot = #{version.definitionSnapshot},
+            definition_checksum = #{version.definitionChecksum},
+            published_by_user_id = #{version.publishedByUserId},
+            published_by_name = #{version.publishedByName},
+            published_time = sysdate(),
+            lock_version = lock_version + 1,
+            update_by = #{version.updateBy},
+            update_time = sysdate(),
+            remark = #{version.remark}
+        where version_id = #{version.versionId}
+          and version_status = 'DRAFT'
+          and lock_version = #{expectedVersion}
+    </update>
+
+    <update id="retirePublishedVersions">
+        update approval_rule_version
+        set version_status = 'RETIRED',
+            lock_version = lock_version + 1,
+            update_by = #{updateBy},
+            update_time = sysdate()
+        where rule_id = #{ruleId}
+          and version_status = 'PUBLISHED'
+          and version_id &lt;&gt; #{exceptVersionId}
+    </update>
+
+    <insert id="insertCondition" parameterType="ApprovalRuleCondition"
+            useGeneratedKeys="true" keyProperty="conditionId">
+        insert into approval_rule_condition (
+            version_id, condition_order, field_code, operator_code,
+            value_type, value_text, create_by, create_time, remark
+        ) values (
+            #{versionId}, #{conditionOrder}, #{fieldCode}, #{operatorCode},
+            #{valueType}, #{valueText}, #{createBy}, sysdate(), #{remark}
+        )
+    </insert>
+
+    <insert id="insertNode" parameterType="ApprovalVersionNode"
+            useGeneratedKeys="true" keyProperty="nodeId">
+        insert into approval_version_node (
+            version_id, node_order, node_code, node_name, strategy_type,
+            strategy_code, strategy_config, approval_mode, required_count,
+            missing_policy, self_policy, return_allowed, reject_allowed,
+            create_by, create_time, remark
+        ) values (
+            #{versionId}, #{nodeOrder}, #{nodeCode}, #{nodeName},
+            #{strategyType}, #{strategyCode}, #{strategyConfig},
+            #{approvalMode}, #{requiredCount}, #{missingPolicy}, #{selfPolicy},
+            #{returnAllowed}, #{rejectAllowed}, #{createBy}, sysdate(),
+            #{remark}
+        )
+    </insert>
+
+    <delete id="deleteConditionsByVersionId" parameterType="Long">
+        delete condition_row
+        from approval_rule_condition condition_row
+        join approval_rule_version version_row
+          on version_row.version_id = condition_row.version_id
+        where condition_row.version_id = #{versionId}
+          and version_row.version_status = 'DRAFT'
+    </delete>
+
+    <delete id="deleteNodesByVersionId" parameterType="Long">
+        delete node_row
+        from approval_version_node node_row
+        join approval_rule_version version_row
+          on version_row.version_id = node_row.version_id
+        where node_row.version_id = #{versionId}
+          and version_row.version_status = 'DRAFT'
+    </delete>
+
+</mapper>

@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "releaseId": "inventory-stock-log-business-type-20260804",
+  "baselineCommit": "b408b7054a48",
+  "migrationList": "scripts/inventory-stock-log-business-type-migrations-20260804.list",
+  "migrationCount": 1,
+  "sourceDirectory": "sql",
+  "deployDirectory": "docker/mysql/releases/inventory-stock-log-business-type-20260804",
+  "executionPolicy": "automatic",
+  "featureFlags": [],
+  "preconditions": {
+    "tables": [
+      "inv_stock_log"
+    ],
+    "columns": [
+      {
+        "table": "inv_stock_log",
+        "names": [
+          "business_type"
+        ]
+      }
+    ],
+    "indexes": []
+  },
+  "migrations": [
+    {
+      "file": "erp_inventory_stock_log_business_type_20260804.sql",
+      "sha256": "3522d6c58f565287d3b4bceb5d826bd930ee8954d1ebab7df9a613488737e946",
+      "creates": [],
+      "backupTables": [
+        "inv_stock_log"
+      ]
+    }
+  ],
+  "integrationTests": [
+    "erp-modules/erp-inventory/src/test/java/com/erp/inventory/mapper/InventorySchemaMigrationTest.java",
+    "erp-common/erp-common-security/src/test/java/com/erp/common/security/handler/GlobalExceptionHandlerTest.java"
+  ],
+  "artifactSha256Required": true
+}

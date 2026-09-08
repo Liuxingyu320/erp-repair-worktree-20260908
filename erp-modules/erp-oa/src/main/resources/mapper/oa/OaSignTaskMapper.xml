@@ -1,0 +1,555 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.oa.mapper.OaSignTaskMapper">
+
+    <resultMap id="OaSignTaskResult" type="com.erp.oa.domain.OaSignTask">
+        <id property="taskId" column="task_id"/>
+        <result property="taskNo" column="task_no"/>
+        <result property="scenario" column="scenario"/>
+        <result property="employeeId" column="employee_id"/>
+        <result property="employeeName" column="employee_name"/>
+        <result property="shopDeptId" column="shop_dept_id"/>
+        <result property="legalEntityId" column="legal_entity_id"/>
+        <result property="assignedHrUserId" column="assigned_hr_user_id"/>
+        <result property="sourceType" column="source_type"/>
+        <result property="sourceBusinessId" column="source_business_id"/>
+        <result property="sourceEventVersion" column="source_event_version"/>
+        <result property="dedupeKey" column="dedupe_key"/>
+        <result property="beforeSnapshotJson" column="before_snapshot_json"/>
+        <result property="afterSnapshotJson" column="after_snapshot_json"/>
+        <result property="businessEffectiveDate" column="business_effective_date"/>
+        <result property="historicalSupplement" column="historical_supplement"/>
+        <result property="status" column="status"/>
+        <result property="automationLevel" column="automation_level"/>
+        <result property="riskLevel" column="risk_level"/>
+        <result property="planVersionId" column="plan_version_id"/>
+        <result property="packageId" column="package_id"/>
+        <result property="confirmedBy" column="confirmed_by"/>
+        <result property="confirmedTime" column="confirmed_time"/>
+        <result property="confirmedSnapshotHash" column="confirmed_snapshot_hash"/>
+        <result property="signDeadline" column="sign_deadline"/>
+        <result property="deadlinePolicySource" column="deadline_policy_source"/>
+        <result property="deadlineDaysSnapshot" column="deadline_days_snapshot"/>
+        <result property="terminalTime" column="terminal_time"/>
+        <result property="terminalReasonCode" column="terminal_reason_code"/>
+        <result property="terminalReasonDetail" column="terminal_reason_detail"/>
+        <result property="resolutionStatus" column="resolution_status"/>
+        <result property="resolvedBy" column="resolved_by"/>
+        <result property="resolvedTime" column="resolved_time"/>
+        <result property="resolutionReasonCode" column="resolution_reason_code"/>
+        <result property="resolutionReasonDetail" column="resolution_reason_detail"/>
+        <result property="reissueOfTaskId" column="reissue_of_task_id"/>
+        <result property="reissuedToTaskId" column="reissued_to_task_id"/>
+        <result property="failureCode" column="failure_code"/>
+        <result property="failureDetail" column="failure_detail"/>
+        <result property="retryCount" column="retry_count"/>
+        <result property="nextRetryTime" column="next_retry_time"/>
+        <result property="version" column="version"/>
+        <result property="createdTime" column="created_time"/>
+        <result property="sentTime" column="sent_time"/>
+        <result property="completedTime" column="completed_time"/>
+        <result property="cancelledTime" column="cancelled_time"/>
+    </resultMap>
+
+    <resultMap id="OaSignTaskMetricsResult" type="com.erp.oa.domain.vo.OaSignTaskMetrics">
+        <result property="needsData" column="needs_data"/>
+        <result property="confirm" column="waiting_hr_confirm"/>
+        <result property="failed" column="failed"/>
+        <result property="viewed" column="viewed"/>
+        <result property="dueSoon" column="due_soon"/>
+        <result property="refused" column="refused"/>
+        <result property="completedMonth" column="completed_month"/>
+    </resultMap>
+
+    <sql id="baseColumns">
+        task_id, task_no, scenario, employee_id, shop_dept_id, legal_entity_id,
+        assigned_hr_user_id, source_type, source_business_id, source_event_version,
+        dedupe_key, before_snapshot_json, after_snapshot_json, business_effective_date,
+        historical_supplement, status, automation_level, risk_level, plan_version_id, package_id,
+        confirmed_by, confirmed_time, confirmed_snapshot_hash, sign_deadline,
+        deadline_policy_source, deadline_days_snapshot, terminal_time,
+        terminal_reason_code, terminal_reason_detail, resolution_status,
+        resolved_by, resolved_time, resolution_reason_code, resolution_reason_detail,
+        reissue_of_task_id, reissued_to_task_id,
+        failure_code, failure_detail, retry_count, next_retry_time, version,
+        created_time, sent_time, completed_time, cancelled_time
+    </sql>
+
+    <insert id="insertOaSignTask" parameterType="com.erp.oa.domain.OaSignTask"
+            useGeneratedKeys="true" keyProperty="taskId">
+        insert into oa_sign_task (
+            task_no, scenario, employee_id, shop_dept_id, legal_entity_id,
+            assigned_hr_user_id, source_type, source_business_id, source_event_version,
+            dedupe_key, before_snapshot_json, after_snapshot_json, business_effective_date,
+            historical_supplement, status, automation_level, risk_level, plan_version_id, package_id,
+            confirmed_by, confirmed_time, confirmed_snapshot_hash, sign_deadline,
+            deadline_policy_source, deadline_days_snapshot, terminal_time,
+            terminal_reason_code, terminal_reason_detail, resolution_status,
+            resolved_by, resolved_time, resolution_reason_code, resolution_reason_detail,
+            reissue_of_task_id, reissued_to_task_id,
+            failure_code, failure_detail, retry_count, next_retry_time, version,
+            created_time, sent_time, completed_time, cancelled_time
+        ) values (
+            #{taskNo}, #{scenario}, #{employeeId}, #{shopDeptId}, #{legalEntityId},
+            #{assignedHrUserId}, #{sourceType}, #{sourceBusinessId}, #{sourceEventVersion},
+            #{dedupeKey}, #{beforeSnapshotJson}, #{afterSnapshotJson}, #{businessEffectiveDate},
+            #{historicalSupplement}, #{status}, #{automationLevel}, #{riskLevel}, #{planVersionId}, #{packageId},
+            #{confirmedBy}, #{confirmedTime}, #{confirmedSnapshotHash}, #{signDeadline},
+            #{deadlinePolicySource}, #{deadlineDaysSnapshot}, #{terminalTime},
+            #{terminalReasonCode}, #{terminalReasonDetail}, #{resolutionStatus},
+            #{resolvedBy}, #{resolvedTime}, #{resolutionReasonCode}, #{resolutionReasonDetail},
+            #{reissueOfTaskId}, #{reissuedToTaskId},
+            #{failureCode}, #{failureDetail}, #{retryCount}, #{nextRetryTime}, #{version},
+            sysdate(), #{sentTime}, #{completedTime}, #{cancelledTime}
+        )
+    </insert>
+
+    <select id="selectOaSignTaskById" resultMap="OaSignTaskResult">
+        select <include refid="baseColumns"/>
+        from oa_sign_task
+        where task_id = #{taskId}
+    </select>
+
+    <select id="selectOaSignTasksByIds" resultMap="OaSignTaskResult">
+        select <include refid="baseColumns"/>
+        from oa_sign_task
+        where task_id in
+        <foreach collection="taskIds" item="taskId" open="(" close=")" separator=",">
+            #{taskId}
+        </foreach>
+    </select>
+
+    <select id="selectOaSignTasksBySourceEvents" resultMap="OaSignTaskResult">
+        select <include refid="baseColumns"/>
+        from oa_sign_task
+        where
+        <foreach collection="sourceEvents" item="source" open="(" close=")" separator=" or ">
+            (upper(trim(scenario)) = upper(trim(#{source.scenario}))
+             and employee_id = #{source.employeeId}
+             and upper(trim(source_type)) = upper(trim(#{source.sourceType}))
+             and cast(trim(source_business_id) as binary)
+                    = cast(trim(#{source.sourceBusinessId}) as binary)
+             and cast(trim(source_event_version) as binary)
+                    = cast(trim(#{source.sourceEventVersion}) as binary))
+        </foreach>
+        order by case
+          when package_id is not null and plan_version_id is not null then 0
+          else 1
+        end asc, task_id asc
+    </select>
+
+    <select id="lockOaSignTaskById" resultMap="OaSignTaskResult">
+        select <include refid="baseColumns"/>
+        from oa_sign_task
+        where task_id = #{taskId}
+        for update
+    </select>
+
+    <select id="countLifecycleReferences" resultType="int">
+        select count(*)
+        from oa_sign_task
+        where task_id != #{taskId}
+          and (reissue_of_task_id = #{taskId} or reissued_to_task_id = #{taskId})
+    </select>
+
+    <select id="selectOaSignTaskByDedupeKey" resultMap="OaSignTaskResult">
+        select <include refid="baseColumns"/>
+        from oa_sign_task
+        where dedupe_key = #{dedupeKey}
+        limit 1
+    </select>
+
+    <select id="selectCanonicalTaskBySourceEvent"
+            parameterType="com.erp.oa.domain.OaSignTask" resultMap="OaSignTaskResult">
+        select <include refid="baseColumns"/>
+        from oa_sign_task
+        where scenario = #{scenario}
+          and employee_id = #{employeeId}
+          and source_type = #{sourceType}
+          and source_business_id = #{sourceBusinessId}
+          and source_event_version = #{sourceEventVersion}
+        order by case
+          when package_id is not null and plan_version_id is not null then 0
+          else 1
+        end asc, task_id asc
+        limit 1
+    </select>
+
+    <select id="selectExactTasksBySourceEvent"
+            parameterType="com.erp.oa.domain.OaSignTask" resultMap="OaSignTaskResult">
+        select <include refid="baseColumns"/>
+        from oa_sign_task
+        where cast(upper(scenario) as binary) = cast(upper(#{scenario}) as binary)
+          and employee_id = #{employeeId}
+          and cast(upper(source_type) as binary) = cast(upper(#{sourceType}) as binary)
+          and cast(source_business_id as binary) = cast(#{sourceBusinessId} as binary)
+          and cast(source_event_version as binary) = cast(#{sourceEventVersion} as binary)
+        order by case
+          when package_id is not null and plan_version_id is not null then 0
+          else 1
+        end asc, task_id asc
+        limit 2
+    </select>
+
+    <select id="selectOpenRenewalTaskForUpdate" resultMap="OaSignTaskResult">
+        select <include refid="baseColumns"/>
+        from oa_sign_task
+        where employee_id = #{employeeId}
+          and scenario = 'RENEWAL'
+          and status not in ('SIGNED', 'REFUSED', 'EXPIRED', 'CANCELLED', 'NO_ACTION')
+        order by task_id asc
+        limit 1
+        for update
+    </select>
+
+    <select id="selectOaSignTaskByTaskNo" resultMap="OaSignTaskResult">
+        select <include refid="baseColumns"/>
+        from oa_sign_task
+        where task_no = #{taskNo}
+        limit 1
+    </select>
+
+    <select id="selectOaSignTaskList" parameterType="com.erp.oa.domain.OaSignTask"
+            resultMap="OaSignTaskResult">
+        select <include refid="baseColumns"/>,
+               (select p.employee_name_snapshot
+                  from oa_sign_package p
+                 where p.package_id = oa_sign_task.package_id
+                 limit 1) as employee_name
+        from oa_sign_task
+        <where>
+            <if test="taskId != null">and task_id = #{taskId}</if>
+            <if test="taskNo != null and taskNo != ''">and task_no = #{taskNo}</if>
+            <if test="scenario != null and scenario != ''">
+                and (scenario = #{scenario}
+                     or (upper(#{scenario}) = 'RENEWAL' and upper(trim(scenario)) = 'RENEW'))
+            </if>
+            <if test="employeeId != null">and employee_id = #{employeeId}</if>
+            <if test="employeeName != null and employeeName != ''">
+                and exists (
+                    select 1 from oa_sign_package p
+                    where p.package_id = oa_sign_task.package_id
+                      and p.employee_name_snapshot like concat('%', #{employeeName}, '%')
+                )
+            </if>
+            <if test="assignedHrUserId != null">and assigned_hr_user_id = #{assignedHrUserId}</if>
+            <if test="status != null and status != ''">and status = #{status}</if>
+            <if test="dueSoon != null and dueSoon">
+                and status in ('PENDING_SIGN', 'VIEWED', 'PENDING_FINAL_CONFIRM')
+                and sign_deadline &gt;= sysdate()
+                and sign_deadline &lt;= date_add(sysdate(), interval 3 day)
+            </if>
+            <if test="completedMonth != null and completedMonth">
+                and status = 'SIGNED'
+                and completed_time &gt;= date_format(current_date, '%Y-%m-01')
+                and completed_time &lt; date_add(last_day(current_date), interval 1 day)
+            </if>
+            <if test="shopDeptId != null">and shop_dept_id = #{shopDeptId}</if>
+            <if test="params.scopeDeptIds != null and params.scopeDeptIds.size() > 0">
+                and shop_dept_id in
+                <foreach collection="params.scopeDeptIds" item="scopeDeptId" open="(" close=")" separator=",">
+                    #{scopeDeptId}
+                </foreach>
+            </if>
+        </where>
+        order by created_time desc, task_id desc
+    </select>
+
+    <select id="selectLatestOnboardTasksByEmployeeIds" resultMap="OaSignTaskResult">
+        select t.*
+        from oa_sign_task t
+             inner join (
+                 select employee_id, max(task_id) as task_id
+                 from oa_sign_task
+                 where upper(trim(scenario)) = 'ONBOARD'
+                   and employee_id in
+                   <foreach collection="employeeIds" item="employeeId" open="(" close=")" separator=",">
+                       #{employeeId}
+                   </foreach>
+                 group by employee_id
+             ) latest on latest.task_id = t.task_id
+        order by t.employee_id asc
+    </select>
+
+    <select id="selectOpenOnboardTaskByEmployeeId" resultMap="OaSignTaskResult">
+        select <include refid="baseColumns"/>
+        from oa_sign_task
+        where employee_id = #{employeeId}
+          and upper(trim(scenario)) = 'ONBOARD'
+          and status not in ('SIGNED', 'REFUSED', 'EXPIRED', 'CANCELLED', 'NO_ACTION')
+        order by task_id asc
+        limit 1
+    </select>
+
+    <select id="selectTaskMetrics" parameterType="com.erp.oa.domain.OaSignTask"
+            resultMap="OaSignTaskMetricsResult">
+        select
+            coalesce(sum(case when status = 'NEEDS_DATA' then 1 else 0 end), 0) as needs_data,
+            coalesce(sum(case when status = 'PENDING_COMPANY' then 1 else 0 end), 0) as waiting_hr_confirm,
+            coalesce(sum(case when status = 'FAILED' then 1 else 0 end), 0) as failed,
+            coalesce(sum(case when status = 'VIEWED' then 1 else 0 end), 0) as viewed,
+            coalesce(sum(case when status IN ('PENDING_SIGN', 'VIEWED', 'PENDING_FINAL_CONFIRM')
+                    and sign_deadline &gt;= sysdate()
+                    and sign_deadline &lt;= date_add(sysdate(), interval 3 day)
+                then 1 else 0 end), 0) as due_soon,
+            coalesce(sum(case when status = 'REFUSED' then 1 else 0 end), 0) as refused,
+            coalesce(sum(case when status = 'SIGNED'
+                    and completed_time &gt;= date_format(current_date, '%Y-%m-01')
+                    and completed_time &lt; date_add(last_day(current_date), interval 1 day)
+                then 1 else 0 end), 0) as completed_month
+        from oa_sign_task
+        <where>
+            <if test="assignedHrUserId != null">and assigned_hr_user_id = #{assignedHrUserId}</if>
+            <if test="shopDeptId != null">and shop_dept_id = #{shopDeptId}</if>
+            <if test="params.scopeDeptIds != null and params.scopeDeptIds.size() > 0">
+                and shop_dept_id in
+                <foreach collection="params.scopeDeptIds" item="scopeDeptId" open="(" close=")" separator=",">
+                    #{scopeDeptId}
+                </foreach>
+            </if>
+        </where>
+    </select>
+
+    <update id="updateStatusWithVersion">
+        update oa_sign_task
+        set status = #{toStatus},
+            version = version + 1,
+            failure_code = #{failureCode},
+            failure_detail = #{failureDetail},
+            next_retry_time = #{nextRetryTime}
+        where task_id = #{taskId}
+          and assigned_hr_user_id = #{assignedHrUserId}
+          and status = #{fromStatus}
+          and version = #{version}
+    </update>
+
+    <update id="updateStatusWithRetryIncrement">
+        update oa_sign_task
+        set status = #{toStatus},
+            version = version + 1,
+            retry_count = retry_count + 1,
+            failure_code = #{failureCode},
+            failure_detail = #{failureDetail},
+            next_retry_time = #{nextRetryTime}
+        where task_id = #{taskId}
+          and assigned_hr_user_id = #{assignedHrUserId}
+          and status = #{fromStatus}
+          and version = #{version}
+    </update>
+
+    <update id="updateConfirmation">
+        update oa_sign_task
+        set confirmed_by = #{confirmedBy},
+            confirmed_time = #{confirmedTime},
+            confirmed_snapshot_hash = #{confirmedSnapshotHash}
+        where task_id = #{taskId}
+          and assigned_hr_user_id = #{assignedHrUserId}
+          and status = #{expectedStatus}
+          and version = #{version}
+          and confirmed_by is null
+    </update>
+
+    <update id="clearConfirmation">
+        update oa_sign_task
+        set confirmed_by = null,
+            confirmed_time = null,
+            confirmed_snapshot_hash = null
+        where task_id = #{taskId}
+          and assigned_hr_user_id = #{assignedHrUserId}
+          and status = #{expectedStatus}
+          and version = #{version}
+    </update>
+
+    <update id="updatePackageLink">
+        update oa_sign_task
+        set package_id = #{packageId},
+            plan_version_id = #{planVersionId}
+        where task_id = #{taskId}
+          and (package_id is null or package_id = #{packageId})
+          and assigned_hr_user_id = #{assignedHrUserId}
+          and status in ('NEW', 'NEEDS_DATA', 'FAILED')
+          and confirmed_by is null
+          and confirmed_time is null
+          and confirmed_snapshot_hash is null
+          and exists (
+              select 1
+              from oa_sign_package p
+              where p.package_id = #{packageId}
+                and p.task_id = oa_sign_task.task_id
+                and ((p.plan_version_id is null and #{planVersionId} is null)
+                     or p.plan_version_id = #{planVersionId})
+          )
+    </update>
+
+    <update id="bindVersionedPackage">
+        update oa_sign_task
+        set package_id = #{packageId},
+            plan_version_id = #{planVersionId},
+            risk_level = #{riskLevel}
+        where task_id = #{taskId}
+          and package_id is null
+          and plan_version_id is null
+          and assigned_hr_user_id = #{assignedHrUserId}
+          and status = 'VALIDATING'
+          and version = #{version}
+          and exists (
+              select 1
+              from oa_sign_package p
+              where p.package_id = #{packageId}
+                and p.task_id = oa_sign_task.task_id
+                and p.plan_version_id = #{planVersionId}
+          )
+    </update>
+
+    <update id="bindNoActionDecision">
+        update oa_sign_task
+        set plan_version_id = #{planVersionId},
+            risk_level = #{riskLevel},
+            version = version + 1
+        where task_id = #{taskId}
+          and package_id is null
+          and plan_version_id is null
+          and assigned_hr_user_id = #{assignedHrUserId}
+          and status = 'VALIDATING'
+          and version = #{version}
+    </update>
+
+    <update id="updateRiskLevelForValidation">
+        update oa_sign_task
+        set risk_level = #{riskLevel}
+        where task_id = #{taskId}
+          and package_id is null
+          and plan_version_id is null
+          and assigned_hr_user_id = #{assignedHrUserId}
+          and status = 'VALIDATING'
+          and version = #{version}
+          and confirmed_by is null
+          and confirmed_time is null
+          and confirmed_snapshot_hash is null
+    </update>
+
+    <update id="updateSentTime">
+        update oa_sign_task
+        set sent_time = #{sentTime}
+        where task_id = #{taskId}
+    </update>
+
+    <update id="updateSentLifecycle">
+        update oa_sign_task
+        set sent_time = #{sentTime},
+            sign_deadline = #{signDeadline},
+            deadline_policy_source = #{deadlinePolicySource},
+            deadline_days_snapshot = #{deadlineDaysSnapshot}
+        where task_id = #{taskId}
+          and status = #{expectedStatus}
+          and version = #{version}
+          and assigned_hr_user_id = #{assignedHrUserId}
+          and sent_time is null
+          and sign_deadline is null
+    </update>
+
+    <update id="updateTerminalMetadata">
+        update oa_sign_task
+        set terminal_time = #{terminalTime},
+            terminal_reason_code = #{terminalReasonCode},
+            terminal_reason_detail = #{terminalReasonDetail},
+            resolution_status = #{resolutionStatus},
+            resolved_by = null,
+            resolved_time = null,
+            resolution_reason_code = null,
+            resolution_reason_detail = null
+        where task_id = #{taskId}
+          and status = #{expectedStatus}
+          and version = #{version}
+          and assigned_hr_user_id = #{assignedHrUserId}
+          and terminal_time is null
+    </update>
+
+    <update id="resumeEmployeeDeadlineAfterCompanyStage">
+        update oa_sign_task
+        set sign_deadline = #{signDeadline},
+            version = version + 1
+        where task_id = #{taskId}
+          and status = #{expectedStatus}
+          and #{expectedStatus} = 'PENDING_COMPANY'
+          and version = #{version}
+          and assigned_hr_user_id = #{assignedHrUserId}
+          and sign_deadline = #{currentDeadline}
+          and #{signDeadline} &gt; #{currentDeadline}
+          and deadline_policy_source is not null
+          and trim(deadline_policy_source) != ''
+          and deadline_days_snapshot &gt; 0
+    </update>
+
+    <update id="updateResolutionWithVersion">
+        update oa_sign_task
+        set resolution_status = #{targetResolutionStatus},
+            resolved_by = #{resolvedBy},
+            resolved_time = #{resolvedTime},
+            resolution_reason_code = #{reasonCode},
+            resolution_reason_detail = #{reasonDetail},
+            reissued_to_task_id = #{reissuedToTaskId},
+            version = version + 1
+        where task_id = #{taskId}
+          and assigned_hr_user_id = #{assignedHrUserId}
+          and status = #{currentStatus}
+          and version = #{expectedVersion}
+          and #{currentStatus} in ('REFUSED', 'EXPIRED')
+          and resolution_status = #{currentResolutionStatus}
+          and #{currentResolutionStatus} = 'OPEN'
+          and #{targetResolutionStatus} in ('CLOSED', 'REISSUED')
+          and terminal_time is not null
+          and #{resolvedBy} is not null
+          and #{resolvedTime} is not null
+          and #{reasonCode} is not null
+          and reissued_to_task_id is null
+          and (
+              (#{targetResolutionStatus} = 'CLOSED' and #{reissuedToTaskId} is null)
+              or (#{targetResolutionStatus} = 'REISSUED' and #{reissuedToTaskId} is not null)
+          )
+    </update>
+
+    <update id="extendDeadlineWithVersion">
+        update oa_sign_task
+        set sign_deadline = #{signDeadline},
+            resolved_by = #{resolvedBy},
+            resolved_time = #{resolvedTime},
+            resolution_reason_code = #{reasonCode},
+            resolution_reason_detail = #{reasonDetail},
+            version = version + 1
+        where task_id = #{taskId}
+          and assigned_hr_user_id = #{assignedHrUserId}
+          and status = #{currentStatus}
+          and version = #{expectedVersion}
+          and #{currentStatus} in ('PENDING_SIGN', 'VIEWED', 'PENDING_FINAL_CONFIRM')
+          and resolution_status &lt;=> #{currentResolutionStatus}
+          and #{currentResolutionStatus} is null
+          and sign_deadline &gt; sysdate()
+          and #{signDeadline} &gt; sign_deadline
+          and #{resolvedBy} is not null
+          and #{resolvedTime} is not null
+          and #{reasonCode} is not null
+    </update>
+
+    <update id="updateCompletedTime">
+        update oa_sign_task
+        set completed_time = #{completedTime}
+        where task_id = #{taskId}
+    </update>
+
+    <delete id="deleteReassignmentsByTaskId">
+        delete from oa_sign_task_hr_reassignment where task_id = #{taskId}
+    </delete>
+
+    <delete id="deleteOaSignTaskById">
+        delete from oa_sign_task where task_id = #{taskId}
+    </delete>
+
+    <delete id="deleteOaSignTaskByIdAndVersion">
+        delete from oa_sign_task
+        where task_id = #{taskId}
+          and version = #{expectedVersion}
+    </delete>
+</mapper>

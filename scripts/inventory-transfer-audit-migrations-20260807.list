@@ -1,0 +1,3 @@
+# Automatic migration list for inventory-transfer-audit-20260807.
+# Keep exactly one reviewed migration and preserve bootstrap dependency order.
+erp_inventory_transfer_audit_identity_20260807.sql

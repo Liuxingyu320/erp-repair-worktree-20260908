@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "defaultPolicy": "metadata-only",
+  "allowedFieldEndpoints": {},
+  "forbiddenAnnotationOptions": [
+    "isSaveRequestData=true",
+    "isSaveResponseData=true",
+    "excludeParamNames"
+  ],
+  "sensitiveControllerFiles": [
+    "erp-modules/erp-system/src/main/java/com/erp/system/controller/SysUserController.java",
+    "erp-modules/erp-system/src/main/java/com/erp/system/controller/SysProfileController.java",
+    "erp-modules/erp-system/src/main/java/com/erp/system/controller/SysConfigController.java",
+    "erp-modules/erp-system/src/main/java/com/erp/system/controller/SysSalaryConfigController.java",
+    "erp-modules/erp-system/src/main/java/com/erp/system/controller/SysNoticeController.java",
+    "erp-modules/erp-oa/src/main/java/com/erp/oa/controller/OaSignPackageController.java",
+    "erp-modules/erp-oa/src/main/java/com/erp/oa/controller/OaLaborContractController.java"
+  ]
+}

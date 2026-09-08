@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.inventory.mapper.InvReceiptBatchMapper">
+
+    <resultMap type="InvReceiptBatch" id="InvReceiptBatchResult">
+        <id property="batchId" column="batch_id"/>
+        <result property="batchNo" column="batch_no"/>
+        <result property="purchaseOrderId" column="purchase_order_id"/>
+        <result property="orderNo" column="order_no"/>
+        <result property="warehouseId" column="warehouse_id"/>
+        <result property="warehouseName" column="warehouse_name"/>
+        <result property="supplierBatchNo" column="supplier_batch_no"/>
+        <result property="deliveryNoteNo" column="delivery_note_no"/>
+        <result property="arrivedTime" column="arrived_time"/>
+        <result property="status" column="status"/>
+        <result property="receivedUserId" column="received_user_id"/>
+        <result property="receivedBy" column="received_by"/>
+        <result property="totalQuantity" column="total_quantity"/>
+        <result property="pendingQuantity" column="pending_quantity"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateBy" column="update_by"/>
+        <result property="updateTime" column="update_time"/>
+        <result property="remark" column="remark"/>
+    </resultMap>
+
+    <sql id="selectReceiptBatchVo">
+        select b.batch_id, b.batch_no, b.purchase_order_id, b.order_no,
+               b.warehouse_id, d.dept_name as warehouse_name,
+               b.supplier_batch_no, b.delivery_note_no, b.arrived_time, b.status,
+               b.received_user_id, b.received_by, b.total_quantity, b.pending_quantity,
+               b.create_by, b.create_time, b.update_by, b.update_time, b.remark
+        from inv_receipt_batch b
+        left join sys_dept d on d.dept_id = b.warehouse_id
+    </sql>
+
+    <select id="selectByIdForUpdate" resultMap="InvReceiptBatchResult">
+        select batch_id, batch_no, purchase_order_id, order_no, warehouse_id,
+               supplier_batch_no, delivery_note_no, arrived_time, status,
+               received_user_id, received_by, total_quantity, pending_quantity,
+               create_by, create_time, update_by, update_time, remark
+        from inv_receipt_batch
+        where batch_id = #{batchId}
+        for update
+    </select>
+
+    <select id="selectPendingByOrderId" resultMap="InvReceiptBatchResult">
+        <include refid="selectReceiptBatchVo"/>
+        where b.purchase_order_id = #{orderId}
+          and b.status in ('pending', 'partial')
+          and b.pending_quantity &gt; 0
+        order by b.arrived_time asc, b.batch_id asc
+    </select>
+
+    <select id="selectByOrderId" resultMap="InvReceiptBatchResult">
+        <include refid="selectReceiptBatchVo"/>
+        where b.purchase_order_id = #{orderId}
+        order by b.arrived_time asc, b.batch_id asc
+    </select>
+
+    <select id="countPendingByOrderId" resultType="int">
+        select count(1)
+        from inv_receipt_batch
+        where purchase_order_id = #{orderId}
+          and status in ('pending', 'partial')
+          and pending_quantity &gt; 0
+    </select>
+
+    <insert id="insertInvReceiptBatch" parameterType="InvReceiptBatch" useGeneratedKeys="true" keyProperty="batchId">
+        insert into inv_receipt_batch (
+            batch_no, purchase_order_id, order_no, warehouse_id,
+            supplier_batch_no, delivery_note_no, arrived_time, status,
+            received_user_id, received_by, total_quantity, pending_quantity,
+            create_by, create_time, remark
+        ) values (
+            #{batchNo}, #{purchaseOrderId}, #{orderNo}, #{warehouseId},
+            #{supplierBatchNo}, #{deliveryNoteNo}, #{arrivedTime}, #{status},
+            #{receivedUserId}, #{receivedBy}, #{totalQuantity}, #{pendingQuantity},
+            #{createBy}, sysdate(), #{remark}
+        )
+    </insert>
+
+    <update id="updateProgress">
+        update inv_receipt_batch
+        set pending_quantity = #{pendingQuantity},
+            status = #{status},
+            update_by = #{updateBy},
+            update_time = sysdate()
+        where batch_id = #{batchId}
+    </update>
+</mapper>

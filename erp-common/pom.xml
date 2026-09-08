@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://maven.apache.org/POM/4.0.0"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <parent>
+        <groupId>com.erp</groupId>
+        <artifactId>erp</artifactId>
+        <version>3.6.8</version>
+    </parent>
+    <modelVersion>4.0.0</modelVersion>
+
+    <modules>
+        <module>erp-common-log</module>
+        <module>erp-common-core</module>
+        <module>erp-common-redis</module>
+        <module>erp-common-seata</module>
+        <module>erp-common-swagger</module>
+        <module>erp-common-security</module>
+        <module>erp-common-sensitive</module>
+        <module>erp-common-datascope</module>
+        <module>erp-common-datasource</module>
+    </modules>
+
+    <artifactId>erp-common</artifactId>
+    <packaging>pom</packaging>
+
+    <description>
+        erp-common通用模块
+    </description>
+
+</project>

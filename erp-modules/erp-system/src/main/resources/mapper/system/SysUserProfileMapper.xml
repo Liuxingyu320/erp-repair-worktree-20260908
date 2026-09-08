@@ -1,0 +1,594 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.system.mapper.SysUserProfileMapper">
+
+    <resultMap type="com.erp.system.api.domain.SysUserProfile" id="SysUserProfileResult">
+        <id     property="profileId"                  column="profile_id"                  />
+        <result property="userId"                     column="user_id"                     />
+        <result property="employeeNo"                 column="employee_no"                 />
+        <result property="positionNo"                 column="position_no"                 />
+        <result property="companyName"                column="company_name"                />
+        <result property="deptLevel1Name"             column="dept_level1_name"            />
+        <result property="deptLevel2Name"             column="dept_level2_name"            />
+        <result property="deptLevel3Name"             column="dept_level3_name"            />
+        <result property="storeName"                  column="store_name"                  />
+        <result property="positionNames"              column="position_names"              />
+        <result property="jobGrade"                   column="job_grade"                   />
+        <result property="departmentSupervisor"       column="department_supervisor"       />
+        <result property="directSupervisor"           column="direct_supervisor"           />
+        <result property="directSupervisorUserId"     column="direct_supervisor_user_id"   />
+        <result property="employeeStatus"             column="employee_status"             />
+        <result property="employeeCategory"           column="employee_category"           />
+        <result property="birthDate"                  column="birth_date"                  />
+        <result property="idType"                     column="id_type"                     />
+        <result property="idNumber"                   column="id_number"                   />
+        <result property="bloodType"                  column="blood_type"                  />
+        <result property="registeredResidence"        column="registered_residence"        />
+        <result property="currentAddress"             column="current_address"             />
+        <result property="studentStatus"              column="student_status"              />
+        <result property="schoolName"                 column="school_name"                 />
+        <result property="retirementStatus"           column="retirement_status"           />
+        <result property="incomeStartYearMonth"       column="income_start_year_month"     />
+        <result property="firstEducation"             column="first_education"             />
+        <result property="firstDegree"                column="first_degree"                />
+        <result property="firstGraduationDate"        column="first_graduation_date"       />
+        <result property="firstGraduationSchool"      column="first_graduation_school"     />
+        <result property="firstMajor"                 column="first_major"                 />
+        <result property="highestEducation"           column="highest_education"           />
+        <result property="highestDegree"              column="highest_degree"              />
+        <result property="highestGraduationDate"      column="highest_graduation_date"     />
+        <result property="highestGraduationSchool"    column="highest_graduation_school"   />
+        <result property="highestMajor"               column="highest_major"               />
+        <result property="politicalStatus"            column="political_status"            />
+        <result property="maritalStatus"              column="marital_status"              />
+        <result property="nationality"                column="nationality"                 />
+        <result property="foreignNationalFlag"        column="foreign_national_flag"       />
+        <result property="ethnicity"                  column="ethnicity"                   />
+        <result property="healthStatus"               column="health_status"               />
+        <result property="emergencyContact"           column="emergency_contact"           />
+        <result property="emergencyContactRelation"   column="emergency_contact_relation"  />
+        <result property="emergencyContactPhone"      column="emergency_contact_phone"     />
+        <result property="recruitmentChannel"         column="recruitment_channel"         />
+        <result property="officePhone"                column="office_phone"                />
+        <result property="workStartDate"              column="work_start_date"             />
+        <result property="workYears"                  column="work_years"                  />
+        <result property="entryDate"                  column="entry_date"                  />
+        <result property="probationPeriod"            column="probation_period"            />
+        <result property="probationStartDate"         column="probation_start_date"        />
+        <result property="probationEndDate"           column="probation_end_date"          />
+        <result property="plannedRegularizationDate"  column="planned_regularization_date" />
+        <result property="actualRegularizationDate"   column="actual_regularization_date"  />
+        <result property="companyYears"               column="company_years"               />
+        <result property="currentPositionStartDate"   column="current_position_start_date" />
+        <result property="contractStartDate"          column="contract_start_date"         />
+        <result property="contractEndDate"            column="contract_end_date"           />
+        <result property="contractType"               column="contract_type"               />
+        <result property="contractTerm"               column="contract_term"               />
+        <result property="renewalCount"               column="renewal_count"               />
+        <result property="workLocation"               column="work_location"               />
+        <result property="workCityLevel"              column="work_city_level"             />
+        <result property="attendanceMethod"           column="attendance_method"           />
+        <result property="householdType"              column="household_type"              />
+        <result property="socialType"                 column="social_type"                 />
+        <result property="socialSecurityLocation"     column="social_security_location"    />
+        <result property="housingFundLocation"        column="housing_fund_location"       />
+        <result property="leaveDate"                  column="leave_date"                  />
+        <result property="bankName"                   column="bank_name"                   />
+        <result property="bankAccount"                column="bank_account"                />
+        <result property="legalEntity"                column="legal_entity"                />
+        <result property="legalEntityId"              column="legal_entity_id"             />
+        <result property="legalEntityCode"            column="legal_entity_code"           />
+        <result property="baseSalary"                 column="base_salary"                 />
+        <result property="postSalary"                 column="post_salary"                 />
+        <result property="fieldAllowance"             column="field_allowance"             />
+        <result property="performanceSalary"          column="performance_salary"          />
+        <result property="salaryTotal"                column="salary_total"                />
+        <result property="salaryVersion"              column="salary_version"              />
+        <result property="createBy"                   column="create_by"                   />
+        <result property="createTime"                 column="create_time"                 />
+        <result property="updateBy"                   column="update_by"                   />
+        <result property="updateTime"                 column="update_time"                 />
+    </resultMap>
+
+    <sql id="selectUserProfileVo">
+        select profile_id, user_id, employee_no, position_no, company_name, dept_level1_name, dept_level2_name,
+               dept_level3_name, store_name, position_names, job_grade, department_supervisor,
+               direct_supervisor, direct_supervisor_user_id, employee_status, employee_category, birth_date, id_type, id_number,
+               blood_type, registered_residence, current_address, student_status, school_name,
+               retirement_status, income_start_year_month, first_education, first_degree,
+               first_graduation_date, first_graduation_school, first_major, highest_education,
+               highest_degree, highest_graduation_date, highest_graduation_school, highest_major,
+               political_status, marital_status, nationality, foreign_national_flag, ethnicity,
+               health_status, emergency_contact, emergency_contact_relation, emergency_contact_phone,
+               recruitment_channel, office_phone, work_start_date, work_years, entry_date,
+               probation_period, probation_start_date, probation_end_date,
+               planned_regularization_date, actual_regularization_date, company_years,
+               current_position_start_date, contract_start_date, contract_end_date, contract_type, contract_term,
+               renewal_count, work_location, work_city_level, attendance_method, household_type,
+               social_type, social_security_location, housing_fund_location, leave_date, bank_name, bank_account,
+               legal_entity, legal_entity_id, legal_entity_code, base_salary, post_salary,
+               field_allowance, performance_salary, salary_total, salary_version,
+               create_by, create_time, update_by, update_time
+        from sys_user_profile
+    </sql>
+
+    <select id="selectUserProfileByUserId" parameterType="Long" resultMap="SysUserProfileResult">
+        <include refid="selectUserProfileVo"/>
+        where user_id = #{userId}
+    </select>
+
+    <select id="selectUserProfileByEmployeeNo" parameterType="String" resultMap="SysUserProfileResult">
+        <include refid="selectUserProfileVo"/>
+        where employee_no = #{employeeNo}
+        limit 1
+    </select>
+
+    <select id="selectEmployeeNoSequenceForUpdate" resultType="Long">
+        select current_value
+        from hr_employee_no_sequence
+        where sequence_key = #{sequenceKey}
+        for update
+    </select>
+
+    <update id="advanceEmployeeNoSequence">
+        update hr_employee_no_sequence
+        set current_value = #{nextValue},
+            update_time = sysdate()
+        where sequence_key = #{sequenceKey}
+          and current_value = #{expectedValue}
+    </update>
+
+    <select id="selectActivePostCodeById" resultType="String">
+        select post_code
+        from sys_post
+        where post_id = #{postId}
+          and status = '0'
+        limit 1
+    </select>
+
+    <insert id="insertUserProfile" parameterType="com.erp.system.api.domain.SysUserProfile" useGeneratedKeys="true" keyProperty="profileId">
+        insert into sys_user_profile (
+            user_id, employee_no, position_no, job_grade, direct_supervisor, direct_supervisor_user_id,
+            employee_status, employee_category, birth_date, id_type, id_number, blood_type,
+            registered_residence, current_address, first_education, first_degree, first_graduation_date,
+            first_graduation_school, first_major, highest_education, highest_degree, highest_graduation_date,
+            highest_graduation_school, highest_major, political_status, marital_status, nationality,
+            foreign_national_flag, ethnicity, health_status, emergency_contact, emergency_contact_relation,
+            emergency_contact_phone, recruitment_channel, office_phone, work_start_date,
+            entry_date, probation_period, probation_start_date, probation_end_date,
+            planned_regularization_date, actual_regularization_date,
+            current_position_start_date, contract_start_date, contract_end_date,
+            contract_type, renewal_count, work_location, work_city_level, attendance_method, household_type,
+            social_type, social_security_location, housing_fund_location, leave_date, bank_name, bank_account,
+            legal_entity, legal_entity_id, legal_entity_code, base_salary, post_salary,
+            field_allowance, performance_salary, salary_total, salary_version,
+            create_by, create_time, update_by, update_time
+        ) values (
+            #{userId}, #{employeeNo}, #{positionNo}, #{jobGrade}, #{directSupervisor}, #{directSupervisorUserId},
+            #{employeeStatus}, #{employeeCategory}, #{birthDate}, #{idType}, #{idNumber}, #{bloodType},
+            #{registeredResidence}, #{currentAddress}, #{firstEducation}, #{firstDegree}, #{firstGraduationDate},
+            #{firstGraduationSchool}, #{firstMajor}, #{highestEducation}, #{highestDegree}, #{highestGraduationDate},
+            #{highestGraduationSchool}, #{highestMajor}, #{politicalStatus}, #{maritalStatus}, #{nationality},
+            #{foreignNationalFlag}, #{ethnicity}, #{healthStatus}, #{emergencyContact}, #{emergencyContactRelation},
+            #{emergencyContactPhone}, #{recruitmentChannel}, #{officePhone}, #{workStartDate},
+            #{entryDate}, #{probationPeriod}, #{probationStartDate}, #{probationEndDate},
+            #{plannedRegularizationDate}, #{actualRegularizationDate},
+            #{currentPositionStartDate}, #{contractStartDate}, #{contractEndDate},
+            #{contractType}, #{renewalCount}, #{workLocation}, #{workCityLevel}, #{attendanceMethod}, #{householdType},
+            #{socialType}, #{socialSecurityLocation}, #{housingFundLocation}, #{leaveDate}, #{bankName}, #{bankAccount},
+            #{legalEntity}, #{legalEntityId}, #{legalEntityCode}, #{baseSalary}, #{postSalary},
+            #{fieldAllowance}, #{performanceSalary}, #{salaryTotal}, #{salaryVersion},
+            #{createBy}, sysdate(), #{updateBy}, sysdate()
+        )
+    </insert>
+
+    <insert id="insertUserProfileIfAbsent">
+        insert into sys_user_profile (user_id, create_by, create_time, update_by, update_time)
+        values (#{userId}, #{operator}, sysdate(), #{operator}, sysdate())
+        on duplicate key update user_id = values(user_id)
+    </insert>
+
+    <update id="updateReviewedSigningFacts">
+        update sys_user_profile
+        <set>
+            <if test="request.currentAddress != null">
+                current_address = #{request.currentAddress},
+            </if>
+            <if test="request.studentStatus != null">
+                student_status = #{request.studentStatus},
+                <if test="request.studentStatus == 'NON_STUDENT'">
+                    school_name = null,
+                </if>
+                <if test="request.studentStatus == 'STUDENT'">
+                    income_start_year_month = null,
+                </if>
+            </if>
+            <if test="request.schoolName != null">
+                school_name = #{request.schoolName},
+            </if>
+            <if test="request.retirementStatus != null">
+                retirement_status = #{request.retirementStatus},
+            </if>
+            <if test="request.incomeStartYearMonth != null">
+                income_start_year_month = #{request.incomeStartYearMonth},
+            </if>
+            update_by = #{operator},
+            update_time = sysdate()
+        </set>
+        where user_id = #{request.employeeId}
+    </update>
+
+    <update id="updateUserProfile" parameterType="com.erp.system.api.domain.SysUserProfile">
+        update sys_user_profile
+        set employee_no = #{employeeNo},
+            job_grade = #{jobGrade},
+            direct_supervisor = #{directSupervisor},
+            direct_supervisor_user_id = #{directSupervisorUserId},
+            employee_status = #{employeeStatus},
+            employee_category = #{employeeCategory},
+            birth_date = #{birthDate},
+            id_type = #{idType},
+            id_number = #{idNumber},
+            blood_type = #{bloodType},
+            registered_residence = #{registeredResidence},
+            current_address = #{currentAddress},
+            first_education = #{firstEducation},
+            first_degree = #{firstDegree},
+            first_graduation_date = #{firstGraduationDate},
+            first_graduation_school = #{firstGraduationSchool},
+            first_major = #{firstMajor},
+            highest_education = #{highestEducation},
+            highest_degree = #{highestDegree},
+            highest_graduation_date = #{highestGraduationDate},
+            highest_graduation_school = #{highestGraduationSchool},
+            highest_major = #{highestMajor},
+            political_status = #{politicalStatus},
+            marital_status = #{maritalStatus},
+            nationality = #{nationality},
+            foreign_national_flag = #{foreignNationalFlag},
+            ethnicity = #{ethnicity},
+            health_status = #{healthStatus},
+            emergency_contact = #{emergencyContact},
+            emergency_contact_relation = #{emergencyContactRelation},
+            emergency_contact_phone = #{emergencyContactPhone},
+            recruitment_channel = #{recruitmentChannel},
+            office_phone = #{officePhone},
+            work_start_date = #{workStartDate},
+            entry_date = #{entryDate},
+            probation_period = #{probationPeriod},
+            probation_start_date = #{probationStartDate},
+            probation_end_date = #{probationEndDate},
+            planned_regularization_date = #{plannedRegularizationDate},
+            actual_regularization_date = #{actualRegularizationDate},
+            current_position_start_date = #{currentPositionStartDate},
+            contract_start_date = #{contractStartDate},
+            contract_end_date = #{contractEndDate},
+            contract_type = #{contractType},
+            renewal_count = #{renewalCount},
+            work_location = #{workLocation},
+            work_city_level = #{workCityLevel},
+            attendance_method = #{attendanceMethod},
+            household_type = #{householdType},
+            social_type = #{socialType},
+            social_security_location = #{socialSecurityLocation},
+            housing_fund_location = #{housingFundLocation},
+            leave_date = #{leaveDate},
+            bank_name = #{bankName},
+            bank_account = #{bankAccount},
+            legal_entity = #{legalEntity},
+            legal_entity_id = #{legalEntityId},
+            legal_entity_code = #{legalEntityCode},
+            base_salary = #{baseSalary},
+            post_salary = #{postSalary},
+            field_allowance = #{fieldAllowance},
+            performance_salary = #{performanceSalary},
+            salary_total = #{salaryTotal},
+            salary_version = #{salaryVersion},
+            update_by = #{updateBy},
+            update_time = sysdate()
+        where user_id = #{userId}
+    </update>
+
+    <update id="patchUserProfile">
+        update sys_user_profile
+        <set>
+            <if test="values.containsKey('jobGrade')">job_grade = #{values.jobGrade},</if>
+            <if test="values.containsKey('directSupervisorUserId')">direct_supervisor_user_id = #{values.directSupervisorUserId},</if>
+            <if test="values.containsKey('employeeStatus')">employee_status = #{values.employeeStatus},</if>
+            <if test="values.containsKey('employeeCategory')">employee_category = #{values.employeeCategory},</if>
+            <if test="values.containsKey('birthDate')">birth_date = #{values.birthDate},</if>
+            <if test="values.containsKey('idType')">id_type = #{values.idType},</if>
+            <if test="values.containsKey('idNumber')">id_number = #{values.idNumber},</if>
+            <if test="values.containsKey('bloodType')">blood_type = #{values.bloodType},</if>
+            <if test="values.containsKey('registeredResidence')">registered_residence = #{values.registeredResidence},</if>
+            <if test="values.containsKey('currentAddress')">current_address = #{values.currentAddress},</if>
+            <if test="values.containsKey('firstEducation')">first_education = #{values.firstEducation},</if>
+            <if test="values.containsKey('firstDegree')">first_degree = #{values.firstDegree},</if>
+            <if test="values.containsKey('firstGraduationDate')">first_graduation_date = #{values.firstGraduationDate},</if>
+            <if test="values.containsKey('firstGraduationSchool')">first_graduation_school = #{values.firstGraduationSchool},</if>
+            <if test="values.containsKey('firstMajor')">first_major = #{values.firstMajor},</if>
+            <if test="values.containsKey('highestEducation')">highest_education = #{values.highestEducation},</if>
+            <if test="values.containsKey('highestDegree')">highest_degree = #{values.highestDegree},</if>
+            <if test="values.containsKey('highestGraduationDate')">highest_graduation_date = #{values.highestGraduationDate},</if>
+            <if test="values.containsKey('highestGraduationSchool')">highest_graduation_school = #{values.highestGraduationSchool},</if>
+            <if test="values.containsKey('highestMajor')">highest_major = #{values.highestMajor},</if>
+            <if test="values.containsKey('politicalStatus')">political_status = #{values.politicalStatus},</if>
+            <if test="values.containsKey('maritalStatus')">marital_status = #{values.maritalStatus},</if>
+            <if test="values.containsKey('nationality')">nationality = #{values.nationality},</if>
+            <if test="values.containsKey('foreignNationalFlag')">foreign_national_flag = #{values.foreignNationalFlag},</if>
+            <if test="values.containsKey('ethnicity')">ethnicity = #{values.ethnicity},</if>
+            <if test="values.containsKey('healthStatus')">health_status = #{values.healthStatus},</if>
+            <if test="values.containsKey('emergencyContact')">emergency_contact = #{values.emergencyContact},</if>
+            <if test="values.containsKey('emergencyContactRelation')">emergency_contact_relation = #{values.emergencyContactRelation},</if>
+            <if test="values.containsKey('emergencyContactPhone')">emergency_contact_phone = #{values.emergencyContactPhone},</if>
+            <if test="values.containsKey('recruitmentChannel')">recruitment_channel = #{values.recruitmentChannel},</if>
+            <if test="values.containsKey('officePhone')">office_phone = #{values.officePhone},</if>
+            <if test="values.containsKey('workStartDate')">work_start_date = #{values.workStartDate},</if>
+            <if test="values.containsKey('entryDate')">entry_date = #{values.entryDate},</if>
+            <if test="values.containsKey('probationPeriod')">probation_period = #{values.probationPeriod},</if>
+            <if test="values.containsKey('plannedRegularizationDate')">planned_regularization_date = #{values.plannedRegularizationDate},</if>
+            <if test="values.containsKey('actualRegularizationDate')">actual_regularization_date = #{values.actualRegularizationDate},</if>
+            <if test="values.containsKey('currentPositionStartDate')">current_position_start_date = #{values.currentPositionStartDate},</if>
+            <if test="values.containsKey('contractStartDate')">contract_start_date = #{values.contractStartDate},</if>
+            <if test="values.containsKey('contractEndDate')">contract_end_date = #{values.contractEndDate},</if>
+            <if test="values.containsKey('contractType')">contract_type = #{values.contractType},</if>
+            <if test="values.containsKey('renewalCount')">renewal_count = #{values.renewalCount},</if>
+            <if test="values.containsKey('workLocation')">work_location = #{values.workLocation},</if>
+            <if test="values.containsKey('workCityLevel')">work_city_level = #{values.workCityLevel},</if>
+            <if test="values.containsKey('attendanceMethod')">attendance_method = #{values.attendanceMethod},</if>
+            <if test="values.containsKey('householdType')">household_type = #{values.householdType},</if>
+            <if test="values.containsKey('socialType')">social_type = #{values.socialType},</if>
+            <if test="values.containsKey('socialSecurityLocation')">social_security_location = #{values.socialSecurityLocation},</if>
+            <if test="values.containsKey('housingFundLocation')">housing_fund_location = #{values.housingFundLocation},</if>
+            <if test="values.containsKey('leaveDate')">leave_date = #{values.leaveDate},</if>
+            <if test="values.containsKey('bankName')">bank_name = #{values.bankName},</if>
+            <if test="values.containsKey('bankAccount')">bank_account = #{values.bankAccount},</if>
+            <if test="values.containsKey('legalEntity')">legal_entity = #{values.legalEntity},</if>
+            update_by = #{operator}, update_time = sysdate()
+        </set>
+        where user_id = #{userId}
+    </update>
+
+    <update id="updateOnboardingProfile" parameterType="com.erp.system.api.domain.SysUserProfile">
+        update sys_user_profile
+        set employee_no = #{employeeNo},
+            position_no = #{positionNo},
+            job_grade = #{jobGrade},
+            direct_supervisor_user_id = #{directSupervisorUserId},
+            employee_status = #{employeeStatus},
+            employee_category = #{employeeCategory},
+            birth_date = #{birthDate},
+            id_type = #{idType},
+            id_number = #{idNumber},
+            registered_residence = #{registeredResidence},
+            current_address = #{currentAddress},
+            marital_status = #{maritalStatus},
+            ethnicity = #{ethnicity},
+            emergency_contact = #{emergencyContact},
+            emergency_contact_relation = #{emergencyContactRelation},
+            emergency_contact_phone = #{emergencyContactPhone},
+            entry_date = #{entryDate},
+            probation_period = #{probationPeriod},
+            planned_regularization_date = #{plannedRegularizationDate},
+            current_position_start_date = #{currentPositionStartDate},
+            contract_start_date = #{contractStartDate},
+            contract_type = #{contractType},
+            work_location = #{workLocation},
+            work_city_level = #{workCityLevel},
+            social_type = #{socialType},
+            bank_name = #{bankName},
+            bank_account = #{bankAccount},
+            legal_entity = #{legalEntity},
+            update_by = #{updateBy},
+            update_time = sysdate()
+        where user_id = #{userId}
+    </update>
+
+    <update id="updateProfileCompletionFields" parameterType="com.erp.system.api.domain.SysUserProfile">
+        update sys_user_profile
+        set birth_date = #{birthDate},
+            id_type = #{idType},
+            id_number = #{idNumber},
+            registered_residence = #{registeredResidence},
+            current_address = #{currentAddress},
+            marital_status = #{maritalStatus},
+            ethnicity = #{ethnicity},
+            update_by = #{updateBy},
+            update_time = sysdate()
+        where user_id = #{userId}
+    </update>
+
+    <select id="lockSigningProfileByUserId" resultType="Long">
+        select profile_id
+        from sys_user_profile
+        where user_id = #{userId}
+        for update
+    </select>
+
+    <select id="selectSigningSnapshotByUserIdForUpdate"
+            resultType="com.erp.oa.api.domain.HrEmployeeSigningSnapshot">
+        select u.user_id as employeeId,
+               p.employee_no as employeeNo,
+               p.position_no as positionNo,
+               u.nick_name as employeeName,
+               u.phonenumber as phone,
+               p.id_type as idType,
+               p.id_number as idNumber,
+               p.current_address as currentAddress,
+               p.employee_status as employeeStatus,
+               p.employee_category as employeeCategory,
+               u.status as accountStatus,
+               u.dept_id as shopDeptId,
+               d.dept_name as shopDeptName,
+               u.dept_id as deptId,
+               d.dept_name as deptName,
+               p.legal_entity_id as legalEntityId,
+               p.legal_entity_code as legalEntityCode,
+               p.legal_entity as legalEntityName,
+               sp.post_id as postId,
+               sp.post_code as postCode,
+               sp.post_name as postName,
+               p.job_grade as jobGradeCode,
+               p.job_grade as jobGradeName,
+               p.direct_supervisor_user_id as directSupervisorId,
+               p.direct_supervisor as directSupervisorName,
+               p.department_supervisor as departmentSupervisorName,
+               p.work_location as workLocation,
+               p.work_city_level as workCityLevel,
+               p.contract_type as contractTypeCode,
+               p.contract_term as contractTermCode,
+               p.social_type as socialTypeCode,
+               coalesce(p.renewal_count, 0) as renewalCount,
+               p.entry_date as entryDate,
+               p.contract_start_date as contractStartDate,
+               p.contract_end_date as contractEndDate,
+               p.probation_start_date as probationStartDate,
+               p.probation_end_date as probationEndDate,
+               p.actual_regularization_date as actualRegularizationDate,
+               p.leave_date as leaveDate,
+               p.base_salary as baseSalary,
+               p.post_salary as postSalary,
+               p.field_allowance as fieldAllowance,
+               p.performance_salary as performanceSalary,
+               p.salary_total as salaryTotal,
+               p.salary_version as salaryVersion
+        from sys_user u
+             inner join sys_user_profile p on p.user_id = u.user_id
+             left join sys_dept d on d.dept_id = u.dept_id
+             left join sys_user_post sup on sup.user_id = u.user_id
+                 and sup.post_id = (
+                     select sup2.post_id
+                     from sys_user_post sup2
+                          inner join sys_post sp2 on sp2.post_id = sup2.post_id
+                     where sup2.user_id = u.user_id
+                       and sp2.status = '0'
+                     order by sp2.post_sort asc, sp2.post_id asc
+                     limit 1
+                 )
+             left join sys_post sp on sp.post_id = sup.post_id
+        where u.user_id = #{userId}
+          and u.del_flag = '0'
+        for update
+    </select>
+
+    <update id="updateLifecycleOnboardingProfile">
+        update sys_user_profile
+        set employee_status = #{snapshot.employeeStatus},
+            job_grade = #{snapshot.jobGradeCode},
+            entry_date = #{snapshot.entryDate},
+            current_position_start_date = #{snapshot.entryDate},
+            contract_start_date = #{snapshot.contractStartDate},
+            contract_end_date = #{snapshot.contractEndDate},
+            contract_type = #{snapshot.contractTypeCode},
+            contract_term = #{snapshot.contractTermCode},
+            social_type = #{snapshot.socialTypeCode},
+            probation_start_date = #{snapshot.probationStartDate},
+            probation_end_date = #{snapshot.probationEndDate},
+            planned_regularization_date = #{snapshot.probationEndDate},
+            legal_entity_id = #{snapshot.legalEntityId},
+            legal_entity_code = #{snapshot.legalEntityCode},
+            legal_entity = #{snapshot.legalEntityName},
+            base_salary = #{snapshot.baseSalary},
+            post_salary = #{snapshot.postSalary},
+            field_allowance = #{snapshot.fieldAllowance},
+            performance_salary = #{snapshot.performanceSalary},
+            salary_total = #{snapshot.salaryTotal},
+            salary_version = #{snapshot.salaryVersion},
+            update_by = #{operatorName},
+            update_time = sysdate()
+        where user_id = #{snapshot.employeeId}
+          and employee_status = '待入职'
+    </update>
+
+    <select id="selectRenewalCandidateUserIds" resultType="Long">
+        select p.user_id
+        from sys_user_profile p
+             inner join sys_user u on u.user_id = p.user_id
+        where p.contract_end_date &gt;= #{windowStart}
+          and p.contract_end_date &lt;= #{windowEnd}
+          and p.employee_status &lt;&gt; '离职'
+          and p.user_id &gt; #{afterUserId}
+          and u.del_flag = '0'
+        order by p.user_id asc
+        limit #{limit}
+    </select>
+
+    <update id="updateRenewalProfile">
+        update sys_user_profile
+        set contract_start_date = #{snapshot.contractStartDate},
+            contract_end_date = #{snapshot.contractEndDate},
+            contract_type = #{snapshot.contractTypeCode},
+            contract_term = #{snapshot.contractTermCode},
+            legal_entity_id = #{snapshot.legalEntityId},
+            legal_entity_code = #{snapshot.legalEntityCode},
+            legal_entity = #{snapshot.legalEntityName},
+            renewal_count = #{snapshot.renewalCount},
+            update_by = #{operatorName},
+            update_time = sysdate()
+        where user_id = #{snapshot.employeeId}
+          and contract_end_date = #{oldContractEndDate}
+          and coalesce(renewal_count, 0) = #{oldRenewalCount}
+          and employee_status &lt;&gt; '离职'
+    </update>
+
+    <update id="updateRegularizationProfile">
+        update sys_user_profile
+        set employee_status = '正式',
+            actual_regularization_date = #{snapshot.actualRegularizationDate},
+            position_no = #{snapshot.positionNo},
+            position_names = #{snapshot.postName},
+            job_grade = #{snapshot.jobGradeCode},
+            base_salary = #{snapshot.baseSalary},
+            post_salary = #{snapshot.postSalary},
+            field_allowance = #{snapshot.fieldAllowance},
+            performance_salary = #{snapshot.performanceSalary},
+            salary_total = #{snapshot.salaryTotal},
+            salary_version = #{snapshot.salaryVersion},
+            update_by = #{operatorName},
+            update_time = sysdate()
+        where user_id = #{snapshot.employeeId}
+          and employee_status = '试用'
+    </update>
+
+    <update id="updateTransferProfile">
+        update sys_user_profile
+        set dept_level3_name = #{snapshot.deptName},
+            store_name = #{snapshot.shopDeptName},
+            position_no = #{snapshot.positionNo},
+            position_names = #{snapshot.postName},
+            job_grade = #{snapshot.jobGradeCode},
+            department_supervisor = #{snapshot.departmentSupervisorName},
+            direct_supervisor = #{snapshot.directSupervisorName},
+            direct_supervisor_user_id = #{snapshot.directSupervisorId},
+            work_location = #{snapshot.workLocation},
+            work_city_level = #{snapshot.workCityLevel},
+            current_position_start_date = #{snapshot.transferEffectiveDate},
+            legal_entity_id = #{snapshot.legalEntityId},
+            legal_entity_code = #{snapshot.legalEntityCode},
+            legal_entity = #{snapshot.legalEntityName},
+            base_salary = #{snapshot.baseSalary},
+            post_salary = #{snapshot.postSalary},
+            field_allowance = #{snapshot.fieldAllowance},
+            performance_salary = #{snapshot.performanceSalary},
+            salary_total = #{snapshot.salaryTotal},
+            salary_version = #{snapshot.salaryVersion},
+            update_by = #{operatorName},
+            update_time = sysdate()
+        where user_id = #{snapshot.employeeId}
+          and employee_status not in ('离职', '待入职')
+    </update>
+
+    <update id="updateOffboardingProfile">
+        update sys_user_profile
+        set employee_status = '离职',
+            leave_date = #{snapshot.leaveDate},
+            update_by = #{operatorName},
+            update_time = sysdate()
+        where user_id = #{snapshot.employeeId}
+          and employee_status = #{expectedEmployeeStatus}
+          and leave_date &lt;=&gt; #{expectedLeaveDate}
+    </update>
+
+</mapper>

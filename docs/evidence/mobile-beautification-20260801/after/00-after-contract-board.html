@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
+<title>Mobile Beautification After Contract Board 2026-08-01</title>
+<style>
+:root{--page:#f4f5f2;--surface:#fff;--ink:#17211d;--muted:#66736d;--line:#dde2de;--primary:#0b6b53;--primary-soft:#e7f2ed;--danger:#c4322b;--danger-soft:#fff0ee;--warn:#a76505;--warn-soft:#fff3dc;--info:#2866b1;--info-soft:#edf4fd;--success:#147a50;--success-soft:#e8f4ed}
+*{box-sizing:border-box}
+body{margin:0;font-family:Inter,PingFang SC,Microsoft YaHei,sans-serif;background:var(--page);color:var(--ink)}
+h1{margin:0 0 8px;font-size:22px}
+p{margin:0;color:var(--muted);font-size:13px;line-height:1.5}
+.wrap{max-width:1100px;margin:0 auto;padding:20px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px;margin-top:16px}
+.card{border:1px solid var(--line);border-radius:16px;background:var(--surface);padding:14px;min-height:220px}
+.card h2{margin:0 0 8px;font-size:16px}
+.chip{display:inline-flex;padding:2px 8px;border-radius:8px;font-size:12px;font-weight:600;margin:2px 4px 2px 0}
+.c-primary{background:var(--primary-soft);color:var(--primary)}
+.c-danger{background:var(--danger-soft);color:var(--danger)}
+.c-warn{background:var(--warn-soft);color:var(--warn)}
+.c-info{background:var(--info-soft);color:var(--info)}
+.c-success{background:var(--success-soft);color:var(--success)}
+.btn{display:flex;align-items:center;justify-content:center;min-height:48px;margin-top:10px;border-radius:12px;background:var(--primary);color:#fff;font-weight:700}
+.btn.sec{background:var(--primary-soft);color:var(--primary);border:1px solid rgba(11,107,83,.28)}
+.meta{margin-top:8px;font-size:12px;color:var(--muted)}
+.bar{height:4px;background:var(--line);border-radius:999px;margin:10px 0}
+.bar i{display:block;height:100%;width:65%;background:var(--primary);border-radius:inherit}
+.list{border:1px solid var(--line);border-radius:12px;overflow:hidden;margin-top:8px}
+.row{padding:10px 12px;border-top:1px solid var(--line);display:flex;justify-content:space-between;gap:8px}
+.row:first-child{border-top:0}
+.note{margin-top:18px;padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:var(--surface);font-size:13px;color:var(--muted)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>改造后视觉契约板（2026-08-01）</h1>
+  <p>暖白底 + 深茶绿主色 · 互斥状态 · 单主操作 · 44px 触控 · 16px 输入 · 安全区/底栏预留</p>
+  <div class="grid">
+    <section class="card"><h2>1 登录</h2><span class="chip c-primary">主按钮 #0B6B53</span><div class="btn">登录</div><div class="meta">无背景图穿透 / 无蓝青渐变 / 验证码 2:1</div></section>
+    <section class="card"><h2>2 个人中心</h2><span class="chip c-primary">页头+底栏</span><div class="list"><div class="row"><span>身份摘要</span><span class="chip c-info">已登录</span></div><div class="row"><span>通知公告</span><span>›</span></div></div><div class="meta">分段：身份 / 设置 / 危险退出</div></section>
+    <section class="card"><h2>3 工作台</h2><span class="chip c-warn">未选组织门控</span><div class="btn">选择组织</div><div class="meta">阻断态互斥；待办优先于指标</div></section>
+    <section class="card"><h2>4 库存/通用列表</h2><div class="list"><div class="row"><span>单号-数量</span><span class="chip c-warn">待处理</span></div><div class="row"><span>单号-数量</span><span class="chip c-success">已完成</span></div></div><div class="meta">连续面板；状态文字+色</div></section>
+    <section class="card"><h2>5 报销</h2><span class="chip c-info">识别中</span><span class="chip c-success">识别成功</span><div class="btn">提交报销</div><div class="meta">固定草稿+提交；无蓝玻璃启动卡</div></section>
+    <section class="card"><h2>6 云盘</h2><span class="chip c-danger">会话失效</span><div class="btn sec">重新登录</div><div class="meta">阻断时不显示空文件夹</div></section>
+    <section class="card"><h2>7 签约</h2><span class="chip c-primary">页签选中</span><div class="meta">同源错误单卡恢复</div><div class="btn">签署</div></section>
+    <section class="card"><h2>8 入职</h2><div class="bar"><i></i></div><span class="chip c-primary">基础</span><span class="chip">任职</span><span class="chip">资料</span><span class="chip">确认</span><div class="btn">下一步</div><div class="meta">仅末步创建；隐藏全局底栏</div></section>
+  </div>
+  <div class="note">本页为验收契约可视化摘要，不替代真机账号截图。基线截图见 baseline/，真机 after 截图需登录态补齐至 after/。</div>
+</div>
+</body></html>

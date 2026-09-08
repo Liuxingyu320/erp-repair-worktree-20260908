@@ -1,0 +1,133 @@
+{
+  "configVersion": "20260809-rev06-v1",
+  "profiles": [
+    {
+      "profileId": "labor-v7-layout-20260720-normal",
+      "expectedBodyPageCount": 18,
+      "signaturePlacements": [
+        {"pageNumber": 14, "x": 319.0, "y": 726.0, "width": 90.0, "height": 42.3},
+        {"pageNumber": 14, "x": 232.0, "y": 278.0, "width": 76.0, "height": 35.8},
+        {"pageNumber": 16, "x": 326.0, "y": 198.0, "width": 78.0, "height": 36.7},
+        {"pageNumber": 18, "x": 454.0, "y": 220.0, "width": 58.0, "height": 27.3}
+      ],
+      "sealPlacements": [
+        {"pageNumber": 14, "x": 180.0, "y": 715.0, "width": 62.0, "height": 61.0}
+      ],
+      "protectedRegions": [
+        {"pageNumber": 16, "x": 410.0, "y": 205.0, "width": 140.0, "height": 43.0},
+        {"pageNumber": 18, "x": 373.0, "y": 190.0, "width": 177.0, "height": 25.0},
+        {"pageNumber": 18, "x": 430.0, "y": 165.0, "width": 120.0, "height": 22.0}
+      ],
+      "textOverlays": [
+        {"field": "companyLegalRepresentative", "pageNumber": 14, "x": 169.5, "y": 660.0, "width": 75.0, "height": 17.0, "fontSize": 12.0},
+        {"field": "attachmentHandbookMark", "pageNumber": 14, "x": 109.5, "y": 414.0, "width": 14.5, "height": 15.5, "fontSize": 12.0}
+      ],
+      "anchors": [
+        {"name": "primary-signing-row", "pageNumber": 14, "x": 100.0, "y": 738.0, "width": 305.0, "height": 25.0, "requiredTexts": ["甲方盖章", "乙方签名"]},
+        {"name": "legal-representative-row", "pageNumber": 14, "x": 100.0, "y": 650.0, "width": 280.0, "height": 40.0, "requiredTexts": ["甲方代表", "日期"]},
+        {"name": "attachment-checklist", "pageNumber": 14, "x": 100.0, "y": 525.0, "width": 260.0, "height": 40.0, "requiredTexts": ["附件清单"]},
+        {"name": "handbook-row", "pageNumber": 14, "x": 100.0, "y": 408.0, "width": 160.0, "height": 28.0, "requiredTexts": ["员工手册"]},
+        {"name": "attachment-signature-row", "pageNumber": 14, "x": 100.0, "y": 278.0, "width": 340.0, "height": 48.0, "requiredTexts": ["乙方", "签名", "日期"]},
+        {"name": "dormitory-signature-row", "pageNumber": 16, "x": 185.0, "y": 195.0, "width": 365.0, "height": 50.0, "requiredTexts": ["乙方", "签名", "日期"]},
+        {"name": "position-confirmation-row", "pageNumber": 18, "x": 345.0, "y": 160.0, "width": 175.0, "height": 80.0, "requiredTexts": ["确认人", "签名", "身份证号码", "日期"]}
+      ]
+    },
+    {
+      "profileId": "labor-v7-layout-SP1785202186549261523",
+      "expectedBodyPageCount": 18,
+      "signaturePlacements": [
+        {"pageNumber": 14, "x": 319.0, "y": 699.0, "width": 90.0, "height": 42.3},
+        {"pageNumber": 14, "x": 232.0, "y": 316.0, "width": 76.0, "height": 35.8},
+        {"pageNumber": 16, "x": 309.0, "y": 225.0, "width": 78.0, "height": 36.7},
+        {"pageNumber": 18, "x": 447.4, "y": 221.3, "width": 45.0, "height": 16.9}
+      ],
+      "sealPlacements": [
+        {"pageNumber": 14, "x": 180.0, "y": 688.0, "width": 62.0, "height": 61.0}
+      ],
+      "protectedRegions": [
+        {"pageNumber": 16, "x": 395.0, "y": 218.0, "width": 150.0, "height": 42.0},
+        {"pageNumber": 18, "x": 380.0, "y": 175.0, "width": 165.0, "height": 32.0},
+        {"pageNumber": 18, "x": 450.0, "y": 135.0, "width": 95.0, "height": 30.0},
+        {"pageNumber": 18, "x": 495.5, "y": 176.8, "width": 1.5, "height": 58.0}
+      ],
+      "textOverlays": [
+        {"field": "companyLegalRepresentative", "pageNumber": 14, "x": 112.1, "y": 651.0, "width": 143.0, "height": 19.0, "fontSize": 12.0},
+        {"field": "attachmentHandbookMark", "pageNumber": 14, "x": 112.1, "y": 430.0, "width": 108.0, "height": 19.0, "fontSize": 12.0},
+        {"field": "archiveEvidenceNotice", "pageNumber": 14, "x": 112.1, "y": 611.8, "width": 332.0, "height": 19.0, "fontSize": 8.5}
+      ],
+      "anchors": [
+        {"name": "primary-signing-row", "pageNumber": 14, "x": 100.0, "y": 710.0, "width": 305.0, "height": 25.0, "requiredTexts": ["甲方盖章", "乙方签名"]},
+        {"name": "legal-representative-row", "pageNumber": 14, "x": 100.0, "y": 640.0, "width": 280.0, "height": 45.0, "requiredTexts": ["甲方代表", "日期"]},
+        {"name": "attachment-checklist", "pageNumber": 14, "x": 100.0, "y": 540.0, "width": 260.0, "height": 40.0, "requiredTexts": ["附件清单"]},
+        {"name": "handbook-row", "pageNumber": 14, "x": 100.0, "y": 428.0, "width": 160.0, "height": 24.0, "requiredTexts": ["员工手册"]},
+        {"name": "attachment-signature-row", "pageNumber": 14, "x": 100.0, "y": 315.0, "width": 340.0, "height": 48.0, "requiredTexts": ["乙方", "签名", "日期"]},
+        {"name": "dormitory-signature-row", "pageNumber": 16, "x": 185.0, "y": 222.0, "width": 365.0, "height": 50.0, "requiredTexts": ["乙方", "签名", "日期"]},
+        {"name": "position-confirmation-row", "pageNumber": 18, "x": 345.0, "y": 160.0, "width": 175.0, "height": 80.0, "requiredTexts": ["确认人", "签名", "身份证号码", "日期"]}
+      ]
+    }
+  ],
+  "futureBindings": [
+    {
+      "templateType": "ONBOARD_LABOR_CONTRACT",
+      "templateVersion": "20260721-v7",
+      "templateSourceHash": "1226728ec0e703d513efda83dc5578ee4cdd65cb3e7d0e7cb5afee813f466558",
+      "resolverId": "labor-v7-anchor-relative-v1"
+    }
+  ],
+  "blockedTemplates": [
+    {
+      "templateType": "ONBOARD_LABOR_CONTRACT",
+      "templateVersion": "20260718-v4-draft",
+      "templateSourceHash": "fdbe2df12eb3704370126e09f2c26fd7cd09e0a06db1e0fe960f42f9513f2118",
+      "reason": "第14/16/18页签署栏明确写为见附加页，未核准正文落位",
+      "replacementVersion": "20260721-v7"
+    }
+  ],
+  "historicalArchiveEvidence": [
+    {
+      "evidenceId": "SP1785202186549261523-archive-evidence-v1",
+      "profileId": "labor-v7-layout-SP1785202186549261523",
+      "packageNo": "SP1785202186549261523",
+      "templateType": "ONBOARD_LABOR_CONTRACT",
+      "templateVersion": "20260721-v7",
+      "templateSourceHash": "1226728ec0e703d513efda83dc5578ee4cdd65cb3e7d0e7cb5afee813f466558",
+      "documentPolicyMode": "SNAPSHOT_V1",
+      "signaturePositionJson": "{\"mode\":\"APPENDED_CONFIRMATION_PAGE\"}",
+      "companySealPositionJson": "{\"mode\":\"APPENDED_CONFIRMATION_PAGE\"}",
+      "reviewPdfHash": "552e2b6a17e6206ea4c12c761d02abf698db3281ecf1861a858ce0024b7ce7d4",
+      "archivePdfHash": "731db734f3fe4dc73a2e18aafadacd5df78e53347209e7b0020ac5f942c6cc69",
+      "finalArchivePdfHash": "731db734f3fe4dc73a2e18aafadacd5df78e53347209e7b0020ac5f942c6cc69",
+      "finalContentHash": "4c5ac52dead9d598ffa410e0da70f7ad6f62c0395d3666b52223d3264e447f4d",
+      "finalRootHash": "2e2a61497054e8261b9cc68d54c19923f39aca79239c7d957dc1675b74a5cd98",
+      "signatureSampleHash": "8b03cc9e6898f1edd1d6ad4dd3594f380aaef771c67de90dbb3aa5bfe0ae59d7",
+      "sealImageHash": "b14583e12e150ff25482e07d9ae9162c7bd5b274260254c8696d24b0926982d1",
+      "legalRepresentativeSnapshot": null,
+      "legalRepresentativeRepairId": "legal-entity-4-representative-20260719-v1",
+      "requiredVisibleDocumentTypes": [
+        "ONBOARD_COMMITMENT",
+        "ONBOARD_LABOR_CONTRACT",
+        "ONBOARD_HANDBOOK_RECEIPT",
+        "ONBOARD_SALARY_CONFIRM"
+      ],
+      "repairFields": [
+        "attachmentHandbookMark",
+        "archiveEvidenceNotice",
+        "companyLegalRepresentative",
+        "companySealPosition",
+        "employeeSignaturePositions"
+      ]
+    }
+  ],
+  "historicalRepresentativeRepairs": [
+    {
+      "repairId": "legal-entity-4-representative-20260719-v1",
+      "legalEntityId": 4,
+      "legalEntityName": "舟山茗汇文化传播有限公司",
+      "effectiveFrom": "2026-07-19T11:34:42Z",
+      "effectiveUntil": "2026-08-09T00:00:00Z",
+      "legalRepresentative": "杜翠香",
+      "evidenceSource": "/oa/sign/evidence/legal-entity-4-representative-20260719-v1.json",
+      "evidenceSha256": "2c034d093388966bca6b2349e21e1f66d46add19acaf601fd41284e54d454c9e"
+    }
+  ]
+}

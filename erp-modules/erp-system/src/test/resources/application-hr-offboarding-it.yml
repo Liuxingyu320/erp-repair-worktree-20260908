@@ -1,0 +1,24 @@
+spring:
+  application:
+    name: erp-system-hr-offboarding-it
+  config:
+    import: []
+  main:
+    web-application-type: none
+    lazy-initialization: true
+  cloud:
+    nacos:
+      discovery:
+        enabled: false
+      config:
+        enabled: false
+    discovery:
+      enabled: false
+  data:
+    redis:
+      repositories:
+        enabled: false
+
+springdoc:
+  api-docs:
+    enabled: false

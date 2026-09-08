@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "releaseId": "existing-employee-onboard-contract-20260717",
+  "status": "development",
+  "executionPolicy": "manual-source-only",
+  "sourceDirectory": "sql",
+  "migrationList": "scripts/existing-employee-onboard-contract-migrations-20260717.list",
+  "releaseFileList": "scripts/existing-employee-onboard-contract-release-files-20260717.list",
+  "migrationCount": 1,
+  "migrations": [
+    {
+      "file": "erp_oa_sign_onboard_open_guard_20260717.sql",
+      "sha256": "9f7ce642e4fc5646aa8a85aef3718e1bf15cfc9b04a045da58619c04875306f3",
+      "phase": "01-open-onboard-employee-guard-before-backend",
+      "applyMode": "manual-native-mysql",
+      "requiresTables": ["oa_sign_task"],
+      "requiresColumns": {
+        "oa_sign_task": ["task_id", "employee_id", "scenario", "status"]
+      },
+      "createsColumns": {
+        "oa_sign_task": ["open_onboard_employee_id"]
+      },
+      "createsIndexes": [
+        {
+          "table": "oa_sign_task",
+          "name": "uk_oa_sign_task_open_onboard_employee",
+          "columns": ["open_onboard_employee_id"],
+          "unique": true
+        }
+      ]
+    }
+  ],
+  "deploymentOrder": [
+    "preflight-and-resolve-duplicate-open-onboard-tasks-from-approved-evidence",
+    "apply-manual-native-mysql-migration",
+    "verify-generated-column-and-unique-index",
+    "deploy-system-and-oa-backend",
+    "deploy-frontend"
+  ],
+  "dockerBootstrapIncluded": false
+}

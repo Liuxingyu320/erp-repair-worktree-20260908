@@ -1,0 +1,321 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.inventory.mapper.InvTransferReservationMapper">
+
+    <resultMap id="StockResult" type="InvStock">
+        <id property="stockId" column="stock_id"/>
+        <result property="itemType" column="item_type"/>
+        <result property="itemId" column="item_id"/>
+        <result property="productId" column="product_id"/>
+        <result property="shopDeptId" column="shop_dept_id"/>
+        <result property="warehouseId" column="warehouse_id"/>
+        <result property="currentQuantity" column="current_quantity"/>
+        <result property="lockedQuantity" column="locked_quantity"/>
+        <result property="availableQuantity" column="available_quantity"/>
+        <result property="costPrice" column="cost_price"/>
+        <result property="totalCost" column="total_cost"/>
+        <result property="version" column="version"/>
+    </resultMap>
+
+    <resultMap id="ReservationResult" type="InvTransferReservation">
+        <id property="reservationId" column="reservation_id"/>
+        <result property="transferId" column="transfer_id"/>
+        <result property="transferDetailId" column="transfer_detail_id"/>
+        <result property="reservationRound" column="reservation_round"/>
+        <result property="stockId" column="stock_id"/>
+        <result property="itemType" column="item_type"/>
+        <result property="itemId" column="item_id"/>
+        <result property="sourceLocationDeptId" column="source_location_dept_id"/>
+        <result property="reservedQuantity" column="reserved_quantity"/>
+        <result property="consumedQuantity" column="consumed_quantity"/>
+        <result property="releasedQuantity" column="released_quantity"/>
+        <result property="status" column="status"/>
+        <result property="version" column="version"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateBy" column="update_by"/>
+        <result property="updateTime" column="update_time"/>
+    </resultMap>
+
+    <sql id="StockColumns">
+        stock_id, item_type, item_id, product_id, shop_dept_id,
+        warehouse_id, current_quantity, locked_quantity,
+        available_quantity, cost_price, total_cost, version
+    </sql>
+
+    <sql id="ReservationColumns">
+        reservation_id, transfer_id, transfer_detail_id, reservation_round, stock_id,
+        item_type, item_id, source_location_dept_id,
+        reserved_quantity, consumed_quantity, released_quantity,
+        status, version, create_by, create_time, update_by, update_time
+    </sql>
+
+    <!--
+      Lock the route facts before item rows. The raw-root expression must stay
+      aligned with SysDeptMapper.selectReplenishmentSourceWarehouseList and
+      InvDeptScopeMapper.selectRawBusinessRootDeptId.
+    -->
+    <select id="selectWarehouseReplenishmentRouteForUpdate"
+            resultType="java.lang.Long">
+        select business_root.dept_id
+        from sys_dept source_dept
+        straight_join sys_dept target_dept
+          on source_dept.dept_id = #{sourceWarehouseId}
+         and target_dept.dept_id = #{targetStoreId}
+        straight_join sys_dept business_root
+          on business_root.dept_id = cast(
+              case
+                  when source_dept.ancestors is null
+                       or source_dept.ancestors = ''
+                       or source_dept.ancestors = '0'
+                      then source_dept.dept_id
+                  when source_dept.ancestors like '0,%'
+                      then substring_index(substring_index(
+                          source_dept.ancestors, ',', 2), ',', -1)
+                  else substring_index(source_dept.ancestors, ',', 1)
+              end as unsigned
+          )
+        where source_dept.del_flag = '0'
+          and source_dept.status = '0'
+          and source_dept.dept_type = 'WAREHOUSE'
+          and target_dept.del_flag = '0'
+          and target_dept.status = '0'
+          and target_dept.dept_type = 'STORE'
+          and business_root.del_flag = '0'
+          and business_root.status = '0'
+          and business_root.dept_id = cast(
+              case
+                  when target_dept.ancestors is null
+                       or target_dept.ancestors = ''
+                       or target_dept.ancestors = '0'
+                      then target_dept.dept_id
+                  when target_dept.ancestors like '0,%'
+                      then substring_index(substring_index(
+                          target_dept.ancestors, ',', 2), ',', -1)
+                  else substring_index(target_dept.ancestors, ',', 1)
+              end as unsigned
+          )
+        for update
+    </select>
+
+    <select id="selectStockForUpdate" resultMap="StockResult">
+        select s.stock_id, s.item_type, s.item_id, s.product_id,
+               s.shop_dept_id, s.warehouse_id, s.current_quantity,
+               s.locked_quantity, s.available_quantity, s.cost_price,
+               s.total_cost, s.version
+        from inv_stock s
+        <if test="itemType == 'product'">
+            straight_join inv_product p
+              on p.product_id = coalesce(s.item_id, s.product_id)
+        </if>
+        <if test="warehouseReplenishment and itemType == 'product'">
+            straight_join sys_dept item_owner
+              on item_owner.dept_id = p.shop_dept_id
+            straight_join sys_dept source_dept
+              on source_dept.dept_id = #{locationDeptId}
+        </if>
+        <if test="itemType == 'gift'">
+            straight_join inv_gift_box gift
+              on gift.gift_id = coalesce(s.item_id, s.product_id)
+        </if>
+        where coalesce(s.item_type, 'product') = #{itemType}
+          and coalesce(s.item_id, s.product_id) = #{itemId}
+          and s.shop_dept_id = #{locationDeptId}
+          and s.warehouse_id = #{locationDeptId}
+        <choose>
+            <when test="itemType == 'product'">
+                and p.del_flag = '0'
+                and p.status = '0'
+                <if test="warehouseReplenishment">
+                    and p.shop_dept_id is not null
+                    and source_dept.del_flag = '0'
+                    and source_dept.status = '0'
+                    and source_dept.dept_type = 'WAREHOUSE'
+                    and item_owner.del_flag = '0'
+                    and item_owner.status = '0'
+                    and (
+                        item_owner.dept_id = source_dept.dept_id
+                        or find_in_set(source_dept.dept_id,
+                            item_owner.ancestors)
+                        or find_in_set(item_owner.dept_id,
+                            source_dept.ancestors)
+                    )
+                </if>
+            </when>
+            <when test="itemType == 'gift'">
+                and gift.del_flag = '0'
+                and gift.status = '0'
+            </when>
+            <otherwise>
+                and 1 = 0
+            </otherwise>
+        </choose>
+        for update
+    </select>
+
+    <select id="selectStockForPlanning" resultMap="StockResult">
+        select stock_id, item_type, item_id, product_id, shop_dept_id,
+               warehouse_id, available_quantity, version
+        from inv_stock
+        where coalesce(item_type, 'product') = #{itemType}
+          and coalesce(item_id, product_id) = #{itemId}
+          and shop_dept_id = #{locationDeptId}
+          and warehouse_id = #{locationDeptId}
+    </select>
+
+    <select id="selectStockByIdForUpdate" resultMap="StockResult">
+        select <include refid="StockColumns"/>
+        from inv_stock
+        where stock_id = #{stockId}
+        for update
+    </select>
+
+    <select id="selectStocksByIdsForUpdate" resultMap="StockResult">
+        select <include refid="StockColumns"/>
+        from inv_stock
+        where stock_id in
+        <foreach collection="stockIds" item="stockId"
+                 open="(" close=")" separator=",">
+            #{stockId}
+        </foreach>
+        order by stock_id
+        for update
+    </select>
+
+    <update id="reserveStock">
+        update inv_stock
+        set locked_quantity = coalesce(locked_quantity, 0) + #{quantity},
+            available_quantity = coalesce(available_quantity, 0) - #{quantity},
+            version = version + 1,
+            update_by = #{updateBy},
+            update_time = sysdate()
+        where stock_id = #{stockId}
+          and version = #{version}
+          and #{quantity} &gt; 0
+          and coalesce(available_quantity, 0) &gt;= #{quantity}
+    </update>
+
+    <update id="releaseStock">
+        update inv_stock
+        set locked_quantity = coalesce(locked_quantity, 0) - #{quantity},
+            available_quantity = coalesce(available_quantity, 0) + #{quantity},
+            version = version + 1,
+            update_by = #{updateBy},
+            update_time = sysdate()
+        where stock_id = #{stockId}
+          and version = #{version}
+          and #{quantity} &gt; 0
+          and coalesce(locked_quantity, 0) &gt;= #{quantity}
+    </update>
+
+    <update id="consumeReservedStockWithCost">
+        update inv_stock
+        set current_quantity = coalesce(current_quantity, 0) - #{quantity},
+            locked_quantity = coalesce(locked_quantity, 0) - #{quantity},
+            total_cost = coalesce(total_cost, 0) - #{deductCost},
+            last_out_time = sysdate(),
+            version = version + 1,
+            update_by = #{updateBy},
+            update_time = sysdate()
+        where stock_id = #{stockId}
+          and version = #{version}
+          and #{quantity} &gt; 0
+          and coalesce(current_quantity, 0) &gt;= #{quantity}
+          and coalesce(locked_quantity, 0) &gt;= #{quantity}
+          and coalesce(total_cost, 0) &gt;= #{deductCost}
+    </update>
+
+    <select id="selectByTransferRoundForUpdate" resultMap="ReservationResult">
+        select <include refid="ReservationColumns"/>
+        from inv_transfer_reservation
+        where transfer_id = #{transferId}
+          and reservation_round = #{reservationRound}
+        order by stock_id, reservation_id
+        for update
+    </select>
+
+    <select id="selectByTransferDetailRoundForUpdate" resultMap="ReservationResult">
+        select <include refid="ReservationColumns"/>
+        from inv_transfer_reservation
+        where transfer_id = #{transferId}
+          and transfer_detail_id = #{transferDetailId}
+          and reservation_round = #{reservationRound}
+        for update
+    </select>
+
+    <insert id="insertReservation" parameterType="InvTransferReservation"
+            useGeneratedKeys="true" keyProperty="reservationId">
+        insert into inv_transfer_reservation (
+            transfer_id, transfer_detail_id, reservation_round, stock_id, item_type, item_id,
+            source_location_dept_id, reserved_quantity,
+            consumed_quantity, released_quantity, status, version,
+            create_by, create_time, update_by, update_time
+        ) values (
+            #{transferId}, #{transferDetailId}, #{reservationRound}, #{stockId}, #{itemType},
+            #{itemId}, #{sourceLocationDeptId}, #{reservedQuantity}, 0, 0,
+            'ACTIVE', 0, #{createBy}, sysdate(), #{createBy}, sysdate()
+        )
+    </insert>
+
+    <update id="increaseReservation">
+        update inv_transfer_reservation
+        set reserved_quantity = reserved_quantity + #{quantity},
+            status = case
+                when consumed_quantity = 0 and released_quantity = 0
+                    then 'ACTIVE'
+                else 'PARTIAL'
+            end,
+            version = version + 1,
+            update_by = #{updateBy},
+            update_time = sysdate()
+        where reservation_id = #{reservationId}
+          and version = #{version}
+          and #{quantity} &gt; 0
+    </update>
+
+    <update id="consumeReservation">
+        update inv_transfer_reservation
+        <!--
+          MySQL evaluates single-table UPDATE assignments from left to right.
+          Resolve the terminal status from the pre-update quantities before
+          mutating consumed_quantity, otherwise #{quantity} is counted twice.
+        -->
+        set status = case
+                when consumed_quantity + released_quantity + #{quantity}
+                        = reserved_quantity
+                    then case when released_quantity = 0
+                        then 'CONSUMED' else 'CLOSED' end
+                else 'PARTIAL'
+            end,
+            consumed_quantity = consumed_quantity + #{quantity},
+            version = version + 1,
+            update_by = #{updateBy},
+            update_time = sysdate()
+        where reservation_id = #{reservationId}
+          and version = #{version}
+          and #{quantity} &gt; 0
+          and reserved_quantity - consumed_quantity - released_quantity
+                &gt;= #{quantity}
+    </update>
+
+    <update id="releaseReservation">
+        update inv_transfer_reservation
+        <!-- Keep status evaluation ahead of the released quantity mutation. -->
+        set status = case
+                when consumed_quantity + released_quantity + #{quantity}
+                        = reserved_quantity
+                    then case when consumed_quantity = 0
+                        then 'RELEASED' else 'CLOSED' end
+                else 'PARTIAL'
+            end,
+            released_quantity = released_quantity + #{quantity},
+            version = version + 1,
+            update_by = #{updateBy},
+            update_time = sysdate()
+        where reservation_id = #{reservationId}
+          and version = #{version}
+          and #{quantity} &gt; 0
+          and reserved_quantity - consumed_quantity - released_quantity
+                &gt;= #{quantity}
+    </update>
+</mapper>

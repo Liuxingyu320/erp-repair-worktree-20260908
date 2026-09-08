@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.inventory.mapper.InvOutboundRecordMapper">
+
+    <resultMap type="InvOutboundRecord" id="InvOutboundRecordResult">
+        <id property="outboundId" column="outbound_id"/>
+        <result property="salesOrderId" column="sales_order_id"/>
+        <result property="orderNo" column="order_no"/>
+        <result property="itemType" column="item_type"/>
+        <result property="itemId" column="item_id"/>
+        <result property="productId" column="product_id"/>
+        <result property="shopDeptId" column="shop_dept_id"/>
+        <result property="quantity" column="quantity"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="remark" column="remark"/>
+        <result property="noticeId" column="notice_id"/>
+        <result property="noticeDetailId" column="notice_detail_id"/>
+        <result property="costPrice" column="cost_price"/>
+        <result property="costAmount" column="cost_amount"/>
+    </resultMap>
+
+    <select id="selectInvOutboundRecordByOrderId" parameterType="Long" resultMap="InvOutboundRecordResult">
+        select outbound_id, sales_order_id, order_no, item_type, item_id,
+               product_id, shop_dept_id,
+               quantity, create_by, create_time, remark,
+               notice_id, notice_detail_id, cost_price, cost_amount
+        from inv_outbound_record
+        where sales_order_id = #{orderId}
+    </select>
+
+    <insert id="insertInvOutboundRecord" parameterType="InvOutboundRecord" useGeneratedKeys="true" keyProperty="outboundId">
+        insert into inv_outbound_record (
+            sales_order_id, order_no, item_type, item_id, product_id, shop_dept_id,
+            quantity, create_by, create_time, remark,
+            notice_id, notice_detail_id, cost_price, cost_amount
+        ) values (
+            #{salesOrderId}, #{orderNo}, coalesce(#{itemType}, 'product'), coalesce(#{itemId}, #{productId}), #{productId}, #{shopDeptId},
+            #{quantity}, #{createBy}, sysdate(), #{remark},
+            #{noticeId}, #{noticeDetailId}, #{costPrice}, #{costAmount}
+        )
+    </insert>
+
+</mapper>

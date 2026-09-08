@@ -1,0 +1,4 @@
+com.erp.common.log.config.LogSanitizerAutoConfiguration
+com.erp.common.log.service.AsyncLogService
+com.erp.common.log.aspect.LogAspect
+com.erp.common.log.support.AuditPayloadSanitizer

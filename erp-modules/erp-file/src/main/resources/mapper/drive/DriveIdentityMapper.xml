@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.file.drive.mapper.DriveIdentityMapper">
+
+    <select id="selectCurrentIdentity" resultType="com.erp.file.drive.domain.DriveIdentity">
+        select u.user_id as userId,
+               d.dept_id as deptId,
+               d.dept_name as deptName,
+               d.parent_id as parentId,
+               d.ancestors as ancestors,
+               d.dept_type as deptType
+        from sys_user u
+        left join sys_dept d
+          on d.dept_id = u.dept_id
+         and d.status = '0'
+         and d.del_flag = '0'
+        where u.user_id = #{userId}
+          and u.status = '0'
+          and u.del_flag = '0'
+    </select>
+
+</mapper>

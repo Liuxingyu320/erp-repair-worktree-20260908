@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.inventory.mapper.InvSalesReturnMapper">
+
+    <resultMap type="InvSalesReturn" id="InvSalesReturnResult">
+        <id property="returnId" column="return_id"/>
+        <result property="returnNo" column="return_no"/>
+        <result property="salesOrderId" column="sales_order_id"/>
+        <result property="salesOrderNo" column="sales_order_no"/>
+        <result property="returnTitle" column="return_title"/>
+        <result property="customerName" column="customer_name"/>
+        <result property="totalAmount" column="total_amount"/>
+        <result property="totalQuantity" column="total_quantity"/>
+        <result property="returnedQuantity" column="returned_quantity"/>
+        <result property="remainingQuantity" column="remaining_quantity"/>
+        <result property="returnDate" column="return_date"/>
+        <result property="status" column="status"/>
+        <result property="shopDeptId" column="shop_dept_id"/>
+        <result property="shopDeptName" column="shop_dept_name"/>
+        <result property="applicantId" column="applicant_id"/>
+        <result property="applicantName" column="applicant_name"/>
+        <result property="applicantNickName" column="applicant_nick_name"/>
+        <result property="applicantDeptId" column="applicant_dept_id"/>
+        <result property="applicantDeptName" column="applicant_dept_name"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateBy" column="update_by"/>
+        <result property="updateTime" column="update_time"/>
+        <result property="remark" column="remark"/>
+    </resultMap>
+
+    <sql id="selectInvSalesReturnVo">
+        select r.return_id, r.return_no, r.sales_order_id, r.sales_order_no, r.return_title,
+               r.customer_name, r.total_amount,
+               coalesce(detail_summary.total_quantity, 0) as total_quantity,
+               coalesce(detail_summary.returned_quantity, 0) as returned_quantity,
+               coalesce(detail_summary.remaining_quantity, 0) as remaining_quantity,
+               r.return_date, r.status, r.shop_dept_id,
+               shop_dept.dept_name as shop_dept_name,
+               r.applicant_id, r.applicant_name, u.nick_name as applicant_nick_name,
+               r.applicant_dept_id, applicant_dept.dept_name as applicant_dept_name,
+               r.create_by, r.create_time, r.update_by, r.update_time, r.remark
+        from inv_sales_return r
+             left join sys_dept shop_dept on shop_dept.dept_id = r.shop_dept_id
+             left join sys_user u on u.user_id = r.applicant_id
+             left join sys_dept applicant_dept on applicant_dept.dept_id = r.applicant_dept_id
+             left join (
+                 select return_id,
+                        sum(coalesce(quantity, 0)) as total_quantity,
+                        sum(coalesce(returned_quantity, 0)) as returned_quantity,
+                        sum(coalesce(quantity, 0) - coalesce(returned_quantity, 0)) as remaining_quantity
+                 from inv_sales_return_detail
+                 group by return_id
+             ) detail_summary on detail_summary.return_id = r.return_id
+    </sql>
+
+    <select id="selectInvSalesReturnList" parameterType="InvSalesReturn" resultMap="InvSalesReturnResult">
+        <include refid="selectInvSalesReturnVo"/>
+        where 1=1
+        <if test="returnNo != null and returnNo != ''">and r.return_no like concat('%', #{returnNo}, '%')</if>
+        <if test="salesOrderNo != null and salesOrderNo != ''">and r.sales_order_no like concat('%', #{salesOrderNo}, '%')</if>
+        <if test="customerName != null and customerName != ''">and r.customer_name like concat('%', #{customerName}, '%')</if>
+        <if test="status != null and status != ''">and r.status = #{status}</if>
+        <if test="shopDeptId != null">and r.shop_dept_id = #{shopDeptId}</if>
+        <if test="params.scopeDeptIds != null">and r.shop_dept_id in <foreach collection="params.scopeDeptIds" item="deptId" open="(" close=")" separator=",">#{deptId}</foreach></if>
+        ${params.dataScope}
+        order by r.create_time desc
+    </select>
+
+    <select id="selectMyInvSalesReturnList" parameterType="InvSalesReturn" resultMap="InvSalesReturnResult">
+        <include refid="selectInvSalesReturnVo"/>
+        where r.create_by = #{createBy}
+        <if test="returnNo != null and returnNo != ''">and r.return_no like concat('%', #{returnNo}, '%')</if>
+        <if test="status != null and status != ''">and r.status = #{status}</if>
+        <if test="shopDeptId != null">and r.shop_dept_id = #{shopDeptId}</if>
+        order by r.create_time desc
+    </select>
+
+    <select id="selectInvSalesReturnById" parameterType="Long" resultMap="InvSalesReturnResult">
+        <include refid="selectInvSalesReturnVo"/>
+        where r.return_id = #{returnId}
+    </select>
+
+    <select id="selectInvSalesReturnByIdForUpdate" parameterType="Long" resultMap="InvSalesReturnResult">
+        select return_id, return_no, sales_order_id, sales_order_no, return_title,
+               customer_name, total_amount, return_date, status, shop_dept_id,
+               applicant_id, applicant_name, applicant_dept_id,
+               create_by, create_time, update_by, update_time, remark
+        from inv_sales_return
+        where return_id = #{returnId} for update
+    </select>
+
+    <insert id="insertInvSalesReturn" parameterType="InvSalesReturn" useGeneratedKeys="true" keyProperty="returnId">
+        insert into inv_sales_return (
+            return_no, sales_order_id, sales_order_no, return_title, customer_name,
+            total_amount, return_date, status, shop_dept_id,
+            applicant_id, applicant_name, applicant_dept_id,
+            create_by, create_time, remark
+        ) values (
+            #{returnNo}, #{salesOrderId}, #{salesOrderNo}, #{returnTitle}, #{customerName},
+            #{totalAmount}, #{returnDate}, #{status}, #{shopDeptId},
+            #{applicantId}, #{applicantName}, #{applicantDeptId},
+            #{createBy}, sysdate(), #{remark}
+        )
+    </insert>
+
+    <update id="updateInvSalesReturn" parameterType="InvSalesReturn">
+        update inv_sales_return
+        <set>
+            <if test="returnTitle != null and returnTitle != ''">return_title = #{returnTitle},</if>
+            <if test="customerName != null and customerName != ''">customer_name = #{customerName},</if>
+            <if test="totalAmount != null">total_amount = #{totalAmount},</if>
+            <if test="returnDate != null">return_date = #{returnDate},</if>
+            <if test="status != null">status = #{status},</if>
+            update_by = #{updateBy}, update_time = sysdate()
+        </set>
+        where return_id = #{returnId}
+    </update>
+
+    <delete id="deleteInvSalesReturnByIds" parameterType="Long">
+        delete from inv_sales_return where return_id in
+        <foreach collection="array" item="returnId" open="(" close=")" separator=",">
+            #{returnId}
+        </foreach>
+    </delete>
+
+</mapper>

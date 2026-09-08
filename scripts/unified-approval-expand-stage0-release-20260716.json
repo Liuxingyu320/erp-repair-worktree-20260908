@@ -1,0 +1,323 @@
+{
+  "schemaVersion": 1,
+  "releaseId": "unified-approval-expand-stage0-20260716",
+  "baselineCommit": "b694659dd2c1",
+  "migrationList": "scripts/unified-approval-expand-stage0-migrations-20260716.list",
+  "migrationCount": 4,
+  "sourceDirectory": "sql",
+  "deployDirectory": "docker/mysql/releases/unified-approval-expand-stage0-20260716",
+  "executionPolicy": "automatic",
+  "featureFlags": [],
+  "preconditions": {
+    "tables": [
+      "inv_stock_check_approval_instance",
+      "inv_stock_check_approval_task",
+      "inv_transfer_approval_rule",
+      "inv_transfer_approval_node",
+      "inv_transfer_approval_instance",
+      "inv_transfer_approval_task"
+    ],
+    "columns": [
+      {
+        "table": "inv_stock_check",
+        "names": [
+          "approval_instance_id",
+          "approval_round",
+          "submitted_user_id",
+          "submitted_by",
+          "submitted_time",
+          "approved_user_id",
+          "approved_by",
+          "approved_time",
+          "last_reject_reason",
+          "last_rejected_user_id",
+          "last_rejected_by",
+          "last_rejected_time",
+          "last_invalid_reason",
+          "last_invalid_detail_snapshot",
+          "last_invalidated_time",
+          "status"
+        ]
+      },
+      {
+        "table": "inv_transfer_order",
+        "names": [
+          "approval_instance_id",
+          "status",
+          "submitted_time"
+        ]
+      },
+      {
+        "table": "hr_employee_health_certificate",
+        "names": [
+          "rejection_reason",
+          "review_status"
+        ]
+      },
+      {
+        "table": "oa_purchase",
+        "names": [
+          "status"
+        ]
+      },
+      {
+        "table": "inv_stock_check_approval_instance",
+        "names": [
+          "instance_id",
+          "check_id",
+          "round_no",
+          "status",
+          "shop_dept_id",
+          "check_no",
+          "profit_item_count",
+          "loss_item_count",
+          "total_abs_diff_quantity",
+          "detail_snapshot",
+          "invalid_reason",
+          "invalid_detail_snapshot",
+          "adjustment_result_snapshot",
+          "submitted_user_id",
+          "submitted_by",
+          "submitted_time",
+          "finished_user_id",
+          "finished_by",
+          "finished_time",
+          "finish_comment",
+          "create_by",
+          "create_time",
+          "update_by",
+          "update_time"
+        ]
+      },
+      {
+        "table": "inv_stock_check_approval_task",
+        "names": [
+          "task_id",
+          "instance_id",
+          "check_id",
+          "round_no",
+          "candidate_user_ids",
+          "candidate_user_names",
+          "status",
+          "action",
+          "approver_user_id",
+          "approver_name",
+          "approval_comment",
+          "approval_time",
+          "self_approved",
+          "create_by",
+          "create_time",
+          "update_by",
+          "update_time"
+        ]
+      },
+      {
+        "table": "inv_transfer_approval_rule",
+        "names": [
+          "rule_id",
+          "rule_name",
+          "document_type",
+          "transfer_type",
+          "scope_type",
+          "scope_id",
+          "condition_type",
+          "condition_operator",
+          "condition_value",
+          "approval_mode",
+          "required_count",
+          "reject_action",
+          "allow_self_approve",
+          "priority",
+          "status",
+          "create_by",
+          "create_time",
+          "update_by",
+          "update_time",
+          "remark"
+        ]
+      },
+      {
+        "table": "inv_transfer_approval_node",
+        "names": [
+          "node_id",
+          "rule_id",
+          "node_order",
+          "node_name",
+          "node_role",
+          "post_id",
+          "post_code",
+          "post_name",
+          "approval_mode",
+          "required_count",
+          "create_by",
+          "create_time",
+          "update_by",
+          "update_time",
+          "remark"
+        ]
+      },
+      {
+        "table": "inv_transfer_approval_instance",
+        "names": [
+          "instance_id",
+          "transfer_id",
+          "rule_id",
+          "rule_name",
+          "rule_snapshot",
+          "status",
+          "current_node_order",
+          "approval_mode",
+          "required_count",
+          "reject_action",
+          "allow_self_approve",
+          "create_by",
+          "create_time",
+          "update_by",
+          "update_time",
+          "remark"
+        ]
+      },
+      {
+        "table": "inv_transfer_approval_task",
+        "names": [
+          "task_id",
+          "instance_id",
+          "transfer_id",
+          "node_order",
+          "node_name",
+          "post_id",
+          "post_code",
+          "post_name",
+          "candidate_user_ids",
+          "candidate_user_names",
+          "status",
+          "approver_id",
+          "approver_name",
+          "approve_time",
+          "comment",
+          "create_by",
+          "create_time",
+          "update_by",
+          "update_time",
+          "remark"
+        ]
+      }
+    ],
+    "indexes": [
+      {
+        "table": "inv_stock_check_approval_instance",
+        "name": "PRIMARY",
+        "columns": ["instance_id"],
+        "unique": true
+      },
+      {
+        "table": "inv_stock_check_approval_instance",
+        "name": "uk_inv_stock_check_approval_round",
+        "columns": ["check_id", "round_no"],
+        "unique": true
+      },
+      {
+        "table": "inv_stock_check_approval_instance",
+        "name": "idx_inv_stock_check_approval_status",
+        "columns": ["status", "shop_dept_id", "submitted_time"],
+        "unique": false
+      },
+      {
+        "table": "inv_stock_check_approval_task",
+        "name": "PRIMARY",
+        "columns": ["task_id"],
+        "unique": true
+      },
+      {
+        "table": "inv_stock_check_approval_task",
+        "name": "idx_inv_stock_check_approval_task_instance",
+        "columns": ["instance_id", "task_id"],
+        "unique": false
+      },
+      {
+        "table": "inv_stock_check_approval_task",
+        "name": "idx_inv_stock_check_approval_task_status",
+        "columns": ["status", "check_id"],
+        "unique": false
+      },
+      {
+        "table": "inv_transfer_approval_rule",
+        "name": "PRIMARY",
+        "columns": ["rule_id"],
+        "unique": true
+      },
+      {
+        "table": "inv_transfer_approval_node",
+        "name": "PRIMARY",
+        "columns": ["node_id"],
+        "unique": true
+      },
+      {
+        "table": "inv_transfer_approval_instance",
+        "name": "PRIMARY",
+        "columns": ["instance_id"],
+        "unique": true
+      },
+      {
+        "table": "inv_transfer_approval_task",
+        "name": "PRIMARY",
+        "columns": ["task_id"],
+        "unique": true
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "file": "erp_unified_approval_schema_expand_stage0_20260716.sql",
+      "sha256": "98a2c7b68b7b6676678b11767e52c2ae039bb05050aeb600e61030f70d64b754",
+      "creates": [
+        "approval_template",
+        "approval_rule",
+        "approval_rule_version",
+        "approval_rule_condition",
+        "approval_version_node",
+        "approval_instance",
+        "approval_task",
+        "approval_task_candidate",
+        "approval_action_log",
+        "approval_callback_outbox",
+        "approval_validation_run",
+        "approval_validation_issue"
+      ],
+      "backupTables": []
+    },
+    {
+      "file": "erp_inventory_unified_approval_expand_stage0_20260716.sql",
+      "sha256": "50a0ce06564491d26c21a7e9aa4a667bebdc6d6a761d09aeb8dcf0e50de3a81b",
+      "creates": [],
+      "backupTables": [
+        "inv_stock_check",
+        "inv_transfer_order"
+      ]
+    },
+    {
+      "file": "erp_hr_health_certificate_unified_approval_expand_stage0_20260716.sql",
+      "sha256": "2fa3fc6b6d59548f4b802e75c72de5b28378696ce41709154a051fa25d76d76f",
+      "creates": [],
+      "backupTables": [
+        "hr_employee_health_certificate"
+      ]
+    },
+    {
+      "file": "erp_oa_purchase_unified_approval_expand_stage0_20260716.sql",
+      "sha256": "d7471d935c2593fb560ef36261231176b29ac2de4ca574e6da53f39df3eb897e",
+      "creates": [],
+      "backupTables": [
+        "oa_purchase"
+      ]
+    }
+  ],
+  "integrationTests": [
+    "scripts/test_unified_approval_cutover_safety.py",
+    "erp-modules/erp-approval",
+    "erp-modules/erp-inventory",
+    "erp-modules/erp-oa",
+    "erp-modules/erp-system"
+  ],
+  "artifactSha256Required": true
+}

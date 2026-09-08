@@ -1,0 +1,155 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.oa.mapper.OaPurchaseMapper">
+
+    <resultMap id="OaPurchaseResult" type="OaPurchase">
+        <id property="purchaseId" column="purchase_id"/>
+        <result property="title" column="title"/>
+        <result property="applicantId" column="applicant_id"/>
+        <result property="applicantName" column="applicant_name"/>
+        <result property="applicantNickName" column="applicant_nick_name"/>
+        <result property="applicantDeptId" column="applicant_dept_id"/>
+        <result property="applicantDeptName" column="applicant_dept_name"/>
+        <result property="shopDeptId" column="shop_dept_id"/>
+        <result property="shopDeptName" column="shop_dept_name"/>
+        <result property="amount" column="amount"/>
+        <result property="reason" column="reason"/>
+        <result property="status" column="status"/>
+        <result property="approvalInstanceId" column="approval_instance_id"/>
+        <result property="approvalRound" column="approval_round"/>
+        <result property="rowVersion" column="row_version"/>
+        <result property="lastApprovalEventKey" column="last_approval_event_key"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateBy" column="update_by"/>
+        <result property="updateTime" column="update_time"/>
+        <result property="remark" column="remark"/>
+    </resultMap>
+
+    <sql id="baseColumns">
+        p.purchase_id, p.title, p.applicant_id, p.applicant_name,
+        u.nick_name as applicant_nick_name,
+        p.applicant_dept_id, applicant_dept.dept_name as applicant_dept_name,
+        p.shop_dept_id, shop_dept.dept_name as shop_dept_name,
+        p.amount, p.reason, p.status, p.approval_instance_id, p.approval_round,
+        p.row_version, p.last_approval_event_key,
+        p.create_by, p.create_time, p.update_by, p.update_time, p.remark
+    </sql>
+
+    <sql id="fromWithReadableNames">
+        from oa_purchase p
+        left join sys_user u on u.user_id = p.applicant_id
+        left join sys_dept applicant_dept on applicant_dept.dept_id = p.applicant_dept_id
+        left join sys_dept shop_dept on shop_dept.dept_id = p.shop_dept_id
+    </sql>
+
+    <insert id="insertOaPurchase" parameterType="OaPurchase" useGeneratedKeys="true" keyProperty="purchaseId">
+        insert into oa_purchase (
+            title, applicant_id, applicant_name, applicant_dept_id, shop_dept_id,
+            amount, reason, status, approval_instance_id, approval_round,
+            row_version, last_approval_event_key,
+            create_by, create_time, remark
+        ) values (
+            #{title}, #{applicantId}, #{applicantName}, #{applicantDeptId}, #{shopDeptId},
+            #{amount}, #{reason}, #{status}, #{approvalInstanceId},
+            coalesce(#{approvalRound}, 0), 0, #{lastApprovalEventKey},
+            #{createBy}, sysdate(), #{remark}
+        )
+    </insert>
+
+    <update id="updateOaPurchase" parameterType="OaPurchase">
+        update oa_purchase
+        <set>
+            <if test="title != null">title = #{title},</if>
+            <if test="shopDeptId != null">shop_dept_id = #{shopDeptId},</if>
+            <if test="amount != null">amount = #{amount},</if>
+            <if test="reason != null">reason = #{reason},</if>
+            <if test="status != null and status != ''">status = #{status},</if>
+            <if test="approvalInstanceId != null">approval_instance_id = #{approvalInstanceId},</if>
+            <if test="approvalRound != null">approval_round = #{approvalRound},</if>
+            <if test="lastApprovalEventKey != null and lastApprovalEventKey != ''">
+                last_approval_event_key = #{lastApprovalEventKey},
+            </if>
+            <if test="updateBy != null and updateBy != ''">update_by = #{updateBy},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            update_time = sysdate(), row_version = row_version + 1
+        </set>
+        where purchase_id = #{purchaseId} and row_version = #{rowVersion}
+    </update>
+
+    <update id="markApprovalSubmitting">
+        update oa_purchase
+        set status = 'submitting', approval_instance_id = null,
+            approval_round = #{businessRound}, last_approval_event_key = null,
+            update_by = #{updateBy}, update_time = sysdate(),
+            row_version = row_version + 1
+        where purchase_id = #{purchaseId}
+          and status = #{expectedStatus}
+          and row_version = #{expectedVersion}
+    </update>
+
+    <update id="finalizeApprovalStart">
+        update oa_purchase
+        set status = 'pending', approval_instance_id = #{instanceId},
+            update_by = #{updateBy}, update_time = sysdate(),
+            row_version = row_version + 1
+        where purchase_id = #{purchaseId}
+          and status = 'submitting'
+          and approval_round = #{businessRound}
+          and row_version = #{expectedVersion}
+          and approval_instance_id is null
+    </update>
+
+    <select id="selectOaPurchaseById" resultMap="OaPurchaseResult">
+        select <include refid="baseColumns"/> <include refid="fromWithReadableNames"/>
+        where p.purchase_id = #{purchaseId}
+    </select>
+
+    <select id="selectOaPurchaseByIdForUpdate" resultMap="OaPurchaseResult">
+        select <include refid="baseColumns"/> <include refid="fromWithReadableNames"/>
+        where p.purchase_id = #{purchaseId}
+        for update
+    </select>
+
+    <select id="selectOaPurchaseList" parameterType="OaPurchase" resultMap="OaPurchaseResult">
+        select <include refid="baseColumns"/> <include refid="fromWithReadableNames"/>
+        <where>
+            <if test="title != null and title != ''">
+                and p.title like concat('%', #{title}, '%')
+            </if>
+            <if test="status != null and status != ''">
+                and p.status = #{status}
+            </if>
+            <if test="params.scopeDeptIds != null and params.scopeDeptIds.size() > 0">
+                and p.shop_dept_id in
+                <foreach collection="params.scopeDeptIds" item="scopeDeptId" open="(" close=")" separator=",">
+                    #{scopeDeptId}
+                </foreach>
+            </if>
+        </where>
+        order by p.purchase_id desc
+    </select>
+
+    <select id="selectMyOaPurchaseList" parameterType="OaPurchase" resultMap="OaPurchaseResult">
+        select <include refid="baseColumns"/> <include refid="fromWithReadableNames"/>
+        <where>
+            p.applicant_id = #{applicantId}
+            <if test="title != null and title != ''">
+                and p.title like concat('%', #{title}, '%')
+            </if>
+            <if test="status != null and status != ''">
+                and p.status = #{status}
+            </if>
+            <if test="params.scopeDeptIds != null and params.scopeDeptIds.size() > 0">
+                and p.shop_dept_id in
+                <foreach collection="params.scopeDeptIds" item="scopeDeptId" open="(" close=")" separator=",">
+                    #{scopeDeptId}
+                </foreach>
+            </if>
+        </where>
+        order by p.purchase_id desc
+    </select>
+
+</mapper>

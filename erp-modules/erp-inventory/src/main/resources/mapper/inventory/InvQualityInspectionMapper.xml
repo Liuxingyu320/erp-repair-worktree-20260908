@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.inventory.mapper.InvQualityInspectionMapper">
+    <resultMap type="InvQualityInspection" id="InvQualityInspectionResult">
+        <id property="inspectionId" column="inspection_id"/>
+        <result property="inspectionNo" column="inspection_no"/>
+        <result property="receiptBatchId" column="receipt_batch_id"/>
+        <result property="batchDetailId" column="batch_detail_id"/>
+        <result property="purchaseOrderId" column="purchase_order_id"/>
+        <result property="purchaseDetailId" column="purchase_detail_id"/>
+        <result property="inspectedQuantity" column="inspected_quantity"/>
+        <result property="acceptedQuantity" column="accepted_quantity"/>
+        <result property="rejectedQuantity" column="rejected_quantity"/>
+        <result property="concessionQuantity" column="concession_quantity"/>
+        <result property="conclusion" column="conclusion"/>
+        <result property="defectLevel" column="defect_level"/>
+        <result property="defectReason" column="defect_reason"/>
+        <result property="inspectorUserId" column="inspector_user_id"/>
+        <result property="inspectorName" column="inspector_name"/>
+        <result property="inspectionTime" column="inspection_time"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="remark" column="remark"/>
+    </resultMap>
+
+    <insert id="insertInvQualityInspection" parameterType="InvQualityInspection" useGeneratedKeys="true" keyProperty="inspectionId">
+        insert into inv_quality_inspection (
+            inspection_no, receipt_batch_id, batch_detail_id, purchase_order_id, purchase_detail_id,
+            inspected_quantity, accepted_quantity, rejected_quantity, concession_quantity,
+            conclusion, defect_level, defect_reason, inspector_user_id, inspector_name,
+            inspection_time, create_by, create_time, remark
+        ) values (
+            #{inspectionNo}, #{receiptBatchId}, #{batchDetailId}, #{purchaseOrderId}, #{purchaseDetailId},
+            #{inspectedQuantity}, #{acceptedQuantity}, #{rejectedQuantity}, #{concessionQuantity},
+            #{conclusion}, #{defectLevel}, #{defectReason}, #{inspectorUserId}, #{inspectorName},
+            #{inspectionTime}, #{createBy}, sysdate(), #{remark}
+        )
+    </insert>
+
+    <select id="selectByReceiptBatchId" resultMap="InvQualityInspectionResult">
+        select inspection_id, inspection_no, receipt_batch_id, batch_detail_id,
+               purchase_order_id, purchase_detail_id, inspected_quantity, accepted_quantity,
+               rejected_quantity, concession_quantity, conclusion, defect_level, defect_reason,
+               inspector_user_id, inspector_name, inspection_time, create_by, create_time, remark
+        from inv_quality_inspection
+        where receipt_batch_id = #{receiptBatchId}
+        order by inspection_time asc, inspection_id asc
+    </select>
+</mapper>

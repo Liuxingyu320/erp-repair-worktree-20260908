@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "releaseId": "system-management-ux-v2-20260714",
+  "status": "development",
+  "executionPolicy": "automatic",
+  "prerequisiteReleaseIds": [
+    "system-management-20260714"
+  ],
+  "sourceDirectory": "sql",
+  "deployDirectory": "docker/mysql/releases/system-management-ux-v2-20260714",
+  "migrationList": "scripts/system-management-ux-v2-migrations-20260714.list",
+  "migrations": [
+    {
+      "file": "erp_system_management_ux_v2_20260714.sql",
+      "sha256": "7a27232cffed4bac6edd6cf07d524d940d9ed1abea25eefeb7b72336c615c56b",
+      "phase": "feature-flag-before-code-cutover",
+      "creates": [],
+      "backupTables": ["sys_config"]
+    }
+  ],
+  "rollback": {
+    "file": "erp_system_management_ux_v2_rollback_20260714.sql",
+    "sha256": "47edb61961f4629c24b22f585965c1bc8213558fb6cdb395e450047c33c8596e",
+    "policy": "remove-only-unchanged-system-owned-false-flag"
+  }
+}

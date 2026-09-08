@@ -1,0 +1,136 @@
+{
+  "schemaVersion": 1,
+  "releaseId": "new-business-20260714",
+  "runId": "uat-20260714-001",
+  "database": "erp_uat_new_business_20260714",
+  "organizationId": "900001",
+  "baseUrl": "https://erp-uat.example.test",
+  "apiBaseUrl": "https://erp-uat.example.test/prod-api",
+  "contexts": {
+    "storeA": { "deptId": "910001", "deptName": "UAT门店A", "deptType": "STORE" },
+    "storeB": { "deptId": "910002", "deptName": "UAT门店B", "deptType": "STORE" },
+    "warehouseA": { "deptId": "920001", "deptName": "UAT仓库A", "deptType": "WAREHOUSE" },
+    "warehouseB": { "deptId": "920002", "deptName": "UAT仓库B", "deptType": "WAREHOUSE" }
+  },
+  "actors": {
+    "employeeStoreA": { "storageState": "/secure/erp-uat/employee-store-a.json" },
+    "employeeStoreB": { "storageState": "/secure/erp-uat/employee-store-b.json" },
+    "managerStoreA": { "storageState": "/secure/erp-uat/manager-store-a.json" },
+    "directSupervisor": { "storageState": "/secure/erp-uat/direct-supervisor.json" },
+    "hrReviewer": { "storageState": "/secure/erp-uat/hr-reviewer.json" },
+    "warehouseEmployeeA": { "storageState": "/secure/erp-uat/warehouse-employee-a.json" },
+    "warehouseManagerA": { "storageState": "/secure/erp-uat/warehouse-manager-a.json" },
+    "warehouseEmployeeB": { "storageState": "/secure/erp-uat/warehouse-employee-b.json" },
+    "admin": { "storageState": "/secure/erp-uat/admin.json" }
+  },
+  "browserPages": [
+    { "id": "health-self", "actor": "employeeStoreA", "context": "storeA", "path": "/mobile/hr/health-certificate", "expectedText": "健康证" },
+    { "id": "customer-store-a", "actor": "employeeStoreA", "context": "storeA", "path": "/mobile/customer", "expectedText": "客户服务卡" },
+    { "id": "customer-store-b", "actor": "employeeStoreB", "context": "storeB", "path": "/mobile/customer", "expectedText": "客户服务卡" },
+    { "id": "transfer-store", "actor": "employeeStoreA", "context": "storeA", "path": "/mobile/transfer", "expectedText": "调拨" },
+    { "id": "transfer-warehouse", "actor": "warehouseEmployeeA", "context": "warehouseA", "path": "/mobile/transfer", "expectedText": "调拨" }
+  ],
+  "apiProbes": [
+    {
+      "id": "health-unauthenticated",
+      "method": "GET",
+      "path": "/system/hr/health-certificate/me",
+      "expect": "failure",
+      "allowedHttpStatuses": [401],
+      "allowedAppCodes": [401],
+      "messageIncludes": ["未认证", "登录", "会话"]
+    },
+    {
+      "id": "health-self",
+      "actor": "employeeStoreA",
+      "context": "storeA",
+      "method": "GET",
+      "path": "/system/hr/health-certificate/me",
+      "expect": "success",
+      "forbiddenKeys": ["bankAccount", "baseSalary", "idCardNumber"]
+    },
+    {
+      "id": "health-hr-list",
+      "actor": "hrReviewer",
+      "context": "storeA",
+      "method": "GET",
+      "path": "/system/hr/health-certificate/list?pageNum=1&pageSize=10",
+      "expect": "success"
+    },
+    {
+      "id": "customer-store-a",
+      "actor": "employeeStoreA",
+      "context": "storeA",
+      "method": "GET",
+      "path": "/inventory/customer/service-card/list?pageNum=1&pageSize=20",
+      "expect": "success",
+      "forbiddenKeys": ["creditLimit", "receivableBalance", "accountBalance", "bankAccount"]
+    },
+    {
+      "id": "customer-cross-store",
+      "actor": "employeeStoreA",
+      "context": "storeB",
+      "method": "GET",
+      "path": "/inventory/customer/service-card/list?pageNum=1&pageSize=20",
+      "expect": "failure",
+      "allowedAppCodes": [500],
+      "messageIncludes": ["无权"]
+    },
+    {
+      "id": "transfer-store-a",
+      "actor": "employeeStoreA",
+      "context": "storeA",
+      "method": "GET",
+      "path": "/inventory/transfer/list?pageNum=1&pageSize=20",
+      "expect": "success"
+    },
+    {
+      "id": "transfer-cross-store",
+      "actor": "employeeStoreA",
+      "context": "storeB",
+      "method": "GET",
+      "path": "/inventory/transfer/list?pageNum=1&pageSize=20",
+      "expect": "failure",
+      "allowedAppCodes": [500],
+      "messageIncludes": ["无权"]
+    }
+  ],
+  "performanceProbes": [
+    {
+      "id": "health-certificate-expiry-list",
+      "actor": "hrReviewer",
+      "context": "storeA",
+      "path": "/system/hr/health-certificate/list?pageNum=1&pageSize=20",
+      "samples": 50,
+      "warmup": 5,
+      "intervalMs": 100
+    },
+    {
+      "id": "customer-service-card-search",
+      "actor": "employeeStoreA",
+      "context": "storeA",
+      "path": "/inventory/customer/service-card/list?pageNum=1&pageSize=20&customerName=PERF-CARD",
+      "samples": 50,
+      "warmup": 5,
+      "intervalMs": 100
+    },
+    {
+      "id": "transfer-workbench",
+      "actor": "warehouseManagerA",
+      "context": "warehouseA",
+      "path": "/inventory/transfer/processing?pageNum=1&pageSize=20",
+      "samples": 50,
+      "warmup": 5,
+      "intervalMs": 100
+    },
+    {
+      "id": "transfer-discrepancy-list",
+      "actor": "warehouseManagerA",
+      "context": "warehouseA",
+      "path": "/inventory/transfer/processing?pageNum=1&pageSize=20&status=discrepancy",
+      "samples": 50,
+      "warmup": 5,
+      "intervalMs": 100
+    }
+  ]
+}

@@ -1,0 +1,149 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.inventory.mapper.InvPurchaseReturnMapper">
+
+    <resultMap type="InvPurchaseReturn" id="InvPurchaseReturnResult">
+        <id property="returnId" column="return_id"/>
+        <result property="returnNo" column="return_no"/>
+        <result property="purchaseOrderId" column="purchase_order_id"/>
+        <result property="purchaseOrderNo" column="purchase_order_no"/>
+        <result property="returnTitle" column="return_title"/>
+        <result property="supplierName" column="supplier_name"/>
+        <result property="totalAmount" column="total_amount"/>
+        <result property="totalQuantity" column="total_quantity"/>
+        <result property="returnedQuantity" column="returned_quantity"/>
+        <result property="remainingQuantity" column="remaining_quantity"/>
+        <result property="returnDate" column="return_date"/>
+        <result property="status" column="status"/>
+        <result property="returnReason" column="return_reason"/>
+        <result property="responsibility" column="responsibility"/>
+        <result property="attachmentUrls" column="attachment_urls"/>
+        <result property="shopDeptId" column="shop_dept_id"/>
+        <result property="shopDeptName" column="shop_dept_name"/>
+        <result property="applicantId" column="applicant_id"/>
+        <result property="applicantName" column="applicant_name"/>
+        <result property="applicantNickName" column="applicant_nick_name"/>
+        <result property="applicantDeptId" column="applicant_dept_id"/>
+        <result property="applicantDeptName" column="applicant_dept_name"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateBy" column="update_by"/>
+        <result property="updateTime" column="update_time"/>
+        <result property="remark" column="remark"/>
+    </resultMap>
+
+    <sql id="selectInvPurchaseReturnVo">
+        select r.return_id, r.return_no, r.purchase_order_id, r.purchase_order_no, r.return_title,
+               r.supplier_name, r.total_amount,
+               coalesce(detail_summary.total_quantity, 0) as total_quantity,
+               coalesce(detail_summary.returned_quantity, 0) as returned_quantity,
+               coalesce(detail_summary.remaining_quantity, 0) as remaining_quantity,
+               r.return_date, r.status, r.return_reason, r.responsibility, r.attachment_urls,
+               r.shop_dept_id,
+               shop_dept.dept_name as shop_dept_name,
+               r.applicant_id, r.applicant_name, u.nick_name as applicant_nick_name,
+               r.applicant_dept_id, applicant_dept.dept_name as applicant_dept_name,
+               r.create_by, r.create_time, r.update_by, r.update_time, r.remark
+        from inv_purchase_return r
+             left join sys_dept shop_dept on shop_dept.dept_id = r.shop_dept_id
+             left join sys_user u on u.user_id = r.applicant_id
+             left join sys_dept applicant_dept on applicant_dept.dept_id = r.applicant_dept_id
+             left join (
+                 select return_id,
+                        sum(coalesce(quantity, 0)) as total_quantity,
+                        sum(coalesce(returned_quantity, 0)) as returned_quantity,
+                        sum(coalesce(quantity, 0) - coalesce(returned_quantity, 0)) as remaining_quantity
+                 from inv_purchase_return_detail
+                 group by return_id
+             ) detail_summary on detail_summary.return_id = r.return_id
+    </sql>
+
+    <select id="selectInvPurchaseReturnList" parameterType="InvPurchaseReturn" resultMap="InvPurchaseReturnResult">
+        <include refid="selectInvPurchaseReturnVo"/>
+        where 1=1
+        <if test="returnNo != null and returnNo != ''">and r.return_no like concat('%', #{returnNo}, '%')</if>
+        <if test="purchaseOrderNo != null and purchaseOrderNo != ''">and r.purchase_order_no like concat('%', #{purchaseOrderNo}, '%')</if>
+        <if test="supplierName != null and supplierName != ''">and r.supplier_name like concat('%', #{supplierName}, '%')</if>
+        <if test="status != null and status != ''">and r.status = #{status}</if>
+        <if test="shopDeptId != null">and r.shop_dept_id = #{shopDeptId}</if>
+        <if test="params.scopeDeptIds != null">and r.shop_dept_id in <foreach collection="params.scopeDeptIds" item="deptId" open="(" close=")" separator=",">#{deptId}</foreach></if>
+        ${params.dataScope}
+        order by r.create_time desc
+    </select>
+
+    <select id="selectMyInvPurchaseReturnList" parameterType="InvPurchaseReturn" resultMap="InvPurchaseReturnResult">
+        <include refid="selectInvPurchaseReturnVo"/>
+        where r.applicant_id = #{applicantId}
+        <if test="returnNo != null and returnNo != ''">and r.return_no like concat('%', #{returnNo}, '%')</if>
+        <if test="status != null and status != ''">and r.status = #{status}</if>
+        <if test="shopDeptId != null">and r.shop_dept_id = #{shopDeptId}</if>
+        order by r.create_time desc
+    </select>
+
+    <select id="selectInvPurchaseReturnById" parameterType="Long" resultMap="InvPurchaseReturnResult">
+        <include refid="selectInvPurchaseReturnVo"/>
+        where r.return_id = #{returnId}
+    </select>
+
+    <select id="countBySupplierNameAndShop" resultType="int">
+        select count(1)
+        from inv_purchase_return
+        where supplier_name = #{supplierName}
+          and shop_dept_id = #{shopDeptId}
+    </select>
+
+    <insert id="insertInvPurchaseReturn" parameterType="InvPurchaseReturn" useGeneratedKeys="true" keyProperty="returnId">
+        insert into inv_purchase_return (
+            return_no, purchase_order_id, purchase_order_no, return_title, supplier_name,
+            total_amount, return_date, status, return_reason, responsibility, attachment_urls, shop_dept_id,
+            applicant_id, applicant_name, applicant_dept_id,
+            create_by, create_time, remark
+        ) values (
+            #{returnNo}, #{purchaseOrderId}, #{purchaseOrderNo}, #{returnTitle}, #{supplierName},
+            #{totalAmount}, #{returnDate}, #{status}, #{returnReason}, #{responsibility}, #{attachmentUrls}, #{shopDeptId},
+            #{applicantId}, #{applicantName}, #{applicantDeptId},
+            #{createBy}, sysdate(), #{remark}
+        )
+    </insert>
+
+    <update id="updateInvPurchaseReturn" parameterType="InvPurchaseReturn">
+        update inv_purchase_return
+        <set>
+            <if test="returnTitle != null and returnTitle != ''">return_title = #{returnTitle},</if>
+            <if test="supplierName != null and supplierName != ''">supplier_name = #{supplierName},</if>
+            <if test="totalAmount != null">total_amount = #{totalAmount},</if>
+            <if test="returnDate != null">return_date = #{returnDate},</if>
+            <if test="status != null">status = #{status},</if>
+            return_reason = #{returnReason},
+            responsibility = #{responsibility},
+            attachment_urls = #{attachmentUrls},
+            remark = #{remark},
+            update_by = #{updateBy}, update_time = sysdate()
+        </set>
+        where return_id = #{returnId}
+    </update>
+
+    <update id="updateInvPurchaseReturnStatus">
+        update inv_purchase_return
+        set status = #{status}, update_by = #{updateBy}, update_time = sysdate()
+        where return_id = #{returnId}
+    </update>
+
+    <select id="selectInvPurchaseReturnByIdForUpdate" parameterType="Long" resultMap="InvPurchaseReturnResult">
+        select return_id, return_no, purchase_order_id, purchase_order_no, return_title,
+               supplier_name, total_amount, return_date, status, return_reason, responsibility,
+               attachment_urls, shop_dept_id,
+               applicant_id, applicant_name, applicant_dept_id,
+               create_by, create_time, update_by, update_time, remark
+        from inv_purchase_return
+        where return_id = #{returnId} for update
+    </select>
+
+    <delete id="deleteInvPurchaseReturnByIds" parameterType="Long">
+        delete from inv_purchase_return where return_id in
+        <foreach collection="array" item="returnId" open="(" close=")" separator=",">
+            #{returnId}
+        </foreach>
+    </delete>
+
+</mapper>

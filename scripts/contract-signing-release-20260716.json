@@ -1,0 +1,249 @@
+{
+  "schemaVersion": 1,
+  "releaseId": "contract-signing-release-a-20260716",
+  "status": "development",
+  "executionPolicy": "manual-phased",
+  "sourceDirectory": "sql",
+  "deployDirectory": "docker/mysql/db",
+  "migrationList": "scripts/contract-signing-migrations-20260716.list",
+  "migrationCount": 4,
+  "migrations": [
+    {
+      "file": "erp_oa_sign_menu_permission_repair_20260716.sql",
+      "sha256": "a46dcc124db641bc609c063879e440ca1cd1520ed9e489a0575a7ab4d41025e8",
+      "phase": "01-menu-permission-repair-before-lifecycle",
+      "creates": [],
+      "backupTables": [
+        "oa_sign_notification_outbox",
+        "oa_sign_task",
+        "oa_sign_task_hr_reassignment",
+        "sys_config",
+        "sys_menu",
+        "sys_role",
+        "sys_role_menu",
+        "sys_sign_hr_menu_grant",
+        "sys_sign_hr_state",
+        "sys_user_role"
+      ],
+      "requiresTables": [
+        "oa_sign_notification_outbox",
+        "oa_sign_task",
+        "oa_sign_task_hr_reassignment",
+        "sys_config",
+        "sys_menu",
+        "sys_role",
+        "sys_role_menu",
+        "sys_sign_hr_menu_grant",
+        "sys_sign_hr_state",
+        "sys_user",
+        "sys_user_role"
+      ],
+      "requiresColumns": {
+        "oa_sign_notification_outbox": [
+          "outbox_id",
+          "channel",
+          "recipient_user_id",
+          "business_key",
+          "payload_json",
+          "status",
+          "retry_count",
+          "next_retry_time",
+          "last_result",
+          "last_error",
+          "version",
+          "created_time",
+          "updated_time"
+        ],
+        "oa_sign_task": ["task_id", "assigned_hr_user_id", "status", "version"],
+        "oa_sign_task_hr_reassignment": [
+          "task_id",
+          "old_hr_user_id",
+          "new_hr_user_id",
+          "task_status",
+          "reassigned_time"
+        ],
+        "sys_config": ["config_id", "config_key", "config_value"],
+        "sys_menu": [
+          "menu_id",
+          "menu_name",
+          "parent_id",
+          "order_num",
+          "path",
+          "component",
+          "query",
+          "route_name",
+          "is_frame",
+          "is_cache",
+          "menu_type",
+          "visible",
+          "status",
+          "perms",
+          "icon",
+          "create_by",
+          "create_time",
+          "update_by",
+          "update_time",
+          "remark"
+        ],
+        "sys_role": [
+          "role_id",
+          "role_name",
+          "role_key",
+          "role_sort",
+          "data_scope",
+          "menu_check_strictly",
+          "dept_check_strictly",
+          "status",
+          "del_flag",
+          "create_by",
+          "create_time",
+          "update_by",
+          "update_time",
+          "remark"
+        ],
+        "sys_role_menu": ["role_id", "menu_id"],
+        "sys_sign_hr_menu_grant": ["role_id", "menu_id", "hr_user_id", "created_time"],
+        "sys_sign_hr_state": ["state_id", "hr_user_id", "managed_role_id", "updated_time"],
+        "sys_user": ["user_id", "status", "del_flag"],
+        "sys_user_role": ["user_id", "role_id"]
+      },
+      "requiresIndexes": [
+        {
+          "table": "oa_sign_notification_outbox",
+          "name": "uk_oa_sign_notification_business",
+          "columns": ["channel", "recipient_user_id", "business_key"],
+          "unique": true
+        }
+      ],
+      "requiresColumnDefinitions": [
+        {
+          "table": "oa_sign_notification_outbox",
+          "name": "payload_json",
+          "dataType": "json",
+          "nullable": false
+        }
+      ],
+      "requiresDataAssertions": [
+        "oa_sign_notification_outbox.payload_json must be valid JSON"
+      ]
+    },
+    {
+      "file": "erp_oa_sign_package_lifecycle_20260716.sql",
+      "sha256": "9ca9f8845d1741fea7c1ef203e01ad05379ff9c20ba1583f9b3535e8fec45742",
+      "phase": "02-lifecycle-deadline-after-menu",
+      "creates": [],
+      "backupTables": ["oa_sign_package", "oa_sign_task"],
+      "requiresTables": ["oa_sign_package", "oa_sign_task"],
+      "requiresColumns": {
+        "oa_sign_package": [
+          "package_id",
+          "status",
+          "sent_time",
+          "sign_deadline",
+          "employee_id",
+          "shop_dept_id",
+          "plan_version_id",
+          "version",
+          "task_id"
+        ],
+        "oa_sign_task": [
+          "task_id",
+          "status",
+          "sent_time",
+          "sign_deadline",
+          "employee_id",
+          "shop_dept_id",
+          "plan_version_id",
+          "version",
+          "package_id",
+          "assigned_hr_user_id",
+          "created_time",
+          "cancelled_time"
+        ]
+      }
+    },
+    {
+      "file": "erp_oa_sign_document_policy_snapshot_20260716.sql",
+      "sha256": "b4eeabaa02f606258777d09c3a753b45c3be9cf0e18ea1e84d2d5a959c66455a",
+      "phase": "03-document-policy-snapshot-after-lifecycle",
+      "creates": [],
+      "backupTables": [
+        "oa_sign_package_document",
+        "oa_sign_plan_version_template",
+        "oa_sign_template"
+      ],
+      "requiresTables": [
+        "oa_sign_package_document",
+        "oa_sign_plan_version_template",
+        "oa_sign_template"
+      ],
+      "requiresColumns": {
+        "oa_sign_package_document": [
+          "document_id",
+          "package_id",
+          "employee_sign_required"
+        ],
+        "oa_sign_plan_version_template": ["id", "company_seal_position_json"],
+        "oa_sign_template": ["template_id", "company_seal_position_json"]
+      }
+    },
+    {
+      "file": "erp_system_user_push_delivery_20260717.sql",
+      "sha256": "0ffbe86c227144306a0835afafb157a2e2cec7f62f6d82211580c0ecc2646a6d",
+      "phase": "04-mobile-push-ledger-before-backend",
+      "creates": ["sys_user_push_delivery"],
+      "backupTables": ["sys_user_notification"],
+      "requiresTables": ["sys_user_notification"],
+      "requiresColumns": {
+        "sys_user_notification": [
+          "notification_id",
+          "user_id",
+          "channel",
+          "business_key",
+          "status"
+        ]
+      }
+    }
+  ],
+  "executionPhases": [
+    "01-menu-permission-repair",
+    "02-lifecycle-deadline",
+    "03-document-policy-snapshot",
+    "04-mobile-push-ledger",
+    "05-backend-deploy",
+    "06-dedicated-non-admin-hr-permission-uat",
+    "07-frontend-deploy"
+  ],
+  "legacyRoleBoundary": {
+    "preserveMenuIds": [4520, 4521, 4522, 4523, 4524, 4525, 4526],
+    "taskCenterMenuId": 9650,
+    "taskCenterGrantSourceMenuId": 4600,
+    "packageOnlyRolesMayReceiveTaskCenter": false
+  },
+  "featureDefaults": {
+    "oa.sign.expiry.enabled": false,
+    "oa.sign.reminder.enabled": false,
+    "oa.sign.emergency-create.enabled": false,
+    "VUE_APP_SIGN_EMERGENCY_CREATE_ENABLED": false,
+    "plan.autoSendCondition.enabled": false
+  },
+  "externalGates": {
+    "nativeMySql57": {
+      "requiredWhenProductionIs57": true,
+      "status": "external-pending",
+      "dockerOrMySql8CannotSubstitute": true
+    },
+    "signedUat": {
+      "required": true,
+      "status": "external-pending",
+      "requiresSeparateLegalAndTestApprovers": true
+    }
+  },
+  "rollbackPolicy": {
+    "forwardOnlySchema": true,
+    "firstAction": "disable-entry-emergency-create-and-schedulers",
+    "deleteBusinessEvidence": false,
+    "dropColumnsOrTablesWithBusinessData": false,
+    "preserveLegacyPackageMenus": true
+  }
+}

@@ -1,0 +1,368 @@
+{
+  "checks": {
+    "a4TolerancePoints": 1.0,
+    "blankPageDefinition": "page text is empty after whitespace removal",
+    "expectedPageCount": 112,
+    "expectedPdfCount": 18,
+    "forbiddenText": [
+      "${",
+      "待 HR 确认"
+    ],
+    "pageFooterBaselinePoints": 36,
+    "pageFooterFontSizePoints": 9,
+    "pageFooterPattern": "第(\\d+)页共(\\d+)页",
+    "pageFooterTemplateTypes": [
+      "ONBOARD_LABOR_CONTRACT"
+    ]
+  },
+  "documents": [
+    {
+      "blankPages": [],
+      "file": "../../../output/sign-release/20260720-v6/qa/rendered/normal/05_ONBOARD_COMMITMENT_v6-inline-fixed-evidence_normal/05_ONBOARD_COMMITMENT_v6-inline-fixed-evidence_normal.pdf",
+      "forbiddenTextHits": [],
+      "nonA4Pages": [],
+      "pageCount": 2,
+      "pageFooterErrors": [],
+      "pageSizePoints": [
+        [
+          595.304,
+          841.89
+        ]
+      ],
+      "profile": "normal",
+      "sha256": "a99c44af7bfdeeb3ae476fed6c46b6f8a1003b2ee667b85b84dde8b41ffb5fd2",
+      "size": 91828,
+      "templateType": "ONBOARD_COMMITMENT"
+    },
+    {
+      "blankPages": [],
+      "file": "../../../output/sign-release/20260720-v6/qa/rendered/normal/09_ONBOARD_LABOR_CONTRACT_v6-inline-fixed-evidence_normal/09_ONBOARD_LABOR_CONTRACT_v6-inline-fixed-evidence_normal.pdf",
+      "forbiddenTextHits": [],
+      "nonA4Pages": [],
+      "pageCount": 18,
+      "pageFooterErrors": [],
+      "pageSizePoints": [
+        [
+          595.304,
+          841.89
+        ]
+      ],
+      "profile": "normal",
+      "sha256": "f24c3bc0c326c12d0f6175e9661196e87d3d1f059fff67584b692c1b1198f4bc",
+      "size": 905201,
+      "templateType": "ONBOARD_LABOR_CONTRACT"
+    },
+    {
+      "blankPages": [],
+      "file": "../../../output/sign-release/20260720-v6/qa/rendered/normal/10_ONBOARD_HANDBOOK_RECEIPT_v6-inline-fixed-evidence_normal/10_ONBOARD_HANDBOOK_RECEIPT_v6-inline-fixed-evidence_normal.pdf",
+      "forbiddenTextHits": [],
+      "nonA4Pages": [],
+      "pageCount": 2,
+      "pageFooterErrors": [],
+      "pageSizePoints": [
+        [
+          595.304,
+          841.89
+        ]
+      ],
+      "profile": "normal",
+      "sha256": "71060ce61a2b1bb01b4d4718c16919ee74f57f4fdcc512180cf338891e51de36",
+      "size": 48261,
+      "templateType": "ONBOARD_HANDBOOK_RECEIPT"
+    },
+    {
+      "blankPages": [],
+      "file": "../../../output/sign-release/20260720-v6/qa/rendered/normal/11_ONBOARD_SALARY_CONFIRM_A_v6-inline-fixed-evidence_normal/11_ONBOARD_SALARY_CONFIRM_A_v6-inline-fixed-evidence_normal.pdf",
+      "forbiddenTextHits": [],
+      "nonA4Pages": [],
+      "pageCount": 3,
+      "pageFooterErrors": [],
+      "pageSizePoints": [
+        [
+          595.304,
+          841.89
+        ]
+      ],
+      "profile": "normal",
+      "sha256": "2ece34124323c9340e86d42e4767de08c32f53c283d91555c6a176d0737799f7",
+      "size": 138917,
+      "templateType": "ONBOARD_SALARY_CONFIRM"
+    },
+    {
+      "blankPages": [],
+      "file": "../../../output/sign-release/20260720-v6/qa/rendered/normal/12_ONBOARD_SALARY_CONFIRM_B_v6-inline-fixed-evidence_normal/12_ONBOARD_SALARY_CONFIRM_B_v6-inline-fixed-evidence_normal.pdf",
+      "forbiddenTextHits": [],
+      "nonA4Pages": [],
+      "pageCount": 2,
+      "pageFooterErrors": [],
+      "pageSizePoints": [
+        [
+          595.304,
+          841.89
+        ]
+      ],
+      "profile": "normal",
+      "sha256": "581ebb6d7d10b699ad9bdc4ab36112c5bef2ea15795d26a8d43dd5bbf7b414ff",
+      "size": 109634,
+      "templateType": "ONBOARD_SALARY_CONFIRM"
+    },
+    {
+      "blankPages": [],
+      "file": "../../../output/sign-release/20260720-v6/qa/rendered/normal/13_ONBOARD_SERVICE_CONTRACT_v6-inline-fixed-evidence_normal/13_ONBOARD_SERVICE_CONTRACT_v6-inline-fixed-evidence_normal.pdf",
+      "forbiddenTextHits": [],
+      "nonA4Pages": [],
+      "pageCount": 15,
+      "pageFooterErrors": [],
+      "pageSizePoints": [
+        [
+          595.304,
+          841.89
+        ]
+      ],
+      "profile": "normal",
+      "sha256": "f2afe1fc58c8f36da792c11dcb9007700c3f73b3cbd6cc88ba7b50e69d2c6d39",
+      "size": 530928,
+      "templateType": "ONBOARD_SERVICE_CONTRACT"
+    },
+    {
+      "blankPages": [],
+      "file": "../../../output/sign-release/20260720-v6/qa/rendered/normal/14_ONBOARD_SERVICE_RECEIPT_v6-inline-fixed-evidence_normal/14_ONBOARD_SERVICE_RECEIPT_v6-inline-fixed-evidence_normal.pdf",
+      "forbiddenTextHits": [],
+      "nonA4Pages": [],
+      "pageCount": 2,
+      "pageFooterErrors": [],
+      "pageSizePoints": [
+        [
+          595.304,
+          841.89
+        ]
+      ],
+      "profile": "normal",
+      "sha256": "cb6713f79b85cb815a5d2f2c946b928e2efbcae5f59a0b2494d8d75b522d72d0",
+      "size": 88934,
+      "templateType": "ONBOARD_SERVICE_RECEIPT"
+    },
+    {
+      "blankPages": [],
+      "file": "../../../output/sign-release/20260720-v6/qa/rendered/normal/15_ONBOARD_CONFIDENTIAL_NONCOMPETE_v6-inline-fixed-evidence_normal/15_ONBOARD_CONFIDENTIAL_NONCOMPETE_v6-inline-fixed-evidence_normal.pdf",
+      "forbiddenTextHits": [],
+      "nonA4Pages": [],
+      "pageCount": 6,
+      "pageFooterErrors": [],
+      "pageSizePoints": [
+        [
+          595.304,
+          841.89
+        ]
+      ],
+      "profile": "normal",
+      "sha256": "90fbc0344442a12cf27ec2e7af49de4377161475ab3f4a43970cf0d5b6663f97",
+      "size": 202384,
+      "templateType": "ONBOARD_CONFIDENTIAL_NONCOMPETE"
+    },
+    {
+      "blankPages": [],
+      "file": "../../../output/sign-release/20260720-v6/qa/rendered/normal/16_ONBOARD_MINOR_NONSTUDENT_DECLARATION_v6-inline-fixed-evidence_normal/16_ONBOARD_MINOR_NONSTUDENT_DECLARATION_v6-inline-fixed-evidence_normal.pdf",
+      "forbiddenTextHits": [],
+      "nonA4Pages": [],
+      "pageCount": 1,
+      "pageFooterErrors": [],
+      "pageSizePoints": [
+        [
+          595.304,
+          841.89
+        ]
+      ],
+      "profile": "normal",
+      "sha256": "ff3ca880cc104a82e93057b5dda6ab5b1012762f7f04a0d2d633147feee54113",
+      "size": 70707,
+      "templateType": "ONBOARD_MINOR_NONSTUDENT_DECLARATION"
+    },
+    {
+      "blankPages": [],
+      "file": "../../../output/sign-release/20260720-v6/qa/rendered/database-max/05_ONBOARD_COMMITMENT_v6-inline-fixed-evidence_database-max/05_ONBOARD_COMMITMENT_v6-inline-fixed-evidence_database-max.pdf",
+      "forbiddenTextHits": [],
+      "nonA4Pages": [],
+      "pageCount": 2,
+      "pageFooterErrors": [],
+      "pageSizePoints": [
+        [
+          595.304,
+          841.89
+        ]
+      ],
+      "profile": "database-max",
+      "sha256": "77497bd3eb48cc39e13ec3c4d3861c5d70ecaa9daab11b93a83f418d2d49213a",
+      "size": 91455,
+      "templateType": "ONBOARD_COMMITMENT"
+    },
+    {
+      "blankPages": [],
+      "file": "../../../output/sign-release/20260720-v6/qa/rendered/database-max/09_ONBOARD_LABOR_CONTRACT_v6-inline-fixed-evidence_database-max/09_ONBOARD_LABOR_CONTRACT_v6-inline-fixed-evidence_database-max.pdf",
+      "forbiddenTextHits": [],
+      "nonA4Pages": [],
+      "pageCount": 20,
+      "pageFooterErrors": [],
+      "pageSizePoints": [
+        [
+          595.304,
+          841.89
+        ]
+      ],
+      "profile": "database-max",
+      "sha256": "886e330053aa83e0a15a08f116f532b828867c2aa646f7195ecbdf8be6eec775",
+      "size": 936518,
+      "templateType": "ONBOARD_LABOR_CONTRACT"
+    },
+    {
+      "blankPages": [],
+      "file": "../../../output/sign-release/20260720-v6/qa/rendered/database-max/10_ONBOARD_HANDBOOK_RECEIPT_v6-inline-fixed-evidence_database-max/10_ONBOARD_HANDBOOK_RECEIPT_v6-inline-fixed-evidence_database-max.pdf",
+      "forbiddenTextHits": [],
+      "nonA4Pages": [],
+      "pageCount": 2,
+      "pageFooterErrors": [],
+      "pageSizePoints": [
+        [
+          595.304,
+          841.89
+        ]
+      ],
+      "profile": "database-max",
+      "sha256": "5c2bf2ca70e7c919b11d224321aa13289f949520d0fdef5a047edf0a72c1c226",
+      "size": 46357,
+      "templateType": "ONBOARD_HANDBOOK_RECEIPT"
+    },
+    {
+      "blankPages": [],
+      "file": "../../../output/sign-release/20260720-v6/qa/rendered/database-max/11_ONBOARD_SALARY_CONFIRM_A_v6-inline-fixed-evidence_database-max/11_ONBOARD_SALARY_CONFIRM_A_v6-inline-fixed-evidence_database-max.pdf",
+      "forbiddenTextHits": [],
+      "nonA4Pages": [],
+      "pageCount": 4,
+      "pageFooterErrors": [],
+      "pageSizePoints": [
+        [
+          595.304,
+          841.89
+        ]
+      ],
+      "profile": "database-max",
+      "sha256": "8efa003c0d5b1d0647e006e5a9b8ca08119eca2c33588d5d54a2930c33663f8e",
+      "size": 136785,
+      "templateType": "ONBOARD_SALARY_CONFIRM"
+    },
+    {
+      "blankPages": [],
+      "file": "../../../output/sign-release/20260720-v6/qa/rendered/database-max/12_ONBOARD_SALARY_CONFIRM_B_v6-inline-fixed-evidence_database-max/12_ONBOARD_SALARY_CONFIRM_B_v6-inline-fixed-evidence_database-max.pdf",
+      "forbiddenTextHits": [],
+      "nonA4Pages": [],
+      "pageCount": 3,
+      "pageFooterErrors": [],
+      "pageSizePoints": [
+        [
+          595.304,
+          841.89
+        ]
+      ],
+      "profile": "database-max",
+      "sha256": "ea25eb5305c964088d05c9cd1e11c280e71959af59dcce89cf2e7cda84e71c3b",
+      "size": 107620,
+      "templateType": "ONBOARD_SALARY_CONFIRM"
+    },
+    {
+      "blankPages": [],
+      "file": "../../../output/sign-release/20260720-v6/qa/rendered/database-max/13_ONBOARD_SERVICE_CONTRACT_v6-inline-fixed-evidence_database-max/13_ONBOARD_SERVICE_CONTRACT_v6-inline-fixed-evidence_database-max.pdf",
+      "forbiddenTextHits": [],
+      "nonA4Pages": [],
+      "pageCount": 18,
+      "pageFooterErrors": [],
+      "pageSizePoints": [
+        [
+          595.304,
+          841.89
+        ]
+      ],
+      "profile": "database-max",
+      "sha256": "ecc4f74fd92a24e447ab3afced8b59017de0b08df59f04c0d533b0cef9b0e165",
+      "size": 524963,
+      "templateType": "ONBOARD_SERVICE_CONTRACT"
+    },
+    {
+      "blankPages": [],
+      "file": "../../../output/sign-release/20260720-v6/qa/rendered/database-max/14_ONBOARD_SERVICE_RECEIPT_v6-inline-fixed-evidence_database-max/14_ONBOARD_SERVICE_RECEIPT_v6-inline-fixed-evidence_database-max.pdf",
+      "forbiddenTextHits": [],
+      "nonA4Pages": [],
+      "pageCount": 2,
+      "pageFooterErrors": [],
+      "pageSizePoints": [
+        [
+          595.304,
+          841.89
+        ]
+      ],
+      "profile": "database-max",
+      "sha256": "0c4f321a253728926f186af1ead2e34646fba46d8feb3d5ac1ce3840eba71b7e",
+      "size": 87087,
+      "templateType": "ONBOARD_SERVICE_RECEIPT"
+    },
+    {
+      "blankPages": [],
+      "file": "../../../output/sign-release/20260720-v6/qa/rendered/database-max/15_ONBOARD_CONFIDENTIAL_NONCOMPETE_v6-inline-fixed-evidence_database-max/15_ONBOARD_CONFIDENTIAL_NONCOMPETE_v6-inline-fixed-evidence_database-max.pdf",
+      "forbiddenTextHits": [],
+      "nonA4Pages": [],
+      "pageCount": 8,
+      "pageFooterErrors": [],
+      "pageSizePoints": [
+        [
+          595.304,
+          841.89
+        ]
+      ],
+      "profile": "database-max",
+      "sha256": "d7ac2420dbeafc758ffc5027621aea5d2cfc7e8537850c46a3f7c2140655934d",
+      "size": 195658,
+      "templateType": "ONBOARD_CONFIDENTIAL_NONCOMPETE"
+    },
+    {
+      "blankPages": [],
+      "file": "../../../output/sign-release/20260720-v6/qa/rendered/database-max/16_ONBOARD_MINOR_NONSTUDENT_DECLARATION_v6-inline-fixed-evidence_database-max/16_ONBOARD_MINOR_NONSTUDENT_DECLARATION_v6-inline-fixed-evidence_database-max.pdf",
+      "forbiddenTextHits": [],
+      "nonA4Pages": [],
+      "pageCount": 2,
+      "pageFooterErrors": [],
+      "pageSizePoints": [
+        [
+          595.304,
+          841.89
+        ]
+      ],
+      "profile": "database-max",
+      "sha256": "5f1a0272731b656a2186beacc5b6fb34b22933f996083dd1a2ea42594509a229",
+      "size": 70797,
+      "templateType": "ONBOARD_MINOR_NONSTUDENT_DECLARATION"
+    }
+  ],
+  "generatedBy": "scripts/contract/verify_beijing_sign_v6_render_qa_20260720.py",
+  "manualVisualApproval": "not-claimed",
+  "pathBase": "evidence-directory",
+  "productionMutation": false,
+  "release": "onboard-sign-20260720-v6-inline-fixed-evidence",
+  "schemaVersion": 1,
+  "scopeExclusions": {
+    "deliveryAddress": "user-excluded; existing contract behavior was retained and was not edited",
+    "employeeHandbookBody": "user-excluded; authoritative body remains an explicit retained risk and was not created or edited"
+  },
+  "sourceManifest": "../../../output/sign-release/20260720-v6/manifest-v6-inline-fixed-evidence.json",
+  "status": "passed",
+  "summary": {
+    "blankPageCount": 0,
+    "forbiddenTextHitCount": 0,
+    "nonA4PageCount": 0,
+    "pageCount": 112,
+    "pageFooterErrorCount": 0,
+    "pdfCount": 18
+  },
+  "tools": {
+    "pdfinfo": "pdfinfo version 26.05.0",
+    "pdftotext": "pdftotext version 26.05.0"
+  }
+}

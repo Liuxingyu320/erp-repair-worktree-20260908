@@ -1,0 +1,20 @@
+# 基础镜像
+FROM mysql:5.7
+# author
+MAINTAINER erp
+
+# Keep SQL outside docker-entrypoint-initdb.d so filename sorting cannot override
+# the reviewed dependency order in bootstrap-files.list. The single sourced
+# entrypoint script executes that list in order through the official image helper;
+# files listed only in manual-files.list remain inert under /opt/erp-bootstrap/sql.
+COPY ./db/*.sql /opt/erp-bootstrap/sql/
+COPY ./bootstrap-files.list /opt/erp-bootstrap/bootstrap-files.list
+COPY ./manual-files.list /opt/erp-bootstrap/manual-files.list
+COPY ./run-bootstrap.sh /docker-entrypoint-initdb.d/00-erp-bootstrap.sh
+
+# A non-executable .sh file is sourced by the official MySQL entrypoint, which
+# makes docker_process_sql available without duplicating password handling.
+RUN chmod 0444 /opt/erp-bootstrap/bootstrap-files.list \
+    /opt/erp-bootstrap/manual-files.list \
+    /opt/erp-bootstrap/sql/*.sql \
+    /docker-entrypoint-initdb.d/00-erp-bootstrap.sh

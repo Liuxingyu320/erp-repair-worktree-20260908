@@ -1,0 +1,250 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.system.mapper.HrHealthCertificateApprovalStartOutboxMapper">
+
+    <resultMap id="OutboxResult" type="com.erp.system.domain.HrHealthCertificateApprovalStartOutbox">
+        <id property="outboxId" column="outbox_id"/>
+        <result property="certificateId" column="certificate_id"/>
+        <result property="businessRound" column="business_round"/>
+        <result property="idempotencyKey" column="idempotency_key"/>
+        <result property="requestJson" column="request_json"/>
+        <result property="status" column="status"/>
+        <result property="retryCount" column="retry_count"/>
+        <result property="nextRetryTime" column="next_retry_time"/>
+        <result property="lastHttpStatus" column="last_http_status"/>
+        <result property="lastErrorCode" column="last_error_code"/>
+        <result property="lastErrorMessage" column="last_error_message"/>
+        <result property="remoteInstanceId" column="remote_instance_id"/>
+        <result property="remoteStatus" column="remote_status"/>
+        <result property="remoteBusinessRound" column="remote_business_round"/>
+        <result property="certificateVersion" column="certificate_version"/>
+        <result property="version" column="version"/>
+        <result property="remoteSucceededTime" column="remote_succeeded_time"/>
+        <result property="completedTime" column="completed_time"/>
+        <result property="manualReplayCount" column="manual_replay_count"/>
+        <result property="manualReplayBy" column="manual_replay_by"/>
+        <result property="manualReplayTime" column="manual_replay_time"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateBy" column="update_by"/>
+        <result property="updateTime" column="update_time"/>
+    </resultMap>
+
+    <sql id="columns">
+        outbox_id, certificate_id, business_round, idempotency_key,
+        request_json, status, retry_count, next_retry_time, last_http_status,
+        last_error_code, last_error_message, remote_instance_id, remote_status,
+        remote_business_round, certificate_version, version,
+        remote_succeeded_time, completed_time,
+        manual_replay_count, manual_replay_by, manual_replay_time, create_by,
+        create_time, update_by, update_time
+    </sql>
+
+    <insert id="insertOutbox"
+            parameterType="com.erp.system.domain.HrHealthCertificateApprovalStartOutbox"
+            useGeneratedKeys="true" keyProperty="outboxId">
+        insert ignore into hr_health_certificate_approval_start_outbox (
+            certificate_id, business_round, idempotency_key, request_json,
+            status, retry_count, next_retry_time, certificate_version,
+            version, create_by, create_time, update_time
+        ) values (
+            #{certificateId}, #{businessRound}, #{idempotencyKey},
+            #{requestJson}, #{status}, #{retryCount}, #{nextRetryTime},
+            #{certificateVersion}, #{version}, #{createBy}, sysdate(), sysdate()
+        )
+    </insert>
+
+    <select id="selectById" resultMap="OutboxResult">
+        select <include refid="columns"/>
+        from hr_health_certificate_approval_start_outbox
+        where outbox_id = #{outboxId}
+    </select>
+
+    <select id="selectByIdForUpdate" resultMap="OutboxResult">
+        select <include refid="columns"/>
+        from hr_health_certificate_approval_start_outbox
+        where outbox_id = #{outboxId}
+        for update
+    </select>
+
+    <select id="selectByCertificateRound" resultMap="OutboxResult">
+        select <include refid="columns"/>
+        from hr_health_certificate_approval_start_outbox
+        where certificate_id = #{certificateId}
+          and business_round = #{businessRound}
+        limit 1
+    </select>
+
+    <select id="selectDueOutboxes" resultMap="OutboxResult">
+        select <include refid="columns"/>
+        from hr_health_certificate_approval_start_outbox
+        where (status in ('PENDING', 'RETRY')
+               and (next_retry_time is null or next_retry_time &lt;= #{dueTime}))
+           or status = 'REMOTE_SUCCEEDED'
+           or (status = 'SUBMITTING'
+               and update_time &lt;= #{staleSubmittingBefore})
+        order by case status when 'REMOTE_SUCCEEDED' then 0
+                     when 'SUBMITTING' then 1 when 'RETRY' then 2 else 3 end,
+                 coalesce(next_retry_time, create_time), outbox_id
+        limit #{limit}
+    </select>
+
+    <select id="selectOpsOutboxes"
+            parameterType="com.erp.system.domain.vo.HrHealthCertificateApprovalStartOutboxQuery"
+            resultType="com.erp.system.domain.vo.HrHealthCertificateApprovalStartOutboxVo">
+        select o.outbox_id outboxId, o.certificate_id certificateId,
+               o.business_round businessRound,
+               o.idempotency_key idempotencyKey, o.status,
+               o.retry_count retryCount, o.next_retry_time nextRetryTime,
+               o.last_http_status lastHttpStatus,
+               o.last_error_code lastErrorCode,
+               o.last_error_message lastErrorMessage,
+               o.remote_instance_id remoteInstanceId,
+               o.remote_status remoteStatus,
+               o.remote_business_round remoteBusinessRound, o.version,
+               o.manual_replay_count manualReplayCount,
+               o.manual_replay_by manualReplayBy,
+               o.manual_replay_time manualReplayTime,
+               o.create_time createTime, o.update_time updateTime
+        from hr_health_certificate_approval_start_outbox o
+        left join hr_employee_health_certificate c
+                on c.certificate_id = o.certificate_id and c.del_flag = '0'
+        left join sys_user u on u.user_id = c.user_id and u.del_flag = '0'
+        left join sys_dept d on d.dept_id = u.dept_id
+        where 1 = 1
+        <if test="outboxId != null">and o.outbox_id = #{outboxId}</if>
+        <if test="status != null and status != ''">and o.status = #{status}</if>
+        ${params.dataScope}
+        order by case o.status when 'FAILED' then 0
+                     when 'REMOTE_SUCCEEDED' then 1
+                     when 'SUBMITTING' then 2 when 'RETRY' then 3 else 4 end,
+                 o.update_time desc, o.outbox_id desc
+    </select>
+
+    <select id="selectSummary"
+            parameterType="com.erp.system.domain.vo.HrHealthCertificateApprovalStartOutboxQuery"
+            resultType="com.erp.system.domain.vo.HrHealthCertificateApprovalStartSummaryVo">
+        select coalesce(sum(case when o.status = 'PENDING' then 1 else 0 end), 0) pendingCount,
+               coalesce(sum(case when o.status = 'RETRY' then 1 else 0 end), 0) retryCount,
+               coalesce(sum(case when o.status = 'SUBMITTING' then 1 else 0 end), 0) submittingCount,
+               coalesce(sum(case when o.status = 'REMOTE_SUCCEEDED' then 1 else 0 end), 0) remoteSucceededCount,
+               coalesce(sum(case when o.status = 'FAILED' then 1 else 0 end), 0) failedCount,
+               coalesce(sum(case when o.status = 'SUCCEEDED' then 1 else 0 end), 0) succeededCount,
+               min(case when o.status in ('PENDING', 'RETRY', 'SUBMITTING', 'REMOTE_SUCCEEDED')
+                        then o.create_time end) oldestWaitingTime,
+               coalesce(timestampdiff(second,
+                   min(case when o.status in ('PENDING', 'RETRY', 'SUBMITTING', 'REMOTE_SUCCEEDED')
+                            then o.create_time end), sysdate()), 0) oldestWaitingSeconds
+        from hr_health_certificate_approval_start_outbox o
+        left join hr_employee_health_certificate c
+                on c.certificate_id = o.certificate_id and c.del_flag = '0'
+        left join sys_user u on u.user_id = c.user_id and u.del_flag = '0'
+        left join sys_dept d on d.dept_id = u.dept_id
+        where 1 = 1
+        ${params.dataScope}
+    </select>
+
+    <select id="selectScopedByIdForUpdate"
+            parameterType="com.erp.system.domain.vo.HrHealthCertificateApprovalStartOutboxQuery"
+            resultMap="OutboxResult">
+        select o.*
+        from hr_health_certificate_approval_start_outbox o
+        inner join hr_employee_health_certificate c
+                on c.certificate_id = o.certificate_id and c.del_flag = '0'
+        inner join sys_user u on u.user_id = c.user_id and u.del_flag = '0'
+        left join sys_dept d on d.dept_id = u.dept_id
+        where o.outbox_id = #{outboxId}
+        ${params.dataScope}
+        for update
+    </select>
+
+    <update id="claimForSubmitting">
+        update hr_health_certificate_approval_start_outbox
+        set status = 'SUBMITTING', next_retry_time = null,
+            version = version + 1, update_time = sysdate()
+        where outbox_id = #{outboxId}
+          and status = #{expectedStatus}
+          and version = #{version}
+    </update>
+
+    <update id="markRemoteSucceeded">
+        update hr_health_certificate_approval_start_outbox
+        set status = 'REMOTE_SUCCEEDED',
+            remote_instance_id = #{remoteInstanceId},
+            remote_status = #{remoteStatus},
+            remote_business_round = #{remoteBusinessRound},
+            remote_succeeded_time = sysdate(), next_retry_time = null,
+            last_http_status = #{lastHttpStatus}, last_error_code = null,
+            last_error_message = null, version = version + 1,
+            update_time = sysdate()
+        where outbox_id = #{outboxId}
+          and status = #{expectedStatus}
+          and version = #{version}
+    </update>
+
+    <update id="markRetry">
+        update hr_health_certificate_approval_start_outbox
+        set status = 'RETRY', retry_count = #{retryCount},
+            next_retry_time = #{nextRetryTime},
+            last_http_status = #{lastHttpStatus},
+            last_error_code = #{lastErrorCode},
+            last_error_message = #{lastErrorMessage},
+            version = version + 1, update_time = sysdate()
+        where outbox_id = #{outboxId}
+          and status = #{expectedStatus}
+          and version = #{version}
+    </update>
+
+    <update id="markFailed">
+        update hr_health_certificate_approval_start_outbox
+        set status = 'FAILED', next_retry_time = null,
+            last_http_status = #{lastHttpStatus},
+            last_error_code = #{lastErrorCode},
+            last_error_message = #{lastErrorMessage},
+            remote_instance_id = coalesce(#{remoteInstanceId}, remote_instance_id),
+            remote_status = coalesce(#{remoteStatus}, remote_status),
+            remote_business_round = coalesce(#{remoteBusinessRound}, remote_business_round),
+            version = version + 1, update_time = sysdate()
+        where outbox_id = #{outboxId}
+          and status = #{expectedStatus}
+          and version = #{version}
+    </update>
+
+    <update id="markSucceeded">
+        update hr_health_certificate_approval_start_outbox
+        set status = 'SUCCEEDED', next_retry_time = null,
+            last_error_code = null, last_error_message = null,
+            completed_time = sysdate(), version = version + 1,
+            update_time = sysdate()
+        where outbox_id = #{outboxId}
+          and status = #{expectedStatus}
+          and version = #{version}
+    </update>
+
+    <update id="replayFailedScoped">
+        update hr_health_certificate_approval_start_outbox o
+        inner join hr_employee_health_certificate c
+                on c.certificate_id = o.certificate_id and c.del_flag = '0'
+        inner join sys_user u on u.user_id = c.user_id and u.del_flag = '0'
+        left join sys_dept d on d.dept_id = u.dept_id
+        set o.status = case when o.remote_instance_id is not null
+                                 and o.remote_business_round = o.business_round
+                            then 'REMOTE_SUCCEEDED' else 'RETRY' end,
+            o.retry_count = 0, o.next_retry_time = sysdate(),
+            o.last_http_status = null, o.last_error_code = null,
+            o.last_error_message = null,
+            o.manual_replay_count = o.manual_replay_count + 1,
+            o.manual_replay_by = #{operator},
+            o.manual_replay_time = sysdate(), o.update_by = #{operator},
+            o.version = o.version + 1, o.update_time = sysdate()
+        where o.outbox_id = #{query.outboxId}
+          and o.status = 'FAILED' and o.version = #{version}
+          and coalesce(o.last_error_code, '') not in (
+              'REMOTE_ROUND_MISMATCH', 'INSTANCE_CONFLICT',
+              'CERTIFICATE_NOT_FOUND', 'CERTIFICATE_STATE_CHANGED',
+              'CERTIFICATE_VERSION_CONFLICT', 'CERTIFICATE_ROUND_CHANGED'
+          )
+        ${query.params.dataScope}
+    </update>
+</mapper>

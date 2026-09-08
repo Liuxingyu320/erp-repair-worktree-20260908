@@ -1,0 +1,126 @@
+# Tomcat
+server:
+  port: 9201
+
+# Spring
+spring: 
+  application:
+    # 应用名称
+    name: erp-system
+  profiles:
+    # 环境配置
+    active: dev
+  cloud:
+    nacos:
+      discovery:
+        # 服务注册地址
+        server-addr: 127.0.0.1:8848
+      config:
+        # 配置中心地址
+        server-addr: 127.0.0.1:8848
+  config:
+    # 配置文件格式
+    file-extension: yml
+    import:
+      - optional:nacos:application-${spring.profiles.active}.${spring.config.file-extension}
+      - optional:nacos:${spring.application.name}-${spring.profiles.active}.${spring.config.file-extension}
+
+drive:
+  enabled: ${DRIVE_ENABLED:false}
+
+hr:
+  sign:
+    lifecycle-automation:
+      enabled: ${HR_SIGN_LIFECYCLE_AUTOMATION_ENABLED:false}
+
+# 登录后的7项核心个人资料补全门禁默认开启。
+# 只有受控验收环境需要跳过时才显式设为 false。
+system:
+  profile-completion:
+    gate-enabled: ${PROFILE_COMPLETION_GATE_ENABLED:true}
+
+---
+# 本地无 Nacos 启动配置：--spring.profiles.active=local
+server:
+  port: 9201
+
+spring:
+  config:
+    activate:
+      on-profile: local
+  data:
+    redis:
+      host: 127.0.0.1
+      port: 6379
+      password: ${REDIS_PASSWORD:}
+  cloud:
+    nacos:
+      discovery:
+        enabled: false
+      config:
+        enabled: false
+    discovery:
+      client:
+        simple:
+          instances:
+            erp-system:
+              - uri: http://127.0.0.1:9201
+            erp-file:
+              - uri: http://127.0.0.1:9300
+  datasource:
+    druid:
+      stat-view-servlet:
+        enabled: ${DRUID_MONITOR_ENABLED:false}
+        loginUsername: ${DRUID_MONITOR_USERNAME:}
+        loginPassword: ${DRUID_MONITOR_PASSWORD:}
+    dynamic:
+      druid:
+        initial-size: 5
+        min-idle: 5
+        maxActive: 20
+        maxWait: 60000
+        connectTimeout: 30000
+        socketTimeout: 60000
+        timeBetweenEvictionRunsMillis: 60000
+        minEvictableIdleTimeMillis: 300000
+        validationQuery: SELECT 1 FROM DUAL
+        testWhileIdle: true
+        testOnBorrow: false
+        testOnReturn: false
+        poolPreparedStatements: true
+        maxPoolPreparedStatementPerConnectionSize: 20
+        filters: stat,slf4j
+        connectionProperties: druid.stat.mergeSql\=true;druid.stat.slowSqlMillis\=5000
+      datasource:
+        master:
+          driver-class-name: com.mysql.cj.jdbc.Driver
+          url: jdbc:mysql://127.0.0.1:3306/${MYSQL_DATABASE:BossERP_NEW}?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&useSSL=false&serverTimezone=Asia/Shanghai
+          username: ${MYSQL_USERNAME:root}
+          password: ${MYSQL_PASSWORD:}
+
+mybatis:
+  typeAliasesPackage: com.erp.system
+  mapperLocations: classpath:mapper/**/*.xml
+
+springdoc:
+  gatewayUrl: http://localhost:8080/${spring.application.name}
+  api-docs:
+    enabled: ${SPRINGDOC_API_DOCS_ENABLED:false}
+  info:
+    title: '系统模块接口文档'
+    description: '系统模块接口描述'
+    contact:
+      name: ERP
+      url: https://erp.vip
+
+push:
+  fcm:
+    enabled: ${PUSH_FCM_ENABLED:false}
+    project-id: ${FIREBASE_PROJECT_ID:}
+  apns:
+    enabled: ${PUSH_APNS_ENABLED:false}
+    team-id: ${APNS_TEAM_ID:}
+    key-id: ${APNS_KEY_ID:}
+    bundle-id: ${APNS_BUNDLE_ID:com.erp.mobile}
+    private-key-path: ${APNS_PRIVATE_KEY_PATH:}
+    environment: ${APNS_ENVIRONMENT:production}

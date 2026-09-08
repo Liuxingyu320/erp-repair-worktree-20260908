@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.oa.mapper.OaFixedAssetQuotaMapper">
+
+    <resultMap id="OaFixedAssetQuotaResult" type="OaFixedAssetQuota">
+        <id property="quotaId" column="quota_id"/>
+        <result property="shopDeptId" column="shop_dept_id"/>
+        <result property="shopDeptName" column="shop_dept_name"/>
+        <result property="quotaYear" column="quota_year"/>
+        <result property="annualRepairRatio" column="annual_repair_ratio"/>
+        <result property="assetTotalAmount" column="asset_total_amount"/>
+        <result property="annualQuotaAmount" column="annual_quota_amount"/>
+        <result property="monthlyQuotaAmount" column="monthly_quota_amount"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateBy" column="update_by"/>
+        <result property="updateTime" column="update_time"/>
+        <result property="remark" column="remark"/>
+    </resultMap>
+
+    <select id="selectQuota" resultMap="OaFixedAssetQuotaResult">
+        select q.quota_id, q.shop_dept_id, sd.dept_name as shop_dept_name, q.quota_year,
+               q.annual_repair_ratio, q.asset_total_amount, q.annual_quota_amount, q.monthly_quota_amount,
+               q.create_by, q.create_time, q.update_by, q.update_time, q.remark
+        from oa_fixed_asset_quota q
+        left join sys_dept sd on sd.dept_id = q.shop_dept_id
+        where q.shop_dept_id = #{shopDeptId}
+          and q.quota_year = #{quotaYear}
+    </select>
+
+    <select id="selectQuotaForUpdate" resultMap="OaFixedAssetQuotaResult">
+        select q.quota_id, q.shop_dept_id, sd.dept_name as shop_dept_name, q.quota_year,
+               q.annual_repair_ratio, q.asset_total_amount, q.annual_quota_amount, q.monthly_quota_amount,
+               q.create_by, q.create_time, q.update_by, q.update_time, q.remark
+        from oa_fixed_asset_quota q
+        left join sys_dept sd on sd.dept_id = q.shop_dept_id
+        where q.shop_dept_id = #{shopDeptId}
+          and q.quota_year = #{quotaYear}
+        for update
+    </select>
+
+    <insert id="insertQuotaIfAbsent">
+        insert ignore into oa_fixed_asset_quota (
+            shop_dept_id, quota_year, annual_repair_ratio, asset_total_amount,
+            annual_quota_amount, monthly_quota_amount, create_by, create_time
+        ) values (
+            #{shopDeptId}, #{quotaYear}, #{annualRepairRatio}, 0,
+            0, 0, #{createBy}, sysdate()
+        )
+    </insert>
+
+    <insert id="insertQuota" parameterType="OaFixedAssetQuota" useGeneratedKeys="true" keyProperty="quotaId">
+        insert into oa_fixed_asset_quota (
+            shop_dept_id, quota_year, annual_repair_ratio, asset_total_amount,
+            annual_quota_amount, monthly_quota_amount, create_by, create_time, remark
+        ) values (
+            #{shopDeptId}, #{quotaYear}, #{annualRepairRatio}, #{assetTotalAmount},
+            #{annualQuotaAmount}, #{monthlyQuotaAmount}, #{createBy}, sysdate(), #{remark}
+        )
+    </insert>
+
+    <update id="updateQuota" parameterType="OaFixedAssetQuota">
+        update oa_fixed_asset_quota
+        set annual_repair_ratio = #{annualRepairRatio},
+            asset_total_amount = #{assetTotalAmount},
+            annual_quota_amount = #{annualQuotaAmount},
+            monthly_quota_amount = #{monthlyQuotaAmount},
+            update_by = #{updateBy},
+            update_time = sysdate(),
+            remark = #{remark}
+        where quota_id = #{quotaId}
+    </update>
+</mapper>

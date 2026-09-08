@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.inventory.mapper.InvStockCheckDetailMapper">
+
+    <resultMap type="InvStockCheckDetail" id="InvStockCheckDetailResult">
+        <id property="detailId" column="detail_id"/>
+        <result property="checkId" column="check_id"/>
+        <result property="productId" column="product_id"/>
+        <result property="productName" column="product_name"/>
+        <result property="productCode" column="product_code"/>
+        <result property="categoryId" column="category_id"/>
+        <result property="categoryName" column="category_name"/>
+        <result property="categoryFullPath" column="category_full_path"/>
+        <result property="unit" column="unit"/>
+        <result property="spec" column="spec"/>
+        <result property="bookQty" column="book_qty"/>
+        <result property="actualQty" column="actual_qty"/>
+        <result property="recountRequired" column="recount_required"/>
+        <result property="recountQty" column="recount_qty"/>
+        <result property="recountBy" column="recount_by"/>
+        <result property="recountTime" column="recount_time"/>
+        <result property="diffQty" column="diff_qty"/>
+        <result property="diffType" column="diff_type"/>
+        <result property="costPrice" column="cost_price"/>
+    </resultMap>
+
+    <sql id="selectInvStockCheckDetailVo">
+        select d.detail_id, d.check_id, d.product_id, d.product_name, d.product_code,
+               p.category_id as category_id,
+               c.category_name as category_name,
+               (
+                   select group_concat(pc.category_name order by find_in_set(pc.category_id, concat(c.ancestors, ',', c.category_id)) separator ' / ')
+                   from inv_product_category pc
+                   where pc.del_flag = '0'
+                     and find_in_set(pc.category_id, concat(c.ancestors, ',', c.category_id)) > 0
+               ) as category_full_path,
+               d.unit, d.spec, d.book_qty, d.actual_qty,
+               d.recount_required, d.recount_qty, d.recount_by, d.recount_time,
+               d.diff_qty, d.diff_type, d.cost_price
+        from inv_stock_check_detail d
+        left join inv_product p on p.product_id = d.product_id
+        left join inv_product_category c on c.category_id = p.category_id and c.del_flag = '0'
+    </sql>
+
+    <select id="selectInvStockCheckDetailByCheckId" parameterType="Long" resultMap="InvStockCheckDetailResult">
+        <include refid="selectInvStockCheckDetailVo"/>
+        where d.check_id = #{checkId}
+        order by d.detail_id asc
+    </select>
+
+    <select id="selectInvStockCheckDetailByCheckIdForUpdate" parameterType="Long" resultMap="InvStockCheckDetailResult">
+        select detail_id, check_id, product_id, product_name, product_code,
+               unit, spec, book_qty, actual_qty,
+               recount_required, recount_qty, recount_by, recount_time,
+               diff_qty, diff_type, cost_price
+        from inv_stock_check_detail
+        where check_id = #{checkId}
+        order by detail_id asc
+        for update
+    </select>
+
+    <insert id="batchInsertInvStockCheckDetail">
+        insert into inv_stock_check_detail (
+            check_id, product_id, product_name, product_code, unit, spec,
+            book_qty, actual_qty, recount_required, recount_qty,
+            diff_qty, diff_type, cost_price
+        ) values
+        <foreach collection="list" item="item" separator=",">
+            (
+                #{item.checkId}, #{item.productId}, #{item.productName}, #{item.productCode},
+                #{item.unit}, #{item.spec}, #{item.bookQty}, #{item.actualQty},
+                #{item.recountRequired}, #{item.recountQty},
+                #{item.diffQty}, #{item.diffType}, #{item.costPrice}
+            )
+        </foreach>
+    </insert>
+
+    <update id="updateInvStockCheckDetail" parameterType="InvStockCheckDetail">
+        update inv_stock_check_detail
+        set actual_qty = #{actualQty},
+            recount_required = #{recountRequired},
+            recount_qty = #{recountQty},
+            recount_by = #{recountBy},
+            recount_time = #{recountTime},
+            diff_qty = #{diffQty},
+            diff_type = #{diffType}
+        where detail_id = #{detailId}
+    </update>
+
+    <update id="resetSnapshot">
+        update inv_stock_check_detail
+        set book_qty = #{bookQty},
+            actual_qty = null,
+            recount_required = '0',
+            recount_qty = null,
+            recount_by = null,
+            recount_time = null,
+            diff_qty = 0,
+            diff_type = 'none',
+            cost_price = #{costPrice}
+        where detail_id = #{detailId}
+    </update>
+
+    <delete id="deleteInvStockCheckDetailByCheckId" parameterType="Long">
+        delete from inv_stock_check_detail where check_id = #{checkId}
+    </delete>
+
+    <select id="selectStockForCheck" resultType="map">
+        select s.product_id as productId,
+               p.product_name as productName,
+               p.product_code as productCode,
+               p.category_id as categoryId,
+               c.ancestors as categoryAncestors,
+               p.unit as unit,
+               p.spec as spec,
+               s.current_quantity as currentQuantity,
+               s.cost_price as costPrice
+        from inv_stock s
+        left join inv_product p on p.product_id = s.product_id
+        left join inv_product_category c on c.category_id = p.category_id and c.del_flag = '0'
+        where s.shop_dept_id = #{shopDeptId}
+          and s.current_quantity &lt;&gt; 0
+        <choose>
+            <when test="warehouseId != null">and s.warehouse_id = #{warehouseId}</when>
+            <otherwise>and s.warehouse_id is null</otherwise>
+        </choose>
+        order by p.product_name asc, s.product_id asc
+    </select>
+
+</mapper>

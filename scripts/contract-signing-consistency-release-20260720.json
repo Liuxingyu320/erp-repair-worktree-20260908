@@ -1,0 +1,243 @@
+{
+  "schemaVersion": 1,
+  "releaseId": "contract-signing-consistency-20260720",
+  "status": "candidate",
+  "executionPolicy": "manual-phased-forward-only",
+  "productionMutationPerformed": false,
+  "productionReleaseReady": false,
+  "sourceFileList": "scripts/contract-signing-consistency-release-files-20260720.list",
+  "sourceFileCount": 335,
+  "migrationList": "scripts/contract-signing-consistency-migrations-20260720.list",
+  "migrationCount": 8,
+  "prerequisiteLedgers": [
+    "contract-signing-release-a-20260716",
+    "onboard-contract-excel-20260718"
+  ],
+  "supersedesReleaseLedgers": [],
+  "migrations": [
+    {
+      "sequence": 1,
+      "file": "erp_oa_sign_salary_social_mapping_20260719.sql",
+      "sha256": "eb9607af03f34d65290b2a031bb29966e65a6d9726f36b918bc9a8dd1555a8a1",
+      "applyMode": "manual-native-mysql",
+      "forwardOnly": true,
+      "rerunnable": true,
+      "repeatExecutionProducesNoBusinessDuplication": true,
+      "copies": [
+        "sql/erp_oa_sign_salary_social_mapping_20260719.sql",
+        "docker/mysql/db/erp_oa_sign_salary_social_mapping_20260719.sql",
+        "erp-modules/erp-oa/src/main/resources/db/migration/erp_oa_sign_salary_social_mapping_20260719.sql"
+      ]
+    },
+    {
+      "sequence": 2,
+      "file": "erp_system_sign_candidate_phone_index_20260719.sql",
+      "sha256": "ad662ad63dd2f431d1ad59dce928bf54596616c4c96e449b79f586b6d4681328",
+      "applyMode": "manual-native-mysql",
+      "forwardOnly": true,
+      "rerunnable": true,
+      "repeatExecutionProducesNoBusinessDuplication": true,
+      "copies": [
+        "sql/erp_system_sign_candidate_phone_index_20260719.sql",
+        "docker/mysql/db/erp_system_sign_candidate_phone_index_20260719.sql",
+        "erp-modules/erp-system/src/main/resources/db/migration/erp_system_sign_candidate_phone_index_20260719.sql"
+      ]
+    },
+    {
+      "sequence": 3,
+      "file": "erp_oa_sign_company_salary_policy_20260720.sql",
+      "sha256": "6f222d063f185490254915ffa4324605e1c189fa18f79e2014da9b83a7facd2b",
+      "applyMode": "manual-native-mysql",
+      "forwardOnly": true,
+      "rerunnable": true,
+      "repeatExecutionProducesNoBusinessDuplication": true,
+      "copies": [
+        "sql/erp_oa_sign_company_salary_policy_20260720.sql",
+        "docker/mysql/db/erp_oa_sign_company_salary_policy_20260720.sql",
+        "erp-modules/erp-oa/src/main/resources/db/migration/erp_oa_sign_company_salary_policy_20260720.sql"
+      ]
+    },
+    {
+      "sequence": 4,
+      "file": "erp_oa_sign_dual_sequence_evidence_20260720.sql",
+      "sha256": "eb962dd09462732b12a67e52420a93c7c3e672fed5bbb26cf47920972606fa0a",
+      "applyMode": "manual-native-mysql",
+      "forwardOnly": true,
+      "rerunnable": true,
+      "repeatExecutionProducesNoBusinessDuplication": true,
+      "copies": [
+        "sql/erp_oa_sign_dual_sequence_evidence_20260720.sql",
+        "docker/mysql/db/erp_oa_sign_dual_sequence_evidence_20260720.sql",
+        "erp-modules/erp-oa/src/main/resources/db/migration/erp_oa_sign_dual_sequence_evidence_20260720.sql"
+      ]
+    },
+    {
+      "sequence": 5,
+      "file": "erp_oa_sign_onboard_send_idempotency_20260720.sql",
+      "sha256": "c6d2eda6d530504b503f6695a8ad7861035768aac635b4b0aeb069209fce2050",
+      "applyMode": "manual-native-mysql",
+      "forwardOnly": true,
+      "rerunnable": true,
+      "repeatExecutionProducesNoBusinessDuplication": true,
+      "copies": [
+        "sql/erp_oa_sign_onboard_send_idempotency_20260720.sql",
+        "docker/mysql/db/erp_oa_sign_onboard_send_idempotency_20260720.sql",
+        "erp-modules/erp-oa/src/main/resources/db/migration/erp_oa_sign_onboard_send_idempotency_20260720.sql"
+      ]
+    },
+    {
+      "sequence": 6,
+      "file": "erp_oa_sign_task_batch_finalize_20260720.sql",
+      "sha256": "5cd0884efb6613763c3ef5ac0be3554e8a7b0c31162c5eef06a67dd838331960",
+      "applyMode": "manual-native-mysql",
+      "forwardOnly": true,
+      "rerunnable": true,
+      "repeatExecutionProducesNoBusinessDuplication": true,
+      "copies": [
+        "sql/erp_oa_sign_task_batch_finalize_20260720.sql",
+        "docker/mysql/db/erp_oa_sign_task_batch_finalize_20260720.sql",
+        "erp-modules/erp-oa/src/main/resources/db/migration/erp_oa_sign_task_batch_finalize_20260720.sql"
+      ]
+    },
+    {
+      "sequence": 7,
+      "file": "erp_oa_sign_file_cleanup_20260720.sql",
+      "sha256": "0d57049074315bda6db4f802d689d1ab64c37473fa01c410e3b2fdf90d9fa559",
+      "applyMode": "manual-native-mysql",
+      "forwardOnly": true,
+      "rerunnable": true,
+      "repeatExecutionProducesNoBusinessDuplication": true,
+      "copies": [
+        "sql/erp_oa_sign_file_cleanup_20260720.sql",
+        "docker/mysql/db/erp_oa_sign_file_cleanup_20260720.sql",
+        "erp-modules/erp-oa/src/main/resources/db/migration/erp_oa_sign_file_cleanup_20260720.sql"
+      ]
+    },
+    {
+      "sequence": 8,
+      "file": "erp_oa_sign_task_hard_delete_idempotency_20260720.sql",
+      "sha256": "cbddc4165293f04e8ceb3604317538ab2e1a198fae638316c22ed00c1cec7eca",
+      "applyMode": "manual-native-mysql",
+      "forwardOnly": true,
+      "rerunnable": true,
+      "repeatExecutionProducesNoBusinessDuplication": true,
+      "copies": [
+        "sql/erp_oa_sign_task_hard_delete_idempotency_20260720.sql",
+        "docker/mysql/db/erp_oa_sign_task_hard_delete_idempotency_20260720.sql",
+        "erp-modules/erp-oa/src/main/resources/db/migration/erp_oa_sign_task_hard_delete_idempotency_20260720.sql"
+      ]
+    }
+  ],
+  "templateCandidate": {
+    "version": "v6-inline-fixed-evidence",
+    "activationStatus": "disabled",
+    "registrationPayloadGenerated": false,
+    "productionMutation": false,
+    "manifestPath": "output/sign-release/20260720-v6/manifest-v6-inline-fixed-evidence.json",
+    "manifestSha256": "eedd8a437671d0a22d02c6a0a84a4fb14946547a466932a1c3d8c71b76ebd001",
+    "renderEvidencePath": "docs/releases/evidence/20260720-contract-signing-v6-render-qa.json",
+    "renderEvidenceSha256": "6782d28e739d7c2587063eaa55c90d268266f86231641b15c7b8d79ead36dbe1",
+    "renderSummary": {
+      "pdfCount": 18,
+      "pageCount": 112,
+      "blankPageCount": 0,
+      "nonA4PageCount": 0,
+      "forbiddenTextHitCount": 0,
+      "pageFooterErrorCount": 0,
+      "manualVisualApproval": "not-claimed"
+    }
+  },
+  "syntheticBrowserUat": {
+    "status": "passed",
+    "mode": "isolated-browser-with-synthetic-identities-and-mocked-api",
+    "evidencePath": "docs/releases/evidence/20260720-contract-signing-synthetic-browser-uat.json",
+    "evidenceSha256": "1c706c85ca2def08f02967a402a14368ac53f3f58ac9a5d12516c6ceb86467fc",
+    "scenarioCount": 4,
+    "browserConsoleErrorCount": 0,
+    "criticalApiNon200Count": 0,
+    "productionMutation": false,
+    "realIdentityUsed": false,
+    "realDualFlowSignedUatSatisfied": false
+  },
+  "databaseValidation": {
+    "productionVersionEvidence": {
+      "status": "recorded-read-only-evidence",
+      "engine": "MySQL",
+      "version": "8.0.24",
+      "source": "docs/superpowers/plans/2026-07-18-contract-signing-rapid-activation-plan.md"
+    },
+    "nativeMySql57Rehearsal": {
+      "status": "not-applicable-version-verified",
+      "preReleaseReadOnlyVersionRecheck": "required"
+    },
+    "localSendIdempotencyRehearsal": {
+      "status": "passed",
+      "engine": "MySQL",
+      "version": "8.0.45",
+      "database": "BossERP_NEW",
+      "consecutiveRunCount": 2,
+      "resultingColumnCount": 9,
+      "resultingUniqueIndexCount": 1,
+      "productionMutation": false
+    },
+    "localHardDeleteIdempotencyRehearsal": {
+      "status": "passed",
+      "engine": "MySQL",
+      "version": "8.0.45",
+      "database": "BossERP_NEW",
+      "consecutiveRunCount": 2,
+      "resultingColumnCount": 16,
+      "resultingUniqueIndexCount": 1,
+      "productionMutation": false
+    }
+  },
+  "userExcludedRetainedRisks": {
+    "employeeHandbookBody": {
+      "modified": false,
+      "resolved": false,
+      "effect": "explicitly excluded by the user; it is not part of this local completion decision"
+    },
+    "deliveryAddress": {
+      "modified": false,
+      "resolved": false,
+      "effect": "existing blank-address behavior remains outside this release"
+    }
+  },
+  "deploymentOrder": [
+    "authorized backup and schema fingerprint",
+    "apply eight hash-pinned migrations in ledger order",
+    "validate company and seal master data",
+    "keep v6 template candidate disabled until separate approval",
+    "deploy backend",
+    "deploy frontend",
+    "run authorized isolated dual-flow UAT",
+    "obtain explicit gray-rollout approval"
+  ],
+  "verificationCommands": [
+    "bash scripts/verify-contract-signing-consistency-release.sh --static",
+    "JAVA_HOME=$(/usr/libexec/java_home -v 17) ./mvnw -pl erp-modules/erp-oa -am test -DskipTests=false",
+    "cd erp-ui && npm test"
+  ],
+  "externalGates": {
+    "nativeMySql57Rehearsal": "not-applicable-version-verified",
+    "authorizedProductionBackup": "approval-required",
+    "authorizedProductionMigration": "approval-required",
+    "templateRegistrationAndPlanPublish": "approval-required",
+    "realDualFlowSignedUat": "pending",
+    "hrBusinessLegalApproval": "pending",
+    "grayRolloutApproval": "approval-required"
+  },
+  "nonClaims": {
+    "productionDeployed": false,
+    "realEmployeeContractSigned": false,
+    "realTaskHardDeleted": false,
+    "externalApprovalFabricated": false
+  },
+  "rollbackPolicy": {
+    "stopExpansionFirst": true,
+    "disableNewEntryBeforeCodeRollback": true,
+    "forwardFixDatabase": true,
+    "preserveDocumentsSignaturesHashesEventsAndAudit": true,
+    "deleteHistoricalEvidence": false
+  }
+}

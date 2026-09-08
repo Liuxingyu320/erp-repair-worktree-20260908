@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://maven.apache.org/POM/4.0.0"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <parent>
+        <groupId>com.erp</groupId>
+        <artifactId>erp</artifactId>
+        <version>3.6.8</version>
+    </parent>
+    <modelVersion>4.0.0</modelVersion>
+
+    <modules>
+        <module>erp-system</module>
+        <module>erp-job</module>
+        <module>erp-file</module>
+        <module>erp-oa</module>
+        <module>erp-inventory</module>
+        <module>erp-approval</module>
+    </modules>
+
+    <artifactId>erp-modules</artifactId>
+    <packaging>pom</packaging>
+
+    <properties>
+        <argLine></argLine>
+        <mockito.version>5.20.0</mockito.version>
+        <mockito.agent.argLine>-javaagent:${settings.localRepository}/org/mockito/mockito-core/${mockito.version}/mockito-core-${mockito.version}.jar</mockito.agent.argLine>
+    </properties>
+
+    <dependencies>
+        <!-- Required as a test JVM agent on JDK 25+, where Mockito inline cannot self-attach. -->
+        <dependency>
+            <groupId>org.mockito</groupId>
+            <artifactId>mockito-core</artifactId>
+            <version>${mockito.version}</version>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>3.5.4</version>
+                <configuration>
+                    <argLine>@{argLine} ${mockito.agent.argLine}</argLine>
+                    <excludes>
+                        <exclude>**/*IT.java</exclude>
+                    </excludes>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+
+    <description>
+        erp-modules业务模块
+    </description>
+
+</project>

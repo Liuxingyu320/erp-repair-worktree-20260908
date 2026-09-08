@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.approval.mapper.ApprovalValidationMapper">
+
+    <resultMap id="ApprovalValidationRunResult" type="ApprovalValidationRun">
+        <id property="runId" column="run_id"/>
+        <result property="templateId" column="template_id"/>
+        <result property="ruleId" column="rule_id"/>
+        <result property="ruleVersionId" column="rule_version_id"/>
+        <result property="validationType" column="validation_type"/>
+        <result property="runStatus" column="run_status"/>
+        <result property="totalCount" column="total_count"/>
+        <result property="errorCount" column="error_count"/>
+        <result property="warningCount" column="warning_count"/>
+        <result property="startedByUserId" column="started_by_user_id"/>
+        <result property="startedByName" column="started_by_name"/>
+        <result property="startedTime" column="started_time"/>
+        <result property="finishedTime" column="finished_time"/>
+        <result property="scopeSnapshot" column="scope_snapshot"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateBy" column="update_by"/>
+        <result property="updateTime" column="update_time"/>
+        <result property="remark" column="remark"/>
+    </resultMap>
+
+    <resultMap id="ApprovalValidationIssueResult" type="ApprovalValidationIssue">
+        <id property="issueId" column="issue_id"/>
+        <result property="runId" column="run_id"/>
+        <result property="templateId" column="template_id"/>
+        <result property="ruleId" column="rule_id"/>
+        <result property="ruleVersionId" column="rule_version_id"/>
+        <result property="severity" column="severity"/>
+        <result property="issueCode" column="issue_code"/>
+        <result property="scopeType" column="scope_type"/>
+        <result property="scopeId" column="scope_id"/>
+        <result property="scopeName" column="scope_name"/>
+        <result property="businessSubtype" column="business_subtype"/>
+        <result property="nodeCode" column="node_code"/>
+        <result property="nodeName" column="node_name"/>
+        <result property="issueMessage" column="issue_message"/>
+        <result property="suggestion" column="suggestion"/>
+        <result property="issueSnapshot" column="issue_snapshot"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="remark" column="remark"/>
+    </resultMap>
+
+    <sql id="validationRunColumns">
+        run_id, template_id, rule_id, rule_version_id, validation_type,
+        run_status, total_count, error_count, warning_count,
+        started_by_user_id, started_by_name, started_time, finished_time,
+        scope_snapshot, create_by, create_time, update_by, update_time, remark
+    </sql>
+
+    <select id="selectValidationRuns" parameterType="ApprovalValidationRun"
+            resultMap="ApprovalValidationRunResult">
+        select <include refid="validationRunColumns"/>
+        from approval_validation_run
+        <where>
+            <if test="templateId != null">and template_id = #{templateId}</if>
+            <if test="ruleId != null">and rule_id = #{ruleId}</if>
+            <if test="ruleVersionId != null">and rule_version_id = #{ruleVersionId}</if>
+            <if test="validationType != null and validationType != ''">
+                and validation_type = #{validationType}
+            </if>
+            <if test="runStatus != null and runStatus != ''">
+                and run_status = #{runStatus}
+            </if>
+        </where>
+        order by started_time desc, run_id desc
+    </select>
+
+    <select id="selectValidationRunById" parameterType="Long"
+            resultMap="ApprovalValidationRunResult">
+        select <include refid="validationRunColumns"/>
+        from approval_validation_run
+        where run_id = #{runId}
+    </select>
+
+    <select id="selectIssuesByRunId" parameterType="Long"
+            resultMap="ApprovalValidationIssueResult">
+        select issue_id, run_id, template_id, rule_id, rule_version_id,
+               severity, issue_code, scope_type, scope_id, scope_name,
+               business_subtype, node_code, node_name, issue_message,
+               suggestion, issue_snapshot, create_by, create_time, remark
+        from approval_validation_issue
+        where run_id = #{runId}
+        order by case severity when 'ERROR' then 0 else 1 end, issue_id
+    </select>
+
+    <insert id="insertValidationRun" parameterType="ApprovalValidationRun"
+            useGeneratedKeys="true" keyProperty="runId">
+        insert into approval_validation_run (
+            template_id, rule_id, rule_version_id, validation_type,
+            run_status, total_count, error_count, warning_count,
+            started_by_user_id, started_by_name, started_time,
+            scope_snapshot, create_by, create_time, remark
+        ) values (
+            #{templateId}, #{ruleId}, #{ruleVersionId}, #{validationType},
+            #{runStatus}, coalesce(#{totalCount}, 0),
+            coalesce(#{errorCount}, 0), coalesce(#{warningCount}, 0),
+            #{startedByUserId}, #{startedByName},
+            coalesce(#{startedTime}, sysdate()), #{scopeSnapshot},
+            #{createBy}, sysdate(), #{remark}
+        )
+    </insert>
+
+    <update id="updateValidationRunResult">
+        update approval_validation_run
+        set run_status = #{run.runStatus},
+            total_count = #{run.totalCount},
+            error_count = #{run.errorCount},
+            warning_count = #{run.warningCount},
+            finished_time = #{run.finishedTime},
+            update_by = #{run.updateBy},
+            update_time = sysdate(),
+            remark = #{run.remark}
+        where run_id = #{run.runId}
+          and run_status = 'RUNNING'
+    </update>
+
+    <insert id="insertValidationIssue" parameterType="ApprovalValidationIssue"
+            useGeneratedKeys="true" keyProperty="issueId">
+        insert into approval_validation_issue (
+            run_id, template_id, rule_id, rule_version_id, severity,
+            issue_code, scope_type, scope_id, scope_name, business_subtype,
+            node_code, node_name, issue_message, suggestion, issue_snapshot,
+            create_by, create_time, remark
+        ) values (
+            #{runId}, #{templateId}, #{ruleId}, #{ruleVersionId}, #{severity},
+            #{issueCode}, #{scopeType}, #{scopeId}, #{scopeName},
+            #{businessSubtype}, #{nodeCode}, #{nodeName}, #{issueMessage},
+            #{suggestion}, #{issueSnapshot}, #{createBy}, sysdate(), #{remark}
+        )
+    </insert>
+
+</mapper>

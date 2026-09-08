@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.inventory.mapper.InvTransferDiscrepancyDispositionMapper">
+    <resultMap id="DispositionResult" type="com.erp.inventory.domain.InvTransferDiscrepancyDisposition">
+        <id property="dispositionId" column="disposition_id"/>
+        <result property="discrepancyId" column="discrepancy_id"/>
+        <result property="discrepancyDetailId" column="discrepancy_detail_id"/>
+        <result property="shipmentDetailId" column="shipment_detail_id"/>
+        <result property="category" column="category"/>
+        <result property="decision" column="decision"/>
+        <result property="quantity" column="quantity"/>
+        <result property="costPrice" column="cost_price"/>
+        <result property="amount" column="amount"/>
+        <result property="inventoryImpact" column="inventory_impact"/>
+        <result property="sourceLocationDeptId" column="source_location_dept_id"/>
+        <result property="targetLocationDeptId" column="target_location_dept_id"/>
+        <result property="responsibleParty" column="responsible_party"/>
+        <result property="note" column="note"/>
+        <result property="attachmentRefs" column="attachment_refs"/>
+        <result property="requestId" column="request_id"/>
+        <result property="handledByUserId" column="handled_by_user_id"/>
+        <result property="handledByName" column="handled_by_name"/>
+        <result property="handledTime" column="handled_time"/>
+        <result property="version" column="version"/>
+    </resultMap>
+
+    <sql id="columns">
+        disposition_id, discrepancy_id, discrepancy_detail_id,
+        shipment_detail_id, category, decision, quantity, cost_price, amount,
+        inventory_impact, source_location_dept_id, target_location_dept_id,
+        responsible_party, note, attachment_refs, request_id,
+        handled_by_user_id, handled_by_name, handled_time, version
+    </sql>
+
+    <insert id="insertDisposition" parameterType="com.erp.inventory.domain.InvTransferDiscrepancyDisposition"
+            useGeneratedKeys="true" keyProperty="dispositionId">
+        insert into inv_transfer_discrepancy_disposition (
+            discrepancy_id, discrepancy_detail_id, shipment_detail_id,
+            category, decision, quantity, cost_price, amount,
+            inventory_impact, source_location_dept_id,
+            target_location_dept_id, responsible_party, note,
+            attachment_refs, request_id, handled_by_user_id,
+            handled_by_name, handled_time, version
+        ) values (
+            #{discrepancyId}, #{discrepancyDetailId}, #{shipmentDetailId},
+            #{category}, #{decision}, #{quantity}, #{costPrice}, #{amount},
+            #{inventoryImpact}, #{sourceLocationDeptId},
+            #{targetLocationDeptId}, #{responsibleParty}, #{note},
+            #{attachmentRefs}, #{requestId}, #{handledByUserId},
+            #{handledByName}, #{handledTime}, 0
+        )
+    </insert>
+
+    <select id="selectByDiscrepancyId" resultMap="DispositionResult">
+        select <include refid="columns"/>
+        from inv_transfer_discrepancy_disposition
+        where discrepancy_id = #{discrepancyId}
+        order by disposition_id
+    </select>
+
+    <select id="selectLatestByDiscrepancyId" resultMap="DispositionResult">
+        select d.*
+        from inv_transfer_discrepancy_disposition d
+        inner join (
+            select discrepancy_detail_id, category,
+                   max(disposition_id) as disposition_id
+            from inv_transfer_discrepancy_disposition
+            where discrepancy_id = #{discrepancyId}
+            group by discrepancy_detail_id, category
+        ) latest on latest.disposition_id = d.disposition_id
+        order by d.discrepancy_detail_id, d.category
+    </select>
+
+    <select id="selectByRequestId" resultMap="DispositionResult">
+        select <include refid="columns"/>
+        from inv_transfer_discrepancy_disposition
+        where discrepancy_id = #{discrepancyId}
+          and request_id = #{requestId}
+        order by discrepancy_detail_id, category
+    </select>
+</mapper>

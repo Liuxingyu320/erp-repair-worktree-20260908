@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.system.mapper.HrOnboardingOperationLogMapper">
+
+    <resultMap id="HrOnboardingOperationLogResult"
+            type="com.erp.system.domain.HrOnboardingOperationLog">
+        <id property="logId" column="log_id" />
+        <result property="onboardingId" column="onboarding_id" />
+        <result property="operationType" column="operation_type" />
+        <result property="fromStatus" column="from_status" />
+        <result property="toStatus" column="to_status" />
+        <result property="operatorUserId" column="operator_user_id" />
+        <result property="operatorName" column="operator_name" />
+        <result property="changedFieldKeys" column="changed_field_keys" />
+        <result property="decisionSummary" column="decision_summary" />
+        <result property="operationSummary" column="operation_summary" />
+        <result property="operationTime" column="operation_time" />
+        <result property="createBy" column="create_by" />
+        <result property="createTime" column="create_time" />
+        <result property="updateBy" column="update_by" />
+        <result property="updateTime" column="update_time" />
+        <result property="remark" column="remark" />
+    </resultMap>
+
+    <insert id="insertOperationLog" parameterType="com.erp.system.domain.HrOnboardingOperationLog"
+            useGeneratedKeys="true" keyProperty="logId">
+        insert into hr_onboarding_operation_log (
+            onboarding_id, operation_type, from_status, to_status, operator_user_id,
+            operator_name, changed_field_keys, decision_summary, operation_summary,
+            operation_time, create_by, update_by, remark
+        ) values (
+            #{onboardingId}, #{operationType}, #{fromStatus}, #{toStatus}, #{operatorUserId},
+            #{operatorName}, #{changedFieldKeys}, #{decisionSummary}, #{operationSummary},
+            coalesce(#{operationTime}, sysdate()), #{createBy}, #{updateBy}, #{remark}
+        )
+    </insert>
+
+    <select id="selectByOnboardingId" parameterType="Long"
+            resultMap="HrOnboardingOperationLogResult">
+        select log_id, onboarding_id, operation_type, from_status, to_status,
+               operator_user_id, operator_name, changed_field_keys, decision_summary,
+               operation_summary, operation_time, create_by, create_time, update_by,
+               update_time, remark
+        from hr_onboarding_operation_log
+        where onboarding_id = #{onboardingId}
+        order by operation_time asc, log_id asc
+    </select>
+
+</mapper>

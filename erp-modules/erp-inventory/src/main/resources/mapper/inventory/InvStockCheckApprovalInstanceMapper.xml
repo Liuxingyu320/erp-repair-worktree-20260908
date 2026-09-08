@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.inventory.mapper.InvStockCheckApprovalInstanceMapper">
+    <resultMap type="InvStockCheckApprovalInstance" id="InstanceResult">
+        <id property="instanceId" column="instance_id"/>
+        <result property="checkId" column="check_id"/>
+        <result property="roundNo" column="round_no"/>
+        <result property="status" column="status"/>
+        <result property="shopDeptId" column="shop_dept_id"/>
+        <result property="checkNo" column="check_no"/>
+        <result property="profitItemCount" column="profit_item_count"/>
+        <result property="lossItemCount" column="loss_item_count"/>
+        <result property="totalAbsDiffQuantity" column="total_abs_diff_quantity"/>
+        <result property="detailSnapshot" column="detail_snapshot"/>
+        <result property="invalidReason" column="invalid_reason"/>
+        <result property="invalidDetailSnapshot" column="invalid_detail_snapshot"/>
+        <result property="adjustmentResultSnapshot" column="adjustment_result_snapshot"/>
+        <result property="submittedUserId" column="submitted_user_id"/>
+        <result property="submittedBy" column="submitted_by"/>
+        <result property="submittedTime" column="submitted_time"/>
+        <result property="finishedUserId" column="finished_user_id"/>
+        <result property="finishedBy" column="finished_by"/>
+        <result property="finishedTime" column="finished_time"/>
+        <result property="finishComment" column="finish_comment"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateBy" column="update_by"/>
+        <result property="updateTime" column="update_time"/>
+    </resultMap>
+
+    <sql id="instanceColumns">
+        instance_id, check_id, round_no, status, shop_dept_id, check_no,
+        profit_item_count, loss_item_count, total_abs_diff_quantity,
+        detail_snapshot, invalid_reason, invalid_detail_snapshot, adjustment_result_snapshot,
+        submitted_user_id, submitted_by, submitted_time,
+        finished_user_id, finished_by, finished_time, finish_comment,
+        create_by, create_time, update_by, update_time
+    </sql>
+
+    <select id="selectByIdForUpdate" resultMap="InstanceResult">
+        select <include refid="instanceColumns"/>
+        from inv_stock_check_approval_instance
+        where instance_id = #{instanceId}
+        for update
+    </select>
+
+    <select id="selectRunningByCheckIdForUpdate" resultMap="InstanceResult">
+        select <include refid="instanceColumns"/>
+        from inv_stock_check_approval_instance
+        where check_id = #{checkId} and status = 'running'
+        order by round_no desc limit 1
+        for update
+    </select>
+
+    <select id="selectByCheckId" resultMap="InstanceResult">
+        select <include refid="instanceColumns"/>
+        from inv_stock_check_approval_instance
+        where check_id = #{checkId}
+        order by round_no desc, instance_id desc
+    </select>
+
+    <insert id="insertInstance" parameterType="InvStockCheckApprovalInstance"
+            useGeneratedKeys="true" keyProperty="instanceId">
+        insert into inv_stock_check_approval_instance (
+            check_id, round_no, status, shop_dept_id, check_no,
+            profit_item_count, loss_item_count, total_abs_diff_quantity,
+            detail_snapshot, invalid_reason, invalid_detail_snapshot, adjustment_result_snapshot,
+            submitted_user_id, submitted_by, submitted_time,
+            create_by, create_time
+        ) values (
+            #{checkId}, #{roundNo}, #{status}, #{shopDeptId}, #{checkNo},
+            #{profitItemCount}, #{lossItemCount}, #{totalAbsDiffQuantity},
+            #{detailSnapshot}, #{invalidReason}, #{invalidDetailSnapshot}, #{adjustmentResultSnapshot},
+            #{submittedUserId}, #{submittedBy}, #{submittedTime},
+            #{createBy}, sysdate()
+        )
+    </insert>
+
+    <update id="updateInstance" parameterType="InvStockCheckApprovalInstance">
+        update inv_stock_check_approval_instance
+        <set>
+            <if test="status != null">status = #{status},</if>
+            <if test="invalidReason != null">invalid_reason = #{invalidReason},</if>
+            <if test="invalidDetailSnapshot != null">invalid_detail_snapshot = #{invalidDetailSnapshot},</if>
+            <if test="adjustmentResultSnapshot != null">adjustment_result_snapshot = #{adjustmentResultSnapshot},</if>
+            <if test="finishedUserId != null">finished_user_id = #{finishedUserId},</if>
+            <if test="finishedBy != null">finished_by = #{finishedBy},</if>
+            <if test="finishedTime != null">finished_time = #{finishedTime},</if>
+            <if test="finishComment != null">finish_comment = #{finishComment},</if>
+            update_by = #{updateBy}, update_time = sysdate()
+        </set>
+        where instance_id = #{instanceId}
+    </update>
+</mapper>

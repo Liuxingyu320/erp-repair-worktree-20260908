@@ -1,0 +1,778 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.inventory.mapper.InvTransferShipmentReceiptPersistenceMapper">
+
+    <resultMap id="LockedDetailResult"
+            type="com.erp.inventory.domain.transfer.InvTransferReceiptLockedDetail">
+        <id property="shipmentDetailId" column="shipment_detail_id"/>
+        <result property="shipmentId" column="shipment_id"/>
+        <result property="transferId" column="transfer_id"/>
+        <result property="transferDetailId" column="transfer_detail_id"/>
+        <result property="itemType" column="item_type"/>
+        <result property="itemId" column="item_id"/>
+        <result property="productId" column="product_id"/>
+        <result property="shippedQuantity" column="shipped_quantity"/>
+        <result property="receivedQuantity" column="received_quantity"/>
+    </resultMap>
+
+    <resultMap id="LockedAllocationResult"
+            type="com.erp.inventory.domain.transfer.InvTransferReceiptLockedAllocation">
+        <id property="allocationId" column="allocation_id"/>
+        <result property="shipmentId" column="shipment_id"/>
+        <result property="shipmentDetailId" column="shipment_detail_id"/>
+        <result property="transferId" column="transfer_id"/>
+        <result property="transferDetailId" column="transfer_detail_id"/>
+        <result property="sourceBalanceId" column="balance_id"/>
+        <result property="sourceLotId" column="lot_id"/>
+        <result property="sourceLocationId" column="location_id"/>
+        <result property="allocationPolicy" column="allocation_policy"/>
+        <result property="trackingPolicy" column="tracking_policy"/>
+        <result property="allocatedQuantity" column="allocated_quantity"/>
+        <result property="balanceVersionAfter" column="balance_version_after"/>
+        <result property="costPrice" column="cost_price"/>
+        <result property="totalCost" column="total_cost"/>
+        <result property="acceptedReceivedQuantity" column="accepted_received_quantity"/>
+        <result property="damagedReceivedQuantity" column="damaged_received_quantity"/>
+        <result property="shortageReportedQuantity" column="shortage_reported_quantity"/>
+        <result property="receiptVersion" column="receipt_version"/>
+    </resultMap>
+
+    <resultMap id="WarehouseModeResult"
+            type="com.erp.inventory.domain.transfer.InvWarehouseStockMode">
+        <id property="warehouseId" column="warehouse_id"/>
+        <result property="writeMode" column="write_mode"/>
+        <result property="readMode" column="read_mode"/>
+        <result property="reconcileStatus" column="reconcile_status"/>
+        <result property="lastReconcileTime" column="last_reconcile_time"/>
+        <result property="lastReconcileBatch" column="last_reconcile_batch"/>
+        <result property="approvedBy" column="approved_by"/>
+        <result property="approvedTime" column="approved_time"/>
+    </resultMap>
+
+    <resultMap id="PolicyResult"
+            type="com.erp.inventory.domain.transfer.InvItemFulfillmentPolicy">
+        <id property="policyId" column="policy_id"/>
+        <result property="itemType" column="item_type"/>
+        <result property="itemId" column="item_id"/>
+        <result property="allocationPolicy" column="allocation_policy"/>
+        <result property="trackingPolicy" column="tracking_policy"/>
+        <result property="status" column="status"/>
+        <result property="version" column="version"/>
+    </resultMap>
+
+    <resultMap id="TargetStockResult"
+            type="com.erp.inventory.domain.transfer.InvTransferReceiptTargetStock">
+        <id property="stockId" column="stock_id"/>
+        <result property="itemType" column="item_type"/>
+        <result property="itemId" column="item_id"/>
+        <result property="productId" column="product_id"/>
+        <result property="shopDeptId" column="shop_dept_id"/>
+        <result property="warehouseId" column="warehouse_id"/>
+        <result property="currentQuantity" column="current_quantity"/>
+        <result property="lockedQuantity" column="locked_quantity"/>
+        <result property="availableQuantity" column="available_quantity"/>
+        <result property="quarantineQuantity" column="quarantine_quantity"/>
+        <result property="costPrice" column="cost_price"/>
+        <result property="totalCost" column="total_cost"/>
+        <result property="version" column="version"/>
+    </resultMap>
+
+    <resultMap id="TargetLotResult"
+            type="com.erp.inventory.domain.transfer.InvTransferReceiptTargetLot">
+        <id property="lotId" column="lot_id"/>
+        <result property="lotNo" column="lot_no"/>
+        <result property="itemType" column="item_type"/>
+        <result property="itemId" column="item_id"/>
+        <result property="productId" column="product_id"/>
+        <result property="warehouseId" column="warehouse_id"/>
+        <result property="sourceLotId" column="source_lot_id"/>
+        <result property="receiptDisposition" column="receipt_disposition"/>
+        <result property="supplierBatchNo" column="supplier_batch_no"/>
+        <result property="productionDate" column="production_date"/>
+        <result property="expiryDate" column="expiry_date"/>
+        <result property="qcStatus" column="qc_status"/>
+        <result property="lotStatus" column="lot_status"/>
+    </resultMap>
+
+    <resultMap id="LocationResult"
+            type="com.erp.inventory.domain.transfer.InvTransferReceiptLocationCandidate">
+        <id property="locationId" column="location_id"/>
+        <result property="warehouseId" column="warehouse_id"/>
+        <result property="locationCode" column="location_code"/>
+        <result property="locationName" column="location_name"/>
+        <result property="locationType" column="location_type"/>
+        <result property="sortOrder" column="sort_order"/>
+        <result property="status" column="status"/>
+        <result property="virtualFlag" column="is_virtual"/>
+    </resultMap>
+
+    <resultMap id="TargetBalanceResult"
+            type="com.erp.inventory.domain.transfer.InvTransferReceiptTargetBalance">
+        <id property="balanceId" column="balance_id"/>
+        <result property="itemType" column="item_type"/>
+        <result property="itemId" column="item_id"/>
+        <result property="productId" column="product_id"/>
+        <result property="warehouseId" column="warehouse_id"/>
+        <result property="lotId" column="lot_id"/>
+        <result property="locationId" column="location_id"/>
+        <result property="currentQuantity" column="current_quantity"/>
+        <result property="lockedQuantity" column="locked_quantity"/>
+        <result property="availableQuantity" column="available_quantity"/>
+        <result property="quarantineQuantity" column="quarantine_quantity"/>
+        <result property="costPrice" column="cost_price"/>
+        <result property="totalCost" column="total_cost"/>
+        <result property="version" column="version"/>
+    </resultMap>
+
+    <resultMap id="SerialFactResult"
+            type="com.erp.inventory.domain.transfer.InvTransferReceiptPlanningSerialFact">
+        <id property="shipmentSerialId" column="shipment_serial_id"/>
+        <result property="allocationId" column="allocation_id"/>
+        <result property="shipmentId" column="shipment_id"/>
+        <result property="serialId" column="serial_id"/>
+        <result property="serialNoSnapshot" column="serial_no_snapshot"/>
+        <result property="currentSerialNo" column="current_serial_no"/>
+        <result property="itemType" column="item_type"/>
+        <result property="itemId" column="item_id"/>
+        <result property="sourceBalanceId" column="source_balance_id"/>
+        <result property="sourceLotId" column="source_lot_id"/>
+        <result property="sourceLocationId" column="source_location_id"/>
+        <result property="statusAfter" column="status_after"/>
+        <result property="currentWarehouseId" column="current_warehouse_id"/>
+        <result property="currentBalanceId" column="current_balance_id"/>
+        <result property="currentLotId" column="current_lot_id"/>
+        <result property="currentLocationId" column="current_location_id"/>
+        <result property="currentStatus" column="current_status"/>
+    </resultMap>
+
+    <resultMap id="LockedTransferDetailResult"
+            type="com.erp.inventory.domain.transfer.InvTransferReceiptLockedTransferDetail">
+        <id property="detailId" column="detail_id"/>
+        <result property="transferId" column="transfer_id"/>
+        <result property="itemType" column="item_type"/>
+        <result property="itemId" column="item_id"/>
+        <result property="productId" column="product_id"/>
+        <result property="quantity" column="quantity"/>
+        <result property="deliveredQuantity" column="delivered_quantity"/>
+        <result property="receivedQuantity" column="received_quantity"/>
+    </resultMap>
+
+    <select id="selectTransferDetailsForUpdate"
+            resultMap="LockedTransferDetailResult">
+        select detail_id, transfer_id, item_type, item_id, product_id,
+               quantity, delivered_quantity, received_quantity
+        from inv_transfer_detail
+        where transfer_id = #{transferId}
+        order by detail_id
+        for update
+    </select>
+
+    <select id="selectShipmentDetailsForUpdate"
+            resultMap="LockedDetailResult">
+        select shipment_detail_id, shipment_id, transfer_id,
+               transfer_detail_id, item_type, item_id, product_id,
+               shipped_quantity, received_quantity
+        from inv_transfer_shipment_detail
+        where shipment_id = #{shipmentId}
+        order by shipment_detail_id
+        for update
+    </select>
+
+    <select id="selectAllocationsForUpdate"
+            resultMap="LockedAllocationResult">
+        select allocation_id, shipment_id, shipment_detail_id,
+               transfer_id, transfer_detail_id,
+               balance_id, lot_id, location_id, allocation_policy,
+               tracking_policy,
+               allocated_quantity, balance_version_after,
+               cost_price, total_cost,
+               accepted_received_quantity, damaged_received_quantity,
+               shortage_reported_quantity, receipt_version
+        from inv_transfer_shipment_allocation
+        where shipment_id = #{shipmentId}
+        order by allocation_id
+        for update
+    </select>
+
+    <select id="selectTargetWarehouseModeForUpdate"
+            resultMap="WarehouseModeResult">
+        select warehouse_id, write_mode, read_mode, reconcile_status,
+               last_reconcile_time, last_reconcile_batch,
+               approved_by, approved_time
+        from inv_warehouse_stock_mode
+        where warehouse_id = #{warehouseId}
+        for update
+    </select>
+
+    <select id="selectPoliciesForUpdate" resultMap="PolicyResult">
+        select policy_id, item_type, item_id, allocation_policy,
+               tracking_policy, status, version
+        from inv_item_fulfillment_policy
+        where
+        <foreach collection="itemKeys" item="item" open="(" close=")"
+                 separator=" or ">
+            (item_type = #{item.itemType} and item_id = #{item.itemId})
+        </foreach>
+        order by item_type, item_id
+        for update
+    </select>
+
+    <select id="selectTargetStocksForUpdate" resultMap="TargetStockResult">
+        select stock_id, item_type, item_id, product_id,
+               shop_dept_id, warehouse_id,
+               current_quantity, locked_quantity, available_quantity,
+               quarantine_quantity, cost_price, total_cost, version
+        from inv_stock
+        where shop_dept_id = #{shopDeptId}
+          and warehouse_id = #{warehouseId}
+          and
+          <foreach collection="itemKeys" item="item" open="(" close=")"
+                   separator=" or ">
+              (item_type = #{item.itemType} and item_id = #{item.itemId})
+          </foreach>
+        order by stock_id
+        for update
+    </select>
+
+    <select id="selectSourceLotsForUpdate" resultMap="TargetLotResult">
+        select lot_id, lot_no, item_type, item_id, product_id,
+               warehouse_id, source_lot_id, receipt_disposition,
+               supplier_batch_no, production_date, expiry_date,
+               qc_status, lot_status
+        from inv_inventory_lot
+        where lot_id in
+        <foreach collection="lotIds" item="lotId"
+                 open="(" close=")" separator=",">
+            #{lotId}
+        </foreach>
+        order by lot_id
+        for update
+    </select>
+
+    <select id="selectLocationsForUpdate" resultMap="LocationResult">
+        select location_id, warehouse_id, location_code, location_name,
+               location_type, sort_order, status, is_virtual
+        from inv_warehouse_location
+        where (location_id in
+               <foreach collection="sourceLocationIds" item="locationId"
+                        open="(" close=")" separator=",">
+                   #{locationId}
+               </foreach>
+               or (warehouse_id = #{targetWarehouseId}
+                   and status = '0'
+                   and is_virtual = '0'
+                   and location_type in ('storage', 'quarantine')))
+        order by location_id
+        for update
+    </select>
+
+    <select id="selectDerivedLotsForUpdate" resultMap="TargetLotResult">
+        select lot_id, lot_no, item_type, item_id, product_id,
+               warehouse_id, source_lot_id, receipt_disposition,
+               supplier_batch_no, production_date, expiry_date,
+               qc_status, lot_status
+        from inv_inventory_lot
+        where
+        <foreach collection="keys" item="item" open="(" close=")"
+                 separator=" or ">
+            (warehouse_id = #{item.warehouseId}
+             and item_type = #{item.itemType}
+             and item_id = #{item.itemId}
+             and source_lot_id = #{item.sourceLotId}
+             and receipt_disposition = #{item.disposition})
+        </foreach>
+        order by lot_id
+        for update
+    </select>
+
+    <select id="selectTargetBalancesForUpdate"
+            resultMap="TargetBalanceResult">
+        select balance_id, item_type, item_id, product_id,
+               warehouse_id, lot_id, location_id,
+               current_quantity, locked_quantity, available_quantity,
+               quarantine_quantity, cost_price, total_cost, version
+        from inv_stock_balance_detail
+        where warehouse_id = #{warehouseId}
+          and
+          <foreach collection="keys" item="item" open="(" close=")"
+                   separator=" or ">
+              (lot_id = #{item.lotId}
+               and location_id = #{item.locationId})
+          </foreach>
+        order by balance_id
+        for update
+    </select>
+
+    <select id="selectShipmentSerialsForUpdate" resultMap="SerialFactResult">
+        select audit.shipment_serial_id, audit.allocation_id,
+               audit.shipment_id, audit.serial_id,
+               audit.serial_no_snapshot,
+               serial_current.serial_no as current_serial_no,
+               audit.item_type, audit.item_id,
+               audit.source_balance_id, audit.source_lot_id,
+               audit.source_location_id, audit.status_after,
+               serial_current.warehouse_id as current_warehouse_id,
+               serial_current.balance_id as current_balance_id,
+               serial_current.lot_id as current_lot_id,
+               serial_current.location_id as current_location_id,
+               serial_current.serial_status as current_status
+        from inv_transfer_shipment_serial audit
+        inner join inv_inventory_serial serial_current
+                on serial_current.serial_id = audit.serial_id
+               and serial_current.item_type = audit.item_type
+               and serial_current.item_id = audit.item_id
+        left join inv_transfer_shipment_receipt_serial receipt_serial
+               on receipt_serial.shipment_id = audit.shipment_id
+              and receipt_serial.shipment_serial_id = audit.shipment_serial_id
+        where audit.shipment_id = #{shipmentId}
+          and receipt_serial.receipt_serial_id is null
+        order by serial_current.serial_id
+        for update
+    </select>
+
+    <insert id="insertReceipt" useGeneratedKeys="true"
+            keyProperty="generatedId.value">
+        insert into inv_transfer_shipment_receipt (
+            shipment_id, transfer_id, receipt_no, command_request_id,
+            request_fingerprint, receipt_plan_version,
+            source_shipment_plan_version, source_reconcile_batch,
+            target_warehouse_id, target_reconcile_batch, arrived_time,
+            finalize_shipment, accepted_quantity, damaged_quantity,
+            shortage_quantity, remaining_quantity_after, receipt_status,
+            operator_user_id, operator_name, create_by, create_time, remark
+        ) values (
+            #{receipt.shipmentId}, #{receipt.transferId},
+            #{receipt.receiptNo}, #{receipt.commandRequestId},
+            #{receipt.requestFingerprint}, #{receipt.receiptPlanVersion},
+            #{receipt.sourceShipmentPlanVersion},
+            #{receipt.sourceReconcileBatch}, #{receipt.targetWarehouseId},
+            #{receipt.targetReconcileBatch}, #{receipt.arrivedTime},
+            case when #{receipt.finalizeShipment} then '1' else '0' end,
+            #{receipt.acceptedQuantity}, #{receipt.damagedQuantity},
+            #{receipt.shortageQuantity},
+            #{receipt.remainingQuantityAfter}, #{receipt.receiptStatus},
+            #{receipt.operatorUserId}, #{receipt.operatorName},
+            #{receipt.createBy}, #{receipt.createdTime}, #{receipt.remark}
+        )
+    </insert>
+
+    <insert id="insertTargetStock" useGeneratedKeys="true"
+            keyProperty="generatedId.value">
+        insert into inv_stock (
+            item_type, item_id, product_id, shop_dept_id, warehouse_id,
+            current_quantity, locked_quantity, available_quantity,
+            quarantine_quantity, cost_price, total_cost, version,
+            last_in_time, create_by, create_time, remark
+        )
+        select #{stock.itemKey.itemType}, #{stock.itemKey.itemId},
+               #{stock.productId}, #{warehouseId}, #{warehouseId},
+               #{stock.acceptedQuantity} + #{stock.damagedQuantity}, 0,
+               #{stock.acceptedQuantity}, #{stock.damagedQuantity},
+               #{stock.incomingCost} / nullif(
+                   #{stock.acceptedQuantity} + #{stock.damagedQuantity}, 0),
+               #{stock.incomingCost}, 0, sysdate(), #{createBy}, sysdate(),
+               'V2 transfer receipt target summary'
+        where #{warehouseId} &gt; 0
+          and #{stock.acceptedQuantity} &gt;= 0
+          and #{stock.damagedQuantity} &gt;= 0
+          and (#{stock.acceptedQuantity} + #{stock.damagedQuantity}) &gt; 0
+          and #{stock.incomingCost} &gt;= 0
+          and #{stock.currentQuantityBefore} = 0
+          and #{stock.currentQuantityAfter} =
+              #{stock.acceptedQuantity} + #{stock.damagedQuantity}
+    </insert>
+
+    <insert id="insertTargetLot" useGeneratedKeys="true"
+            keyProperty="generatedId.value">
+        insert into inv_inventory_lot (
+            lot_no, item_type, item_id, product_id, warehouse_id,
+            supplier_batch_no, production_date, expiry_date,
+            qc_status, lot_status, source_type, source_business_id,
+            source_lot_id, receipt_disposition,
+            create_by, create_time, remark
+        )
+        select #{lot.lotNo}, #{lot.key.itemType}, #{lot.key.itemId},
+               #{lot.productId}, #{lot.key.warehouseId},
+               #{lot.supplierBatchNo}, #{lot.productionDate},
+               #{lot.expiryDate}, #{lot.qcStatus}, #{lot.lotStatus},
+               'transfer', #{transferId}, #{lot.key.sourceLotId},
+               #{lot.key.disposition}, #{createBy}, sysdate(),
+               'V2 transfer receipt derived lot'
+        where #{lot.key.warehouseId} &gt; 0
+          and #{lot.key.sourceLotId} &gt; 0
+          and #{lot.key.disposition} in ('accepted', 'damaged')
+    </insert>
+
+    <insert id="insertTargetBalance" useGeneratedKeys="true"
+            keyProperty="generatedId.value">
+        insert into inv_stock_balance_detail (
+            item_type, item_id, product_id, warehouse_id, lot_id,
+            location_id, current_quantity, locked_quantity,
+            available_quantity, quarantine_quantity, cost_price,
+            total_cost, version, last_in_time, create_by, create_time,
+            remark
+        )
+        select #{balance.key.lotKey.itemType},
+               #{balance.key.lotKey.itemId}, #{productId}, #{warehouseId},
+               #{targetLotId}, #{balance.key.locationId},
+               #{balance.availableQuantity} +
+                   #{balance.quarantineQuantity}, 0,
+               #{balance.availableQuantity},
+               #{balance.quarantineQuantity},
+               #{balance.incomingCost} / nullif(
+                   #{balance.availableQuantity} +
+                   #{balance.quarantineQuantity}, 0),
+               #{balance.incomingCost}, 0, sysdate(), #{createBy}, sysdate(),
+               'V2 transfer receipt target balance'
+        where #{warehouseId} = #{balance.key.lotKey.warehouseId}
+          and #{targetLotId} &gt; 0
+          and #{balance.key.locationId} &gt; 0
+          and #{balance.availableQuantity} &gt;= 0
+          and #{balance.quarantineQuantity} &gt;= 0
+          and (#{balance.availableQuantity} +
+               #{balance.quarantineQuantity}) &gt; 0
+          and #{balance.incomingCost} &gt;= 0
+          and #{balance.currentQuantityBefore} = 0
+          and #{balance.currentQuantityAfter} =
+              #{balance.availableQuantity} +
+              #{balance.quarantineQuantity}
+    </insert>
+
+    <insert id="insertStockLog" useGeneratedKeys="true"
+            keyProperty="generatedId.value">
+        insert into inv_stock_log (
+            item_type, item_id, product_id, shop_dept_id, warehouse_id,
+            movement_type, business_type, business_id, business_no,
+            change_quantity, before_quantity, after_quantity, cost_price,
+            create_by, create_time, remark
+        ) values (
+            #{stockLog.itemKey.itemType}, #{stockLog.itemKey.itemId},
+            #{stockLog.productId}, #{receipt.targetWarehouseId},
+            #{receipt.targetWarehouseId}, 'transfer_in',
+            'transfer_receipt', #{receipt.transferId},
+            #{receipt.receiptNo}, #{stockLog.changeQuantity},
+            #{stockLog.beforeQuantity}, #{stockLog.afterQuantity},
+            #{stockLog.costPrice}, #{receipt.createBy}, sysdate(),
+            concat('accepted=', #{stockLog.acceptedQuantity},
+                   ', damaged=', #{stockLog.damagedQuantity})
+        )
+    </insert>
+
+    <insert id="insertReceiptAllocation" useGeneratedKeys="true"
+            keyProperty="generatedId.value">
+        insert into inv_transfer_shipment_receipt_allocation (
+            receipt_id, shipment_id, shipment_allocation_id,
+            shipment_detail_id, transfer_detail_id, item_type, item_id,
+            product_id, tracking_policy, source_balance_id, source_lot_id,
+            source_location_id, cost_price, accepted_quantity,
+            damaged_quantity, shortage_quantity, accepted_cost,
+            damaged_cost, allocation_version_before,
+            allocation_version_after, accepted_location_id,
+            accepted_target_lot_id, accepted_target_balance_id,
+            accepted_balance_version_before,
+            accepted_balance_version_after, quarantine_location_id,
+            damaged_target_lot_id, damaged_target_balance_id,
+            damaged_balance_version_before,
+            damaged_balance_version_after, discrepancy_note,
+            attachment_refs, create_by, create_time
+        ) values (
+            #{receiptId}, #{shipmentId},
+            #{allocation.shipmentAllocationId},
+            #{allocation.shipmentDetailId}, #{allocation.transferDetailId},
+            #{allocation.itemKey.itemType}, #{allocation.itemKey.itemId},
+            #{allocation.productId}, #{allocation.trackingPolicy},
+            #{allocation.sourceBalanceId}, #{allocation.sourceLotId},
+            #{allocation.sourceLocationId}, #{allocation.sourceCostPrice},
+            #{allocation.acceptedQuantity}, #{allocation.damagedQuantity},
+            #{allocation.shortageQuantity}, #{allocation.acceptedCost},
+            #{allocation.damagedCost},
+            #{allocation.expectedReceiptVersion},
+            #{allocation.expectedReceiptVersion} + 1,
+            #{allocation.acceptedLocationId}, #{acceptedTargetLotId},
+            #{acceptedTargetBalanceId},
+            #{allocation.acceptedBalanceVersionBefore},
+            #{allocation.acceptedBalanceVersionAfter},
+            #{allocation.quarantineLocationId}, #{damagedTargetLotId},
+            #{damagedTargetBalanceId},
+            #{allocation.damagedBalanceVersionBefore},
+            #{allocation.damagedBalanceVersionAfter},
+            #{allocation.discrepancyNote}, #{allocation.attachmentRefs},
+            #{createBy}, sysdate()
+        )
+    </insert>
+
+    <insert id="insertReceiptDiscrepancyCase" useGeneratedKeys="true"
+            keyProperty="generatedId.value">
+        insert into inv_transfer_receipt_discrepancy_case (
+            receipt_id, receipt_allocation_id, shipment_id, transfer_id,
+            shipment_allocation_id, discrepancy_type,
+            discrepancy_quantity, source_cost_price, discrepancy_amount,
+            fact_fingerprint, discrepancy_note, attachment_refs, status,
+            case_version, create_by, create_time
+        )
+        select #{receiptId}, #{receiptAllocationId}, #{receipt.shipmentId},
+               #{receipt.transferId}, #{discrepancy.shipmentAllocationId},
+               #{discrepancy.discrepancyType},
+               #{discrepancy.discrepancyQuantity},
+               #{discrepancy.sourceCostPrice},
+               #{discrepancy.discrepancyAmount},
+               #{discrepancy.factFingerprint}, ra.discrepancy_note,
+               ra.attachment_refs, 'awaiting_confirmation', 0,
+               #{receipt.createBy}, #{receipt.createdTime}
+        from inv_transfer_shipment_receipt_allocation ra
+        where ra.receipt_allocation_id = #{receiptAllocationId}
+          and ra.receipt_id = #{receiptId}
+          and ra.shipment_id = #{receipt.shipmentId}
+          and ra.shipment_allocation_id =
+              #{discrepancy.shipmentAllocationId}
+          and #{receipt.transferId} &gt; 0
+          and #{discrepancy.discrepancyType}
+              in ('damaged', 'shortage')
+          and #{discrepancy.discrepancyQuantity} &gt; 0
+          and #{discrepancy.discrepancyQuantity} =
+              case when #{discrepancy.discrepancyType} = 'damaged'
+                   then ra.damaged_quantity else ra.shortage_quantity end
+          and #{discrepancy.sourceCostPrice} = ra.cost_price
+          and #{discrepancy.sourceCostPrice} &gt;= 0
+          and #{discrepancy.discrepancyAmount} = round(
+              ra.cost_price * #{discrepancy.discrepancyQuantity}, 6)
+          and #{discrepancy.discrepancyAmount} &gt;= 0
+          and length(#{discrepancy.factFingerprint}) = 64
+          and #{discrepancy.factFingerprint} not regexp '[^a-f0-9]'
+          and ra.discrepancy_note = #{discrepancy.discrepancyNote}
+          and length(trim(ra.discrepancy_note)) between 1 and 500
+          and ra.attachment_refs = #{discrepancy.attachmentRefs}
+          and length(trim(ra.attachment_refs)) between 1 and 2000
+    </insert>
+
+    <insert id="insertReceiptSerial">
+        insert into inv_transfer_shipment_receipt_serial (
+            receipt_id, receipt_allocation_id, shipment_id,
+            shipment_allocation_id, shipment_serial_id, serial_id,
+            serial_no_snapshot, disposition, source_balance_id,
+            source_lot_id, source_location_id, target_balance_id,
+            target_lot_id, target_location_id, status_before, status_after,
+            create_by, create_time
+        ) values (
+            #{receiptId}, #{receiptAllocationId}, #{shipmentId},
+            #{serial.shipmentAllocationId}, #{serial.shipmentSerialId},
+            #{serial.serialId}, #{serial.serialNo}, #{serial.disposition},
+            #{serial.sourceBalanceId}, #{serial.sourceLotId},
+            #{serial.sourceLocationId}, #{targetBalanceId}, #{targetLotId},
+            #{serial.targetLocationId}, #{serial.statusBefore},
+            #{serial.statusAfter}, #{createBy}, sysdate()
+        )
+    </insert>
+
+    <insert id="insertReceiptLedger">
+        insert into inv_stock_ledger_detail (
+            request_id, command_request_id, receipt_allocation_id,
+            receipt_disposition,
+            summary_stock_log_id, warehouse_id, item_type, item_id,
+            product_id, movement_type, business_type, business_id,
+            business_no, to_balance_id, to_lot_id, to_location_id,
+            change_quantity, before_quantity, after_quantity, cost_price,
+            total_cost, operator_user_id, operator_name, occurred_time,
+            create_by, create_time, remark
+        ) values (
+            #{ledger.requestId}, #{receipt.commandRequestId},
+            #{receiptAllocationId},
+            #{ledger.disposition}, #{summaryStockLogId},
+            #{receipt.targetWarehouseId}, #{ledger.itemKey.itemType},
+            #{ledger.itemKey.itemId}, #{ledger.productId}, 'transfer_in',
+            'transfer_receipt', #{receiptId}, #{receipt.receiptNo},
+            #{targetBalanceId}, #{targetLotId},
+            #{ledger.targetBalanceKey.locationId},
+            #{ledger.changeQuantity}, #{ledger.beforeQuantity},
+            #{ledger.afterQuantity}, #{ledger.costPrice},
+            #{ledger.totalCost}, #{receipt.operatorUserId},
+            #{receipt.operatorName}, #{receipt.arrivedTime},
+            #{receipt.createBy}, sysdate(),
+            concat('V2 transfer receipt ', #{ledger.disposition})
+        )
+    </insert>
+
+    <update id="updateAllocationProgress">
+        update inv_transfer_shipment_allocation
+        set accepted_received_quantity =
+                accepted_received_quantity + #{acceptedDelta},
+            damaged_received_quantity =
+                damaged_received_quantity + #{damagedDelta},
+            shortage_reported_quantity =
+                shortage_reported_quantity + #{shortageDelta},
+            receipt_version = receipt_version + 1
+        where allocation_id = #{allocationId}
+          and shipment_id = #{shipmentId}
+          and receipt_version = #{receiptVersion}
+          and #{acceptedDelta} &gt;= 0
+          and #{damagedDelta} &gt;= 0
+          and #{shortageDelta} &gt;= 0
+          and (#{acceptedDelta} + #{damagedDelta}
+               + #{shortageDelta}) &gt; 0
+          and accepted_received_quantity &gt;= 0
+          and damaged_received_quantity &gt;= 0
+          and shortage_reported_quantity &gt;= 0
+          and accepted_received_quantity + damaged_received_quantity
+              + shortage_reported_quantity + #{acceptedDelta}
+              + #{damagedDelta} + #{shortageDelta}
+              &lt;= allocated_quantity
+    </update>
+
+    <update id="addTargetStock">
+        update inv_stock
+        set cost_price = (coalesce(total_cost, 0) + #{incomingCost})
+                / (current_quantity + #{acceptedQuantity}
+                   + #{damagedQuantity}),
+            current_quantity = current_quantity + #{acceptedQuantity}
+                + #{damagedQuantity},
+            available_quantity = available_quantity + #{acceptedQuantity},
+            quarantine_quantity = quarantine_quantity + #{damagedQuantity},
+            total_cost = coalesce(total_cost, 0) + #{incomingCost},
+            last_in_time = sysdate(),
+            version = version + 1,
+            update_by = #{updateBy},
+            update_time = sysdate()
+        where stock_id = #{stockId}
+          and shop_dept_id = #{shopDeptId}
+          and warehouse_id = #{warehouseId}
+          and version = #{version}
+          and #{acceptedQuantity} &gt;= 0
+          and #{damagedQuantity} &gt;= 0
+          and (#{acceptedQuantity} + #{damagedQuantity}) &gt; 0
+          and #{incomingCost} &gt;= 0
+          and current_quantity &gt;= 0
+          and available_quantity &gt;= 0
+          and locked_quantity &gt;= 0
+          and quarantine_quantity &gt;= 0
+          and coalesce(total_cost, 0) &gt;= 0
+          and current_quantity = available_quantity
+              + locked_quantity + quarantine_quantity
+    </update>
+
+    <update id="addTargetBalance">
+        update inv_stock_balance_detail
+        set cost_price = (coalesce(total_cost, 0) + #{incomingCost})
+                / (current_quantity + #{availableQuantity}
+                   + #{quarantineQuantity}),
+            current_quantity = current_quantity + #{availableQuantity}
+                + #{quarantineQuantity},
+            available_quantity = available_quantity + #{availableQuantity},
+            quarantine_quantity = quarantine_quantity
+                + #{quarantineQuantity},
+            total_cost = coalesce(total_cost, 0) + #{incomingCost},
+            last_in_time = sysdate(),
+            version = version + 1,
+            update_by = #{updateBy},
+            update_time = sysdate()
+        where balance_id = #{balanceId}
+          and warehouse_id = #{warehouseId}
+          and lot_id = #{lotId}
+          and location_id = #{locationId}
+          and version = #{version}
+          and #{availableQuantity} &gt;= 0
+          and #{quarantineQuantity} &gt;= 0
+          and (#{availableQuantity} + #{quarantineQuantity}) &gt; 0
+          and #{incomingCost} &gt;= 0
+          and current_quantity &gt;= 0
+          and available_quantity &gt;= 0
+          and locked_quantity &gt;= 0
+          and quarantine_quantity &gt;= 0
+          and coalesce(total_cost, 0) &gt;= 0
+          and current_quantity = available_quantity
+              + locked_quantity + quarantine_quantity
+    </update>
+
+    <update id="moveSerialToTarget">
+        update inv_inventory_serial
+        set warehouse_id = #{targetWarehouseId},
+            balance_id = #{targetBalanceId},
+            lot_id = #{targetLotId},
+            location_id = #{targetLocationId},
+            serial_status = #{statusAfter},
+            update_by = #{updateBy},
+            update_time = sysdate()
+        where serial_id = #{serialId}
+          and warehouse_id = #{sourceWarehouseId}
+          and balance_id = #{sourceBalanceId}
+          and lot_id = #{sourceLotId}
+          and location_id = #{sourceLocationId}
+          and serial_status = 'shipped'
+          and #{targetWarehouseId} &gt; 0
+          and #{targetBalanceId} &gt; 0
+          and #{targetLotId} &gt; 0
+          and #{targetLocationId} &gt; 0
+          and #{statusAfter} in ('available', 'quarantine')
+    </update>
+
+    <update id="addShipmentDetailFulfilled">
+        update inv_transfer_shipment_detail
+        set received_quantity = received_quantity
+                + #{detail.fulfillmentDelta}
+        where shipment_detail_id = #{detail.detailId}
+          and shipment_id = #{shipmentId}
+          and transfer_id = #{transferId}
+          and transfer_detail_id = #{transferDetailId}
+          and received_quantity = #{detail.expectedReceivedQuantity}
+          and #{detail.fulfillmentDelta} &gt; 0
+          and received_quantity + #{detail.fulfillmentDelta}
+              = #{detail.receivedQuantityAfter}
+          and received_quantity + #{detail.fulfillmentDelta}
+              &lt;= shipped_quantity
+    </update>
+
+    <update id="addTransferDetailFulfilled">
+        update inv_transfer_detail
+        set received_quantity = received_quantity
+                + #{detail.fulfillmentDelta}
+        where detail_id = #{detail.detailId}
+          and transfer_id = #{transferId}
+          and received_quantity = #{detail.expectedReceivedQuantity}
+          and #{detail.fulfillmentDelta} &gt; 0
+          and received_quantity + #{detail.fulfillmentDelta}
+              = #{detail.receivedQuantityAfter}
+          and received_quantity + #{detail.fulfillmentDelta}
+              &lt;= delivered_quantity
+          and delivered_quantity &lt;= quantity
+    </update>
+
+    <update id="updateShipmentLifecycle">
+        update inv_transfer_shipment
+        set status = #{statusAfter},
+            received_by = #{receivedBy},
+            received_time = #{arrivedTime}
+        where shipment_id = #{shipmentId}
+          and transfer_id = #{transferId}
+          and inventory_write_version = 'V2_DETAIL'
+          and status = #{expectedStatus}
+          and #{expectedStatus} in ('pending_receive', 'partial_received')
+          and #{statusAfter} in
+              ('partial_received', 'received', 'discrepancy')
+    </update>
+
+    <update id="updateTransferLifecycle">
+        update inv_transfer_order
+        set status = #{statusAfter},
+            received_time = #{receivedTime},
+            update_by = #{updateBy},
+            update_time = sysdate(),
+            version = version + 1
+        where transfer_id = #{transferId}
+          and status = #{expectedStatus}
+          and version = #{expectedVersion}
+          and #{expectedStatus} in
+              ('partial_delivered', 'delivered', 'partial_received')
+          and #{statusAfter} in
+              ('partial_received', 'received', 'discrepancy')
+    </update>
+
+    <insert id="insertTransferStatusLog">
+        insert into inv_transfer_status_log (
+            transfer_id, from_status, to_status, action, operator_id,
+            operator_name, reason, create_time
+        ) values (
+            #{transferId}, #{fromStatus}, #{toStatus}, #{action},
+            #{operatorId}, #{operatorName}, #{reason}, sysdate()
+        )
+    </insert>
+
+</mapper>

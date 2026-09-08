@@ -1,0 +1,236 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.system.mapper.HrHealthCertificateMapper">
+
+    <resultMap id="CertificateResult" type="com.erp.system.domain.vo.HrHealthCertificateVo">
+        <id property="certificateId" column="certificate_id"/>
+        <result property="userId" column="user_id"/>
+        <result property="deptIdSnapshot" column="dept_id_snapshot"/>
+        <result property="certificateNo" column="certificate_no"/>
+        <result property="issuedDate" column="issued_date"/>
+        <result property="validFrom" column="valid_from"/>
+        <result property="expiresOn" column="expires_on"/>
+        <result property="issuerName" column="issuer_name"/>
+        <result property="attachmentNodeId" column="attachment_node_id"/>
+        <result property="reviewStatus" column="review_status"/>
+        <result property="currentFlag" column="current_flag"/>
+        <result property="reviewedByUserId" column="reviewed_by_user_id"/>
+        <result property="reviewedByName" column="reviewed_by_name"/>
+        <result property="reviewedTime" column="reviewed_time"/>
+        <result property="rejectionReason" column="rejection_reason"/>
+        <result property="approvalInstanceId" column="approval_instance_id"/>
+        <result property="approvalRound" column="approval_round"/>
+        <result property="lastApprovalEventKey" column="last_approval_event_key"/>
+        <result property="version" column="version"/>
+        <result property="delFlag" column="del_flag"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateBy" column="update_by"/>
+        <result property="updateTime" column="update_time"/>
+        <result property="employeeNo" column="employee_no"/>
+        <result property="employeeName" column="employee_name"/>
+        <result property="currentDeptId" column="current_dept_id"/>
+        <result property="currentDeptName" column="current_dept_name"/>
+    </resultMap>
+
+    <sql id="columns">
+        c.certificate_id, c.user_id, c.dept_id_snapshot, c.certificate_no,
+        c.issued_date, c.valid_from, c.expires_on, c.issuer_name,
+        c.attachment_node_id, c.review_status, c.current_flag,
+        c.reviewed_by_user_id, c.reviewed_by_name, c.reviewed_time,
+        c.rejection_reason, c.approval_instance_id, c.approval_round,
+        c.last_approval_event_key, c.version, c.del_flag, c.create_by, c.create_time,
+        c.update_by, c.update_time, p.employee_no, u.nick_name employee_name,
+        u.dept_id current_dept_id, d.dept_name current_dept_name
+    </sql>
+
+    <sql id="fromSql">
+        from hr_employee_health_certificate c
+        inner join sys_user u on u.user_id = c.user_id and u.del_flag = '0'
+        left join sys_user_profile p on p.user_id = c.user_id
+        left join sys_dept d on d.dept_id = u.dept_id
+    </sql>
+
+    <select id="selectById" resultMap="CertificateResult">
+        select <include refid="columns"/> <include refid="fromSql"/>
+        where c.certificate_id = #{certificateId} and c.del_flag = '0'
+    </select>
+
+    <select id="selectByIdForUpdate" resultMap="CertificateResult">
+        select <include refid="columns"/> <include refid="fromSql"/>
+        where c.certificate_id = #{certificateId} and c.del_flag = '0'
+        for update
+    </select>
+
+    <select id="selectByUserId" resultMap="CertificateResult">
+        select <include refid="columns"/> <include refid="fromSql"/>
+        where c.user_id = #{userId} and c.del_flag = '0'
+        order by case when c.current_flag = 'Y' then 0 else 1 end,
+                 c.create_time desc, c.certificate_id desc
+    </select>
+
+    <select id="selectCurrentByUserIds" resultMap="CertificateResult">
+        select <include refid="columns"/> <include refid="fromSql"/>
+        where c.del_flag = '0' and c.review_status = 'APPROVED'
+          and c.current_flag = 'Y' and c.user_id in
+        <foreach collection="userIds" item="userId" open="(" close=")" separator=",">
+            #{userId}
+        </foreach>
+    </select>
+
+    <select id="selectScopedList" parameterType="com.erp.system.domain.vo.HrHealthCertificateVo"
+            resultMap="CertificateResult">
+        select <include refid="columns"/> <include refid="fromSql"/>
+        where c.del_flag = '0'
+        <if test="certificateId != null">and c.certificate_id = #{certificateId}</if>
+        <if test="reviewStatus != null and reviewStatus != ''">and c.review_status = #{reviewStatus}</if>
+        <if test="currentDeptId != null">and u.dept_id = #{currentDeptId}</if>
+        <if test="healthCertificateStatus == 'EXPIRED'">and c.current_flag = 'Y' and c.expires_on &lt; current_date()</if>
+        <if test="healthCertificateStatus == 'EXPIRING'">and c.current_flag = 'Y' and c.expires_on between current_date() and date_add(current_date(), interval 30 day)</if>
+        <if test="healthCertificateStatus == 'EXPIRING_OR_EXPIRED'">and c.current_flag = 'Y' and c.review_status = 'APPROVED' and c.expires_on &lt;= date_add(current_date(), interval 30 day)</if>
+        ${params.dataScope}
+        order by case c.review_status when 'PENDING_REVIEW' then 0 else 1 end,
+                 c.expires_on, c.certificate_id desc
+    </select>
+
+    <select id="selectOpsSummary"
+            parameterType="com.erp.system.domain.vo.HrHealthCertificateVo"
+            resultType="com.erp.system.domain.vo.HrHealthCertificateOpsSummaryVo">
+        select coalesce(sum(case when c.review_status = 'PENDING_REVIEW'
+                                 then 1 else 0 end), 0) pendingReviewCount,
+               coalesce(sum(case when c.current_flag = 'Y'
+                                  and c.review_status = 'APPROVED'
+                                  and c.expires_on &gt; date_add(current_date(), interval 30 day)
+                                 then 1 else 0 end), 0) validCount,
+               coalesce(sum(case when c.current_flag = 'Y'
+                                  and c.review_status = 'APPROVED'
+                                  and c.expires_on between current_date()
+                                      and date_add(current_date(), interval 30 day)
+                                 then 1 else 0 end), 0) expiringCount,
+               coalesce(sum(case when c.current_flag = 'Y'
+                                  and c.review_status = 'APPROVED'
+                                  and c.expires_on &lt; current_date()
+                                 then 1 else 0 end), 0) expiredCount,
+               min(case when c.review_status = 'PENDING_REVIEW'
+                        then c.create_time end) oldestPendingTime,
+               coalesce(timestampdiff(hour,
+                   min(case when c.review_status = 'PENDING_REVIEW'
+                            then c.create_time end), sysdate()), 0) oldestPendingHours
+        <include refid="fromSql"/>
+        where c.del_flag = '0'
+        <if test="currentDeptId != null">and u.dept_id = #{currentDeptId}</if>
+        ${params.dataScope}
+    </select>
+
+    <select id="selectReminderCandidates" resultMap="CertificateResult">
+        select <include refid="columns"/> <include refid="fromSql"/>
+        where c.del_flag = '0' and c.review_status = 'APPROVED'
+          and c.current_flag = 'Y' and c.expires_on &lt;= #{expiresThrough}
+          and c.certificate_id &gt; #{afterCertificateId}
+          and (p.employee_status is null or p.employee_status &lt;&gt; '离职')
+        order by c.certificate_id
+        limit #{limit}
+    </select>
+
+    <select id="selectReminderRecipientUserIds" resultType="Long">
+        select distinct u.user_id
+        from sys_user u
+        inner join sys_user_role ur on ur.user_id = u.user_id
+        inner join sys_role r on r.role_id = ur.role_id and r.status = '0'
+        inner join sys_role_menu rm on rm.role_id = r.role_id
+        inner join sys_menu m on m.menu_id = rm.menu_id
+        left join sys_user_shop us on us.user_id = u.user_id
+        where u.status = '0' and u.del_flag = '0'
+          and m.perms = 'hr:healthCertificate:remind'
+          and (u.user_id = 1 or us.dept_id = #{deptId})
+    </select>
+
+    <insert id="insertCertificate" parameterType="com.erp.system.domain.HrHealthCertificate"
+            useGeneratedKeys="true" keyProperty="certificateId">
+        insert into hr_employee_health_certificate (
+            user_id, dept_id_snapshot, certificate_no, issued_date, valid_from,
+            expires_on, issuer_name, attachment_node_id, review_status,
+            current_flag, approval_instance_id, approval_round,
+            last_approval_event_key, version, del_flag, create_by, create_time
+        ) values (
+            #{userId}, #{deptIdSnapshot}, #{certificateNo}, #{issuedDate}, #{validFrom},
+            #{expiresOn}, #{issuerName}, #{attachmentNodeId}, #{reviewStatus},
+            null, null, 0, null, 0, '0', #{createBy}, sysdate()
+        )
+    </insert>
+
+    <update id="updateDraft" parameterType="com.erp.system.domain.HrHealthCertificate">
+        update hr_employee_health_certificate
+        set certificate_no = #{certificateNo}, issued_date = #{issuedDate},
+            valid_from = #{validFrom}, expires_on = #{expiresOn},
+            issuer_name = #{issuerName}, attachment_node_id = #{attachmentNodeId},
+            review_status = 'DRAFT', rejection_reason = null,
+            update_by = #{updateBy}, update_time = sysdate(), version = version + 1
+        where certificate_id = #{certificateId} and user_id = #{userId}
+          and review_status in ('DRAFT', 'REJECTED', 'RETURNED', 'WITHDRAWN')
+          and version = #{version}
+          and del_flag = '0'
+    </update>
+
+    <update id="markApprovalSubmitting">
+        update hr_employee_health_certificate
+        set review_status = 'APPROVAL_SUBMITTING', rejection_reason = null,
+            approval_instance_id = null, last_approval_event_key = null,
+            approval_round = #{approvalRound},
+            update_by = #{updateBy}, update_time = sysdate(), version = version + 1
+        where certificate_id = #{certificateId} and user_id = #{userId}
+          and review_status in ('DRAFT', 'REJECTED', 'RETURNED', 'WITHDRAWN')
+          and version = #{version}
+          and del_flag = '0'
+    </update>
+
+    <update id="markApprovalPending">
+        update hr_employee_health_certificate
+        set review_status = 'APPROVAL_PENDING',
+            approval_instance_id = #{approvalInstanceId},
+            approval_round = #{approvalRound},
+            update_by = #{updateBy}, update_time = sysdate(), version = version + 1
+        where certificate_id = #{certificateId}
+          and review_status = 'APPROVAL_SUBMITTING'
+          and approval_round = #{approvalRound} and version = #{version}
+          and del_flag = '0'
+    </update>
+
+    <select id="lockEmployeeProfile" resultType="Long">
+        select user_id from sys_user_profile where user_id = #{userId} for update
+    </select>
+
+    <update id="clearCurrentByUserId">
+        update hr_employee_health_certificate
+        set current_flag = null, update_by = #{updateBy},
+            update_time = sysdate(), version = version + 1
+        where user_id = #{userId} and current_flag = 'Y' and del_flag = '0'
+    </update>
+
+    <update id="reviewCertificate">
+        update hr_employee_health_certificate
+        set review_status = #{decision}, current_flag = #{currentFlag},
+            reviewed_by_user_id = #{reviewerUserId}, reviewed_by_name = #{reviewerName},
+            reviewed_time = sysdate(), rejection_reason = #{rejectionReason},
+            update_by = #{reviewerName}, update_time = sysdate(), version = version + 1
+        where certificate_id = #{certificateId} and review_status = 'PENDING_REVIEW'
+          and version = #{version} and del_flag = '0'
+    </update>
+
+    <update id="applyApprovalResult">
+        update hr_employee_health_certificate
+        set review_status = #{targetStatus}, current_flag = #{currentFlag},
+            reviewed_by_user_id = #{operatorUserId},
+            reviewed_by_name = #{operatorName}, reviewed_time = sysdate(),
+            rejection_reason = #{reason},
+            last_approval_event_key = #{eventKey},
+            update_by = #{operatorName}, update_time = sysdate(),
+            version = version + 1
+        where certificate_id = #{certificateId}
+          and review_status = 'APPROVAL_PENDING'
+          and approval_instance_id = #{approvalInstanceId}
+          and approval_round = #{approvalRound}
+          and version = #{version} and del_flag = '0'
+    </update>
+</mapper>

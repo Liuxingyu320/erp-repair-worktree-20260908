@@ -1,0 +1,43 @@
+spring:
+  application:
+    name: erp-system-hr-onboarding-it
+  config:
+    import: []
+  main:
+    web-application-type: none
+    lazy-initialization: true
+  cloud:
+    nacos:
+      discovery:
+        enabled: false
+      config:
+        enabled: false
+    discovery:
+      enabled: false
+  data:
+    redis:
+      repositories:
+        enabled: false
+  datasource:
+    dynamic:
+      primary: master
+      strict: true
+      datasource:
+        master:
+          driver-class-name: com.mysql.cj.jdbc.Driver
+          url: ${hr.onboarding.it.jdbc-url}
+          username: ${hr.onboarding.it.username}
+          password: ${hr.onboarding.it.password}
+      druid:
+        initial-size: 1
+        min-idle: 1
+        max-active: 8
+        validation-query: SELECT 1
+
+mybatis:
+  typeAliasesPackage: com.erp.system
+  mapperLocations: classpath:mapper/**/*.xml
+
+springdoc:
+  api-docs:
+    enabled: false

@@ -1,0 +1,40 @@
+CREATE TABLE IF NOT EXISTS inv_transfer_shipment (
+  shipment_id bigint NOT NULL AUTO_INCREMENT COMMENT 'shipment id',
+  transfer_id bigint NOT NULL COMMENT 'transfer order id',
+  shipment_no varchar(64) NOT NULL COMMENT 'shipment number',
+  warehouse_id bigint DEFAULT NULL COMMENT 'warehouse id',
+  warehouse_dept_id bigint DEFAULT NULL COMMENT 'warehouse dept id',
+  status varchar(32) DEFAULT 'pending_receive' COMMENT 'pending_receive/received/abnormal',
+  shipped_by varchar(64) DEFAULT '' COMMENT 'shipped by',
+  shipped_time datetime DEFAULT NULL COMMENT 'shipped time',
+  received_by varchar(64) DEFAULT '' COMMENT 'received by',
+  received_time datetime DEFAULT NULL COMMENT 'received time',
+  create_by varchar(64) DEFAULT '',
+  create_time datetime DEFAULT CURRENT_TIMESTAMP,
+  update_by varchar(64) DEFAULT '',
+  update_time datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  remark varchar(500) DEFAULT '',
+  PRIMARY KEY (shipment_id),
+  UNIQUE KEY uk_its_shipment_no (shipment_no),
+  KEY idx_its_transfer (transfer_id),
+  KEY idx_its_status (status),
+  KEY idx_its_warehouse (warehouse_id),
+  KEY idx_its_shipped_time (shipped_time)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='transfer shipment batch';
+
+CREATE TABLE IF NOT EXISTS inv_transfer_shipment_detail (
+  shipment_detail_id bigint NOT NULL AUTO_INCREMENT COMMENT 'shipment detail id',
+  shipment_id bigint NOT NULL COMMENT 'shipment id',
+  transfer_id bigint NOT NULL COMMENT 'transfer order id',
+  transfer_detail_id bigint NOT NULL COMMENT 'transfer detail id',
+  product_id bigint NOT NULL COMMENT 'product id',
+  product_name varchar(128) DEFAULT '' COMMENT 'product name',
+  planned_quantity decimal(16,2) DEFAULT '0.00' COMMENT 'requested quantity',
+  shipped_quantity decimal(16,2) DEFAULT '0.00' COMMENT 'shipped quantity',
+  received_quantity decimal(16,2) DEFAULT '0.00' COMMENT 'received quantity',
+  PRIMARY KEY (shipment_detail_id),
+  KEY idx_itsd_shipment (shipment_id),
+  KEY idx_itsd_transfer (transfer_id),
+  KEY idx_itsd_transfer_detail (transfer_detail_id),
+  KEY idx_itsd_product (product_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='transfer shipment batch detail';

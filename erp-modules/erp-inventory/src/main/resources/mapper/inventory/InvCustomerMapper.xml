@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.inventory.mapper.InvCustomerMapper">
+
+    <resultMap type="InvCustomer" id="InvCustomerResult">
+        <id property="customerId" column="customer_id"/>
+        <result property="customerName" column="customer_name"/>
+        <result property="customerCode" column="customer_code"/>
+        <result property="contactPerson" column="contact_person"/>
+        <result property="contactPhone" column="contact_phone"/>
+        <result property="contactEmail" column="contact_email"/>
+        <result property="address" column="address"/>
+        <result property="creditLimit" column="credit_limit"/>
+        <result property="creditUsed" column="credit_used"/>
+        <result property="paymentTerms" column="payment_terms"/>
+        <result property="customerLevel" column="customer_level"/>
+        <result property="shopDeptId" column="shop_dept_id"/>
+        <result property="shopDeptName" column="shop_dept_name"/>
+        <result property="status" column="status"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateBy" column="update_by"/>
+        <result property="updateTime" column="update_time"/>
+        <result property="remark" column="remark"/>
+    </resultMap>
+
+    <sql id="selectInvCustomerVo">
+        select c.customer_id, c.customer_name, c.customer_code, c.contact_person, c.contact_phone,
+               c.contact_email, c.address, c.credit_limit, c.credit_used, c.payment_terms,
+               c.customer_level, c.shop_dept_id, shop_dept.dept_name as shop_dept_name,
+               c.status, c.create_by, c.create_time,
+               c.update_by, c.update_time, c.remark
+        from inv_customer c
+        left join sys_dept shop_dept on shop_dept.dept_id = c.shop_dept_id
+    </sql>
+
+    <select id="selectInvCustomerList" parameterType="InvCustomer" resultMap="InvCustomerResult">
+        <include refid="selectInvCustomerVo"/>
+        where 1=1
+        <if test="customerName != null and customerName != ''">and c.customer_name like concat('%', #{customerName}, '%')</if>
+        <if test="customerCode != null and customerCode != ''">and c.customer_code = #{customerCode}</if>
+        <if test="contactPhone != null and contactPhone != ''">and c.contact_phone like concat('%', #{contactPhone}, '%')</if>
+        <if test="customerLevel != null and customerLevel != ''">and c.customer_level = #{customerLevel}</if>
+        <if test="shopDeptId != null">and c.shop_dept_id = #{shopDeptId}</if>
+        <if test="status != null and status != ''">and c.status = #{status}</if>
+        <if test="params.scopeDeptIds != null">and c.shop_dept_id in <foreach collection="params.scopeDeptIds" item="deptId" open="(" close=")" separator=",">#{deptId}</foreach></if>
+        ${params.dataScope}
+        order by c.create_time desc
+    </select>
+
+    <select id="selectInvCustomerById" parameterType="Long" resultMap="InvCustomerResult">
+        <include refid="selectInvCustomerVo"/>
+        where c.customer_id = #{customerId}
+    </select>
+
+    <insert id="insertInvCustomer" parameterType="InvCustomer" useGeneratedKeys="true" keyProperty="customerId">
+        insert into inv_customer (
+            customer_name, customer_code, contact_person, contact_phone, contact_email,
+            address, credit_limit, credit_used, payment_terms, customer_level,
+            shop_dept_id, status, create_by, create_time, remark
+        ) values (
+            #{customerName}, #{customerCode}, #{contactPerson}, #{contactPhone}, #{contactEmail},
+            #{address}, #{creditLimit}, #{creditUsed}, #{paymentTerms}, #{customerLevel},
+            #{shopDeptId}, '0', #{createBy}, sysdate(), #{remark}
+        )
+    </insert>
+
+    <update id="updateInvCustomer" parameterType="InvCustomer">
+        update inv_customer
+        <set>
+            <if test="customerName != null and customerName != ''">customer_name = #{customerName},</if>
+            <if test="customerCode != null">customer_code = #{customerCode},</if>
+            <if test="contactPerson != null">contact_person = #{contactPerson},</if>
+            <if test="contactPhone != null">contact_phone = #{contactPhone},</if>
+            <if test="contactEmail != null">contact_email = #{contactEmail},</if>
+            <if test="address != null">address = #{address},</if>
+            <if test="creditLimit != null">credit_limit = #{creditLimit},</if>
+            <if test="creditUsed != null">credit_used = #{creditUsed},</if>
+            <if test="paymentTerms != null">payment_terms = #{paymentTerms},</if>
+            <if test="customerLevel != null">customer_level = #{customerLevel},</if>
+            <if test="status != null">status = #{status},</if>
+            update_by = #{updateBy}, update_time = sysdate()
+        </set>
+        where customer_id = #{customerId}
+    </update>
+
+    <delete id="deleteInvCustomerByIds" parameterType="Long">
+        delete from inv_customer where customer_id in
+        <foreach collection="array" item="customerId" open="(" close=")" separator=",">
+            #{customerId}
+        </foreach>
+        and not exists (
+            select 1 from inv_customer_service_profile p
+            where p.customer_id = inv_customer.customer_id
+        )
+    </delete>
+
+</mapper>

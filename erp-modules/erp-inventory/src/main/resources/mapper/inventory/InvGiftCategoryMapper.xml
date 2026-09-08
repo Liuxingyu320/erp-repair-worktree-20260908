@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.inventory.mapper.InvGiftCategoryMapper">
+
+    <resultMap type="InvGiftCategory" id="InvGiftCategoryResult">
+        <id property="categoryId" column="category_id"/>
+        <result property="parentId" column="parent_id"/>
+        <result property="ancestors" column="ancestors"/>
+        <result property="categoryName" column="category_name"/>
+        <result property="categoryCode" column="category_code"/>
+        <result property="orderNum" column="order_num"/>
+        <result property="status" column="status"/>
+        <result property="delFlag" column="del_flag"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateBy" column="update_by"/>
+        <result property="updateTime" column="update_time"/>
+        <result property="remark" column="remark"/>
+    </resultMap>
+
+    <sql id="selectInvGiftCategoryVo">
+        select category_id, parent_id, ancestors, category_name, category_code,
+               order_num, status, del_flag, create_by, create_time, update_by, update_time, remark
+        from inv_gift_category
+    </sql>
+
+    <select id="selectInvGiftCategoryList" parameterType="InvGiftCategory" resultMap="InvGiftCategoryResult">
+        <include refid="selectInvGiftCategoryVo"/>
+        where del_flag = '0'
+        <if test="categoryName != null and categoryName != ''">and category_name like concat('%', #{categoryName}, '%')</if>
+        <if test="status != null and status != ''">and status = #{status}</if>
+        order by order_num, category_id
+    </select>
+
+    <select id="selectInvGiftCategoryById" parameterType="Long" resultMap="InvGiftCategoryResult">
+        <include refid="selectInvGiftCategoryVo"/>
+        where category_id = #{categoryId} and del_flag = '0'
+    </select>
+
+    <select id="countCategoryCode" resultType="int">
+        select count(1)
+        from inv_gift_category
+        where del_flag = '0'
+          and category_code = #{categoryCode}
+        <if test="excludeCategoryId != null">and category_id != #{excludeCategoryId}</if>
+    </select>
+
+    <select id="countChildCategory" parameterType="Long" resultType="int">
+        select count(1)
+        from inv_gift_category
+        where del_flag = '0'
+          and parent_id = #{categoryId}
+    </select>
+
+    <select id="countGiftByCategoryId" parameterType="Long" resultType="int">
+        select count(1)
+        from inv_gift_box
+        where del_flag = '0'
+          and category_id = #{categoryId}
+    </select>
+
+    <insert id="insertInvGiftCategory" parameterType="InvGiftCategory" useGeneratedKeys="true" keyProperty="categoryId">
+        insert into inv_gift_category (
+            parent_id, ancestors, category_name, category_code, order_num,
+            status, del_flag, create_by, create_time, remark
+        ) values (
+            #{parentId}, #{ancestors}, #{categoryName}, #{categoryCode}, #{orderNum},
+            #{status}, '0', #{createBy}, sysdate(), #{remark}
+        )
+    </insert>
+
+    <update id="updateInvGiftCategory" parameterType="InvGiftCategory">
+        update inv_gift_category
+        <set>
+            <if test="categoryName != null">category_name = #{categoryName},</if>
+            <if test="categoryCode != null">category_code = #{categoryCode},</if>
+            <if test="parentId != null">parent_id = #{parentId},</if>
+            <if test="ancestors != null">ancestors = #{ancestors},</if>
+            <if test="orderNum != null">order_num = #{orderNum},</if>
+            <if test="status != null">status = #{status},</if>
+            update_by = #{updateBy}, update_time = sysdate()
+        </set>
+        where category_id = #{categoryId}
+    </update>
+
+    <delete id="deleteInvGiftCategoryById" parameterType="Long">
+        update inv_gift_category set del_flag = '2' where category_id = #{categoryId}
+    </delete>
+
+</mapper>

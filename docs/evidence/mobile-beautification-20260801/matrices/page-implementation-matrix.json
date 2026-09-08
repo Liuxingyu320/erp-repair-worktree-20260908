@@ -1,0 +1,188 @@
+{
+  "count": 20,
+  "implementations": [
+    {
+      "id": "login",
+      "name": "登录",
+      "states": [
+        "normal"
+      ]
+    },
+    {
+      "id": "register",
+      "name": "注册",
+      "states": [
+        "normal"
+      ]
+    },
+    {
+      "id": "change-password",
+      "name": "强制改密",
+      "states": [
+        "normal",
+        "error"
+      ]
+    },
+    {
+      "id": "complete-profile",
+      "name": "资料补全",
+      "states": [
+        "loading",
+        "error",
+        "normal"
+      ]
+    },
+    {
+      "id": "select-shop",
+      "name": "选择组织",
+      "states": [
+        "loading",
+        "empty",
+        "normal"
+      ]
+    },
+    {
+      "id": "401",
+      "name": "401",
+      "states": [
+        "permission"
+      ]
+    },
+    {
+      "id": "404",
+      "name": "404",
+      "states": [
+        "error"
+      ]
+    },
+    {
+      "id": "lock",
+      "name": "锁屏",
+      "states": [
+        "normal",
+        "error"
+      ]
+    },
+    {
+      "id": "workbench",
+      "name": "工作台",
+      "states": [
+        "loading",
+        "context",
+        "permission",
+        "session",
+        "network",
+        "normal"
+      ]
+    },
+    {
+      "id": "inventory",
+      "name": "进销存工作台",
+      "states": [
+        "loading",
+        "error",
+        "normal"
+      ]
+    },
+    {
+      "id": "feature",
+      "name": "通用业务模板",
+      "states": [
+        "loading",
+        "session",
+        "permission",
+        "network",
+        "empty",
+        "filtered-empty",
+        "normal",
+        "sheet"
+      ]
+    },
+    {
+      "id": "todo",
+      "name": "待办",
+      "states": [
+        "loading",
+        "error",
+        "empty",
+        "normal"
+      ]
+    },
+    {
+      "id": "reimbursement",
+      "name": "报销",
+      "states": [
+        "list",
+        "form",
+        "detail",
+        "dialog"
+      ]
+    },
+    {
+      "id": "drive",
+      "name": "云盘",
+      "states": [
+        "loading",
+        "session",
+        "empty",
+        "normal",
+        "preview"
+      ]
+    },
+    {
+      "id": "sign",
+      "name": "签约",
+      "states": [
+        "loading",
+        "error",
+        "empty",
+        "detail",
+        "dialog"
+      ]
+    },
+    {
+      "id": "onboarding-form",
+      "name": "入职表单",
+      "states": [
+        "loading",
+        "error",
+        "steps"
+      ]
+    },
+    {
+      "id": "onboarding-list",
+      "name": "入职列表",
+      "states": [
+        "list",
+        "filter"
+      ]
+    },
+    {
+      "id": "customer",
+      "name": "客户服务卡",
+      "states": [
+        "list",
+        "detail",
+        "form"
+      ]
+    },
+    {
+      "id": "contract",
+      "name": "合同",
+      "states": [
+        "list",
+        "preview",
+        "sign"
+      ]
+    },
+    {
+      "id": "hr-bundle",
+      "name": "员工/完整度/健康证",
+      "states": [
+        "list",
+        "editor",
+        "shell"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,134 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.inventory.mapper.InvStockLogMapper">
+
+    <resultMap type="InvStockLog" id="InvStockLogResult">
+        <id property="logId" column="log_id"/>
+        <result property="itemType" column="item_type"/>
+        <result property="itemId" column="item_id"/>
+        <result property="productId" column="product_id"/>
+        <result property="itemCode" column="item_code"/>
+        <result property="itemName" column="item_name"/>
+        <result property="productCode" column="product_code"/>
+        <result property="productName" column="product_name"/>
+        <result property="shopDeptId" column="shop_dept_id"/>
+        <result property="shopDeptName" column="shop_dept_name"/>
+        <result property="warehouseId" column="warehouse_id"/>
+        <result property="warehouseName" column="warehouse_name"/>
+        <result property="batchNo" column="batch_no"/>
+        <result property="expiryDate" column="expiry_date"/>
+        <result property="serialNo" column="serial_no"/>
+        <result property="locationCode" column="location_code"/>
+        <result property="locationName" column="location_name"/>
+        <result property="movementType" column="movement_type"/>
+        <result property="businessType" column="business_type"/>
+        <result property="businessId" column="business_id"/>
+        <result property="businessNo" column="business_no"/>
+        <result property="changeQuantity" column="change_quantity"/>
+        <result property="beforeQuantity" column="before_quantity"/>
+        <result property="afterQuantity" column="after_quantity"/>
+        <result property="costPrice" column="cost_price"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="remark" column="remark"/>
+    </resultMap>
+
+    <select id="selectInvStockLogList" parameterType="InvStockLog" resultMap="InvStockLogResult">
+        select l.log_id, coalesce(l.item_type, 'product') as item_type,
+               coalesce(l.item_id, l.product_id) as item_id, l.product_id,
+               case coalesce(l.item_type, 'product')
+                    when 'oe' then oe.oe_item_code
+                    when 'gift' then gift.gift_code
+                    else p.product_code
+               end as item_code,
+               case coalesce(l.item_type, 'product')
+                    when 'oe' then oe.oe_item_name
+                    when 'gift' then gift.gift_name
+                    else p.product_name
+               end as item_name,
+               p.product_code, p.product_name,
+               l.shop_dept_id, shop_dept.dept_name as shop_dept_name,
+               l.warehouse_id, warehouse_dept.dept_name as warehouse_name,
+               l.batch_no, l.expiry_date, l.serial_no, l.location_code, l.location_name,
+               l.movement_type, l.business_type, l.business_id, l.business_no,
+               l.change_quantity, l.before_quantity, l.after_quantity,
+               l.cost_price, l.create_by, l.create_time, l.remark
+        from inv_stock_log l
+             left join inv_product p on p.product_id = l.product_id and p.del_flag = '0'
+             left join inv_oe_item oe on coalesce(l.item_type, 'product') = 'oe' and oe.oe_item_id = coalesce(l.item_id, l.product_id) and oe.del_flag = '0'
+             left join inv_gift_box gift on coalesce(l.item_type, 'product') = 'gift' and gift.gift_id = coalesce(l.item_id, l.product_id) and gift.del_flag = '0'
+             left join sys_dept shop_dept on shop_dept.dept_id = l.shop_dept_id
+             left join sys_dept warehouse_dept on warehouse_dept.dept_id = l.warehouse_id
+        <where>
+            <if test="itemType != null and itemType != ''">and coalesce(l.item_type, 'product') = #{itemType}</if>
+            <if test="itemId != null">and coalesce(l.item_id, l.product_id) = #{itemId}</if>
+            <if test="productId != null">and l.product_id = #{productId}</if>
+            <if test="keyword != null and keyword != ''">
+                and (
+                    p.product_code like concat('%', #{keyword}, '%')
+                    or p.product_name like concat('%', #{keyword}, '%')
+                    or oe.oe_item_code like concat('%', #{keyword}, '%')
+                    or oe.oe_item_name like concat('%', #{keyword}, '%')
+                    or gift.gift_code like concat('%', #{keyword}, '%')
+                    or gift.gift_name like concat('%', #{keyword}, '%')
+                    or l.batch_no like concat('%', #{keyword}, '%')
+                    or l.serial_no like concat('%', #{keyword}, '%')
+                    or l.location_code like concat('%', #{keyword}, '%')
+                    or l.location_name like concat('%', #{keyword}, '%')
+                    or l.business_no like concat('%', #{keyword}, '%')
+                )
+            </if>
+            <if test="shopDeptId != null">and l.shop_dept_id = #{shopDeptId}</if>
+            <if test="warehouseId != null">and l.warehouse_id = #{warehouseId}</if>
+            <if test="batchNo != null and batchNo != ''">and l.batch_no = #{batchNo}</if>
+            <if test="expiryDate != null">and l.expiry_date = #{expiryDate}</if>
+            <if test="serialNo != null and serialNo != ''">and l.serial_no = #{serialNo}</if>
+            <if test="locationCode != null and locationCode != ''">and l.location_code = #{locationCode}</if>
+            <if test="locationName != null and locationName != ''">and l.location_name like concat('%', #{locationName}, '%')</if>
+            <if test="movementType != null and movementType != ''">
+                <choose>
+                    <when test="movementType == 'purchase_return_out'">
+                        and l.movement_type in ('purchase_return_out', 'purchase_return')
+                    </when>
+                    <when test="movementType == 'sales_return_in'">
+                        and l.movement_type in ('sales_return_in', 'sales_return')
+                    </when>
+                    <when test="movementType == 'sales_out'">
+                        and l.movement_type in ('sales_out', 'outbound_out')
+                    </when>
+                    <when test="movementType == 'stock_check_profit'">
+                        and (l.movement_type = 'stock_check_profit' or (l.movement_type = 'check' and l.change_quantity &gt; 0))
+                    </when>
+                    <when test="movementType == 'stock_check_loss'">
+                        and (l.movement_type = 'stock_check_loss' or (l.movement_type = 'check' and l.change_quantity &lt; 0))
+                    </when>
+                    <otherwise>
+                        and l.movement_type = #{movementType}
+                    </otherwise>
+                </choose>
+            </if>
+            <if test="businessType != null and businessType != ''">and l.business_type = #{businessType}</if>
+            <if test="businessId != null">and l.business_id = #{businessId}</if>
+            <if test="businessNo != null and businessNo != ''">and l.business_no like concat('%', #{businessNo}, '%')</if>
+            <if test="beginTime != null">and l.create_time &gt;= #{beginTime}</if>
+            <if test="endTime != null">and l.create_time &lt; date_add(#{endTime}, interval 1 day)</if>
+            <if test="params.scopeDeptIds != null">and l.shop_dept_id in <foreach collection="params.scopeDeptIds" item="deptId" open="(" close=")" separator=",">#{deptId}</foreach></if>
+        </where>
+        order by l.create_time desc
+    </select>
+
+    <insert id="insertInvStockLog" parameterType="InvStockLog" useGeneratedKeys="true" keyProperty="logId">
+        insert into inv_stock_log (
+            item_type, item_id, product_id, shop_dept_id, warehouse_id, movement_type, business_type,
+            batch_no, expiry_date, serial_no, location_code, location_name,
+            business_id, business_no, change_quantity, before_quantity, after_quantity,
+            cost_price, create_by, create_time, remark
+        ) values (
+            coalesce(#{itemType}, 'product'), coalesce(#{itemId}, #{productId}), #{productId}, #{shopDeptId}, #{warehouseId}, #{movementType}, #{businessType},
+            #{batchNo}, #{expiryDate}, #{serialNo}, #{locationCode}, #{locationName},
+            #{businessId}, #{businessNo}, #{changeQuantity}, #{beforeQuantity}, #{afterQuantity},
+            #{costPrice}, #{createBy}, sysdate(), #{remark}
+        )
+    </insert>
+
+</mapper>

@@ -1,0 +1,260 @@
+/**
+ * System management visual layer
+ *
+ * Shared hierarchy and density rules for account, permission, organization,
+ * configuration and audit pages. All selectors stay under the module marker.
+ */
+
+@media screen and (min-width: 992px) {
+  .app-wrapper:not(.mobile) .system-management-page {
+    --system-accent: var(--erp-primary, #0b6b53);
+    --system-accent-soft: var(--erp-primary-soft, #e7f2ed);
+    --system-panel-border: var(--erp-border, #dde2de);
+
+    .search-card {
+      margin-bottom: 12px;
+      padding: 16px 18px 8px;
+      background: var(--erp-surface, #ffffff);
+      border-color: var(--system-panel-border) !important;
+      box-shadow: var(--erp-shadow-card, 0 8px 22px rgba(23, 33, 29, 0.055));
+    }
+
+    .search-card > .el-form {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      column-gap: 4px;
+    }
+
+    .search-card .el-form-item {
+      margin-right: 14px;
+      margin-bottom: 8px;
+    }
+
+    .search-card .el-form-item__label {
+      color: #46534d;
+      font-weight: 650;
+    }
+
+    .content-card[class*="-toolbar-card"] {
+      margin-bottom: 12px;
+      padding: 10px 12px;
+      background: var(--erp-surface-raised, #fbfcfa);
+      border-color: var(--system-panel-border) !important;
+      box-shadow: var(--erp-shadow-subtle, 0 2px 10px rgba(23, 33, 29, 0.045));
+    }
+
+    .content-card[class*="-toolbar-card"] > .el-row {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-right: 0 !important;
+      margin-left: 0 !important;
+    }
+
+    .content-card[class*="-toolbar-card"] > .el-row > [class*="el-col"] {
+      float: none;
+      width: auto;
+      padding-right: 0 !important;
+      padding-left: 0 !important;
+    }
+
+    .content-card[class*="-toolbar-card"] .top-right-btn {
+      margin-left: auto;
+    }
+
+    .table-card {
+      padding: 16px 16px 10px;
+      overflow: hidden;
+      border-color: var(--system-panel-border) !important;
+      box-shadow: var(--erp-shadow-card, 0 8px 22px rgba(23, 33, 29, 0.055));
+    }
+
+    .table-card > .el-table {
+      overflow: hidden;
+      border: 1px solid var(--erp-border, #dde2de);
+      border-radius: 12px;
+    }
+
+    .table-card > .el-table .el-table__header-wrapper th,
+    .table-card > .el-table .el-table__fixed-header-wrapper th {
+      color: #46534d;
+      background: #f6f8f6 !important;
+    }
+
+    .table-card > .el-table .el-table__body tr:last-child td {
+      border-bottom-color: transparent !important;
+    }
+
+    .table-card .el-table .el-button--text {
+      border-radius: 7px !important;
+    }
+
+    .table-card .el-table .el-button--text:hover,
+    .table-card .el-table .el-button--text:focus {
+      background: var(--system-accent-soft);
+    }
+
+    .panel-title {
+      color: var(--erp-text, #17211d);
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    .panel-subtitle {
+      margin-top: 3px;
+      color: var(--erp-text-secondary, #66736d);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    .auth-role-user-card {
+      margin-bottom: 12px;
+      padding: 16px 18px 4px;
+    }
+
+    .auth-role-table-card .form-header,
+    .auth-role-user-card .form-header {
+      margin: 0 0 18px;
+      padding: 0 0 10px;
+      color: var(--system-accent);
+      font-size: 14px;
+      font-weight: 700;
+      background: transparent;
+      border-bottom: 1px solid var(--erp-border, #dde2de);
+    }
+
+    .system-form-actions {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      margin-top: 12px;
+      padding: 12px 16px;
+    }
+
+    .tree-border {
+      padding: 8px;
+      border-color: var(--erp-border, #dde2de);
+      background: var(--erp-surface-muted, #f8f8f5);
+    }
+
+    .el-table__empty-block {
+      min-height: 210px;
+    }
+
+    .el-switch.is-checked .el-switch__core {
+      border-color: var(--system-accent);
+      background: var(--system-accent);
+    }
+
+    .el-button--primary.is-plain {
+      color: var(--system-accent);
+      border-color: var(--erp-primary-muted, #d6e9e1);
+      background: var(--system-accent-soft);
+    }
+
+    .el-button--success.is-plain {
+      color: #15803d;
+      border-color: #bbf7d0;
+      background: #f0fdf4;
+    }
+
+    .el-button--warning.is-plain {
+      color: #b45309;
+      border-color: #fde68a;
+      background: #fffbeb;
+    }
+
+    .el-button--danger.is-plain {
+      color: #b91c1c;
+      border-color: #fecaca;
+      background: #fef2f2;
+    }
+
+    .el-button--info.is-plain {
+      color: #475569;
+      border-color: #dbe2ea;
+      background: var(--erp-surface-muted, #f8f8f5);
+    }
+  }
+
+  .app-wrapper:not(.mobile) .tree-sidebar-manage-wrap.system-management-page {
+    background: var(--erp-canvas, #f4f5f2);
+
+    .tree-sidebar-content {
+      background: transparent;
+    }
+
+    .tree-sidebar-content .content-inner {
+      padding: 16px 18px 24px;
+    }
+
+    .tree-sidebar {
+      border-right-color: var(--erp-border, #dde2de);
+      box-shadow: 5px 0 18px rgba(23, 33, 29, 0.035);
+    }
+  }
+
+  .app-wrapper:not(.mobile) .system-management-page .user-setup-summary .setup-summary-card {
+    border-color: var(--erp-border, #dde2de);
+    border-radius: 12px;
+    box-shadow: var(--erp-shadow-subtle, 0 2px 10px rgba(23, 33, 29, 0.045));
+  }
+
+  .app-wrapper:not(.mobile) .system-management-page .user-setup-summary .setup-summary-card:hover,
+  .app-wrapper:not(.mobile) .system-management-page .user-setup-summary .setup-summary-card:focus-visible {
+    border-color: #8fb3a4;
+    box-shadow: 0 10px 24px rgba(23, 33, 29, 0.09);
+  }
+
+  .app-wrapper:not(.mobile) .system-management-page.shop-config-page .user-card,
+  .app-wrapper:not(.mobile) .system-management-page.shop-config-page .shop-tree-card {
+    height: 100%;
+  }
+
+  .app-wrapper:not(.mobile) .system-management-page.salary-config-page .salary-tabs {
+    overflow: hidden;
+    border-color: var(--system-panel-border);
+    border-radius: 14px;
+    box-shadow: var(--erp-shadow-card, 0 8px 22px rgba(23, 33, 29, 0.055));
+  }
+
+  .app-wrapper:not(.mobile) .system-management-page.salary-config-page .el-tabs--border-card > .el-tabs__header {
+    background: var(--erp-surface-muted, #f8f8f5);
+    border-bottom-color: var(--erp-border, #dde2de);
+  }
+
+  .app-wrapper:not(.mobile) .system-management-page.salary-config-page .el-tabs--border-card > .el-tabs__header .el-tabs__item.is-active {
+    color: var(--system-accent);
+    background: #ffffff;
+    border-right-color: var(--erp-border, #dde2de);
+    border-left-color: var(--erp-border, #dde2de);
+  }
+}
+
+@media screen and (min-width: 992px) and (max-width: 1366px) {
+  .app-wrapper:not(.mobile) .system-management-page {
+    padding: 16px 18px 24px;
+
+    .search-card {
+      padding-right: 14px;
+      padding-left: 14px;
+    }
+
+    .search-card .el-input,
+    .search-card .el-select {
+      max-width: 220px;
+    }
+  }
+
+  .app-wrapper:not(.mobile) .tree-sidebar-manage-wrap.system-management-page {
+    padding: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .system-management-page .setup-summary-card {
+    transition: none !important;
+  }
+}

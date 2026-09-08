@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.inventory.mapper.InvTransferApprovalNodeMapper">
+
+    <resultMap type="InvTransferApprovalNode" id="InvTransferApprovalNodeResult">
+        <id property="nodeId" column="node_id"/>
+        <result property="ruleId" column="rule_id"/>
+        <result property="nodeOrder" column="node_order"/>
+        <result property="nodeName" column="node_name"/>
+        <result property="nodeRole" column="node_role"/>
+        <result property="postId" column="post_id"/>
+        <result property="postCode" column="post_code"/>
+        <result property="postName" column="post_name"/>
+        <result property="approvalMode" column="approval_mode"/>
+        <result property="requiredCount" column="required_count"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateBy" column="update_by"/>
+        <result property="updateTime" column="update_time"/>
+        <result property="remark" column="remark"/>
+    </resultMap>
+
+    <sql id="selectInvTransferApprovalNodeVo">
+        select node_id, rule_id, node_order, node_name, node_role,
+               post_id, post_code, post_name, approval_mode, required_count,
+               create_by, create_time, update_by, update_time, remark
+        from inv_transfer_approval_node
+    </sql>
+
+    <select id="selectNodesByRuleId" parameterType="Long" resultMap="InvTransferApprovalNodeResult">
+        <include refid="selectInvTransferApprovalNodeVo"/>
+        where rule_id = #{ruleId}
+        order by node_order asc, node_id asc
+    </select>
+
+    <insert id="batchInsertNodes" parameterType="java.util.List">
+        insert into inv_transfer_approval_node (
+            rule_id, node_order, node_name, node_role, post_id,
+            post_code, post_name, approval_mode, required_count,
+            create_by, create_time, remark
+        ) values
+        <foreach collection="list" item="node" separator=",">
+            (
+                #{node.ruleId}, #{node.nodeOrder}, #{node.nodeName}, #{node.nodeRole}, #{node.postId},
+                #{node.postCode}, #{node.postName}, #{node.approvalMode}, #{node.requiredCount},
+                #{node.createBy}, sysdate(), #{node.remark}
+            )
+        </foreach>
+    </insert>
+
+    <delete id="deleteNodesByRuleId" parameterType="Long">
+        delete from inv_transfer_approval_node where rule_id = #{ruleId}
+    </delete>
+
+</mapper>

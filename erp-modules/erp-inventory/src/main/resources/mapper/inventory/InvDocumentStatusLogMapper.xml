@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.inventory.mapper.InvDocumentStatusLogMapper">
+
+    <resultMap type="InvDocumentStatusLog" id="InvDocumentStatusLogResult">
+        <id property="logId" column="log_id"/>
+        <result property="documentType" column="document_type"/>
+        <result property="documentId" column="document_id"/>
+        <result property="documentNo" column="document_no"/>
+        <result property="shopDeptId" column="shop_dept_id"/>
+        <result property="shopDeptName" column="shop_dept_name"/>
+        <result property="previousStatus" column="previous_status"/>
+        <result property="newStatus" column="new_status"/>
+        <result property="action" column="action"/>
+        <result property="operatorName" column="operator_name"/>
+        <result property="operateTime" column="operate_time"/>
+        <result property="remark" column="remark"/>
+    </resultMap>
+
+    <select id="selectInvDocumentStatusLogList" parameterType="InvDocumentStatusLog"
+            resultMap="InvDocumentStatusLogResult">
+        select l.log_id, l.document_type, l.document_id, l.document_no,
+               l.shop_dept_id, shop_dept.dept_name as shop_dept_name,
+               l.previous_status, l.new_status, l.action,
+               l.operator_name, l.operate_time, l.remark
+        from inv_document_status_log l
+             left join sys_dept shop_dept on shop_dept.dept_id = l.shop_dept_id
+        <where>
+            <if test="documentType != null and documentType != ''">and l.document_type = #{documentType}</if>
+            <if test="documentId != null">and l.document_id = #{documentId}</if>
+            <if test="shopDeptId != null">and l.shop_dept_id = #{shopDeptId}</if>
+            <if test="params.beginOperateTime != null and params.beginOperateTime != ''">and l.operate_time &gt;= #{params.beginOperateTime}</if>
+            <if test="params.endOperateTime != null and params.endOperateTime != ''">and l.operate_time &lt;= #{params.endOperateTime}</if>
+            <if test="params.scopeDeptIds != null">and l.shop_dept_id in <foreach collection="params.scopeDeptIds" item="deptId" open="(" close=")" separator=",">#{deptId}</foreach></if>
+        </where>
+        order by l.operate_time desc, l.log_id desc
+    </select>
+
+</mapper>

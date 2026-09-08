@@ -1,0 +1,291 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.oa.mapper.OaSignOnboardDataRequestMapper">
+    <resultMap id="RequestResult" type="com.erp.oa.domain.OaSignOnboardDataRequest">
+        <id property="requestId" column="request_id"/>
+        <result property="requestNo" column="request_no"/>
+        <result property="batchId" column="batch_id"/>
+        <result property="rowId" column="row_id"/>
+        <result property="employeeId" column="employee_id"/>
+        <result property="allowedFieldsJson" column="allowed_fields_json"/>
+        <result property="signingSequence" column="signing_sequence"/>
+        <result property="factSnapshotJson" column="fact_snapshot_json"/>
+        <result property="confirmationSnapshotVersion" column="confirmation_snapshot_version"/>
+        <result property="confirmationSnapshotHash" column="confirmation_snapshot_hash"/>
+        <result property="submittedValuesJson" column="submitted_values_json"/>
+        <result property="approvedHrValuesJson" column="approved_hr_values_json"/>
+        <result property="status" column="status"/>
+        <result property="submittedTime" column="submitted_time"/>
+        <result property="factConfirmationText" column="fact_confirmation_text"/>
+        <result property="signatureRequestId" column="signature_request_id"/>
+        <result property="signaturePayloadHash" column="signature_payload_hash"/>
+        <result property="signatureSampleBytes" column="signature_sample_bytes" jdbcType="LONGVARBINARY"/>
+        <result property="signatureSampleHash" column="signature_sample_hash"/>
+        <result property="signatureSampleTime" column="signature_sample_time"/>
+        <result property="reviewedByUserId" column="reviewed_by_user_id"/>
+        <result property="reviewReason" column="review_reason"/>
+        <result property="reviewedTime" column="reviewed_time"/>
+        <result property="profileSyncStatus" column="profile_sync_status"/>
+        <result property="profileSyncRequestId" column="profile_sync_request_id"/>
+        <result property="profileBeforeHash" column="profile_before_hash"/>
+        <result property="profileAfterHash" column="profile_after_hash"/>
+        <result property="version" column="version"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateTime" column="update_time"/>
+    </resultMap>
+    <sql id="columns">
+        request_id, request_no, batch_id, row_id, employee_id, allowed_fields_json,
+        signing_sequence, fact_snapshot_json, confirmation_snapshot_version,
+        confirmation_snapshot_hash, submitted_values_json, approved_hr_values_json,
+        status, submitted_time, fact_confirmation_text, signature_request_id,
+        signature_payload_hash, signature_sample_bytes, signature_sample_hash, signature_sample_time,
+        reviewed_by_user_id, review_reason,
+        reviewed_time, profile_sync_status, profile_sync_request_id, profile_before_hash,
+        profile_after_hash, version, create_time, update_time
+    </sql>
+    <!-- Employee list calls never need the task-scoped PNG bytes. Keep the audit blob on the
+         detail path and project only its hash/time here. -->
+    <sql id="employeeListColumns">
+        r.request_id, r.request_no, r.batch_id, r.row_id, r.employee_id,
+        r.allowed_fields_json, r.signing_sequence, r.fact_snapshot_json,
+        r.confirmation_snapshot_version, r.confirmation_snapshot_hash,
+        r.submitted_values_json, r.approved_hr_values_json, r.status, r.submitted_time,
+        r.fact_confirmation_text, r.signature_request_id, r.signature_payload_hash,
+        null as signature_sample_bytes, r.signature_sample_hash, r.signature_sample_time,
+        r.reviewed_by_user_id, r.review_reason, r.reviewed_time, r.profile_sync_status,
+        r.profile_sync_request_id, r.profile_before_hash, r.profile_after_hash,
+        r.version, r.create_time, r.update_time
+    </sql>
+    <insert id="insertRequest" parameterType="com.erp.oa.domain.OaSignOnboardDataRequest"
+            useGeneratedKeys="true" keyProperty="requestId">
+        insert into oa_sign_onboard_data_request (
+            request_no, batch_id, row_id, employee_id, allowed_fields_json,
+            signing_sequence, fact_snapshot_json, confirmation_snapshot_version,
+            confirmation_snapshot_hash, submitted_values_json, approved_hr_values_json,
+            status, submitted_time, fact_confirmation_text, signature_request_id,
+            signature_payload_hash, signature_sample_bytes, signature_sample_hash, signature_sample_time,
+            reviewed_by_user_id, review_reason,
+            reviewed_time, profile_sync_status, profile_sync_request_id, profile_before_hash,
+            profile_after_hash, version, create_time, update_time
+        ) values (
+            #{requestNo}, #{batchId}, #{rowId}, #{employeeId}, #{allowedFieldsJson},
+            #{signingSequence}, #{factSnapshotJson}, #{confirmationSnapshotVersion},
+            #{confirmationSnapshotHash}, #{submittedValuesJson}, #{approvedHrValuesJson},
+            #{status}, #{submittedTime}, #{factConfirmationText}, #{signatureRequestId},
+            #{signaturePayloadHash}, #{signatureSampleBytes,jdbcType=LONGVARBINARY},
+            #{signatureSampleHash}, #{signatureSampleTime},
+            #{reviewedByUserId}, #{reviewReason},
+            #{reviewedTime}, #{profileSyncStatus}, #{profileSyncRequestId}, #{profileBeforeHash},
+            #{profileAfterHash}, #{version}, sysdate(), sysdate()
+        )
+    </insert>
+    <select id="selectById" resultMap="RequestResult">
+        select <include refid="columns"/> from oa_sign_onboard_data_request where request_id = #{requestId}
+    </select>
+    <select id="selectSummariesByIds" resultMap="RequestResult">
+        select <include refid="employeeListColumns"/>
+        from oa_sign_onboard_data_request r
+        where r.request_id in
+        <foreach collection="requestIds" item="requestId" open="(" separator="," close=")">
+            #{requestId}
+        </foreach>
+    </select>
+    <select id="selectByRowId" resultMap="RequestResult">
+        select <include refid="columns"/> from oa_sign_onboard_data_request
+        where row_id = #{rowId} order by request_id desc limit 1
+    </select>
+    <select id="selectMine" resultMap="RequestResult">
+        select <include refid="employeeListColumns"/>
+        from oa_sign_onboard_data_request r
+             inner join oa_sign_onboard_import_row ir
+                     on ir.row_id = r.row_id
+                    and ir.data_request_id = r.request_id
+                    and ir.batch_id = r.batch_id
+                    and ir.employee_id = r.employee_id
+             left join oa_sign_package sp
+                    on sp.package_id = ir.package_id
+                   and sp.employee_id = r.employee_id
+        where r.employee_id = #{employeeId}
+          and (
+              r.status in ('PENDING_EMPLOYEE', 'SUBMITTED', 'APPROVED', 'REJECTED', 'PROFILE_SYNC_FAILED')
+              or (
+                  r.status = 'COMPLETED'
+                  and upper(trim(r.signing_sequence)) = 'SIGNATURE_FIRST'
+                  and (sp.package_id is null or sp.status = 'draft')
+              )
+          )
+        order by r.request_id desc
+    </select>
+    <update id="reopenRejected">
+        update oa_sign_onboard_data_request
+        set status = 'PENDING_EMPLOYEE', submitted_values_json = null, submitted_time = null,
+            review_reason = null, reviewed_by_user_id = null, reviewed_time = null,
+            profile_sync_status = 'NOT_STARTED', version = version + 1, update_time = sysdate()
+        where request_id = #{requestId} and version = #{expectedVersion} and status = 'REJECTED'
+    </update>
+    <update id="refreshEmployeeFields">
+        update oa_sign_onboard_data_request
+        set allowed_fields_json = #{allowedFieldsJson},
+            signing_sequence = #{signingSequence}, fact_snapshot_json = #{factSnapshotJson},
+            confirmation_snapshot_version = #{confirmationSnapshotVersion},
+            confirmation_snapshot_hash = #{confirmationSnapshotHash},
+            status = 'PENDING_EMPLOYEE',
+            submitted_values_json = null, submitted_time = null,
+            fact_confirmation_text = null, signature_request_id = null,
+            signature_payload_hash = null,
+            signature_sample_bytes = null, signature_sample_hash = null, signature_sample_time = null,
+            reviewed_by_user_id = null, review_reason = null, reviewed_time = null,
+            approved_hr_values_json = null, profile_sync_status = 'NOT_STARTED',
+            profile_sync_request_id = #{profileSyncRequestId},
+            profile_before_hash = #{profileBeforeHash}, profile_after_hash = null,
+            version = version + 1, update_time = sysdate()
+        where request_id = #{requestId} and version = #{expectedVersion}
+          and status in ('PENDING_EMPLOYEE', 'REJECTED')
+    </update>
+    <update id="submit">
+        update oa_sign_onboard_data_request
+        set submitted_values_json = #{submittedValuesJson}, status = #{targetStatus},
+            fact_confirmation_text = #{factConfirmationText},
+            signature_request_id = #{signatureRequestId},
+            signature_payload_hash = #{signaturePayloadHash},
+            signature_sample_bytes = #{signatureSampleBytes,jdbcType=LONGVARBINARY},
+            signature_sample_hash = #{signatureSampleHash},
+            signature_sample_time = #{signatureSampleTime},
+            profile_sync_status = #{profileSyncStatus},
+            submitted_time = sysdate(), review_reason = null, version = version + 1, update_time = sysdate()
+        where request_id = #{requestId} and employee_id = #{employeeId}
+          and version = #{expectedVersion} and status in ('PENDING_EMPLOYEE', 'REJECTED')
+          and fact_confirmation_text is null and signature_request_id is null
+          and signature_payload_hash is null and signature_sample_bytes is null
+          and signature_sample_hash is null and signature_sample_time is null
+    </update>
+    <update id="resubmitPreservingSignature">
+        update oa_sign_onboard_data_request
+        set submitted_values_json = #{submittedValuesJson}, status = #{targetStatus},
+            signature_payload_hash = #{signaturePayloadHash},
+            profile_sync_status = #{profileSyncStatus},
+            submitted_time = sysdate(), review_reason = null,
+            reviewed_by_user_id = null, reviewed_time = null,
+            version = version + 1, update_time = sysdate()
+        where request_id = #{requestId} and employee_id = #{employeeId}
+          and version = #{expectedVersion} and status in ('PENDING_EMPLOYEE', 'REJECTED')
+          and upper(trim(signing_sequence)) = 'SIGNATURE_FIRST'
+          and fact_confirmation_text is not null and signature_request_id is not null
+          and signature_payload_hash = #{expectedSignaturePayloadHash}
+          and signature_sample_bytes is not null
+          and signature_sample_hash is not null and signature_sample_time is not null
+    </update>
+    <update id="review">
+        update oa_sign_onboard_data_request
+        set status = #{targetStatus}, reviewed_by_user_id = #{reviewedByUserId},
+            review_reason = #{reviewReason}, reviewed_time = sysdate(),
+            approved_hr_values_json = coalesce(#{approvedHrValuesJson}, approved_hr_values_json),
+            profile_sync_status = #{profileSyncStatus}, profile_sync_request_id = #{profileSyncRequestId},
+            version = version + 1, update_time = sysdate()
+        where request_id = #{requestId} and version = #{expectedVersion} and status = #{fromStatus}
+    </update>
+    <update id="updateProfileSync">
+        update oa_sign_onboard_data_request
+        set status = #{status}, profile_sync_status = #{status},
+            profile_before_hash = #{profileBeforeHash}, profile_after_hash = #{profileAfterHash},
+            version = version + 1, update_time = sysdate()
+        where request_id = #{requestId} and version = #{expectedVersion}
+          and status in ('APPROVED', 'PROFILE_SYNC_FAILED')
+    </update>
+    <select id="countActiveStagedFirstStageLink" resultType="int">
+        select count(*)
+        from oa_sign_onboard_data_request d
+        inner join oa_sign_onboard_import_row r
+                on r.data_request_id = d.request_id
+               and r.row_id = d.row_id
+               and r.batch_id = d.batch_id
+               and r.employee_id = d.employee_id
+        inner join oa_sign_task t
+                on t.task_id = r.task_id
+               and t.package_id = r.package_id
+               and t.employee_id = r.employee_id
+               and upper(trim(t.scenario)) = 'ONBOARD'
+               and upper(trim(t.source_type)) = 'MANUAL_SIGN_EXCEL_IMPORT'
+               and t.source_business_id = cast(r.row_id as char)
+               and t.source_event_version = cast(r.source_event_version as char)
+        inner join oa_sign_package p
+                on p.package_id = r.package_id
+               and p.task_id = r.task_id
+               and p.employee_id = r.employee_id
+               and p.shop_dept_id = t.shop_dept_id
+               and p.plan_version_id = t.plan_version_id
+               and upper(trim(p.signing_sequence)) = 'SIGNATURE_FIRST'
+        where t.task_id = #{taskId}
+          and p.package_id = #{packageId}
+          and d.employee_id = #{employeeId}
+          and t.status = #{currentTaskStatus}
+          and p.status = #{currentPackageStatus}
+          and (
+              (#{currentTaskStatus} = 'PENDING_SIGN' and #{currentPackageStatus} = 'pending_sign')
+              or (#{currentTaskStatus} = 'VIEWED' and #{currentPackageStatus} = 'part_viewed')
+          )
+          and upper(trim(d.signing_sequence)) = 'SIGNATURE_FIRST'
+          and d.status in (
+              'PENDING_EMPLOYEE', 'REJECTED', 'SUBMITTED', 'APPROVED',
+              'PROFILE_SYNC_FAILED', 'COMPLETED'
+          )
+          and r.status in (
+              'WAITING_EMPLOYEE_DATA', 'PENDING_HR_REVIEW',
+              'PROFILE_SYNC_APPLYING', 'PROFILE_SYNC_FAILED',
+              'READY_TO_GENERATE', 'GENERATE_FAILED'
+          )
+    </select>
+    <update id="cancelStagedFirstStageByTerminal">
+        update oa_sign_onboard_data_request d
+        inner join oa_sign_onboard_import_row r
+                on r.data_request_id = d.request_id
+               and r.row_id = d.row_id
+               and r.batch_id = d.batch_id
+               and r.employee_id = d.employee_id
+        inner join oa_sign_task t
+                on t.task_id = r.task_id
+               and t.package_id = r.package_id
+               and t.employee_id = r.employee_id
+               and upper(trim(t.scenario)) = 'ONBOARD'
+               and upper(trim(t.source_type)) = 'MANUAL_SIGN_EXCEL_IMPORT'
+               and t.source_business_id = cast(r.row_id as char)
+               and t.source_event_version = cast(r.source_event_version as char)
+        inner join oa_sign_package p
+                on p.package_id = r.package_id
+               and p.task_id = r.task_id
+               and p.employee_id = r.employee_id
+               and p.shop_dept_id = t.shop_dept_id
+               and p.plan_version_id = t.plan_version_id
+               and upper(trim(p.signing_sequence)) = 'SIGNATURE_FIRST'
+        set d.status = 'CANCELLED',
+            d.profile_sync_status = 'CANCELLED',
+            d.version = d.version + 1,
+            d.update_time = sysdate()
+        where t.task_id = #{taskId}
+          and p.package_id = #{packageId}
+          and d.employee_id = #{employeeId}
+          and t.status = #{terminalTaskStatus}
+          and p.status = #{terminalPackageStatus}
+          and (
+              (#{terminalTaskStatus} = 'REFUSED' and #{terminalPackageStatus} = 'refused')
+              or (#{terminalTaskStatus} = 'EXPIRED' and #{terminalPackageStatus} = 'expired')
+          )
+          and upper(trim(d.signing_sequence)) = 'SIGNATURE_FIRST'
+          and d.status in (
+              'PENDING_EMPLOYEE', 'REJECTED', 'SUBMITTED', 'APPROVED',
+              'PROFILE_SYNC_FAILED', 'COMPLETED'
+          )
+          and r.status in (
+              'WAITING_EMPLOYEE_DATA', 'PENDING_HR_REVIEW',
+              'PROFILE_SYNC_APPLYING', 'PROFILE_SYNC_FAILED',
+              'READY_TO_GENERATE', 'GENERATE_FAILED'
+          )
+    </update>
+    <delete id="deleteRequestsByIds">
+        delete from oa_sign_onboard_data_request
+        where request_id in
+        <foreach collection="requestIds" item="requestId" open="(" separator="," close=")">
+            #{requestId}
+        </foreach>
+    </delete>
+</mapper>

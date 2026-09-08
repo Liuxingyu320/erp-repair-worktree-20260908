@@ -1,0 +1,6 @@
+# Release A 生产维护窗口账本；executionPolicy=manual-phased，禁止一键自动串行。
+# Docker bootstrap 是新建环境快照，不得代替此生产顺序和执行记录。
+erp_oa_sign_menu_permission_repair_20260716.sql
+erp_oa_sign_package_lifecycle_20260716.sql
+erp_oa_sign_document_policy_snapshot_20260716.sql
+erp_system_user_push_delivery_20260717.sql

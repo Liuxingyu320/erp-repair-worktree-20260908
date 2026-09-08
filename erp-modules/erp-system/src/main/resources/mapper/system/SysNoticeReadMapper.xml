@@ -1,0 +1,139 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.system.mapper.SysNoticeReadMapper">
+
+    <resultMap type="SysNoticeRead" id="SysNoticeReadResult">
+        <id property="readId" column="read_id" />
+        <result property="noticeId" column="notice_id" />
+        <result property="userId" column="user_id" />
+        <result property="readTime" column="read_time" />
+    </resultMap>
+
+    <insert id="insertNoticeRead" parameterType="SysNoticeRead">
+        insert ignore into sys_notice_read (notice_id, user_id, read_time)
+        values (#{noticeId}, #{userId}, sysdate())
+    </insert>
+
+    <select id="selectUnreadCount" resultType="int">
+        select count(*)
+        from sys_notice_recipient nr
+        inner join sys_notice n on n.notice_id = nr.notice_id
+        where nr.user_id = #{userId}
+          and n.lifecycle_status = 'PUBLISHED'
+          and n.status = '0'
+          and (n.expire_time is null or n.expire_time &gt; sysdate())
+          and not exists (
+              select 1 from sys_notice_read r
+              where r.notice_id = n.notice_id and r.user_id = #{userId}
+          )
+    </select>
+
+    <select id="selectIsRead" resultType="int">
+        select count(*) from sys_notice_read
+        where notice_id = #{noticeId} and user_id = #{userId}
+    </select>
+
+    <select id="selectReadableRecipientCount" resultType="int">
+        select count(*)
+        from sys_notice_recipient nr
+        inner join sys_notice n on n.notice_id = nr.notice_id
+        where nr.notice_id = #{noticeId} and nr.user_id = #{userId}
+          and n.lifecycle_status = 'PUBLISHED' and n.status = '0'
+          and (n.expire_time is null or n.expire_time &gt; sysdate())
+    </select>
+
+    <select id="selectReadableRecipientCountBatch" resultType="int">
+        select count(distinct nr.notice_id)
+        from sys_notice_recipient nr
+        inner join sys_notice n on n.notice_id = nr.notice_id
+        where nr.user_id = #{userId}
+          and nr.notice_id in
+          <foreach collection="noticeIds" item="noticeId" open="(" separator="," close=")">
+              #{noticeId}
+          </foreach>
+          and n.lifecycle_status = 'PUBLISHED' and n.status = '0'
+          and (n.expire_time is null or n.expire_time &gt; sysdate())
+    </select>
+
+    <select id="selectReadableNoticeById" resultType="SysNotice">
+        select n.notice_id as noticeId, n.notice_title as noticeTitle,
+               n.notice_type as noticeType, cast(n.notice_content as char) as noticeContent,
+               n.status, n.lifecycle_status as lifecycleStatus, n.audience_type as audienceType,
+               n.published_time as publishedTime, n.expire_time as expireTime,
+               n.version, n.previous_notice_id as previousNoticeId,
+               n.create_by as createBy, n.create_time as createTime,
+               case when r.notice_id is not null then true else false end as isRead
+        from sys_notice_recipient nr
+        inner join sys_notice n on n.notice_id = nr.notice_id
+        left join sys_notice_read r
+          on r.notice_id = n.notice_id and r.user_id = #{userId}
+        where nr.notice_id = #{noticeId} and nr.user_id = #{userId}
+          and n.lifecycle_status = 'PUBLISHED' and n.status = '0'
+          and (n.expire_time is null or n.expire_time &gt; sysdate())
+    </select>
+
+    <select id="selectNoticeListWithReadStatus" resultType="SysNotice">
+        select n.notice_id as noticeId, n.notice_title as noticeTitle,
+               n.notice_type as noticeType, n.status,
+               n.lifecycle_status as lifecycleStatus, n.published_time as publishedTime,
+               n.expire_time as expireTime, n.create_by as createBy,
+               n.create_time as createTime,
+               case when r.notice_id is not null then true else false end as isRead
+        from sys_notice_recipient nr
+        inner join sys_notice n on n.notice_id = nr.notice_id
+        left join sys_notice_read r
+          on r.notice_id = n.notice_id and r.user_id = #{userId}
+        where nr.user_id = #{userId}
+          and n.lifecycle_status = 'PUBLISHED' and n.status = '0'
+          and (n.expire_time is null or n.expire_time &gt; sysdate())
+        order by n.published_time desc, n.notice_id desc
+        limit #{limit}
+    </select>
+
+    <insert id="insertNoticeReadBatch">
+        insert ignore into sys_notice_read (notice_id, user_id, read_time)
+        values
+        <foreach collection="noticeIds" item="noticeId" separator=",">
+            (#{noticeId}, #{userId}, sysdate())
+        </foreach>
+    </insert>
+
+    <insert id="insertAllUnreadNotices">
+        insert ignore into sys_notice_read (notice_id, user_id, read_time)
+        select n.notice_id, #{userId}, sysdate()
+        from sys_notice_recipient nr
+        inner join sys_notice n on n.notice_id = nr.notice_id
+        where nr.user_id = #{userId}
+          and n.lifecycle_status = 'PUBLISHED' and n.status = '0'
+          and (n.expire_time is null or n.expire_time &gt; sysdate())
+          and not exists (
+              select 1 from sys_notice_read r
+              where r.notice_id = n.notice_id and r.user_id = #{userId}
+          )
+    </insert>
+
+    <delete id="deleteByNoticeIds">
+        delete from sys_notice_read where notice_id in
+        <foreach collection="noticeIds" item="noticeId" open="(" separator="," close=")">
+            #{noticeId}
+        </foreach>
+    </delete>
+
+    <select id="selectReadUsersByNoticeId" resultType="com.erp.system.domain.vo.SysNoticeReadUserVo">
+        select u.user_id as userId, u.nick_name as nickName,
+               d.dept_name as deptName, r.read_time as readTime
+        from sys_notice_read r
+        inner join sys_notice_recipient nr
+          on nr.notice_id = r.notice_id and nr.user_id = r.user_id
+        inner join sys_user u on u.user_id = r.user_id and u.del_flag = '0'
+        left join sys_dept d on d.dept_id = u.dept_id
+        where r.notice_id = #{noticeId}
+        <if test="searchValue != null and searchValue != ''">
+            and (u.user_name like concat('%', #{searchValue}, '%')
+                 or u.nick_name like concat('%', #{searchValue}, '%'))
+        </if>
+        order by r.read_time desc
+    </select>
+</mapper>

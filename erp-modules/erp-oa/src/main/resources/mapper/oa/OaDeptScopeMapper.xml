@@ -1,0 +1,164 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.oa.mapper.OaDeptScopeMapper">
+
+    <select id="selectSubDeptIds" resultType="java.lang.Long">
+        select dept_id
+        from sys_dept
+        where dept_id = #{deptId}
+           or find_in_set(#{deptId}, ancestors)
+    </select>
+
+    <select id="selectUserShopDeptIds" resultType="java.lang.Long">
+        select distinct d.dept_id
+        from sys_user_shop us
+             inner join sys_dept scope_dept on scope_dept.dept_id = us.dept_id
+             inner join sys_dept d on (
+                d.dept_id = scope_dept.dept_id
+                or find_in_set(scope_dept.dept_id, d.ancestors)
+             )
+        where us.user_id = #{userId}
+          and scope_dept.del_flag = '0'
+          and scope_dept.status = '0'
+          and scope_dept.dept_type in ('GROUP', 'COMPANY', 'STORE', 'WAREHOUSE')
+          and d.del_flag = '0'
+          and d.status = '0'
+          and d.dept_type = 'STORE'
+        order by d.parent_id, d.order_num
+    </select>
+
+    <select id="selectUserAuthorizedOaDeptIds" resultType="java.lang.Long">
+        select authorized.dept_id
+        from (
+            select distinct d.dept_id, d.parent_id, d.order_num
+            from sys_user_shop us
+                 inner join sys_dept scope_dept on scope_dept.dept_id = us.dept_id
+                 inner join sys_dept d on (
+                    d.dept_id = scope_dept.dept_id
+                    or find_in_set(scope_dept.dept_id, d.ancestors)
+                 )
+            where us.user_id = #{userId}
+              and scope_dept.del_flag = '0'
+              and scope_dept.status = '0'
+              and scope_dept.dept_type in ('GROUP', 'COMPANY', 'STORE', 'WAREHOUSE')
+              and d.del_flag = '0'
+              and d.status = '0'
+              and d.dept_type in ('STORE', 'WAREHOUSE')
+        ) authorized
+        order by authorized.parent_id, authorized.order_num, authorized.dept_id
+    </select>
+
+    <select id="selectAllActiveOaDeptIds" resultType="java.lang.Long">
+        select d.dept_id
+        from sys_dept d
+        where d.del_flag = '0'
+          and d.status = '0'
+          and d.dept_type in ('STORE', 'WAREHOUSE')
+        order by d.parent_id, d.order_num
+    </select>
+
+    <select id="selectDeptName" resultType="java.lang.String">
+        select dept_name
+        from sys_dept
+        where dept_id = #{deptId}
+          and del_flag = '0'
+        limit 1
+    </select>
+
+    <resultMap id="LegalEntityCandidateResult" type="com.erp.oa.domain.vo.OaLegalEntityCandidate">
+        <id property="legalEntityId" column="legal_entity_id"/>
+        <result property="legalEntityCode" column="legal_entity_code"/>
+        <result property="legalEntityName" column="legal_entity_name"/>
+        <result property="unifiedSocialCreditCode" column="unified_social_credit_code"/>
+        <result property="registeredAddress" column="registered_address"/>
+        <result property="legalRepresentative" column="legal_representative"/>
+        <result property="contactPhone" column="contact_phone"/>
+        <result property="sourceDeptId" column="source_dept_id"/>
+        <result property="sourceDeptName" column="source_dept_name"/>
+    </resultMap>
+
+    <resultMap id="LegalEntityResult" type="com.erp.system.api.domain.SysLegalEntity">
+        <id property="legalEntityId" column="legal_entity_id"/>
+        <result property="legalEntityCode" column="legal_entity_code"/>
+        <result property="legalEntityName" column="legal_entity_name"/>
+        <result property="unifiedSocialCreditCode" column="unified_social_credit_code"/>
+        <result property="registeredAddress" column="registered_address"/>
+        <result property="legalRepresentative" column="legal_representative"/>
+        <result property="contactPhone" column="contact_phone"/>
+        <result property="status" column="status"/>
+        <result property="version" column="version"/>
+    </resultMap>
+
+    <select id="selectLegalEntityCandidate" resultMap="LegalEntityCandidateResult">
+        select le.legal_entity_id, le.legal_entity_code, le.legal_entity_name,
+               le.unified_social_credit_code, le.registered_address,
+               le.legal_representative, le.contact_phone,
+               candidate.dept_id as source_dept_id, candidate.dept_name as source_dept_name
+        from sys_dept source
+        inner join sys_dept candidate on candidate.dept_id = source.dept_id
+             or find_in_set(candidate.dept_id, source.ancestors)
+        inner join sys_legal_entity le on le.legal_entity_id = candidate.legal_entity_id
+        where source.dept_id = #{deptId}
+          and source.del_flag = '0'
+          and candidate.del_flag = '0'
+          and source.status = '0'
+          and candidate.status = '0'
+          and le.status = '0'
+        order by case when candidate.dept_id = source.dept_id then 999999
+                      else find_in_set(candidate.dept_id, source.ancestors) end desc
+        limit 1
+    </select>
+
+    <select id="selectActiveLegalEntities" resultMap="LegalEntityResult">
+        select legal_entity_id, legal_entity_code, legal_entity_name,
+               unified_social_credit_code, registered_address, legal_representative,
+               contact_phone, status, version
+        from sys_legal_entity where status = '0'
+        order by legal_entity_name asc, legal_entity_id asc
+    </select>
+
+    <select id="selectActiveLegalEntityById" resultMap="LegalEntityResult">
+        select legal_entity_id, legal_entity_code, legal_entity_name,
+               unified_social_credit_code, registered_address, legal_representative,
+               contact_phone, status, version
+        from sys_legal_entity
+        where legal_entity_id = #{legalEntityId} and status = '0'
+    </select>
+
+    <select id="countDeptInScope" resultType="int">
+        select count(1)
+        from sys_dept
+        where dept_id = #{targetDeptId}
+          and (dept_id = #{scopeDeptId} or find_in_set(#{scopeDeptId}, ancestors))
+    </select>
+
+    <select id="countUserShopScope" resultType="int">
+        select count(1)
+        from sys_user_shop us
+             inner join sys_dept scope_dept on scope_dept.dept_id = us.dept_id
+             inner join sys_dept target_dept on target_dept.dept_id = #{deptId}
+        where us.user_id = #{userId}
+          and scope_dept.del_flag = '0'
+          and scope_dept.status = '0'
+          and scope_dept.dept_type in ('GROUP', 'COMPANY', 'STORE', 'WAREHOUSE')
+          and target_dept.del_flag = '0'
+          and target_dept.status = '0'
+          and target_dept.dept_type = 'STORE'
+          and (
+              target_dept.dept_id = scope_dept.dept_id
+              or find_in_set(scope_dept.dept_id, target_dept.ancestors)
+          )
+    </select>
+
+    <select id="countActiveStoreDept" resultType="int">
+        select count(1)
+        from sys_dept
+        where dept_id = #{deptId}
+          and del_flag = '0'
+          and status = '0'
+          and dept_type = 'STORE'
+    </select>
+
+</mapper>

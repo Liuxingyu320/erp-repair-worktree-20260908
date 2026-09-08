@@ -1,0 +1,313 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.oa.mapper.OaSignNotificationOutboxMapper">
+
+    <resultMap id="OaSignNotificationOutboxResult" type="com.erp.oa.domain.OaSignNotificationOutbox">
+        <id property="outboxId" column="outbox_id"/>
+        <result property="channel" column="channel"/>
+        <result property="recipientUserId" column="recipient_user_id"/>
+        <result property="businessKey" column="business_key"/>
+        <result property="payloadJson" column="payload_json"/>
+        <result property="status" column="status"/>
+        <result property="retryCount" column="retry_count"/>
+        <result property="nextRetryTime" column="next_retry_time"/>
+        <result property="lastResult" column="last_result"/>
+        <result property="lastError" column="last_error"/>
+        <result property="version" column="version"/>
+        <result property="createdTime" column="created_time"/>
+        <result property="updatedTime" column="updated_time"/>
+    </resultMap>
+
+    <resultMap id="OaSignNotificationFailureResult" type="com.erp.oa.domain.vo.OaSignNotificationFailure">
+        <id property="taskId" column="task_id"/>
+        <result property="notificationBusinessKey" column="notification_business_key"/>
+    </resultMap>
+
+    <sql id="baseColumns">
+        outbox_id, channel, recipient_user_id, business_key, payload_json,
+        status, retry_count, next_retry_time, last_result, last_error,
+        version, created_time, updated_time
+    </sql>
+
+    <sql id="qualifiedBaseColumns">
+        o.outbox_id as outbox_id,
+        o.channel as channel,
+        o.recipient_user_id as recipient_user_id,
+        o.business_key as business_key,
+        o.payload_json as payload_json,
+        o.status as status,
+        o.retry_count as retry_count,
+        o.next_retry_time as next_retry_time,
+        o.last_result as last_result,
+        o.last_error as last_error,
+        o.version as version,
+        o.created_time as created_time,
+        o.updated_time as updated_time
+    </sql>
+
+    <!--
+      Authorization and recovery follow the current task linkage, never the frozen HR
+      fields in payload_json. HR-routed rows must target the currently assigned HR;
+      employee-routed rows must target the task employee. Any stale or malformed
+      recipient fails closed and remains audit-only.
+    -->
+    <sql id="currentTaskRecipient">
+        and (
+              (json_unquote(json_extract(o.payload_json, '$.routeType')) = 'OA_SIGN_HR_TASK'
+                  and o.recipient_user_id = t.assigned_hr_user_id)
+           or (json_unquote(json_extract(o.payload_json, '$.routeType')) = 'OA_SIGN_PACKAGE_SIGN'
+                  and o.recipient_user_id = t.employee_id)
+        )
+    </sql>
+
+    <insert id="insertOaSignNotificationOutbox"
+            parameterType="com.erp.oa.domain.OaSignNotificationOutbox"
+            useGeneratedKeys="true" keyProperty="outboxId">
+        insert ignore into oa_sign_notification_outbox (
+            channel, recipient_user_id, business_key, payload_json, status,
+            retry_count, next_retry_time, last_result, last_error, version,
+            created_time, updated_time
+        ) values (
+            #{channel}, #{recipientUserId}, #{businessKey}, #{payloadJson}, #{status},
+            #{retryCount}, #{nextRetryTime}, #{lastResult}, #{lastError}, #{version},
+            sysdate(), sysdate()
+        )
+    </insert>
+
+    <select id="selectByBusinessKey" resultMap="OaSignNotificationOutboxResult">
+        select <include refid="baseColumns"/>
+        from oa_sign_notification_outbox
+        where channel = #{channel}
+          and recipient_user_id = #{recipientUserId}
+          and business_key = #{businessKey}
+        limit 1
+    </select>
+
+    <select id="selectDueNotifications" resultMap="OaSignNotificationOutboxResult">
+        select <include refid="qualifiedBaseColumns"/>
+        from oa_sign_notification_outbox o
+        inner join oa_sign_task t
+                on t.task_id = cast(json_unquote(json_extract(o.payload_json, '$.taskId')) as unsigned)
+        where ((
+                o.status in ('PENDING', 'RETRY')
+                and (o.next_retry_time is null or o.next_retry_time &lt;= #{dueTime})
+              )
+           or (
+                o.status = 'SENDING'
+                and o.updated_time &lt;= #{staleSendingBefore}
+              ))
+          <include refid="currentTaskRecipient"/>
+        order by coalesce(o.next_retry_time, o.created_time), o.outbox_id
+        limit #{limit}
+    </select>
+
+    <update id="claimForSending">
+        update oa_sign_notification_outbox o
+        inner join oa_sign_task t
+                on t.task_id = cast(json_unquote(json_extract(o.payload_json, '$.taskId')) as unsigned)
+        set o.status = 'SENDING',
+            o.version = o.version + 1,
+            o.updated_time = sysdate()
+        where o.outbox_id = #{outboxId}
+          and o.status = #{expectedStatus}
+          and o.version = #{version}
+          <include refid="currentTaskRecipient"/>
+    </update>
+
+    <update id="markSent">
+        update oa_sign_notification_outbox
+        set status = 'SENT',
+            next_retry_time = null,
+            last_result = #{lastResult},
+            last_error = null,
+            version = version + 1,
+            updated_time = sysdate()
+        where outbox_id = #{outboxId}
+          and status = 'SENDING'
+          and version = #{version}
+    </update>
+
+    <update id="markRetry">
+        update oa_sign_notification_outbox
+        set status = 'RETRY',
+            retry_count = #{retryCount},
+            next_retry_time = #{nextRetryTime},
+            last_result = null,
+            last_error = #{lastError},
+            version = version + 1,
+            updated_time = sysdate()
+        where outbox_id = #{outboxId}
+          and status = 'SENDING'
+          and version = #{version}
+    </update>
+
+    <update id="markDead">
+        update oa_sign_notification_outbox
+        set status = 'DEAD',
+            next_retry_time = null,
+            last_result = null,
+            last_error = #{lastError},
+            version = version + 1,
+            updated_time = sysdate()
+        where outbox_id = #{outboxId}
+          and status = 'SENDING'
+          and version = #{version}
+    </update>
+
+    <select id="selectDeadNotificationsForHr" resultMap="OaSignNotificationOutboxResult">
+        select <include refid="qualifiedBaseColumns"/>
+        from oa_sign_notification_outbox o
+        inner join oa_sign_task t
+                on t.task_id = cast(json_unquote(json_extract(o.payload_json, '$.taskId')) as unsigned)
+        where o.status = 'DEAD'
+          <include refid="currentTaskRecipient"/>
+          <choose>
+              <when test="scopeDeptIds != null and scopeDeptIds.size() > 0">
+                  and t.shop_dept_id in
+                  <foreach collection="scopeDeptIds" item="deptId" open="(" separator="," close=")">
+                      #{deptId}
+                  </foreach>
+              </when>
+              <otherwise>
+                  and 1 = 0
+              </otherwise>
+          </choose>
+        order by o.updated_time desc, o.outbox_id desc
+        limit #{limit}
+    </select>
+
+    <!--
+      The task-center alert needs only a task id and an opaque retry key. Select
+      one oldest actionable DEAD event per task, authorize against the task's
+      current HR assignment, and never return payload/error/recipient columns.
+    -->
+    <select id="selectNotificationFailuresForHr" resultMap="OaSignNotificationFailureResult">
+        select t.task_id as task_id,
+               o.business_key as notification_business_key
+        from oa_sign_task t
+        inner join (
+            select cast(json_unquote(json_extract(dead.payload_json, '$.taskId')) as unsigned) as task_id,
+                   min(dead.outbox_id) as outbox_id
+            from oa_sign_notification_outbox dead
+            inner join oa_sign_task current_task
+                    on current_task.task_id = cast(json_unquote(
+                            json_extract(dead.payload_json, '$.taskId')) as unsigned)
+            where dead.status = 'DEAD'
+              and (
+                    (json_unquote(json_extract(dead.payload_json, '$.routeType')) = 'OA_SIGN_HR_TASK'
+                        and dead.recipient_user_id = current_task.assigned_hr_user_id)
+                 or (json_unquote(json_extract(dead.payload_json, '$.routeType')) = 'OA_SIGN_PACKAGE_SIGN'
+                        and dead.recipient_user_id = current_task.employee_id)
+              )
+            group by cast(json_unquote(json_extract(dead.payload_json, '$.taskId')) as unsigned)
+        ) oldest_dead on oldest_dead.task_id = t.task_id
+        inner join oa_sign_notification_outbox o on o.outbox_id = oldest_dead.outbox_id
+        where 1 = 1
+          and t.assigned_hr_user_id = #{hrUserId}
+          <choose>
+              <when test="scopeDeptIds != null and scopeDeptIds.size() > 0">
+                  and t.shop_dept_id in
+                  <foreach collection="scopeDeptIds" item="deptId" open="(" separator="," close=")">
+                      #{deptId}
+                  </foreach>
+              </when>
+              <otherwise>
+                  and 1 = 0
+              </otherwise>
+          </choose>
+        order by coalesce(o.updated_time, o.created_time), t.task_id
+        limit #{limit}
+    </select>
+
+    <select id="selectNotificationsForTaskBusinessKey" resultMap="OaSignNotificationOutboxResult">
+        select <include refid="qualifiedBaseColumns"/>
+        from oa_sign_notification_outbox o
+        inner join oa_sign_task t
+                on t.task_id = cast(json_unquote(json_extract(o.payload_json, '$.taskId')) as unsigned)
+               and t.task_id = #{taskId}
+        where o.business_key = #{businessKey}
+          and t.assigned_hr_user_id = #{hrUserId}
+          <include refid="currentTaskRecipient"/>
+        order by o.outbox_id
+    </select>
+
+    <select id="selectLatestNotificationForTask" resultMap="OaSignNotificationOutboxResult">
+        select <include refid="qualifiedBaseColumns"/>
+        from oa_sign_notification_outbox o
+        inner join oa_sign_task t
+                on t.task_id = cast(json_unquote(json_extract(o.payload_json, '$.taskId')) as unsigned)
+               and t.task_id = #{taskId}
+        where 1 = 1
+          <include refid="currentTaskRecipient"/>
+        order by o.updated_time desc, o.outbox_id desc
+        limit 1
+    </select>
+
+    <select id="lockCurrentReminderCandidate" resultType="long">
+        select p.package_id
+        from oa_sign_package p
+        inner join oa_sign_task t
+                on t.task_id = p.task_id
+               and t.package_id = p.package_id
+               and t.employee_id = p.employee_id
+               and t.shop_dept_id = p.shop_dept_id
+               and t.plan_version_id = p.plan_version_id
+        inner join oa_sign_plan_version v
+                on v.version_id = p.plan_version_id
+               and v.publish_status = 'PUBLISHED'
+        where p.package_id = #{candidate.packageId}
+          and p.task_id = #{candidate.taskId}
+          and p.employee_id = #{candidate.employeeId}
+          and p.shop_dept_id = #{candidate.shopDeptId}
+          and t.assigned_hr_user_id = #{candidate.assignedHrUserId}
+          and p.status = #{candidate.packageStatus}
+          and p.sign_deadline = #{candidate.signDeadline}
+          and t.sign_deadline = p.sign_deadline
+          and p.sign_deadline &gt; #{enqueueTime}
+          and p.deadline_policy_source is not null
+          and trim(p.deadline_policy_source) != ''
+          and t.deadline_policy_source is not null
+          and trim(t.deadline_policy_source) != ''
+          and p.deadline_days_snapshot &gt; 0
+          and t.deadline_days_snapshot = p.deadline_days_snapshot
+          and (
+                (#{candidate.reminderStage} = 'INITIAL'
+                    and ((p.status = 'pending_sign' and t.status = 'PENDING_SIGN')
+                      or (p.status = 'part_viewed' and t.status = 'VIEWED'))
+                    and BINARY p.document_version = BINARY #{candidate.activeDocumentVersion})
+                or
+                (#{candidate.reminderStage} = 'FINAL'
+                    and p.status = 'pending_final_confirm'
+                    and t.status = 'PENDING_FINAL_CONFIRM'
+                    and BINARY p.final_document_version = BINARY #{candidate.activeDocumentVersion})
+              )
+        limit 1
+        for update
+    </select>
+
+    <update id="requeueDead">
+        update oa_sign_notification_outbox o
+        inner join oa_sign_task t
+                on t.task_id = cast(json_unquote(json_extract(o.payload_json, '$.taskId')) as unsigned)
+               and t.task_id = #{taskId}
+        set o.status = 'PENDING',
+            o.retry_count = 0,
+            o.next_retry_time = null,
+            o.last_result = 'MANUAL_REQUEUE',
+            o.last_error = null,
+            o.version = o.version + 1,
+            o.updated_time = sysdate()
+        where o.outbox_id = #{outboxId}
+          and o.status = 'DEAD'
+          and o.version = #{version}
+          and t.assigned_hr_user_id = #{hrUserId}
+          <include refid="currentTaskRecipient"/>
+    </update>
+
+    <delete id="deleteByTaskId">
+        delete from oa_sign_notification_outbox
+        where cast(json_unquote(json_extract(payload_json, '$.taskId')) as unsigned) = #{taskId}
+    </delete>
+</mapper>

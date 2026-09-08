@@ -1,0 +1,57 @@
+groups:
+  - name: erp-active-business
+    interval: 1m
+    rules:
+      - alert: ErpNewBusinessCustomerScopeDeniedSpike
+        expr: sum(increase(erp_inventory_customer_card_scope_denied_total[15m])) > 10
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: 客户服务卡跨店拒绝次数异常升高
+          description: 检查门店上下文切换、角色范围和是否存在越权探测。
+
+      - alert: ErpNewBusinessCustomerOptimisticConflictSpike
+        expr: sum(increase(erp_inventory_customer_card_write_total{outcome="optimistic_conflict"}[15m])) > 10
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: 客户服务卡乐观锁冲突异常升高
+          description: 检查重复编辑、移动端重试和客户端版本刷新逻辑。
+
+      - alert: ErpNewBusinessHealthReminderFailure
+        expr: sum(increase(erp_hr_health_certificate_reminder_total{outcome="failure"}[15m])) > 0
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: 健康证提醒任务发生失败
+          description: 检查提醒调度、用户消息写入及失败日志，不影响健康证主流程。
+
+      - alert: ErpNewBusinessReconciliationFailed
+        expr: max(erp_new_business_reconciliation_success) == 0
+        for: 0m
+        labels:
+          severity: critical
+        annotations:
+          summary: 现役业务只读对账发现异常
+          description: 查看脱敏计数并创建运维工单；不要把原始客户或员工明细发到告警渠道。
+
+      - alert: ErpNewBusinessReconciliationStale
+        expr: absent(erp_new_business_reconciliation_last_run_timestamp_seconds) or (time() - max(erp_new_business_reconciliation_last_run_timestamp_seconds) > 93600)
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: 现役业务对账超过26小时未成功产出结果
+          description: 检查定时任务、只读数据库账号和node_exporter textfile目录。
+
+      - alert: ErpNewBusinessTransferDiscrepancyOverdue24h
+        expr: max(erp_new_business_reconciliation_issue_total{issue_code="TRANSFER_DISCREPANCY_OVERDUE_24H"}) > 0
+        for: 0m
+        labels:
+          severity: critical
+        annotations:
+          summary: 调拨差异超过24小时未结
+          description: 跟进短少、残损、拒收或待质检处置，差异关闭前不能完成调拨。

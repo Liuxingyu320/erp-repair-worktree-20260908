@@ -1,0 +1,4 @@
+# 20260718 入职签约 Excel 增量迁移账本。
+# 只能在维护窗口人工执行；两项都完成后才能部署后端。
+erp_oa_sign_onboard_import_20260718.sql
+erp_system_sign_profile_supplement_20260718.sql

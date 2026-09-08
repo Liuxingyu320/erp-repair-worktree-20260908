@@ -1,0 +1,418 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.inventory.mapper.InvTransferOrderMapper">
+
+    <resultMap type="InvTransferOrder" id="InvTransferOrderResult">
+        <id property="transferId" column="transfer_id"/>
+        <result property="orderNo" column="order_no"/>
+        <result property="purchaseId" column="purchase_id"/>
+        <result property="fromDeptId" column="from_dept_id"/>
+        <result property="fromDeptName" column="from_dept_name"/>
+        <result property="fromWarehouseId" column="from_warehouse_id"/>
+        <result property="fromWarehouseName" column="from_warehouse_name"/>
+        <result property="toDeptId" column="to_dept_id"/>
+        <result property="toDeptName" column="to_dept_name"/>
+        <result property="toDeptHierarchy" column="to_dept_hierarchy"/>
+        <result property="toWarehouseId" column="to_warehouse_id"/>
+        <result property="toWarehouseName" column="to_warehouse_name"/>
+        <result property="status" column="status"/>
+        <result property="totalQuantity" column="total_quantity"/>
+        <result property="detailLineCount" column="detail_line_count"/>
+        <result property="totalAmount" column="total_amount"/>
+        <result property="transferType" column="transfer_type"/>
+        <result property="returnReasonCode" column="return_reason_code"/>
+        <result property="returnReasonText" column="return_reason_text"/>
+        <result property="attachmentNodeIds" column="attachment_node_ids"/>
+        <result property="recipientName" column="recipient_name"/>
+        <result property="recipientPhone" column="recipient_phone"/>
+        <result property="shippingAddress" column="shipping_address"/>
+        <result property="sourceBusinessType" column="source_business_type"/>
+        <result property="sourceBusinessId" column="source_business_id"/>
+        <result property="sourceConfirmStatus" column="source_confirm_status"/>
+        <result property="sourceConfirmedUserId" column="source_confirmed_user_id"/>
+        <result property="sourceConfirmedBy" column="source_confirmed_by"/>
+        <result property="sourceConfirmedTime" column="source_confirmed_time"/>
+        <result property="sourceConfirmRemark" column="source_confirm_remark"/>
+        <result property="reselectionFromTransferId" column="reselection_from_transfer_id"/>
+        <result property="version" column="version"/>
+        <result property="approvalInstanceId" column="approval_instance_id"/>
+        <result property="approvalRound" column="approval_round"/>
+        <result property="approvalEngine" column="approval_engine"/>
+        <result property="lastApprovalEventKey" column="last_approval_event_key"/>
+        <result property="submittedTime" column="submitted_time"/>
+        <result property="approvedTime" column="approved_time"/>
+        <result property="deliveredTime" column="delivered_time"/>
+        <result property="receivedTime" column="received_time"/>
+        <result property="archivedTime" column="archived_time"/>
+        <result property="closeReason" column="close_reason"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createdByUserId" column="created_by_user_id"/>
+        <result property="createdByName" column="created_by_name"/>
+        <result property="submittedByUserId" column="submitted_by_user_id"/>
+        <result property="submittedByName" column="submitted_by_name"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateBy" column="update_by"/>
+        <result property="updateTime" column="update_time"/>
+        <result property="remark" column="remark"/>
+    </resultMap>
+
+    <sql id="selectInvTransferOrderColumns">
+        transfer_id, order_no, purchase_id, from_dept_id, from_dept_name,
+               from_warehouse_id,
+               (select d.dept_name from sys_dept d where d.dept_id = from_warehouse_id) as from_warehouse_name,
+               to_dept_id, to_dept_name,
+               (select group_concat(parent_dept.dept_name
+                                     order by find_in_set(parent_dept.dept_id, target_dept.ancestors)
+                                     separator ' / ')
+                  from sys_dept target_dept
+                       inner join sys_dept parent_dept
+                         on parent_dept.dept_id &lt;&gt; 0
+                        and find_in_set(parent_dept.dept_id, target_dept.ancestors) > 0
+                        and parent_dept.del_flag = '0'
+                        and parent_dept.status = '0'
+                 where target_dept.dept_id = inv_transfer_order.to_dept_id) as to_dept_hierarchy,
+               to_warehouse_id,
+               (select d.dept_name from sys_dept d where d.dept_id = to_warehouse_id) as to_warehouse_name,
+               status, total_quantity, total_amount, transfer_type,
+               return_reason_code, return_reason_text, attachment_node_ids,
+               recipient_name, recipient_phone, shipping_address,
+               source_business_type, source_business_id,
+               source_confirm_status, source_confirmed_user_id,
+               source_confirmed_by, source_confirmed_time,
+               source_confirm_remark, reselection_from_transfer_id, version,
+               approval_instance_id, approval_round, approval_engine,
+               last_approval_event_key, submitted_time, approved_time, delivered_time,
+               received_time, archived_time, close_reason,
+               create_by, created_by_user_id, created_by_name,
+               submitted_by_user_id, submitted_by_name,
+               create_time, update_by, update_time, remark
+    </sql>
+
+    <sql id="selectInvTransferOrderVo">
+        select <include refid="selectInvTransferOrderColumns"/>
+        from inv_transfer_order
+    </sql>
+
+    <select id="selectInvTransferOrderById" parameterType="Long" resultMap="InvTransferOrderResult">
+        <include refid="selectInvTransferOrderVo"/>
+        where transfer_id = #{transferId}
+    </select>
+
+    <select id="selectInvTransferOrderByIdForUpdate" parameterType="Long" resultMap="InvTransferOrderResult">
+        <include refid="selectInvTransferOrderVo"/>
+        where transfer_id = #{transferId} for update
+    </select>
+
+    <select id="selectInvTransferOrderList" parameterType="InvTransferOrder" resultMap="InvTransferOrderResult">
+        select <include refid="selectInvTransferOrderColumns"/>,
+               (select count(*)
+                from inv_transfer_detail line
+                where line.transfer_id = inv_transfer_order.transfer_id) detail_line_count
+        from inv_transfer_order
+        <where>
+            <if test="orderNo != null and orderNo != ''">and order_no like concat('%', #{orderNo}, '%')</if>
+            <choose>
+                <when test="params.statuses != null and params.statuses.size() > 0">
+                    and status in
+                    <foreach collection="params.statuses" item="item" open="(" close=")" separator=",">
+                        #{item}
+                    </foreach>
+                </when>
+                <otherwise>
+                    <if test="status != null and status != ''">and status = #{status}</if>
+                </otherwise>
+            </choose>
+            <if test="transferType != null and transferType != ''">and transfer_type = #{transferType}</if>
+            <if test="fromDeptId != null">and from_dept_id = #{fromDeptId}</if>
+            <if test="toDeptId != null">and to_dept_id = #{toDeptId}</if>
+            <if test="params.hideDraftTransfers == true">
+                and status &lt;&gt; 'draft'
+            </if>
+            <if test="params.storeDeptId != null">
+                and (from_dept_id = #{params.storeDeptId}
+                     or to_dept_id = #{params.storeDeptId})
+            </if>
+            <if test="params.currentScopeDeptId != null">
+                and not (
+                    transfer_type = 'cross_store'
+                    and status in ('draft', 'submitted')
+                    and from_dept_id = #{params.currentScopeDeptId}
+                    and to_dept_id &lt;&gt; #{params.currentScopeDeptId}
+                )
+            </if>
+            <if test="params.scopeDeptIds != null">
+                and (
+                    from_dept_id in <foreach collection="params.scopeDeptIds" item="deptId" open="(" close=")" separator=",">#{deptId}</foreach>
+                    or to_dept_id in <foreach collection="params.scopeDeptIds" item="deptId" open="(" close=")" separator=",">#{deptId}</foreach>
+                )
+            </if>
+            ${params.dataScope}
+        </where>
+        order by create_time desc
+        <if test="params.rowLimit != null">
+            limit #{params.rowLimit}
+        </if>
+    </select>
+
+    <select id="selectOpsSummary" parameterType="InvTransferOrder"
+            resultType="com.erp.inventory.domain.vo.InvTransferOpsSummaryVo">
+        select coalesce(sum(case when o.status = 'submitted'
+                                 then 1 else 0 end), 0) pendingApprovalCount,
+               coalesce(sum(case when o.status in ('approved', 'reserved',
+                                      'partial_delivered')
+                                 then 1 else 0 end), 0) pendingShipmentCount,
+               coalesce(sum(case when o.status in ('partial_delivered', 'delivered',
+                                      'partial_received')
+                                 then 1 else 0 end), 0) pendingReceiptCount,
+               coalesce(sum(case when o.transfer_type = 'store_return'
+                                  and o.status in ('draft', 'submitted', 'approved',
+                                      'reserved', 'partial_delivered', 'delivered',
+                                      'partial_received', 'discrepancy')
+                                 then 1 else 0 end), 0) storeReturnProcessingCount,
+               coalesce(sum(case when o.transfer_type = 'store_return'
+                                  and o.status in ('partial_delivered', 'delivered',
+                                      'partial_received')
+                                  <if test="params.scopeDeptIds != null">
+                                  and o.to_dept_id in
+                                  <foreach collection="params.scopeDeptIds" item="deptId"
+                                           open="(" close=")" separator=",">
+                                      #{deptId}
+                                  </foreach>
+                                  </if>
+                                 then 1 else 0 end), 0) returnPendingReceiveCount,
+               coalesce(sum(case
+                   <if test="params.scopeDeptIds != null">
+                   when o.to_dept_id in
+                   <foreach collection="params.scopeDeptIds" item="deptId"
+                            open="(" close=")" separator=",">
+                       #{deptId}
+                   </foreach>
+                   </if>
+                   <if test="params.scopeDeptIds == null">when 1 = 0</if>
+                   then coalesce(x.open_count, 0) else 0 end), 0)
+                   openDiscrepancyCount,
+               coalesce(sum(case
+                   <if test="params.scopeDeptIds != null">
+                   when o.to_dept_id in
+                   <foreach collection="params.scopeDeptIds" item="deptId"
+                            open="(" close=")" separator=",">
+                       #{deptId}
+                   </foreach>
+                   </if>
+                   <if test="params.scopeDeptIds == null">when 1 = 0</if>
+                   then coalesce(x.pending_qc_count, 0) else 0 end), 0)
+                   pendingQcCount,
+               coalesce(sum(case when o.transfer_type = 'store_return'
+                                  and o.status in ('received', 'closed')
+                                  and o.received_time &gt;= date_sub(sysdate(), interval 1 day)
+                                 then 1 else 0 end), 0) returnReceivedLast24h,
+               min(case when o.transfer_type = 'store_return'
+                         and o.status in ('partial_delivered', 'delivered',
+                             'partial_received')
+                         <if test="params.scopeDeptIds != null">
+                         and o.to_dept_id in
+                         <foreach collection="params.scopeDeptIds" item="deptId"
+                                  open="(" close=")" separator=",">
+                             #{deptId}
+                         </foreach>
+                         </if>
+                        then o.create_time end) oldestReturnWaitingTime,
+               coalesce(timestampdiff(second,
+                   min(case when o.transfer_type = 'store_return'
+                             and o.status in ('partial_delivered', 'delivered',
+                                 'partial_received')
+                             <if test="params.scopeDeptIds != null">
+                             and o.to_dept_id in
+                             <foreach collection="params.scopeDeptIds" item="deptId"
+                                      open="(" close=")" separator=",">
+                                 #{deptId}
+                             </foreach>
+                             </if>
+                            then o.create_time end), sysdate()), 0)
+                   oldestReturnWaitingSeconds
+        from inv_transfer_order o
+        left join (
+            select transfer_id,
+                   sum(case when status in ('OPEN', 'PENDING_QC') then 1 else 0 end)
+                       open_count,
+                   sum(case when status = 'PENDING_QC' then 1 else 0 end)
+                       pending_qc_count
+            from inv_transfer_discrepancy
+            group by transfer_id
+        ) x on x.transfer_id = o.transfer_id
+        <where>
+            <if test="params.hideDraftTransfers == true">
+                and o.status &lt;&gt; 'draft'
+            </if>
+            <if test="params.currentScopeDeptId != null">
+                and not (
+                    o.transfer_type = 'cross_store'
+                    and o.status in ('draft', 'submitted')
+                    and o.from_dept_id = #{params.currentScopeDeptId}
+                    and o.to_dept_id &lt;&gt; #{params.currentScopeDeptId}
+                )
+            </if>
+            <if test="params.scopeDeptIds != null">
+                and (o.from_dept_id in
+                <foreach collection="params.scopeDeptIds" item="deptId"
+                         open="(" close=")" separator=",">#{deptId}</foreach>
+                or o.to_dept_id in
+                <foreach collection="params.scopeDeptIds" item="deptId"
+                         open="(" close=")" separator=",">#{deptId}</foreach>)
+            </if>
+        </where>
+    </select>
+
+    <select id="selectByPurchaseId" parameterType="Long" resultMap="InvTransferOrderResult">
+        <include refid="selectInvTransferOrderVo"/>
+        where purchase_id = #{purchaseId}
+        limit 1
+    </select>
+
+    <select id="selectBySourceBusinessTypeIdWarehouse" resultMap="InvTransferOrderResult">
+        <include refid="selectInvTransferOrderVo"/>
+        where source_business_type = #{sourceBusinessType}
+          and source_business_id = #{sourceBusinessId}
+          and from_warehouse_id = #{fromWarehouseId}
+        limit 1
+    </select>
+
+    <select id="selectBySourceBusinessTypeIdWarehouseForUpdate" resultMap="InvTransferOrderResult">
+        <include refid="selectInvTransferOrderVo"/>
+        where source_business_type = #{sourceBusinessType}
+          and source_business_id = #{sourceBusinessId}
+          and from_warehouse_id = #{fromWarehouseId}
+        limit 1 for update
+    </select>
+
+    <insert id="insertInvTransferOrder" parameterType="InvTransferOrder" useGeneratedKeys="true" keyProperty="transferId">
+        insert into inv_transfer_order (
+            order_no, purchase_id, from_dept_id, from_dept_name, from_warehouse_id,
+            to_dept_id, to_dept_name, to_warehouse_id, status, total_quantity, total_amount,
+            transfer_type, return_reason_code, return_reason_text,
+            attachment_node_ids, recipient_name, recipient_phone, shipping_address,
+            source_business_type, source_business_id, version,
+            source_confirm_status, source_confirmed_user_id,
+            source_confirmed_by, source_confirmed_time,
+            source_confirm_remark, reselection_from_transfer_id,
+            approval_instance_id, approval_round, approval_engine,
+            last_approval_event_key, submitted_time, approved_time,
+            delivered_time, received_time, archived_time, close_reason,
+            create_by, created_by_user_id, created_by_name,
+            create_time, remark
+        ) values (
+            #{orderNo}, #{purchaseId}, #{fromDeptId}, #{fromDeptName}, #{fromWarehouseId},
+            #{toDeptId}, #{toDeptName}, #{toWarehouseId}, #{status}, #{totalQuantity}, #{totalAmount},
+            #{transferType}, #{returnReasonCode}, #{returnReasonText},
+            #{attachmentNodeIds}, #{recipientName}, #{recipientPhone}, #{shippingAddress},
+            #{sourceBusinessType}, #{sourceBusinessId}, 0,
+            coalesce(#{sourceConfirmStatus}, 'NOT_REQUIRED'),
+            #{sourceConfirmedUserId}, #{sourceConfirmedBy},
+            #{sourceConfirmedTime}, #{sourceConfirmRemark},
+            #{reselectionFromTransferId},
+            #{approvalInstanceId}, coalesce(#{approvalRound}, 0),
+            coalesce(#{approvalEngine}, 'LEGACY'), #{lastApprovalEventKey},
+            #{submittedTime}, #{approvedTime},
+            #{deliveredTime}, #{receivedTime}, #{archivedTime}, #{closeReason},
+            #{createBy}, #{createdByUserId}, #{createdByName},
+            sysdate(), #{remark}
+        )
+    </insert>
+
+    <update id="updateDraftIfVersionMatches" parameterType="InvTransferOrder">
+        update inv_transfer_order
+        <set>
+            <if test="purchaseId != null">purchase_id = #{purchaseId},</if>
+            <if test="fromDeptId != null">from_dept_id = #{fromDeptId},</if>
+            <if test="fromDeptName != null">from_dept_name = #{fromDeptName},</if>
+            <if test="fromWarehouseId != null">from_warehouse_id = #{fromWarehouseId},</if>
+            <if test="toDeptId != null">to_dept_id = #{toDeptId},</if>
+            <if test="toDeptName != null">to_dept_name = #{toDeptName},</if>
+            <if test="toWarehouseId != null">to_warehouse_id = #{toWarehouseId},</if>
+            <if test="totalQuantity != null">total_quantity = #{totalQuantity},</if>
+            <if test="totalAmount != null">total_amount = #{totalAmount},</if>
+            <if test="transferType != null">transfer_type = #{transferType},</if>
+            <if test="returnReasonCode != null">return_reason_code = #{returnReasonCode},</if>
+            <if test="returnReasonText != null">return_reason_text = #{returnReasonText},</if>
+            <if test="attachmentNodeIds != null">attachment_node_ids = #{attachmentNodeIds},</if>
+            <if test="recipientName != null">recipient_name = #{recipientName},</if>
+            <if test="recipientPhone != null">recipient_phone = #{recipientPhone},</if>
+            <if test="shippingAddress != null">shipping_address = #{shippingAddress},</if>
+            <if test="sourceBusinessType != null">source_business_type = #{sourceBusinessType},</if>
+            <if test="sourceBusinessId != null">source_business_id = #{sourceBusinessId},</if>
+            <if test="sourceConfirmStatus != null">source_confirm_status = #{sourceConfirmStatus},</if>
+            <if test="reselectionFromTransferId != null">reselection_from_transfer_id = #{reselectionFromTransferId},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            update_by = #{updateBy}, update_time = sysdate(), version = version + 1
+        </set>
+        where transfer_id = #{transferId}
+          and status = 'draft'
+          and version = #{version}
+    </update>
+
+    <update id="finalizeNativeApprovalStart">
+        update inv_transfer_order
+        set approval_instance_id = #{instanceId},
+            update_by = #{updateBy}, update_time = sysdate(),
+            version = version + 1
+        where transfer_id = #{transferId}
+          and status = 'submitted'
+          and approval_engine = 'NATIVE'
+          and approval_round = #{businessRound}
+          and version = #{expectedVersion}
+          and approval_instance_id is null
+    </update>
+
+    <update id="updateInvTransferOrder" parameterType="InvTransferOrder">
+        update inv_transfer_order
+        <set>
+            <if test="purchaseId != null">purchase_id = #{purchaseId},</if>
+            <if test="fromDeptId != null">from_dept_id = #{fromDeptId},</if>
+            <if test="fromDeptName != null">from_dept_name = #{fromDeptName},</if>
+            <if test="fromWarehouseId != null">from_warehouse_id = #{fromWarehouseId},</if>
+            <if test="toDeptId != null">to_dept_id = #{toDeptId},</if>
+            <if test="toDeptName != null">to_dept_name = #{toDeptName},</if>
+            <if test="toWarehouseId != null">to_warehouse_id = #{toWarehouseId},</if>
+            <if test="status != null">status = #{status},</if>
+            <if test="totalQuantity != null">total_quantity = #{totalQuantity},</if>
+            <if test="totalAmount != null">total_amount = #{totalAmount},</if>
+            <if test="transferType != null">transfer_type = #{transferType},</if>
+            <if test="returnReasonCode != null">return_reason_code = #{returnReasonCode},</if>
+            <if test="returnReasonText != null">return_reason_text = #{returnReasonText},</if>
+            <if test="attachmentNodeIds != null">attachment_node_ids = #{attachmentNodeIds},</if>
+            <if test="recipientName != null">recipient_name = #{recipientName},</if>
+            <if test="recipientPhone != null">recipient_phone = #{recipientPhone},</if>
+            <if test="shippingAddress != null">shipping_address = #{shippingAddress},</if>
+            <if test="sourceBusinessType != null">source_business_type = #{sourceBusinessType},</if>
+            <if test="sourceBusinessId != null">source_business_id = #{sourceBusinessId},</if>
+            <if test="sourceConfirmStatus != null">source_confirm_status = #{sourceConfirmStatus},</if>
+            <if test="sourceConfirmedUserId != null">source_confirmed_user_id = #{sourceConfirmedUserId},</if>
+            <if test="sourceConfirmedBy != null">source_confirmed_by = #{sourceConfirmedBy},</if>
+            <if test="sourceConfirmedTime != null">source_confirmed_time = #{sourceConfirmedTime},</if>
+            <if test="sourceConfirmRemark != null">source_confirm_remark = #{sourceConfirmRemark},</if>
+            <if test="reselectionFromTransferId != null">reselection_from_transfer_id = #{reselectionFromTransferId},</if>
+            <if test="approvalInstanceId != null">approval_instance_id = #{approvalInstanceId},</if>
+            <if test="approvalRound != null">approval_round = #{approvalRound},</if>
+            <if test="approvalEngine != null and approvalEngine != ''">approval_engine = #{approvalEngine},</if>
+            <if test="lastApprovalEventKey != null and lastApprovalEventKey != ''">last_approval_event_key = #{lastApprovalEventKey},</if>
+            <if test="submittedTime != null">submitted_time = #{submittedTime},</if>
+            <if test="submittedByUserId != null">
+                submitted_by_user_id = #{submittedByUserId},
+                submitted_by_name = #{submittedByName},
+            </if>
+            <if test="approvedTime != null">approved_time = #{approvedTime},</if>
+            <if test="deliveredTime != null">delivered_time = #{deliveredTime},</if>
+            <if test="receivedTime != null">received_time = #{receivedTime},</if>
+            <if test="archivedTime != null">archived_time = #{archivedTime},</if>
+            <if test="closeReason != null">close_reason = #{closeReason},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            update_by = #{updateBy}, update_time = sysdate(), version = version + 1
+        </set>
+        where transfer_id = #{transferId}
+    </update>
+
+    <delete id="deleteInvTransferOrderById" parameterType="Long">
+        delete from inv_transfer_order where transfer_id = #{transferId}
+    </delete>
+
+</mapper>

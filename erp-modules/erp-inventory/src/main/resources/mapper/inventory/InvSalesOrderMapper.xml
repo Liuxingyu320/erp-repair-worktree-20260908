@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.inventory.mapper.InvSalesOrderMapper">
+
+    <resultMap type="InvSalesOrder" id="InvSalesOrderResult">
+        <id property="orderId" column="order_id"/>
+        <result property="orderNo" column="order_no"/>
+        <result property="orderTitle" column="order_title"/>
+        <result property="customerId" column="customer_id"/>
+        <result property="customerName" column="customer_name"/>
+        <result property="targetDeptName" column="target_dept_name"/>
+        <result property="totalQuantity" column="total_quantity"/>
+        <result property="deliveredQuantity" column="delivered_quantity"/>
+        <result property="remainingQuantity" column="remaining_quantity"/>
+        <result property="totalAmount" column="total_amount"/>
+        <result property="orderDate" column="order_date"/>
+        <result property="status" column="status"/>
+        <result property="shopDeptId" column="shop_dept_id"/>
+        <result property="applicantId" column="applicant_id"/>
+        <result property="applicantName" column="applicant_name"/>
+        <result property="applicantNickName" column="applicant_nick_name"/>
+        <result property="applicantDeptId" column="applicant_dept_id"/>
+        <result property="applicantDeptName" column="applicant_dept_name"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateBy" column="update_by"/>
+        <result property="updateTime" column="update_time"/>
+        <result property="remark" column="remark"/>
+    </resultMap>
+
+    <sql id="selectInvSalesOrderVo">
+        select o.order_id, o.order_no, o.order_title, o.customer_id, o.customer_name,
+               shop_dept.dept_name as target_dept_name,
+               coalesce(detail_summary.total_quantity, 0) as total_quantity,
+               coalesce(detail_summary.delivered_quantity, 0) as delivered_quantity,
+               coalesce(detail_summary.remaining_quantity, 0) as remaining_quantity,
+               o.total_amount, o.order_date, o.status, o.shop_dept_id,
+               o.applicant_id, o.applicant_name, u.nick_name as applicant_nick_name,
+               o.applicant_dept_id, applicant_dept.dept_name as applicant_dept_name,
+               o.create_by, o.create_time, o.update_by, o.update_time, o.remark
+        from inv_sales_order o
+             left join sys_dept shop_dept on shop_dept.dept_id = o.shop_dept_id
+             left join sys_user u on u.user_id = o.applicant_id
+             left join sys_dept applicant_dept on applicant_dept.dept_id = o.applicant_dept_id
+             left join (
+                 select order_id,
+                        sum(coalesce(quantity, 0)) as total_quantity,
+                        sum(coalesce(delivered_quantity, 0)) as delivered_quantity,
+                        sum(coalesce(quantity, 0) - coalesce(delivered_quantity, 0)) as remaining_quantity
+                 from inv_sales_detail
+                 group by order_id
+             ) detail_summary on detail_summary.order_id = o.order_id
+    </sql>
+
+    <select id="selectInvSalesOrderById" parameterType="Long" resultMap="InvSalesOrderResult">
+        <include refid="selectInvSalesOrderVo"/>
+        where o.order_id = #{orderId}
+    </select>
+
+    <select id="selectInvSalesOrderByIdForUpdate" parameterType="Long" resultMap="InvSalesOrderResult">
+        select order_id, order_no, order_title, customer_id, customer_name, total_amount,
+               order_date, status, shop_dept_id, applicant_id, applicant_name,
+               applicant_dept_id, create_by, create_time, update_by, update_time, remark
+        from inv_sales_order
+        where order_id = #{orderId} for update
+    </select>
+
+    <select id="selectInvSalesOrderList" parameterType="InvSalesOrder" resultMap="InvSalesOrderResult">
+        <include refid="selectInvSalesOrderVo"/>
+        <where>
+            <if test="orderNo != null and orderNo != ''">and o.order_no like concat('%', #{orderNo}, '%')</if>
+            <if test="orderTitle != null and orderTitle != ''">and o.order_title like concat('%', #{orderTitle}, '%')</if>
+            <if test="customerName != null and customerName != ''">and o.customer_name like concat('%', #{customerName}, '%')</if>
+            <if test="status != null and status != ''">and o.status = #{status}</if>
+            <if test="params.beginOrderDate != null and params.beginOrderDate != ''">and o.order_date &gt;= #{params.beginOrderDate}</if>
+            <if test="params.endOrderDate != null and params.endOrderDate != ''">and o.order_date &lt;= #{params.endOrderDate}</if>
+            <if test="applicantName != null and applicantName != ''">and o.applicant_name like concat('%', #{applicantName}, '%')</if>
+            <if test="params.scopeDeptIds != null">and o.shop_dept_id in <foreach collection="params.scopeDeptIds" item="deptId" open="(" close=")" separator=",">#{deptId}</foreach></if>
+            ${params.dataScope}
+        </where>
+        order by o.create_time desc
+    </select>
+
+    <select id="selectMyInvSalesOrderList" parameterType="InvSalesOrder" resultMap="InvSalesOrderResult">
+        <include refid="selectInvSalesOrderVo"/>
+        <where>
+            o.applicant_id = #{applicantId}
+            <if test="orderNo != null and orderNo != ''">and o.order_no like concat('%', #{orderNo}, '%')</if>
+            <if test="orderTitle != null and orderTitle != ''">and o.order_title like concat('%', #{orderTitle}, '%')</if>
+            <if test="customerName != null and customerName != ''">and o.customer_name like concat('%', #{customerName}, '%')</if>
+            <if test="status != null and status != ''">and o.status = #{status}</if>
+            <if test="params.beginOrderDate != null and params.beginOrderDate != ''">and o.order_date &gt;= #{params.beginOrderDate}</if>
+            <if test="params.endOrderDate != null and params.endOrderDate != ''">and o.order_date &lt;= #{params.endOrderDate}</if>
+            <if test="params.scopeDeptIds != null">and o.shop_dept_id in <foreach collection="params.scopeDeptIds" item="deptId" open="(" close=")" separator=",">#{deptId}</foreach></if>
+            ${params.dataScope}
+        </where>
+        order by o.create_time desc
+    </select>
+
+    <select id="countByCustomerNameAndShop" resultType="int">
+        select
+            (select count(1) from inv_sales_order
+             where customer_name = #{customerName}
+               and shop_dept_id = #{shopDeptId})
+            + (select count(1) from inv_sales_return
+               where customer_name = #{customerName}
+                 and shop_dept_id = #{shopDeptId})
+            + (select count(1) from inv_delivery_notice
+               where customer_name = #{customerName}
+                 and shop_dept_id = #{shopDeptId})
+    </select>
+
+    <insert id="insertInvSalesOrder" parameterType="InvSalesOrder" useGeneratedKeys="true" keyProperty="orderId">
+        insert into inv_sales_order (
+            order_no, order_title, customer_id, customer_name, total_amount, order_date, status,
+            shop_dept_id, applicant_id, applicant_name, applicant_dept_id,
+            create_by, create_time, remark
+        ) values (
+            #{orderNo}, #{orderTitle}, #{customerId}, #{customerName}, #{totalAmount}, #{orderDate}, #{status},
+            #{shopDeptId}, #{applicantId}, #{applicantName}, #{applicantDeptId},
+            #{createBy}, sysdate(), #{remark}
+        )
+    </insert>
+
+    <update id="updateInvSalesOrder" parameterType="InvSalesOrder">
+        update inv_sales_order
+        <set>
+            <if test="orderTitle != null">order_title = #{orderTitle},</if>
+            <if test="customerId != null">customer_id = #{customerId},</if>
+            <if test="customerName != null">customer_name = #{customerName},</if>
+            <if test="totalAmount != null">total_amount = #{totalAmount},</if>
+            <if test="orderDate != null">order_date = #{orderDate},</if>
+            <if test="status != null">status = #{status},</if>
+            update_by = #{updateBy}, update_time = sysdate()
+        </set>
+        where order_id = #{orderId}
+    </update>
+
+    <delete id="deleteInvSalesOrderByIds" parameterType="Long">
+        delete from inv_sales_order where order_id in
+        <foreach collection="array" item="orderId" open="(" close=")" separator=",">
+            #{orderId}
+        </foreach>
+    </delete>
+
+</mapper>

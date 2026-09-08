@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.inventory.mapper.InvReceiptBatchDetailMapper">
+
+    <resultMap type="InvReceiptBatchDetail" id="InvReceiptBatchDetailResult">
+        <id property="batchDetailId" column="batch_detail_id"/>
+        <result property="batchId" column="batch_id"/>
+        <result property="purchaseOrderId" column="purchase_order_id"/>
+        <result property="purchaseDetailId" column="purchase_detail_id"/>
+        <result property="itemType" column="item_type"/>
+        <result property="itemId" column="item_id"/>
+        <result property="productId" column="product_id"/>
+        <result property="itemCode" column="item_code"/>
+        <result property="itemName" column="item_name"/>
+        <result property="unit" column="unit"/>
+        <result property="receivedQuantity" column="received_quantity"/>
+        <result property="pendingQuantity" column="pending_quantity"/>
+        <result property="inspectedQuantity" column="inspected_quantity"/>
+        <result property="acceptedQuantity" column="accepted_quantity"/>
+        <result property="rejectedQuantity" column="rejected_quantity"/>
+        <result property="concessionQuantity" column="concession_quantity"/>
+    </resultMap>
+
+    <sql id="selectBatchDetailVo">
+        select batch_detail_id, batch_id, purchase_order_id, purchase_detail_id,
+               item_type, item_id, product_id, item_code, item_name, unit,
+               received_quantity, pending_quantity, inspected_quantity,
+               accepted_quantity, rejected_quantity, concession_quantity
+        from inv_receipt_batch_detail
+    </sql>
+
+    <select id="selectByBatchId" resultMap="InvReceiptBatchDetailResult">
+        <include refid="selectBatchDetailVo"/>
+        where batch_id = #{batchId}
+        order by batch_detail_id asc
+    </select>
+
+    <select id="selectByBatchIdForUpdate" resultMap="InvReceiptBatchDetailResult">
+        <include refid="selectBatchDetailVo"/>
+        where batch_id = #{batchId}
+        order by batch_detail_id asc
+        for update
+    </select>
+
+    <insert id="insertInvReceiptBatchDetail" parameterType="InvReceiptBatchDetail" useGeneratedKeys="true" keyProperty="batchDetailId">
+        insert into inv_receipt_batch_detail (
+            batch_id, purchase_order_id, purchase_detail_id,
+            item_type, item_id, product_id, item_code, item_name, unit,
+            received_quantity, pending_quantity, inspected_quantity,
+            accepted_quantity, rejected_quantity, concession_quantity
+        ) values (
+            #{batchId}, #{purchaseOrderId}, #{purchaseDetailId},
+            coalesce(#{itemType}, 'product'), coalesce(#{itemId}, #{productId}), #{productId},
+            #{itemCode}, #{itemName}, #{unit},
+            #{receivedQuantity}, #{pendingQuantity}, #{inspectedQuantity},
+            #{acceptedQuantity}, #{rejectedQuantity}, #{concessionQuantity}
+        )
+    </insert>
+
+    <update id="updateInspectionProgress" parameterType="InvReceiptBatchDetail">
+        update inv_receipt_batch_detail
+        set pending_quantity = #{pendingQuantity},
+            inspected_quantity = #{inspectedQuantity},
+            accepted_quantity = #{acceptedQuantity},
+            rejected_quantity = #{rejectedQuantity},
+            concession_quantity = #{concessionQuantity}
+        where batch_detail_id = #{batchDetailId}
+    </update>
+</mapper>

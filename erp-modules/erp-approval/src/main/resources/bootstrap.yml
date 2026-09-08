@@ -1,0 +1,96 @@
+# Tomcat
+server:
+  port: 9206
+
+# Spring
+spring:
+  application:
+    name: erp-approval
+  profiles:
+    active: dev
+  cloud:
+    nacos:
+      discovery:
+        server-addr: 127.0.0.1:8848
+        ip: 127.0.0.1
+      config:
+        server-addr: 127.0.0.1:8848
+  config:
+    file-extension: yml
+    import:
+      - optional:nacos:application-${spring.profiles.active}.${spring.config.file-extension}
+      - optional:nacos:${spring.application.name}-${spring.profiles.active}.${spring.config.file-extension}
+  datasource:
+    druid:
+      stat-view-servlet:
+        enabled: ${DRUID_MONITOR_ENABLED:false}
+        loginUsername: ${DRUID_MONITOR_USERNAME:}
+        loginPassword: ${DRUID_MONITOR_PASSWORD:}
+    dynamic:
+      druid:
+        initial-size: 2
+        min-idle: 2
+        maxActive: 10
+        maxWait: 60000
+        connectTimeout: 30000
+        socketTimeout: 60000
+        validationQuery: SELECT 1 FROM DUAL
+        testWhileIdle: true
+        testOnBorrow: false
+        testOnReturn: false
+      datasource:
+        master:
+          driver-class-name: com.mysql.cj.jdbc.Driver
+          url: jdbc:mysql://127.0.0.1:3306/${MYSQL_DATABASE:BossERP_NEW}?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&useSSL=false&serverTimezone=Asia/Shanghai
+          username: ${MYSQL_USERNAME:root}
+          password: ${MYSQL_PASSWORD:}
+
+mybatis:
+  typeAliasesPackage: com.erp.approval
+  mapperLocations: classpath:mapper/**/*.xml
+
+---
+# Local startup without Nacos: --spring.profiles.active=local
+server:
+  port: 9206
+
+spring:
+  config:
+    activate:
+      on-profile: local
+  data:
+    redis:
+      host: 127.0.0.1
+      port: 6379
+      password: ${REDIS_PASSWORD:}
+  cloud:
+    nacos:
+      discovery:
+        enabled: false
+      config:
+        enabled: false
+    discovery:
+      client:
+        simple:
+          instances:
+            erp-approval:
+              - uri: http://127.0.0.1:9206
+  datasource:
+    dynamic:
+      datasource:
+        master:
+          driver-class-name: com.mysql.cj.jdbc.Driver
+          url: jdbc:mysql://127.0.0.1:3306/${MYSQL_DATABASE:BossERP_NEW}?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&useSSL=false&serverTimezone=Asia/Shanghai
+          username: ${MYSQL_USERNAME:root}
+          password: ${MYSQL_PASSWORD:}
+
+springdoc:
+  gatewayUrl: http://localhost:8080/${spring.application.name}
+  api-docs:
+    enabled: ${SPRINGDOC_API_DOCS_ENABLED:false}
+  info:
+    title: '统一审批中心接口文档'
+    description: '统一审批配置、运行、监控与检查接口'
+    contact:
+      name: ERP
+      url: https://erp.vip

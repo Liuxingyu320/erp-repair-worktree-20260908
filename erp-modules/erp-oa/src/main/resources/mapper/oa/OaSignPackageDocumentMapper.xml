@@ -1,0 +1,180 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.oa.mapper.OaSignPackageDocumentMapper">
+
+    <resultMap id="OaSignPackageDocumentResult" type="OaSignPackageDocument">
+        <id property="documentId" column="document_id"/>
+        <result property="packageId" column="package_id"/>
+        <result property="templateId" column="template_id"/>
+        <result property="templateType" column="template_type"/>
+        <result property="documentName" column="document_name"/>
+        <result property="templateVersionSnapshot" column="template_version_snapshot"/>
+        <result property="sourceFileUrlSnapshot" column="source_file_url_snapshot"/>
+        <result property="generatedFileUrl" column="generated_file_url"/>
+        <result property="generatedPdfUrl" column="generated_pdf_url"/>
+        <result property="signedFileUrl" column="signed_file_url"/>
+        <result property="certificateFileUrl" column="certificate_file_url"/>
+        <result property="fileHashBeforeSign" column="file_hash_before_sign"/>
+        <result property="fileHashAfterSign" column="file_hash_after_sign"/>
+        <result property="reviewPdfUrl" column="review_pdf_url"/>
+        <result property="reviewPdfHash" column="review_pdf_hash"/>
+        <result property="signedPdfUrl" column="signed_pdf_url"/>
+        <result property="signedPdfHash" column="signed_pdf_hash"/>
+        <result property="finalPdfUrl" column="final_pdf_url"/>
+        <result property="finalPdfHash" column="final_pdf_hash"/>
+        <result property="finalContentHash" column="final_content_hash"/>
+        <result property="finalArchivePdfUrl" column="final_archive_pdf_url"/>
+        <result property="finalArchivePdfHash" column="final_archive_pdf_hash"/>
+        <result property="signatureFileUrl" column="signature_file_url"/>
+        <result property="signatureHash" column="signature_hash"/>
+        <result property="certificateHash" column="certificate_hash"/>
+        <result property="documentVersion" column="document_version"/>
+        <result property="finalDocumentVersion" column="final_document_version"/>
+        <result property="finalReadConfirmed" column="final_read_confirmed"/>
+        <result property="finalReadConfirmedTime" column="final_read_confirmed_time"/>
+        <result property="employeeVisible" column="employee_visible"/>
+        <result property="readConfirmationRequired" column="read_confirmation_required"/>
+        <result property="employeeSignRequired" column="employee_sign_required"/>
+        <result property="signaturePositionJson" column="signature_position_json"/>
+        <result property="companySealPositionJson" column="company_seal_position_json"/>
+        <result property="companySealRequired" column="company_seal_required"/>
+        <result property="documentPolicyMode" column="document_policy_mode"/>
+        <result property="readConfirmed" column="read_confirmed"/>
+        <result property="signed" column="signed"/>
+        <result property="sortOrder" column="sort_order"/>
+        <result property="status" column="status"/>
+        <result property="errorMessage" column="error_message"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateTime" column="update_time"/>
+        <result property="remark" column="remark"/>
+    </resultMap>
+
+    <sql id="baseColumns">
+        document_id, package_id, template_id, template_type, document_name,
+        template_version_snapshot, source_file_url_snapshot, generated_file_url,
+        generated_pdf_url, signed_file_url, certificate_file_url, file_hash_before_sign,
+        file_hash_after_sign, review_pdf_url, review_pdf_hash, signed_pdf_url, signed_pdf_hash,
+        final_pdf_url, final_pdf_hash, final_content_hash,
+        final_archive_pdf_url, final_archive_pdf_hash,
+        signature_file_url, signature_hash, certificate_hash, document_version,
+        final_document_version, final_read_confirmed, final_read_confirmed_time,
+        employee_visible, read_confirmation_required, employee_sign_required,
+        signature_position_json, company_seal_position_json,
+        company_seal_required, document_policy_mode,
+        read_confirmed, signed, sort_order,
+        status, error_message, create_time, update_time, remark
+    </sql>
+
+    <insert id="insertOaSignPackageDocument" parameterType="OaSignPackageDocument" useGeneratedKeys="true" keyProperty="documentId">
+        insert into oa_sign_package_document (
+            package_id, template_id, template_type, document_name, template_version_snapshot,
+            source_file_url_snapshot, generated_file_url, generated_pdf_url, signed_file_url,
+            certificate_file_url, file_hash_before_sign, file_hash_after_sign,
+            review_pdf_url, review_pdf_hash, signed_pdf_url, signed_pdf_hash,
+            final_pdf_url, final_pdf_hash, final_content_hash,
+            final_archive_pdf_url, final_archive_pdf_hash,
+            signature_file_url, signature_hash, certificate_hash, document_version,
+            final_document_version, final_read_confirmed, final_read_confirmed_time,
+            employee_visible, read_confirmation_required, employee_sign_required,
+            signature_position_json, company_seal_position_json,
+            company_seal_required, document_policy_mode,
+            read_confirmed, signed, sort_order, status,
+            error_message, create_time, remark
+        ) values (
+            #{packageId}, #{templateId}, #{templateType}, #{documentName}, #{templateVersionSnapshot},
+            #{sourceFileUrlSnapshot}, #{generatedFileUrl}, #{generatedPdfUrl}, #{signedFileUrl},
+            #{certificateFileUrl}, #{fileHashBeforeSign}, #{fileHashAfterSign},
+            #{reviewPdfUrl}, #{reviewPdfHash}, #{signedPdfUrl}, #{signedPdfHash},
+            #{finalPdfUrl}, #{finalPdfHash}, #{finalContentHash},
+            #{finalArchivePdfUrl}, #{finalArchivePdfHash},
+            #{signatureFileUrl}, #{signatureHash}, #{certificateHash}, #{documentVersion},
+            #{finalDocumentVersion}, coalesce(#{finalReadConfirmed}, 'N'), #{finalReadConfirmedTime},
+            #{employeeVisible}, #{readConfirmationRequired}, #{employeeSignRequired},
+            #{signaturePositionJson}, #{companySealPositionJson},
+            #{companySealRequired}, #{documentPolicyMode},
+            #{readConfirmed}, #{signed}, #{sortOrder}, #{status},
+            #{errorMessage}, sysdate(), #{remark}
+        )
+    </insert>
+
+    <update id="updateOaSignPackageDocument" parameterType="OaSignPackageDocument">
+        update oa_sign_package_document
+        <set>
+            <if test="templateId != null">template_id = #{templateId},</if>
+            <if test="templateType != null">template_type = #{templateType},</if>
+            <if test="documentName != null">document_name = #{documentName},</if>
+            <if test="templateVersionSnapshot != null">template_version_snapshot = #{templateVersionSnapshot},</if>
+            <if test="sourceFileUrlSnapshot != null">source_file_url_snapshot = #{sourceFileUrlSnapshot},</if>
+            <if test="generatedFileUrl != null">generated_file_url = #{generatedFileUrl},</if>
+            <if test="generatedPdfUrl != null">generated_pdf_url = #{generatedPdfUrl},</if>
+            <if test="signedFileUrl != null">signed_file_url = #{signedFileUrl},</if>
+            <if test="certificateFileUrl != null">certificate_file_url = #{certificateFileUrl},</if>
+            <if test="fileHashBeforeSign != null">file_hash_before_sign = #{fileHashBeforeSign},</if>
+            <if test="fileHashAfterSign != null">file_hash_after_sign = #{fileHashAfterSign},</if>
+            <if test="reviewPdfUrl != null">review_pdf_url = #{reviewPdfUrl},</if>
+            <if test="reviewPdfHash != null">review_pdf_hash = #{reviewPdfHash},</if>
+            <if test="signedPdfUrl != null">signed_pdf_url = #{signedPdfUrl},</if>
+            <if test="signedPdfHash != null">signed_pdf_hash = #{signedPdfHash},</if>
+            <if test="finalPdfUrl != null">final_pdf_url = #{finalPdfUrl},</if>
+            <if test="finalPdfHash != null">final_pdf_hash = #{finalPdfHash},</if>
+            <if test="finalContentHash != null">final_content_hash = #{finalContentHash},</if>
+            <if test="finalArchivePdfUrl != null">final_archive_pdf_url = #{finalArchivePdfUrl},</if>
+            <if test="finalArchivePdfHash != null">final_archive_pdf_hash = #{finalArchivePdfHash},</if>
+            <if test="signatureFileUrl != null">signature_file_url = #{signatureFileUrl},</if>
+            <if test="signatureHash != null">signature_hash = #{signatureHash},</if>
+            <if test="certificateHash != null">certificate_hash = #{certificateHash},</if>
+            <if test="documentVersion != null">document_version = #{documentVersion},</if>
+            <if test="finalDocumentVersion != null">final_document_version = #{finalDocumentVersion},</if>
+            <if test="finalReadConfirmed != null">final_read_confirmed = #{finalReadConfirmed},</if>
+            <if test="finalReadConfirmedTime != null">final_read_confirmed_time = #{finalReadConfirmedTime},</if>
+            <if test="readConfirmed != null">read_confirmed = #{readConfirmed},</if>
+            <if test="signed != null">signed = #{signed},</if>
+            <if test="sortOrder != null">sort_order = #{sortOrder},</if>
+            <if test="status != null">status = #{status},</if>
+            <if test="errorMessage != null">error_message = #{errorMessage},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            update_time = sysdate()
+        </set>
+        where document_id = #{documentId}
+    </update>
+
+    <update id="markFinalReadConfirmed">
+        update oa_sign_package_document
+        set final_read_confirmed = 'Y',
+            final_read_confirmed_time = coalesce(final_read_confirmed_time, #{confirmedTime}),
+            update_time = sysdate()
+        where document_id = #{documentId}
+          and package_id = #{packageId}
+          and final_document_version = #{finalDocumentVersion}
+          and final_pdf_hash = #{finalPdfHash}
+          and employee_visible = 'Y'
+          and final_pdf_url is not null
+    </update>
+
+    <delete id="deleteDocumentsByPackageId">
+        delete from oa_sign_package_document where package_id = #{packageId}
+    </delete>
+
+    <select id="selectOaSignPackageDocumentById" resultMap="OaSignPackageDocumentResult">
+        select <include refid="baseColumns"/>
+        from oa_sign_package_document
+        where document_id = #{documentId}
+    </select>
+
+    <select id="selectDocumentsByPackageId" resultMap="OaSignPackageDocumentResult">
+        select <include refid="baseColumns"/>
+        from oa_sign_package_document
+        where package_id = #{packageId}
+        order by sort_order asc, document_id asc
+    </select>
+
+    <select id="selectRequiredDocumentsByPackageId" resultMap="OaSignPackageDocumentResult">
+        select <include refid="baseColumns"/>
+        from oa_sign_package_document
+        where package_id = #{packageId}
+          and employee_sign_required = 'Y'
+        order by sort_order asc, document_id asc
+    </select>
+</mapper>

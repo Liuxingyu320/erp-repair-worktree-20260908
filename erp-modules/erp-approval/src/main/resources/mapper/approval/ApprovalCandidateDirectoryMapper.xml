@@ -1,0 +1,283 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.approval.mapper.ApprovalCandidateDirectoryMapper">
+
+    <resultMap id="DirectoryUserResult" type="ApprovalDirectoryUser">
+        <id property="userId" column="user_id"/>
+        <result property="userName" column="user_name"/>
+        <result property="deptId" column="dept_id"/>
+        <result property="deptName" column="dept_name"/>
+        <result property="postSort" column="post_sort"/>
+    </resultMap>
+
+    <resultMap id="DirectoryDeptResult" type="ApprovalDirectoryDept">
+        <id property="deptId" column="dept_id"/>
+        <result property="deptName" column="dept_name"/>
+        <result property="deptType" column="dept_type"/>
+    </resultMap>
+
+    <sql id="activeEmployee">
+        u.del_flag = '0' and u.status = '0'
+        and (profile.employee_status is null
+             or trim(profile.employee_status) = ''
+             or trim(profile.employee_status) &lt;&gt; '离职')
+    </sql>
+
+    <sql id="permissionExists">
+        <if test="permission != null and permission != ''">
+            and exists (
+                select 1
+                from sys_user_role permission_ur
+                join sys_role permission_role
+                  on permission_role.role_id = permission_ur.role_id
+                join sys_role_menu permission_rm
+                  on permission_rm.role_id = permission_role.role_id
+                join sys_menu permission_menu
+                  on permission_menu.menu_id = permission_rm.menu_id
+                where permission_ur.user_id = u.user_id
+                  and permission_role.del_flag = '0'
+                  and permission_role.status = '0'
+                  and permission_menu.status = '0'
+                  and permission_menu.perms = #{permission}
+            )
+        </if>
+    </sql>
+
+    <select id="selectResponsibilityPostUsers" resultMap="DirectoryUserResult">
+        select distinct u.user_id,
+               coalesce(nullif(trim(u.nick_name), ''), nullif(trim(u.user_name), ''), '姓名未配置') user_name,
+               u.dept_id,
+               user_dept.dept_name,
+               p.post_sort
+        from sys_user u
+        join sys_user_post up on up.user_id = u.user_id
+        join sys_post p on p.post_id = up.post_id
+        join sys_dept anchor on anchor.dept_id = #{anchorDeptId}
+        left join sys_dept user_dept on user_dept.dept_id = u.dept_id
+        left join sys_user_profile profile on profile.user_id = u.user_id
+        where <include refid="activeEmployee"/>
+          and p.status = '0'
+          and p.post_code = #{postCode}
+          and anchor.del_flag = '0' and anchor.status = '0'
+          <choose>
+              <when test="directOnly">
+                  and (
+                      u.dept_id = anchor.dept_id
+                      or exists (
+                          select 1 from sys_user_shop direct_scope
+                          where direct_scope.user_id = u.user_id
+                            and direct_scope.dept_id = anchor.dept_id
+                      )
+                  )
+              </when>
+              <otherwise>
+                  and exists (
+                      select 1
+                      from sys_user_shop responsibility_scope
+                      join sys_dept scope_dept
+                        on scope_dept.dept_id = responsibility_scope.dept_id
+                      where responsibility_scope.user_id = u.user_id
+                        and scope_dept.del_flag = '0'
+                        and scope_dept.status = '0'
+                        and (scope_dept.dept_id = anchor.dept_id
+                             or find_in_set(scope_dept.dept_id, anchor.ancestors))
+                  )
+              </otherwise>
+          </choose>
+          <include refid="permissionExists"/>
+        order by p.post_sort, u.user_id
+    </select>
+
+    <select id="selectOrgLeaderUsers" resultMap="DirectoryUserResult">
+        select distinct u.user_id,
+               coalesce(nullif(trim(u.nick_name), ''), nullif(trim(u.user_name), ''), '姓名未配置') user_name,
+               u.dept_id,
+               user_dept.dept_name,
+               null post_sort
+        from sys_dept anchor
+        join sys_dept leader_dept
+          on leader_dept.dept_id = anchor.dept_id
+          or find_in_set(leader_dept.dept_id, anchor.ancestors)
+        join sys_user u on u.user_id = leader_dept.leader_user_id
+        left join sys_dept user_dept on user_dept.dept_id = u.dept_id
+        left join sys_user_profile profile on profile.user_id = u.user_id
+        where anchor.dept_id = #{anchorDeptId}
+          and anchor.del_flag = '0' and anchor.status = '0'
+          and leader_dept.del_flag = '0' and leader_dept.status = '0'
+          and <include refid="activeEmployee"/>
+          <if test="deptType != null and deptType != ''">
+              and leader_dept.dept_type = #{deptType}
+          </if>
+          <include refid="permissionExists"/>
+        order by case when leader_dept.dept_id = anchor.dept_id then 9999
+                      else find_in_set(leader_dept.dept_id, anchor.ancestors) end desc,
+                 u.user_id
+    </select>
+
+    <select id="selectPermissionHolders" resultMap="DirectoryUserResult">
+        select distinct u.user_id,
+               coalesce(nullif(trim(u.nick_name), ''), nullif(trim(u.user_name), ''), '姓名未配置') user_name,
+               u.dept_id, user_dept.dept_name, null post_sort
+        from sys_user u
+        join sys_user_shop us on us.user_id = u.user_id
+        join sys_dept scope_dept on scope_dept.dept_id = us.dept_id
+        join sys_dept anchor on anchor.dept_id = #{anchorDeptId}
+        left join sys_dept user_dept on user_dept.dept_id = u.dept_id
+        left join sys_user_profile profile on profile.user_id = u.user_id
+        where <include refid="activeEmployee"/>
+          and anchor.del_flag = '0' and anchor.status = '0'
+          and scope_dept.del_flag = '0' and scope_dept.status = '0'
+          and (scope_dept.dept_id = anchor.dept_id
+               or find_in_set(scope_dept.dept_id, anchor.ancestors))
+          <include refid="permissionExists"/>
+        order by u.user_id
+    </select>
+
+    <select id="selectActiveFixedUsers" resultMap="DirectoryUserResult">
+        select u.user_id,
+               coalesce(nullif(trim(u.nick_name), ''), nullif(trim(u.user_name), ''), '姓名未配置') user_name,
+               u.dept_id, d.dept_name, null post_sort
+        from sys_user u
+        left join sys_dept d on d.dept_id = u.dept_id
+        left join sys_user_profile profile on profile.user_id = u.user_id
+        where <include refid="activeEmployee"/>
+          and u.user_id in
+          <foreach collection="userIds" item="userId" open="(" separator="," close=")">
+              #{userId}
+          </foreach>
+          <include refid="permissionExists"/>
+        order by field(u.user_id,
+          <foreach collection="userIds" item="userId" separator=",">#{userId}</foreach>)
+    </select>
+
+    <select id="selectActiveUserById" resultMap="DirectoryUserResult">
+        select u.user_id,
+               coalesce(nullif(trim(u.nick_name), ''), nullif(trim(u.user_name), ''), '姓名未配置') user_name,
+               u.dept_id, d.dept_name, null post_sort
+        from sys_user u
+        left join sys_dept d on d.dept_id = u.dept_id
+        left join sys_user_profile profile on profile.user_id = u.user_id
+        where u.user_id = #{userId}
+          and <include refid="activeEmployee"/>
+          <include refid="permissionExists"/>
+    </select>
+
+    <select id="selectActiveAnchors" resultMap="DirectoryDeptResult">
+        select d.dept_id, d.dept_name, d.dept_type
+        from sys_dept d
+        where d.del_flag = '0' and d.status = '0'
+          <choose>
+              <when test="businessCode == 'INV_TRANSFER'">
+                  and d.dept_type = 'STORE'
+              </when>
+              <when test="businessCode == 'INV_STOCK_CHECK'">
+                  and d.dept_type in ('STORE', 'WAREHOUSE')
+              </when>
+              <otherwise>
+                  and d.dept_type in ('GROUP', 'COMPANY', 'STORE', 'WAREHOUSE')
+              </otherwise>
+          </choose>
+          <choose>
+              <when test="scopeType == 'STORE'">
+                  and d.dept_id = #{scopeId}
+              </when>
+              <when test="scopeType == 'AREA'">
+                  and (d.dept_id = #{scopeId} or find_in_set(#{scopeId}, d.ancestors))
+              </when>
+          </choose>
+        order by d.dept_id
+    </select>
+
+    <select id="selectActiveDeptById" resultMap="DirectoryDeptResult">
+        select dept_id, dept_name, dept_type
+        from sys_dept
+        where dept_id = #{deptId} and del_flag = '0' and status = '0'
+    </select>
+
+    <select id="selectActivePostSortByCode" resultType="java.lang.Integer">
+        select min(post_sort) from sys_post
+        where post_code = #{postCode} and status = '0'
+    </select>
+
+    <select id="selectDirectStoreUsersByPostCode" resultMap="DirectoryUserResult">
+        select distinct u.user_id,
+               coalesce(nullif(trim(u.nick_name), ''), nullif(trim(u.user_name), ''), '姓名未配置') user_name,
+               u.dept_id, user_dept.dept_name, p.post_sort
+        from sys_user u
+        join sys_user_post up on up.user_id = u.user_id
+        join sys_post p on p.post_id = up.post_id
+        join sys_dept anchor on anchor.dept_id = #{anchorDeptId}
+        left join sys_dept user_dept on user_dept.dept_id = u.dept_id
+        left join sys_user_profile profile on profile.user_id = u.user_id
+        where <include refid="activeEmployee"/>
+          and p.status = '0' and p.post_code = #{postCode}
+          and anchor.del_flag = '0' and anchor.status = '0'
+          and anchor.dept_type = 'STORE'
+          and (u.dept_id = anchor.dept_id or exists (
+              select 1 from sys_user_shop direct_scope
+              where direct_scope.user_id = u.user_id
+                and direct_scope.dept_id = anchor.dept_id))
+          <include refid="permissionExists"/>
+        order by u.user_id
+    </select>
+
+    <select id="selectCoveredHigherPostUsers" resultMap="DirectoryUserResult">
+        select distinct u.user_id,
+               coalesce(nullif(trim(u.nick_name), ''), nullif(trim(u.user_name), ''), '姓名未配置') user_name,
+               u.dept_id, user_dept.dept_name, p.post_sort
+        from sys_user u
+        join sys_user_post up on up.user_id = u.user_id
+        join sys_post p on p.post_id = up.post_id
+        join sys_user_shop us on us.user_id = u.user_id
+        join sys_dept scope_dept on scope_dept.dept_id = us.dept_id
+        join sys_dept anchor on anchor.dept_id = #{anchorDeptId}
+        left join sys_dept user_dept on user_dept.dept_id = u.dept_id
+        left join sys_user_profile profile on profile.user_id = u.user_id
+        where <include refid="activeEmployee"/>
+          and p.status = '0'
+          and anchor.del_flag = '0' and anchor.status = '0'
+          and anchor.dept_type = 'STORE'
+          and scope_dept.del_flag = '0' and scope_dept.status = '0'
+          and (scope_dept.dept_id = anchor.dept_id
+               or find_in_set(scope_dept.dept_id, anchor.ancestors))
+          and p.post_sort &gt; #{executiveBoundarySort}
+          and p.post_sort &lt; #{managerPostSort}
+          and p.post_code not in
+          <foreach collection="excludedPostCodes" item="postCode" open="(" separator="," close=")">
+              #{postCode}
+          </foreach>
+          <include refid="permissionExists"/>
+        order by p.post_sort desc, u.user_id
+    </select>
+
+    <select id="selectCoveredUsersByPostCode" resultMap="DirectoryUserResult">
+        select distinct u.user_id,
+               coalesce(nullif(trim(u.nick_name), ''), nullif(trim(u.user_name), ''), '姓名未配置') user_name,
+               u.dept_id, user_dept.dept_name, p.post_sort
+        from sys_user u
+        join sys_user_post up on up.user_id = u.user_id
+        join sys_post p on p.post_id = up.post_id
+        join sys_user_shop us on us.user_id = u.user_id
+        join sys_dept scope_dept on scope_dept.dept_id = us.dept_id
+        join sys_dept anchor on anchor.dept_id = #{anchorDeptId}
+        left join sys_dept user_dept on user_dept.dept_id = u.dept_id
+        left join sys_user_profile profile on profile.user_id = u.user_id
+        where <include refid="activeEmployee"/>
+          and p.status = '0' and p.post_code = #{postCode}
+          and anchor.del_flag = '0' and anchor.status = '0'
+          and anchor.dept_type = 'STORE'
+          and scope_dept.del_flag = '0' and scope_dept.status = '0'
+          and (scope_dept.dept_id = anchor.dept_id
+               or find_in_set(scope_dept.dept_id, anchor.ancestors))
+          <include refid="permissionExists"/>
+        order by u.user_id
+    </select>
+
+    <select id="selectActivePostCodesByUserId" resultType="java.lang.String">
+        select p.post_code
+        from sys_user_post up
+        join sys_post p on p.post_id = up.post_id
+        where up.user_id = #{userId} and p.status = '0'
+        order by p.post_sort, p.post_id
+    </select>
+</mapper>

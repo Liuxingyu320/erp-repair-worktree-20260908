@@ -1,0 +1,255 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.inventory.mapper.InvCustomerServiceCardMapper">
+    <resultMap id="CardResult" type="com.erp.inventory.domain.vo.InvCustomerServiceCardVo">
+        <id property="customerId" column="customer_id"/>
+        <result property="customerName" column="customer_name"/>
+        <result property="customerCode" column="customer_code"/>
+        <result property="contactPerson" column="contact_person"/>
+        <result property="contactPhone" column="contact_phone"/>
+        <result property="shopDeptId" column="shop_dept_id"/>
+        <result property="shopDeptName" column="shop_dept_name"/>
+        <result property="status" column="status"/>
+        <result property="photoNodeId" column="photo_node_id"/>
+        <result property="teaPreferences" column="tea_preferences"/>
+        <result property="preferenceTags" column="preference_tags"/>
+        <result property="brewingServicePreferences" column="brewing_service_preferences"/>
+        <result property="cautions" column="cautions"/>
+        <result property="budgetMin" column="budget_min"/>
+        <result property="budgetMax" column="budget_max"/>
+        <result property="lastVisitDate" column="last_visit_date"/>
+        <result property="version" column="version"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateBy" column="update_by"/>
+        <result property="updateTime" column="update_time"/>
+    </resultMap>
+    <resultMap id="OptionResult" type="com.erp.inventory.domain.vo.InvCustomerOptionVo">
+        <id property="customerId" column="customer_id"/>
+        <result property="customerName" column="customer_name"/>
+        <result property="customerCode" column="customer_code"/>
+        <result property="contactPhone" column="contact_phone"/>
+        <result property="status" column="status"/>
+    </resultMap>
+    <resultMap id="RecordResult" type="com.erp.inventory.domain.InvCustomerServiceRecord">
+        <id property="recordId" column="record_id"/>
+        <result property="customerId" column="customer_id"/>
+        <result property="serviceDate" column="service_date"/>
+        <result property="serviceUserId" column="service_user_id"/>
+        <result property="serviceUserName" column="service_user_name"/>
+        <result property="partySize" column="party_size"/>
+        <result property="teaServed" column="tea_served"/>
+        <result property="preferenceSnapshot" column="preference_snapshot"/>
+        <result property="cautionSnapshot" column="caution_snapshot"/>
+        <result property="serviceNote" column="service_note"/>
+        <result property="consumptionAmount" column="consumption_amount"/>
+        <result property="shopDeptId" column="shop_dept_id"/>
+        <result property="requestKey" column="request_key"/>
+        <result property="sourceClient" column="source_client"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+    </resultMap>
+    <resultMap id="AuditResult" type="com.erp.inventory.domain.vo.InvCustomerServiceAuditVo">
+        <id property="logId" column="log_id"/>
+        <result property="customerId" column="customer_id"/>
+        <result property="customerName" column="customer_name"/>
+        <result property="changeType" column="change_type"/>
+        <result property="changedFields" column="changed_fields"/>
+        <result property="beforeSummary" column="before_summary"/>
+        <result property="afterSummary" column="after_summary"/>
+        <result property="operatorUserId" column="operator_user_id"/>
+        <result property="operatorName" column="operator_name"/>
+        <result property="sourceClient" column="source_client"/>
+        <result property="createTime" column="create_time"/>
+    </resultMap>
+
+    <sql id="cardColumns">
+        c.customer_id, c.customer_name, c.customer_code, c.contact_person,
+        c.contact_phone, c.shop_dept_id, sd.dept_name shop_dept_name, c.status,
+        p.photo_node_id, p.tea_preferences, p.preference_tags,
+        p.brewing_service_preferences, p.cautions, p.budget_min, p.budget_max,
+        p.last_visit_date, coalesce(p.version, 0) version,
+        c.create_by, c.create_time,
+        coalesce(p.update_by, c.update_by, c.create_by) update_by,
+        coalesce(p.update_time, c.update_time, c.create_time) update_time
+    </sql>
+    <sql id="cardFrom">
+        from inv_customer c
+        left join inv_customer_service_profile p on p.customer_id = c.customer_id
+        left join sys_dept sd on sd.dept_id = c.shop_dept_id
+    </sql>
+
+    <select id="selectOptions" resultMap="OptionResult">
+        select customer_id, customer_name, customer_code, contact_phone, status
+        from inv_customer
+        where shop_dept_id = #{shopDeptId} and status = '0'
+        <if test="keyword != null and keyword != ''">
+            and (customer_name like concat('%', #{keyword}, '%')
+              or contact_phone like concat('%', #{keyword}, '%')
+              or customer_code like concat('%', #{keyword}, '%'))
+        </if>
+        order by customer_name, customer_id desc
+        limit 200
+    </select>
+
+    <select id="selectCardList" resultMap="CardResult">
+        select <include refid="cardColumns"/> <include refid="cardFrom"/>
+        where c.shop_dept_id = #{shopDeptId}
+        <if test="status != null and status != ''">and c.status = #{status}</if>
+        <if test="keyword != null and keyword != ''">
+            and (c.customer_name like concat('%', #{keyword}, '%')
+              or c.contact_phone like concat('%', #{keyword}, '%')
+              or c.customer_code like concat('%', #{keyword}, '%')
+              or p.tea_preferences like concat('%', #{keyword}, '%')
+              or p.preference_tags like concat('%', #{keyword}, '%')
+              or p.brewing_service_preferences like concat('%', #{keyword}, '%')
+              or p.cautions like concat('%', #{keyword}, '%'))
+        </if>
+        <if test="preferenceTag != null and preferenceTag != ''">
+            and concat(',', coalesce(p.preference_tags, ''), ',')
+                like concat('%,', #{preferenceTag}, ',%')
+        </if>
+        order by coalesce(p.last_visit_date, c.create_time) desc, c.customer_id desc
+    </select>
+
+    <select id="selectCardById" resultMap="CardResult">
+        select <include refid="cardColumns"/> <include refid="cardFrom"/>
+        where c.customer_id = #{customerId}
+    </select>
+
+    <select id="selectAuditList" resultMap="AuditResult">
+        select l.log_id, l.customer_id, c.customer_name, l.change_type,
+               l.changed_fields, l.before_summary, l.after_summary,
+               l.operator_user_id, l.operator_name, l.source_client,
+               l.create_time
+        from inv_customer_service_change_log l
+        inner join inv_customer c on c.customer_id = l.customer_id
+        where l.shop_dept_id = #{shopDeptId}
+          and c.shop_dept_id = #{shopDeptId}
+        <if test="customerId != null">and l.customer_id = #{customerId}</if>
+        <if test="changeType != null and changeType != ''">and l.change_type = #{changeType}</if>
+        <if test="sourceClient != null and sourceClient != ''">and l.source_client = #{sourceClient}</if>
+        <if test="operatorName != null and operatorName != ''">
+            and l.operator_name like concat('%', #{operatorName}, '%')
+        </if>
+        <if test="params.beginTime != null and params.beginTime != ''">
+            and l.create_time &gt;= #{params.beginTime}
+        </if>
+        <if test="params.endTime != null and params.endTime != ''">
+            and l.create_time &lt;= #{params.endTime}
+        </if>
+        order by l.create_time desc, l.log_id desc
+    </select>
+
+    <select id="countProfile" resultType="int">
+        select count(1) from inv_customer_service_profile where customer_id = #{customerId}
+    </select>
+
+    <insert id="insertProfile" parameterType="com.erp.inventory.domain.InvCustomerServiceProfile">
+        insert into inv_customer_service_profile (
+            customer_id, photo_node_id, tea_preferences, preference_tags,
+            brewing_service_preferences, cautions, budget_min, budget_max,
+            last_visit_date, version, create_by, create_time
+        ) values (
+            #{customerId}, #{photoNodeId}, #{teaPreferences}, #{preferenceTags},
+            #{brewingServicePreferences}, #{cautions}, #{budgetMin}, #{budgetMax},
+            #{lastVisitDate}, 0, #{createBy}, sysdate()
+        )
+    </insert>
+
+    <update id="updateProfile" parameterType="com.erp.inventory.domain.InvCustomerServiceProfile">
+        update inv_customer_service_profile
+        set photo_node_id = #{photoNodeId}, tea_preferences = #{teaPreferences},
+            preference_tags = #{preferenceTags},
+            brewing_service_preferences = #{brewingServicePreferences},
+            cautions = #{cautions}, budget_min = #{budgetMin}, budget_max = #{budgetMax},
+            last_visit_date = #{lastVisitDate}, version = version + 1,
+            update_by = #{updateBy}, update_time = sysdate()
+        where customer_id = #{customerId} and version = #{version}
+    </update>
+
+    <update id="bumpProfileVersion">
+        update inv_customer_service_profile
+        set version = version + 1, update_by = #{updateBy}, update_time = sysdate()
+        where customer_id = #{customerId} and version = #{version}
+    </update>
+
+    <update id="updateCustomerCore">
+        update inv_customer
+        set customer_name = #{customerName}, customer_code = #{customerCode},
+            contact_person = #{contactPerson}, contact_phone = #{contactPhone},
+            update_by = #{updateBy}, update_time = sysdate()
+        where customer_id = #{customerId} and status = '0'
+    </update>
+
+    <update id="archiveCustomer">
+        update inv_customer set status = '1', update_by = #{updateBy}, update_time = sysdate()
+        where customer_id = #{customerId} and status != '1'
+    </update>
+
+    <insert id="insertRecord" parameterType="com.erp.inventory.domain.InvCustomerServiceRecord"
+            useGeneratedKeys="true" keyProperty="recordId">
+        insert into inv_customer_service_record (
+            customer_id, service_date, service_user_id, service_user_name,
+            party_size, tea_served, preference_snapshot, caution_snapshot,
+            service_note, consumption_amount, shop_dept_id, request_key,
+            source_client, create_by, create_time
+        ) values (
+            #{customerId}, #{serviceDate}, #{serviceUserId}, #{serviceUserName},
+            #{partySize}, #{teaServed}, #{preferenceSnapshot}, #{cautionSnapshot},
+            #{serviceNote}, #{consumptionAmount}, #{shopDeptId}, #{requestKey},
+            #{sourceClient}, #{createBy}, sysdate()
+        )
+    </insert>
+
+    <select id="selectRecordIdByRequestKey" resultType="long">
+        select record_id from inv_customer_service_record
+        where customer_id = #{customerId} and request_key = #{requestKey} limit 1
+    </select>
+
+    <select id="selectRecords" resultMap="RecordResult">
+        select record_id, customer_id, service_date, service_user_id, service_user_name,
+               party_size, tea_served, preference_snapshot, caution_snapshot,
+               service_note, consumption_amount, shop_dept_id, request_key,
+               source_client, create_by, create_time
+        from inv_customer_service_record where customer_id = #{customerId}
+        order by service_date desc, record_id desc limit 100
+    </select>
+
+    <update id="touchLastVisit">
+        update inv_customer_service_profile
+        set last_visit_date = case when last_visit_date is null or last_visit_date &lt; #{serviceDate}
+                                   then #{serviceDate} else last_visit_date end,
+            version = version + 1, update_by = #{updateBy}, update_time = sysdate()
+        where customer_id = #{customerId}
+          and exists (
+              select 1 from inv_customer c
+              where c.customer_id = #{customerId} and c.status = '0'
+          )
+    </update>
+
+    <select id="selectChangeLogIdByRequestKey" resultType="long">
+        select log_id from inv_customer_service_change_log
+        where customer_id = #{customerId} and request_key = #{requestKey} limit 1
+    </select>
+
+    <select id="selectCreatedCustomerIdByRequestKey" resultType="long">
+        select customer_id from inv_customer_service_change_log
+        where shop_dept_id = #{shopDeptId} and request_key = #{requestKey}
+          and change_type = 'CREATE'
+        order by log_id limit 1
+    </select>
+
+    <insert id="insertChangeLog" parameterType="com.erp.inventory.domain.InvCustomerServiceChangeLog"
+            useGeneratedKeys="true" keyProperty="logId">
+        insert into inv_customer_service_change_log (
+            customer_id, request_key, change_type, changed_fields,
+            before_summary, after_summary, operator_user_id, operator_name,
+            shop_dept_id, source_client, create_time
+        ) values (
+            #{customerId}, #{requestKey}, #{changeType}, #{changedFields},
+            #{beforeSummary}, #{afterSummary}, #{operatorUserId}, #{operatorName},
+            #{shopDeptId}, #{sourceClient}, sysdate()
+        )
+    </insert>
+</mapper>

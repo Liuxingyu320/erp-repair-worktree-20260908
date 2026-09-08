@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.inventory.mapper.InvTransferShipmentPlanningMapper">
+
+    <resultMap id="WarehouseModeResult"
+            type="com.erp.inventory.domain.transfer.InvWarehouseStockMode">
+        <id property="warehouseId" column="warehouse_id"/>
+        <result property="writeMode" column="write_mode"/>
+        <result property="readMode" column="read_mode"/>
+        <result property="reconcileStatus" column="reconcile_status"/>
+        <result property="lastReconcileTime" column="last_reconcile_time"/>
+        <result property="lastReconcileBatch" column="last_reconcile_batch"/>
+        <result property="approvedBy" column="approved_by"/>
+        <result property="approvedTime" column="approved_time"/>
+    </resultMap>
+
+    <resultMap id="FulfillmentPolicyResult"
+            type="com.erp.inventory.domain.transfer.InvItemFulfillmentPolicy">
+        <id property="policyId" column="policy_id"/>
+        <result property="itemType" column="item_type"/>
+        <result property="itemId" column="item_id"/>
+        <result property="allocationPolicy" column="allocation_policy"/>
+        <result property="trackingPolicy" column="tracking_policy"/>
+        <result property="status" column="status"/>
+        <result property="version" column="version"/>
+    </resultMap>
+
+    <resultMap id="AllocationCandidateResult"
+            type="com.erp.inventory.domain.transfer.InvShipmentAllocationCandidate">
+        <id property="balanceId" column="balance_id"/>
+        <result property="itemType" column="item_type"/>
+        <result property="itemId" column="item_id"/>
+        <result property="warehouseId" column="warehouse_id"/>
+        <result property="lotId" column="lot_id"/>
+        <result property="lotNo" column="lot_no"/>
+        <result property="expiryDate" column="expiry_date"/>
+        <result property="receivedAt" column="received_at"/>
+        <result property="locationId" column="location_id"/>
+        <result property="locationCode" column="location_code"/>
+        <result property="availableQuantity" column="available_quantity"/>
+        <result property="version" column="version"/>
+    </resultMap>
+
+    <resultMap id="SerialCandidateResult"
+            type="com.erp.inventory.domain.transfer.InvShipmentSerialCandidate">
+        <id property="serialId" column="serial_id"/>
+        <result property="balanceId" column="balance_id"/>
+        <result property="serialNo" column="serial_no"/>
+        <result property="serialStatus" column="serial_status"/>
+    </resultMap>
+
+    <select id="selectWarehouseMode" resultMap="WarehouseModeResult">
+        select warehouse_id, write_mode, read_mode, reconcile_status,
+               last_reconcile_time, last_reconcile_batch,
+               approved_by, approved_time
+        from inv_warehouse_stock_mode
+        where warehouse_id = #{warehouseId}
+    </select>
+
+    <select id="selectFulfillmentPolicies"
+            resultMap="FulfillmentPolicyResult">
+        select policy_id, item_type, item_id, allocation_policy,
+               tracking_policy, status, version
+        from inv_item_fulfillment_policy
+        where
+        <foreach collection="itemKeys" item="item" open="(" close=")"
+                 separator=" or ">
+            (item_type = #{item.itemType} and item_id = #{item.itemId})
+        </foreach>
+        order by item_type, item_id
+    </select>
+
+    <select id="selectEligibleBalances"
+            resultMap="AllocationCandidateResult">
+        select b.balance_id, b.item_type, b.item_id, b.warehouse_id,
+               b.lot_id, l.lot_no, l.expiry_date,
+               coalesce(b.last_in_time, b.create_time, l.create_time) received_at,
+               b.location_id, w.location_code,
+               b.available_quantity, b.version
+        from inv_stock_balance_detail b
+        inner join inv_inventory_lot l
+                on l.lot_id = b.lot_id
+               and l.warehouse_id = b.warehouse_id
+               and l.item_type = b.item_type
+               and l.item_id = b.item_id
+        inner join inv_warehouse_location w
+                on w.location_id = b.location_id
+               and w.warehouse_id = b.warehouse_id
+        where b.warehouse_id = #{warehouseId}
+          and b.available_quantity &gt; 0
+          and l.qc_status in ('passed', 'concession')
+          and l.lot_status = 'active'
+          and (l.expiry_date is null or l.expiry_date &gt;= current_date)
+          and w.status = '0'
+          and w.is_virtual = '0'
+          and w.location_type not in ('receiving', 'quarantine', 'virtual')
+          and
+          <foreach collection="itemKeys" item="item" open="(" close=")"
+                   separator=" or ">
+              (b.item_type = #{item.itemType} and b.item_id = #{item.itemId})
+          </foreach>
+        order by b.item_type, b.item_id, l.expiry_date,
+                 received_at, b.balance_id
+    </select>
+
+    <select id="selectAvailableSerials" resultMap="SerialCandidateResult">
+        select serial_id, balance_id, serial_no, serial_status
+        from inv_inventory_serial
+        where serial_status = 'available'
+          and balance_id in
+          <foreach collection="balanceIds" item="balanceId"
+                   open="(" close=")" separator=",">
+              #{balanceId}
+          </foreach>
+        order by balance_id, serial_id
+    </select>
+
+</mapper>

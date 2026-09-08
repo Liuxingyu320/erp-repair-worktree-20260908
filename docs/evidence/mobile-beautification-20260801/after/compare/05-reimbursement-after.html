@@ -1,0 +1,25 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"/><meta name="viewport" content="width=390,initial-scale=1,viewport-fit=cover"/><title>05-reimbursement</title><style>
+:root{--page:#f4f5f2;--surface:#fff;--ink:#17211d;--muted:#66736d;--line:#dde2de;--primary:#0b6b53;--primary-soft:#e7f2ed;--danger:#c4322b;--danger-soft:#fff0ee;--warn:#a76505;--warn-soft:#fff3dc;--info:#2866b1;--info-soft:#edf4fd;--success:#147a50;--success-soft:#e8f4ed}
+*{box-sizing:border-box}body{margin:0;font-family:Inter,PingFang SC,Microsoft YaHei,sans-serif;background:var(--page);color:var(--ink)}
+.phone{width:390px;min-height:844px;margin:0 auto;background:var(--page);border:1px solid var(--line);position:relative;overflow:hidden}
+.topbar{min-height:56px;padding:12px 16px;border-bottom:1px solid var(--line);background:var(--surface);display:flex;justify-content:space-between;align-items:center}
+.topbar h1{margin:0;font-size:20px;font-weight:700}.content{padding:16px 16px 100px}.panel{border:1px solid var(--line);border-radius:16px;background:var(--surface);padding:14px;margin-bottom:12px}
+.state{min-height:160px;display:grid;place-items:center;align-content:center;gap:8px;text-align:center;padding:24px;border:1px solid var(--line);border-radius:16px;background:var(--surface)}
+.state.err{background:var(--danger-soft);border-color:rgba(196,50,43,.22);color:var(--danger)}
+.state.warn{background:var(--warn-soft);border-color:rgba(167,101,5,.22);color:var(--warn)}
+.state.info{background:var(--info-soft);border-color:rgba(40,102,177,.16);color:var(--info)}
+.btn{display:flex;align-items:center;justify-content:center;min-height:48px;border-radius:12px;background:var(--primary);color:#fff;font-weight:700;margin-top:10px}
+.btn.sec{background:var(--primary-soft);color:var(--primary);border:1px solid rgba(11,107,83,.28)}
+.btn.ghost{background:var(--surface);color:var(--muted);border:1px solid var(--line)}
+.chip{display:inline-flex;padding:2px 8px;border-radius:8px;font-size:12px;font-weight:600;margin-right:4px}
+.chip.p{background:var(--primary-soft);color:var(--primary)}.chip.w{background:var(--warn-soft);color:var(--warn)}.chip.d{background:var(--danger-soft);color:var(--danger)}.chip.s{background:var(--success-soft);color:var(--success)}.chip.i{background:var(--info-soft);color:var(--info)}
+.row{display:flex;justify-content:space-between;gap:8px;padding:12px 0;border-top:1px solid var(--line)}.row:first-child{border-top:0}
+.muted{color:var(--muted);font-size:13px;line-height:1.5}.field{margin:10px 0}.field label{display:block;font-size:13px;color:var(--muted);margin-bottom:6px}
+.field input{width:100%;min-height:48px;border:1px solid #cbd3ce;border-radius:12px;padding:0 12px;font-size:16px}
+.bottom{position:absolute;left:0;right:0;bottom:0;padding:12px 16px;border-top:1px solid var(--line);background:var(--surface);display:grid;grid-template-columns:1fr 1.3fr;gap:8px}
+.nav{position:absolute;left:0;right:0;bottom:0;min-height:68px;border-top:1px solid var(--line);background:var(--surface);display:grid;grid-template-columns:repeat(4,1fr)}
+.nav span{display:grid;place-items:center;font-size:12px;color:var(--muted)}.nav .on{color:var(--primary);font-weight:700}
+.tag{position:absolute;top:8px;right:8px;font-size:11px;padding:3px 8px;border-radius:999px;background:var(--primary-soft);color:var(--primary);z-index:2}
+.gridwrap{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px;padding:16px;background:#e8ebe6}
+h2{margin:0 0 8px;font-size:15px}.cap{font-size:12px;color:var(--muted);margin-bottom:8px}
+</style></head><body style="margin:0;background:#cfd4cf"><div class="phone"><div class="tag">after</div><header class="topbar"><h1>费用报销</h1><span class="muted">⋯</span></header><main class="content"><div class="panel"><span class="chip i">识别中</span><span class="chip s">识别成功</span></div></main><footer class="bottom"><div class="btn sec">保存草稿</div><div class="btn">提交报销</div></footer></div></body></html>

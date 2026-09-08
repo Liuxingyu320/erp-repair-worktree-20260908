@@ -1,0 +1,614 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.inventory.mapper.InvTransferReceiptDiscrepancyReturnReservationLifecycleMapper">
+
+    <resultMap id="LifecycleFactResult"
+            type="com.erp.inventory.domain.transfer.InvTransferReceiptDiscrepancyReturnReservationLifecycleFact">
+        <id property="reservationId"
+                column="quarantine_reservation_id"/>
+        <result property="reservationRequestId" column="request_id"/>
+        <result property="actionId" column="adjudication_action_id"/>
+        <result property="childTransferId" column="child_transfer_id"/>
+        <result property="childTransferDetailId"
+                column="child_transfer_detail_id"/>
+        <result property="reservationRound" column="reservation_round"/>
+        <result property="receiptAllocationId"
+                column="receipt_allocation_id"/>
+        <result property="shipmentAllocationId"
+                column="shipment_allocation_id"/>
+        <result property="stockId" column="stock_id"/>
+        <result property="balanceId" column="quarantine_balance_id"/>
+        <result property="lotId" column="quarantine_lot_id"/>
+        <result property="locationId" column="quarantine_location_id"/>
+        <result property="itemType" column="item_type"/>
+        <result property="itemId" column="item_id"/>
+        <result property="productId" column="product_id"/>
+        <result property="trackingPolicy" column="tracking_policy"/>
+        <result property="reservedQuantity" column="reserved_quantity"/>
+        <result property="consumedQuantity" column="consumed_quantity"/>
+        <result property="releasedQuantity" column="released_quantity"/>
+        <result property="sourceCostPrice" column="source_cost_price"/>
+        <result property="reservedAmount" column="reserved_amount"/>
+        <result property="decisionFingerprint"
+                column="decision_fingerprint"/>
+        <result property="status" column="reservation_status"/>
+        <result property="version" column="reservation_version"/>
+        <result property="childStatus" column="child_status"/>
+        <result property="approvalRound" column="approval_round"/>
+        <result property="sourceWarehouseId" column="source_warehouse_id"/>
+        <result property="sourceBusinessType"
+                column="source_business_type"/>
+        <result property="sourceBusinessId" column="source_business_id"/>
+        <result property="requestedQuantity" column="requested_quantity"/>
+        <result property="deliveredQuantity" column="delivered_quantity"/>
+        <result property="workflowId" column="workflow_id"/>
+        <result property="workflowType" column="workflow_type"/>
+        <result property="inventorySource" column="inventory_source"/>
+        <result property="workflowFingerprint"
+                column="workflow_fingerprint"/>
+    </resultMap>
+
+    <resultMap id="StockResult"
+            type="com.erp.inventory.domain.transfer.InvTransferReceiptTargetStock">
+        <id property="stockId" column="stock_id"/>
+        <result property="itemType" column="item_type"/>
+        <result property="itemId" column="item_id"/>
+        <result property="productId" column="product_id"/>
+        <result property="shopDeptId" column="shop_dept_id"/>
+        <result property="warehouseId" column="warehouse_id"/>
+        <result property="currentQuantity" column="current_quantity"/>
+        <result property="lockedQuantity" column="locked_quantity"/>
+        <result property="availableQuantity" column="available_quantity"/>
+        <result property="quarantineQuantity"
+                column="quarantine_quantity"/>
+        <result property="costPrice" column="cost_price"/>
+        <result property="totalCost" column="total_cost"/>
+        <result property="version" column="version"/>
+    </resultMap>
+
+    <resultMap id="BalanceResult"
+            type="com.erp.inventory.domain.transfer.InvTransferReceiptTargetBalance">
+        <id property="balanceId" column="balance_id"/>
+        <result property="itemType" column="item_type"/>
+        <result property="itemId" column="item_id"/>
+        <result property="productId" column="product_id"/>
+        <result property="warehouseId" column="warehouse_id"/>
+        <result property="lotId" column="lot_id"/>
+        <result property="locationId" column="location_id"/>
+        <result property="currentQuantity" column="current_quantity"/>
+        <result property="lockedQuantity" column="locked_quantity"/>
+        <result property="availableQuantity" column="available_quantity"/>
+        <result property="quarantineQuantity"
+                column="quarantine_quantity"/>
+        <result property="costPrice" column="cost_price"/>
+        <result property="totalCost" column="total_cost"/>
+        <result property="version" column="version"/>
+    </resultMap>
+
+    <resultMap id="SerialResult"
+            type="com.erp.inventory.domain.transfer.InvTransferReceiptDiscrepancyReturnReservationSerialLifecycleFact">
+        <id property="bindingId"
+                column="quarantine_reservation_serial_id"/>
+        <result property="reservationId"
+                column="quarantine_reservation_id"/>
+        <result property="receiptSerialId" column="receipt_serial_id"/>
+        <result property="serialId" column="serial_id"/>
+        <result property="serialNoSnapshot" column="serial_no_snapshot"/>
+        <result property="warehouseId" column="warehouse_id"/>
+        <result property="balanceId" column="balance_id"/>
+        <result property="lotId" column="lot_id"/>
+        <result property="locationId" column="location_id"/>
+        <result property="lifecycleStatus" column="lifecycle_status"/>
+        <result property="version" column="binding_version"/>
+        <result property="currentSerialNo" column="current_serial_no"/>
+        <result property="currentSerialStatus"
+                column="current_serial_status"/>
+        <result property="currentWarehouseId"
+                column="current_warehouse_id"/>
+        <result property="currentBalanceId" column="current_balance_id"/>
+        <result property="currentLotId" column="current_lot_id"/>
+        <result property="currentLocationId"
+                column="current_location_id"/>
+    </resultMap>
+
+    <select id="selectReservationForUpdate"
+            resultMap="LifecycleFactResult">
+        select reservation.quarantine_reservation_id,
+               reservation.request_id,
+               reservation.adjudication_action_id,
+               reservation.child_transfer_id,
+               reservation.child_transfer_detail_id,
+               reservation.reservation_round,
+               reservation.receipt_allocation_id,
+               reservation.shipment_allocation_id,
+               reservation.stock_id,
+               reservation.quarantine_balance_id,
+               reservation.quarantine_lot_id,
+               reservation.quarantine_location_id,
+               reservation.item_type, reservation.item_id,
+               reservation.product_id, reservation.tracking_policy,
+               reservation.reserved_quantity,
+               reservation.consumed_quantity,
+               reservation.released_quantity,
+               reservation.source_cost_price,
+               reservation.reserved_amount,
+               reservation.decision_fingerprint,
+               reservation.status as reservation_status,
+               reservation.version as reservation_version,
+               child.status as child_status, child.approval_round,
+               coalesce(nullif(child.from_warehouse_id, 0),
+                        child.from_dept_id) as source_warehouse_id,
+               child.source_business_type, child.source_business_id,
+               detail.quantity as requested_quantity,
+               detail.delivered_quantity,
+               workflow.workflow_id, workflow.workflow_type,
+               workflow.inventory_source,
+               workflow.workflow_fingerprint
+        from inv_transfer_quarantine_reservation reservation
+        inner join inv_transfer_order child
+                on child.transfer_id = reservation.child_transfer_id
+               and child.transfer_id = #{childTransferId}
+               and child.approval_round = reservation.reservation_round
+        inner join inv_transfer_detail detail
+                on detail.detail_id =
+                    reservation.child_transfer_detail_id
+               and detail.transfer_id = child.transfer_id
+        inner join
+            inv_transfer_receipt_discrepancy_adjudication_workflow_link
+                workflow
+                on workflow.adjudication_action_id =
+                    reservation.adjudication_action_id
+               and workflow.child_transfer_id = child.transfer_id
+               and workflow.source_business_type =
+                    child.source_business_type
+               and workflow.source_business_id = child.source_business_id
+        where reservation.child_transfer_id = #{childTransferId}
+          and child.source_business_type =
+              'transfer_discrepancy_return'
+          and child.source_business_id =
+              reservation.adjudication_action_id
+          and workflow.workflow_type = 'return'
+          and workflow.inventory_source = 'quarantine_detail'
+          and workflow.quarantine_balance_id =
+              reservation.quarantine_balance_id
+          and workflow.quarantine_lot_id =
+              reservation.quarantine_lot_id
+          and workflow.quarantine_location_id =
+              reservation.quarantine_location_id
+          and (select count(1)
+               from inv_transfer_detail all_detail
+               where all_detail.transfer_id = child.transfer_id) = 1
+        for update
+    </select>
+
+    <select id="selectStockForUpdate" resultMap="StockResult">
+        select stock_id, item_type, item_id, product_id, shop_dept_id,
+               warehouse_id, current_quantity, locked_quantity,
+               available_quantity, quarantine_quantity, cost_price,
+               total_cost, version
+        from inv_stock
+        where stock_id = #{fact.stockId}
+          and item_type = #{fact.itemType}
+          and item_id = #{fact.itemId}
+        for update
+    </select>
+
+    <select id="selectBalanceForUpdate" resultMap="BalanceResult">
+        select balance_id, item_type, item_id, product_id, warehouse_id,
+               lot_id, location_id, current_quantity, locked_quantity,
+               available_quantity, quarantine_quantity, cost_price,
+               total_cost, version
+        from inv_stock_balance_detail
+        where balance_id = #{fact.balanceId}
+          and item_type = #{fact.itemType}
+          and item_id = #{fact.itemId}
+          and lot_id = #{fact.lotId}
+          and location_id = #{fact.locationId}
+        for update
+    </select>
+
+    <select id="selectSerialsForUpdate" resultMap="SerialResult">
+        select binding.quarantine_reservation_serial_id,
+               binding.quarantine_reservation_id,
+               binding.receipt_serial_id, binding.serial_id,
+               binding.serial_no_snapshot, binding.warehouse_id,
+               binding.balance_id, binding.lot_id, binding.location_id,
+               binding.lifecycle_status,
+               binding.version as binding_version,
+               serial.serial_no as current_serial_no,
+               serial.serial_status as current_serial_status,
+               serial.warehouse_id as current_warehouse_id,
+               serial.balance_id as current_balance_id,
+               serial.lot_id as current_lot_id,
+               serial.location_id as current_location_id
+        from inv_transfer_quarantine_reservation_serial binding
+        inner join inv_inventory_serial serial
+                on serial.serial_id = binding.serial_id
+               and serial.serial_no = binding.serial_no_snapshot
+        where binding.quarantine_reservation_id = #{fact.reservationId}
+          and binding.lifecycle_status = 'ACTIVE'
+        order by binding.receipt_serial_id, binding.serial_id
+        for update
+    </select>
+
+    <update id="consumeStock">
+        update inv_stock
+        set current_quantity = #{prepared.stock.currentAfter},
+            locked_quantity = #{prepared.stock.lockedAfter},
+            total_cost = #{prepared.stock.totalCostAfter},
+            version = #{prepared.stock.versionAfter},
+            update_by = #{prepared.command.operator},
+            update_time = sysdate()
+        where stock_id = #{prepared.fact.stockId}
+          and item_type = #{prepared.fact.itemType}
+          and item_id = #{prepared.fact.itemId}
+          and product_id &lt;=&gt; #{prepared.fact.productId}
+          and version = #{prepared.stock.versionBefore}
+          and current_quantity = #{prepared.stock.currentBefore}
+          and available_quantity = #{prepared.stock.availableBefore}
+          and locked_quantity = #{prepared.stock.lockedBefore}
+          and quarantine_quantity = #{prepared.stock.quarantineBefore}
+          and total_cost = #{prepared.stock.totalCostBefore}
+          and current_quantity = available_quantity + locked_quantity
+              + quarantine_quantity
+          and #{prepared.stock.currentAfter} = current_quantity
+              - #{prepared.quantity}
+          and #{prepared.stock.availableAfter} = available_quantity
+          and #{prepared.stock.lockedAfter} = locked_quantity
+              - #{prepared.quantity}
+          and #{prepared.stock.quarantineAfter} = quarantine_quantity
+          and #{prepared.stock.totalCostAfter} = total_cost
+              - #{prepared.amount}
+          and #{prepared.stock.versionAfter} = version + 1
+          and current_quantity &gt;= #{prepared.quantity}
+          and locked_quantity &gt;= #{prepared.quantity}
+          and total_cost &gt;= #{prepared.amount}
+    </update>
+
+    <update id="consumeBalance">
+        update inv_stock_balance_detail
+        set current_quantity = #{prepared.balance.currentAfter},
+            locked_quantity = #{prepared.balance.lockedAfter},
+            total_cost = #{prepared.balance.totalCostAfter},
+            version = #{prepared.balance.versionAfter},
+            update_by = #{prepared.command.operator},
+            update_time = sysdate()
+        where balance_id = #{prepared.fact.balanceId}
+          and item_type = #{prepared.fact.itemType}
+          and item_id = #{prepared.fact.itemId}
+          and product_id &lt;=&gt; #{prepared.fact.productId}
+          and lot_id = #{prepared.fact.lotId}
+          and location_id = #{prepared.fact.locationId}
+          and version = #{prepared.balance.versionBefore}
+          and current_quantity = #{prepared.balance.currentBefore}
+          and available_quantity = #{prepared.balance.availableBefore}
+          and available_quantity = 0
+          and locked_quantity = #{prepared.balance.lockedBefore}
+          and quarantine_quantity =
+              #{prepared.balance.quarantineBefore}
+          and cost_price = #{prepared.fact.sourceCostPrice}
+          and total_cost = #{prepared.balance.totalCostBefore}
+          and current_quantity = available_quantity + locked_quantity
+              + quarantine_quantity
+          and #{prepared.balance.currentAfter} = current_quantity
+              - #{prepared.quantity}
+          and #{prepared.balance.availableAfter} = available_quantity
+          and #{prepared.balance.lockedAfter} = locked_quantity
+              - #{prepared.quantity}
+          and #{prepared.balance.quarantineAfter} = quarantine_quantity
+          and #{prepared.balance.totalCostAfter} = total_cost
+              - #{prepared.amount}
+          and #{prepared.balance.versionAfter} = version + 1
+          and current_quantity &gt;= #{prepared.quantity}
+          and locked_quantity &gt;= #{prepared.quantity}
+          and total_cost &gt;= #{prepared.amount}
+    </update>
+
+    <update id="consumePhysicalSerial">
+        update inv_inventory_serial
+        set serial_status = #{serial.physicalAfter},
+            update_by = #{prepared.command.operator},
+            update_time = sysdate(),
+            remark = concat('adjudication return shipment=',
+                    #{prepared.shipmentId})
+        where serial_id = #{serial.serialId}
+          and serial_no = #{serial.serialNo}
+          and item_type = #{prepared.fact.itemType}
+          and item_id = #{prepared.fact.itemId}
+          and warehouse_id = #{prepared.fact.sourceWarehouseId}
+          and balance_id = #{prepared.fact.balanceId}
+          and lot_id = #{prepared.fact.lotId}
+          and location_id = #{prepared.fact.locationId}
+          and serial_status = #{serial.physicalBefore}
+          and #{serial.physicalAfter} = 'shipped'
+    </update>
+
+    <insert id="insertConsumption" useGeneratedKeys="true"
+            keyProperty="generatedId.value">
+        insert into inv_transfer_quarantine_reservation_consumption (
+            request_id, quarantine_reservation_id,
+            adjudication_action_id, child_transfer_id,
+            child_transfer_detail_id, shipment_id, shipment_detail_id,
+            consumed_quantity, consumed_amount,
+            stock_version_before, stock_version_after,
+            balance_version_before, balance_version_after,
+            operator_name, create_by, create_time
+        )
+        select #{prepared.command.requestId},
+               reservation.quarantine_reservation_id,
+               reservation.adjudication_action_id,
+               reservation.child_transfer_id,
+               reservation.child_transfer_detail_id,
+               shipment.shipment_id, shipment_detail.shipment_detail_id,
+               #{prepared.quantity}, #{prepared.amount},
+               #{prepared.stock.versionBefore},
+               #{prepared.stock.versionAfter},
+               #{prepared.balance.versionBefore},
+               #{prepared.balance.versionAfter},
+               #{prepared.command.operator},
+               #{prepared.command.operator},
+               #{prepared.command.occurredAt}
+        from inv_transfer_quarantine_reservation reservation
+        inner join inv_transfer_shipment shipment
+                on shipment.shipment_id = #{prepared.shipmentId}
+               and shipment.transfer_id = reservation.child_transfer_id
+               and shipment.inventory_write_version = 'V2_DETAIL'
+        inner join inv_transfer_shipment_detail shipment_detail
+                on shipment_detail.shipment_detail_id =
+                    #{prepared.shipmentDetailId}
+               and shipment_detail.shipment_id = shipment.shipment_id
+               and shipment_detail.transfer_id = shipment.transfer_id
+               and shipment_detail.transfer_detail_id =
+                    reservation.child_transfer_detail_id
+        where reservation.quarantine_reservation_id =
+              #{prepared.fact.reservationId}
+          and reservation.version = #{prepared.versionBefore}
+          and reservation.status = #{prepared.statusBefore}
+          and shipment_detail.shipped_quantity = #{prepared.quantity}
+          and shipment_detail.cost_price =
+              #{prepared.fact.sourceCostPrice}
+          and not exists (
+              select 1
+              from inv_transfer_quarantine_reservation_consumption prior
+              where prior.request_id = #{prepared.command.requestId}
+                 or (prior.quarantine_reservation_id =
+                         reservation.quarantine_reservation_id
+                     and prior.shipment_detail_id =
+                         shipment_detail.shipment_detail_id)
+          )
+    </insert>
+
+    <update id="consumeSerialBinding">
+        update inv_transfer_quarantine_reservation_serial
+        set lifecycle_status = #{serial.lifecycleAfter},
+            consumption_id = #{consumptionId},
+            consumed_shipment_id = #{prepared.shipmentId},
+            version = #{serial.versionAfter},
+            update_by = #{prepared.command.operator},
+            update_time = sysdate()
+        where quarantine_reservation_serial_id = #{serial.bindingId}
+          and quarantine_reservation_id = #{prepared.fact.reservationId}
+          and receipt_serial_id = #{serial.receiptSerialId}
+          and serial_id = #{serial.serialId}
+          and lifecycle_status = #{serial.lifecycleBefore}
+          and version = #{serial.versionBefore}
+          and #{serial.lifecycleAfter} = 'CONSUMED'
+          and exists (
+              select 1
+              from inv_transfer_quarantine_reservation_consumption event
+              where event.consumption_id = #{consumptionId}
+                and event.request_id = #{prepared.command.requestId}
+                and event.quarantine_reservation_id =
+                    #{prepared.fact.reservationId}
+                and event.shipment_id = #{prepared.shipmentId}
+          )
+    </update>
+
+    <update id="updateConsumedReservation">
+        update inv_transfer_quarantine_reservation
+        set consumed_quantity = #{prepared.consumedAfter},
+            status = #{prepared.statusAfter},
+            version = #{prepared.versionAfter},
+            update_by = #{prepared.command.operator},
+            update_time = sysdate()
+        where quarantine_reservation_id = #{prepared.fact.reservationId}
+          and child_transfer_id = #{prepared.fact.childTransferId}
+          and child_transfer_detail_id =
+              #{prepared.fact.childTransferDetailId}
+          and reservation_round = #{prepared.fact.reservationRound}
+          and consumed_quantity = #{prepared.consumedBefore}
+          and released_quantity = #{prepared.releasedQuantity}
+          and reserved_quantity = #{prepared.reservedQuantity}
+          and status = #{prepared.statusBefore}
+          and version = #{prepared.versionBefore}
+          and #{prepared.consumedAfter} = consumed_quantity
+              + #{prepared.quantity}
+          and #{prepared.remainingAfter} = reserved_quantity
+              - #{prepared.consumedAfter} - released_quantity
+          and #{prepared.versionAfter} = version + 1
+          and exists (
+              select 1
+              from inv_transfer_quarantine_reservation_consumption event
+              where event.request_id = #{prepared.command.requestId}
+                and event.quarantine_reservation_id =
+                    #{prepared.fact.reservationId}
+          )
+    </update>
+
+    <update id="releaseStock">
+        update inv_stock
+        set locked_quantity = #{prepared.stock.lockedAfter},
+            quarantine_quantity = #{prepared.stock.quarantineAfter},
+            version = #{prepared.stock.versionAfter},
+            update_by = #{prepared.command.operator},
+            update_time = sysdate()
+        where stock_id = #{prepared.fact.stockId}
+          and item_type = #{prepared.fact.itemType}
+          and item_id = #{prepared.fact.itemId}
+          and product_id &lt;=&gt; #{prepared.fact.productId}
+          and version = #{prepared.stock.versionBefore}
+          and current_quantity = #{prepared.stock.currentBefore}
+          and available_quantity = #{prepared.stock.availableBefore}
+          and locked_quantity = #{prepared.stock.lockedBefore}
+          and quarantine_quantity = #{prepared.stock.quarantineBefore}
+          and total_cost = #{prepared.stock.totalCostBefore}
+          and current_quantity = available_quantity + locked_quantity
+              + quarantine_quantity
+          and #{prepared.stock.currentAfter} = current_quantity
+          and #{prepared.stock.availableAfter} = available_quantity
+          and #{prepared.stock.lockedAfter} = locked_quantity
+              - #{prepared.quantity}
+          and #{prepared.stock.quarantineAfter} = quarantine_quantity
+              + #{prepared.quantity}
+          and #{prepared.stock.totalCostAfter} = total_cost
+          and #{prepared.stock.versionAfter} = version + 1
+          and locked_quantity &gt;= #{prepared.quantity}
+    </update>
+
+    <update id="releaseBalance">
+        update inv_stock_balance_detail
+        set locked_quantity = #{prepared.balance.lockedAfter},
+            quarantine_quantity = #{prepared.balance.quarantineAfter},
+            version = #{prepared.balance.versionAfter},
+            update_by = #{prepared.command.operator},
+            update_time = sysdate()
+        where balance_id = #{prepared.fact.balanceId}
+          and item_type = #{prepared.fact.itemType}
+          and item_id = #{prepared.fact.itemId}
+          and product_id &lt;=&gt; #{prepared.fact.productId}
+          and lot_id = #{prepared.fact.lotId}
+          and location_id = #{prepared.fact.locationId}
+          and version = #{prepared.balance.versionBefore}
+          and current_quantity = #{prepared.balance.currentBefore}
+          and available_quantity = #{prepared.balance.availableBefore}
+          and available_quantity = 0
+          and locked_quantity = #{prepared.balance.lockedBefore}
+          and quarantine_quantity =
+              #{prepared.balance.quarantineBefore}
+          and cost_price = #{prepared.fact.sourceCostPrice}
+          and total_cost = #{prepared.balance.totalCostBefore}
+          and current_quantity = available_quantity + locked_quantity
+              + quarantine_quantity
+          and #{prepared.balance.currentAfter} = current_quantity
+          and #{prepared.balance.availableAfter} = available_quantity
+          and #{prepared.balance.lockedAfter} = locked_quantity
+              - #{prepared.quantity}
+          and #{prepared.balance.quarantineAfter} = quarantine_quantity
+              + #{prepared.quantity}
+          and #{prepared.balance.totalCostAfter} = total_cost
+          and #{prepared.balance.versionAfter} = version + 1
+          and locked_quantity &gt;= #{prepared.quantity}
+    </update>
+
+    <update id="releasePhysicalSerial">
+        update inv_inventory_serial
+        set serial_status = #{serial.physicalAfter},
+            update_by = #{prepared.command.operator},
+            update_time = sysdate(),
+            remark = concat('adjudication return release=',
+                    #{prepared.command.requestId})
+        where serial_id = #{serial.serialId}
+          and serial_no = #{serial.serialNo}
+          and item_type = #{prepared.fact.itemType}
+          and item_id = #{prepared.fact.itemId}
+          and warehouse_id = #{prepared.fact.sourceWarehouseId}
+          and balance_id = #{prepared.fact.balanceId}
+          and lot_id = #{prepared.fact.lotId}
+          and location_id = #{prepared.fact.locationId}
+          and serial_status = #{serial.physicalBefore}
+          and #{serial.physicalAfter} = 'quarantine'
+    </update>
+
+    <insert id="insertRelease" useGeneratedKeys="true"
+            keyProperty="generatedId.value">
+        insert into inv_transfer_quarantine_reservation_release (
+            request_id, quarantine_reservation_id,
+            adjudication_action_id, child_transfer_id,
+            child_transfer_detail_id, reason_code, reason_reference,
+            released_quantity, stock_version_before,
+            stock_version_after, balance_version_before,
+            balance_version_after, operator_name, create_by, create_time
+        )
+        select #{prepared.command.requestId},
+               reservation.quarantine_reservation_id,
+               reservation.adjudication_action_id,
+               reservation.child_transfer_id,
+               reservation.child_transfer_detail_id,
+               #{prepared.reasonCode}, #{prepared.reasonReference},
+               #{prepared.quantity}, #{prepared.stock.versionBefore},
+               #{prepared.stock.versionAfter},
+               #{prepared.balance.versionBefore},
+               #{prepared.balance.versionAfter},
+               #{prepared.command.operator},
+               #{prepared.command.operator},
+               #{prepared.command.occurredAt}
+        from inv_transfer_quarantine_reservation reservation
+        where reservation.quarantine_reservation_id =
+              #{prepared.fact.reservationId}
+          and reservation.version = #{prepared.versionBefore}
+          and reservation.status = #{prepared.statusBefore}
+          and not exists (
+              select 1
+              from inv_transfer_quarantine_reservation_release prior
+              where prior.request_id = #{prepared.command.requestId}
+                 or prior.quarantine_reservation_id =
+                    reservation.quarantine_reservation_id
+          )
+    </insert>
+
+    <update id="releaseSerialBinding">
+        update inv_transfer_quarantine_reservation_serial
+        set lifecycle_status = #{serial.lifecycleAfter},
+            release_id = #{releaseId},
+            version = #{serial.versionAfter},
+            update_by = #{prepared.command.operator},
+            update_time = sysdate()
+        where quarantine_reservation_serial_id = #{serial.bindingId}
+          and quarantine_reservation_id = #{prepared.fact.reservationId}
+          and receipt_serial_id = #{serial.receiptSerialId}
+          and serial_id = #{serial.serialId}
+          and lifecycle_status = #{serial.lifecycleBefore}
+          and version = #{serial.versionBefore}
+          and #{serial.lifecycleAfter} = 'RELEASED'
+          and exists (
+              select 1
+              from inv_transfer_quarantine_reservation_release event
+              where event.release_id = #{releaseId}
+                and event.request_id = #{prepared.command.requestId}
+                and event.quarantine_reservation_id =
+                    #{prepared.fact.reservationId}
+          )
+    </update>
+
+    <update id="updateReleasedReservation">
+        update inv_transfer_quarantine_reservation
+        set released_quantity = #{prepared.releasedAfter},
+            status = #{prepared.statusAfter},
+            version = #{prepared.versionAfter},
+            update_by = #{prepared.command.operator},
+            update_time = sysdate()
+        where quarantine_reservation_id = #{prepared.fact.reservationId}
+          and child_transfer_id = #{prepared.fact.childTransferId}
+          and child_transfer_detail_id =
+              #{prepared.fact.childTransferDetailId}
+          and reservation_round = #{prepared.fact.reservationRound}
+          and consumed_quantity = #{prepared.consumedQuantity}
+          and released_quantity = #{prepared.releasedBefore}
+          and reserved_quantity = #{prepared.reservedQuantity}
+          and status = #{prepared.statusBefore}
+          and version = #{prepared.versionBefore}
+          and #{prepared.releasedAfter} = released_quantity
+              + #{prepared.quantity}
+          and reserved_quantity = consumed_quantity
+              + #{prepared.releasedAfter}
+          and #{prepared.versionAfter} = version + 1
+          and exists (
+              select 1
+              from inv_transfer_quarantine_reservation_release event
+              where event.request_id = #{prepared.command.requestId}
+                and event.quarantine_reservation_id =
+                    #{prepared.fact.reservationId}
+          )
+    </update>
+
+</mapper>

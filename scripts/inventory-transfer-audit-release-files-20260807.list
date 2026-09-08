@@ -1,0 +1,24 @@
+# 调拨审计身份快照功能的精确源码与发布治理边界；不使用 glob。
+# The manifest is structurally verified; its self-hash is excluded because it
+# cannot contain a hash of its own bytes. All other entries have SHA-256/status
+# records in the manifest and are checked fail-closed by the verifier.
+docker/mysql/bootstrap-files.list
+docker/mysql/db/erp_inventory_transfer_audit_identity_20260807.sql
+docker/mysql/releases/inventory-transfer-audit-20260807/erp_inventory_transfer_audit_identity_20260807.sql
+erp-modules/erp-inventory/src/main/java/com/erp/inventory/domain/InvTransferOrder.java
+erp-modules/erp-inventory/src/main/java/com/erp/inventory/service/impl/InvTransferServiceImpl.java
+erp-modules/erp-inventory/src/main/resources/mapper/inventory/InvTransferOrderMapper.xml
+erp-modules/erp-inventory/src/test/java/com/erp/inventory/mapper/InventoryMapperBindingTest.java
+erp-modules/erp-inventory/src/test/java/com/erp/inventory/mapper/InventorySchemaMigrationTest.java
+erp-modules/erp-inventory/src/test/java/com/erp/inventory/mapper/NewBusinessOpsMapperBindingTest.java
+erp-modules/erp-inventory/src/test/java/com/erp/inventory/service/impl/InvTransferServiceImplTest.java
+erp-ui/src/views/inventory/transfer/index.vue
+erp-ui/src/views/inventory/transfer/transferOrgHierarchy.js
+erp-ui/test/inventoryTransferAuditRelease.test.js
+erp-ui/test/transferOrgHierarchy.test.js
+erp-ui/test/transferWarehouseProcessingVisibility.test.js
+scripts/inventory-transfer-audit-migrations-20260807.list
+scripts/inventory-transfer-audit-release-20260807.json
+scripts/inventory-transfer-audit-release-files-20260807.list
+scripts/verify-inventory-transfer-audit-release.sh
+sql/erp_inventory_transfer_audit_identity_20260807.sql

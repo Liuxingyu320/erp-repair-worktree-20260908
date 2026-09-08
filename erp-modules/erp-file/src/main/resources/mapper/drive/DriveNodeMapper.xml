@@ -1,0 +1,346 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.file.drive.mapper.DriveNodeMapper">
+
+    <resultMap id="DriveNodeResult" type="com.erp.file.drive.domain.DriveNode">
+        <id property="nodeId" column="node_id" />
+        <result property="spaceId" column="space_id" />
+        <result property="spaceName" column="space_name" />
+        <result property="parentId" column="parent_id" />
+        <result property="ancestors" column="ancestors" />
+        <result property="nodeType" column="node_type" />
+        <result property="nodeName" column="node_name" />
+        <result property="normalizedName" column="normalized_name" />
+        <result property="extension" column="extension" />
+        <result property="storageKey" column="storage_key" />
+        <result property="contentType" column="content_type" />
+        <result property="sizeBytes" column="size_bytes" />
+        <result property="sha256" column="sha256" />
+        <result property="status" column="status" />
+        <result property="activeFlag" column="active_flag" />
+        <result property="originalParentId" column="original_parent_id" />
+        <result property="trashRootId" column="trash_root_id" />
+        <result property="trashedBy" column="trashed_by" />
+        <result property="trashedTime" column="trashed_time" />
+        <result property="purgeAfter" column="purge_after" />
+        <result property="version" column="version" />
+        <result property="createBy" column="create_by" />
+        <result property="createTime" column="create_time" />
+        <result property="updateBy" column="update_by" />
+        <result property="updateTime" column="update_time" />
+        <result property="remark" column="remark" />
+    </resultMap>
+
+    <sql id="DriveNodeColumns">
+        node_id, space_id, parent_id, ancestors, node_type, node_name,
+        normalized_name, extension, storage_key, content_type, size_bytes,
+        sha256, status, active_flag, original_parent_id, trash_root_id,
+        trashed_by, trashed_time, purge_after, version, create_by,
+        create_time, update_by, update_time, remark
+    </sql>
+
+    <select id="selectById" resultMap="DriveNodeResult">
+        select <include refid="DriveNodeColumns" />
+        from drive_node
+        where node_id = #{nodeId}
+    </select>
+
+    <select id="selectActiveById" resultMap="DriveNodeResult">
+        select <include refid="DriveNodeColumns" />
+        from drive_node
+        where node_id = #{nodeId}
+          and status = 'ACTIVE'
+    </select>
+
+    <select id="selectByIdForUpdate" resultMap="DriveNodeResult">
+        select <include refid="DriveNodeColumns" />
+        from drive_node
+        where node_id = #{nodeId}
+        for update
+    </select>
+
+    <sql id="DriveNodeOrder">
+        order by node_type = 'FOLDER' desc,
+        <choose>
+            <when test="sortField == 'name'">
+                normalized_name
+                <choose>
+                    <when test="sortDirection == 'asc'">asc</when>
+                    <otherwise>desc</otherwise>
+                </choose>,
+                node_id
+                <choose>
+                    <when test="sortDirection == 'asc'">asc</when>
+                    <otherwise>desc</otherwise>
+                </choose>
+            </when>
+            <when test="sortField == 'size'">
+                size_bytes
+                <choose>
+                    <when test="sortDirection == 'asc'">asc</when>
+                    <otherwise>desc</otherwise>
+                </choose>,
+                node_id
+                <choose>
+                    <when test="sortDirection == 'asc'">asc</when>
+                    <otherwise>desc</otherwise>
+                </choose>
+            </when>
+            <otherwise>
+                update_time desc, node_id desc
+            </otherwise>
+        </choose>
+    </sql>
+
+    <select id="selectActiveChildren" resultMap="DriveNodeResult">
+        select <include refid="DriveNodeColumns" />
+        from drive_node
+        where space_id = #{spaceId}
+          and parent_id = #{parentId}
+          and status = 'ACTIVE'
+        <include refid="DriveNodeOrder" />
+    </select>
+
+    <select id="selectActiveSearch" resultMap="DriveNodeResult">
+        select <include refid="DriveNodeColumns" />
+        from drive_node
+        where space_id = #{spaceId}
+          and status = 'ACTIVE'
+          and normalized_name like concat('%', #{keywordPattern}, '%') escape '!'
+        <include refid="DriveNodeOrder" />
+    </select>
+
+    <select id="existsActiveName" resultType="int">
+        select count(1)
+        from drive_node
+        where space_id = #{spaceId}
+          and parent_id = #{parentId}
+          and normalized_name = #{normalizedName}
+          and status = 'ACTIVE'
+          and active_flag = 1
+        <if test="excludeNodeId != null">
+          and node_id != #{excludeNodeId}
+        </if>
+    </select>
+
+    <insert id="insertNode" useGeneratedKeys="true" keyProperty="nodeId">
+        insert into drive_node (
+            space_id, parent_id, ancestors, node_type, node_name, normalized_name,
+            extension, storage_key, content_type, size_bytes, sha256, status,
+            active_flag, original_parent_id, trash_root_id, trashed_by, trashed_time,
+            purge_after, version, create_by, create_time, update_by, update_time, remark
+        ) values (
+            #{spaceId}, #{parentId}, #{ancestors}, #{nodeType}, #{nodeName}, #{normalizedName},
+            #{extension}, #{storageKey}, #{contentType}, #{sizeBytes}, #{sha256}, #{status},
+            #{activeFlag}, #{originalParentId}, #{trashRootId}, #{trashedBy}, #{trashedTime},
+            #{purgeAfter}, #{version}, #{createBy}, #{createTime}, #{updateBy}, #{updateTime}, #{remark}
+        )
+    </insert>
+
+    <update id="updateName">
+        update drive_node
+        set node_name = #{nodeName},
+            normalized_name = #{normalizedName},
+            extension = #{extension},
+            version = version + 1,
+            update_by = #{updateBy},
+            update_time = now()
+        where node_id = #{nodeId}
+          and status = 'ACTIVE'
+          and version = #{version}
+    </update>
+
+    <update id="updateParent">
+        update drive_node
+        set parent_id = #{parentId},
+            ancestors = #{ancestors},
+            version = version + 1,
+            update_by = #{updateBy},
+            update_time = now()
+        where node_id = #{nodeId}
+          and status = 'ACTIVE'
+          and version = #{version}
+    </update>
+
+    <update id="updateDescendantAncestors">
+        update drive_node
+        set ancestors = concat(#{newPrefix}, substring(ancestors, char_length(#{oldPrefix}) + 1)),
+            version = version + 1,
+            update_by = #{updateBy},
+            update_time = now()
+        where space_id = #{spaceId}
+          and status = 'ACTIVE'
+          and (ancestors = #{oldPrefix}
+               or ancestors like concat(#{oldPrefix}, ',%'))
+    </update>
+
+    <select id="selectPathNodes" resultMap="DriveNodeResult">
+        select <include refid="DriveNodeColumns" />
+        from drive_node
+        where space_id = #{spaceId}
+          and status = 'ACTIVE'
+          and node_type = 'FOLDER'
+          and node_id in
+          <foreach collection="nodeIds" item="nodeId" open="(" separator="," close=")">
+              #{nodeId}
+          </foreach>
+    </select>
+
+    <select id="selectTrashRoots" resultMap="DriveNodeResult">
+        select <include refid="DriveNodeColumns" />
+        from drive_node
+        where space_id = #{spaceId}
+          and trash_root_id = node_id
+          and status in ('TRASHED', 'PURGING', 'PURGE_FAILED')
+        order by trashed_time desc, node_id desc
+    </select>
+
+    <select id="selectTrashBatch" resultMap="DriveNodeResult">
+        select <include refid="DriveNodeColumns" />
+        from drive_node
+        where trash_root_id = #{trashRootId}
+        order by node_id asc
+    </select>
+
+    <select id="selectTrashBatchForUpdate" resultMap="DriveNodeResult">
+        select <include refid="DriveNodeColumns" />
+        from drive_node
+        where trash_root_id = #{trashRootId}
+        order by node_id asc
+        for update
+    </select>
+
+    <update id="trashActiveSubtree">
+        update drive_node
+        set status = 'TRASHED',
+            active_flag = null,
+            original_parent_id = parent_id,
+            trash_root_id = #{rootNodeId},
+            trashed_by = #{trashedBy},
+            trashed_time = now(),
+            purge_after = date_add(now(), interval #{retentionDays} day),
+            version = version + 1,
+            update_by = #{updateBy},
+            update_time = now()
+        where space_id = #{spaceId}
+          and status = 'ACTIVE'
+          and active_flag = 1
+          and (node_id = #{rootNodeId}
+               or ancestors = #{rootPath}
+               or ancestors like concat(#{rootPath}, ',%'))
+    </update>
+
+    <update id="restoreTrashBatch">
+        update drive_node
+        set parent_id = case when node_id = #{rootNodeId}
+                             then #{parentId} else parent_id end,
+            ancestors = case when node_id = #{rootNodeId}
+                             then #{rootAncestors}
+                             else concat(#{newPrefix},
+                                  substring(ancestors, char_length(#{oldPrefix}) + 1)) end,
+            node_name = case when node_id = #{rootNodeId}
+                             then #{rootName} else node_name end,
+            normalized_name = case when node_id = #{rootNodeId}
+                                   then #{normalizedName} else normalized_name end,
+            status = 'ACTIVE',
+            active_flag = 1,
+            original_parent_id = null,
+            trash_root_id = null,
+            trashed_by = null,
+            trashed_time = null,
+            purge_after = null,
+            version = version + 1,
+            update_by = #{updateBy},
+            update_time = now()
+        where trash_root_id = #{trashRootId}
+          and status = 'TRASHED'
+          and (node_id = #{rootNodeId}
+               or ancestors = #{oldPrefix}
+               or ancestors like concat(#{oldPrefix}, ',%'))
+    </update>
+
+    <update id="claimTrashRoot">
+        update drive_node
+        set status = 'PURGING',
+            version = version + 1,
+            update_by = #{updateBy},
+            update_time = now()
+        where node_id = #{trashRootId}
+          and trash_root_id = #{trashRootId}
+          and version = #{expectedVersion}
+          and status = #{expectedStatus}
+          and (#{expectedStatus} != 'PURGING'
+               or update_time is null
+               or update_time &lt; #{staleBefore})
+    </update>
+
+    <update id="claimTrashDescendants">
+        update drive_node
+        set status = 'PURGING',
+            version = version + 1,
+            update_by = #{updateBy},
+            update_time = now()
+        where trash_root_id = #{trashRootId}
+          and node_id != #{rootNodeId}
+          and status = #{expectedStatus}
+          and (#{expectedStatus} != 'PURGING'
+               or update_time is null
+               or update_time &lt; #{staleBefore})
+    </update>
+
+    <select id="selectClaimRootForUpdate" resultMap="DriveNodeResult">
+        select <include refid="DriveNodeColumns" />
+        from drive_node
+        where node_id = #{trashRootId}
+          and trash_root_id = #{trashRootId}
+          and status = 'PURGING'
+          and version = #{claimVersion}
+        for update
+    </select>
+
+    <update id="markPurgeFailedRoot">
+        update drive_node
+        set status = 'PURGE_FAILED',
+            version = version + 1,
+            update_by = #{updateBy},
+            update_time = now()
+        where node_id = #{trashRootId}
+          and trash_root_id = #{trashRootId}
+          and status = 'PURGING'
+          and version = #{claimVersion}
+    </update>
+
+    <update id="markPurgeFailedDescendants">
+        update drive_node
+        set status = 'PURGE_FAILED',
+            version = version + 1,
+            update_by = #{updateBy},
+            update_time = now()
+        where trash_root_id = #{trashRootId}
+          and node_id != #{rootNodeId}
+          and status = 'PURGING'
+    </update>
+
+    <delete id="deletePurgeBatch">
+        delete from drive_node
+        where trash_root_id = #{trashRootId}
+          and status = 'PURGING'
+    </delete>
+
+    <select id="selectExpiredTrashRoots" resultMap="DriveNodeResult">
+        select <include refid="DriveNodeColumns" />
+        from drive_node
+        where trash_root_id = node_id
+          and (
+            (status = 'TRASHED' and purge_after &lt;= #{now})
+            or status = 'PURGE_FAILED'
+            or (status = 'PURGING'
+                and (update_time is null or update_time &lt; #{staleBefore}))
+          )
+        order by purge_after asc, trash_root_id asc
+        limit #{limit}
+    </select>
+
+</mapper>

@@ -1,0 +1,775 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.approval.mapper.ApprovalRuntimeMapper">
+
+    <resultMap id="ApprovalInstanceResult" type="ApprovalInstance">
+        <id property="instanceId" column="instance_id"/>
+        <result property="rootInstanceId" column="root_instance_id"/>
+        <result property="previousInstanceId" column="previous_instance_id"/>
+        <result property="templateId" column="template_id"/>
+        <result property="templateName" column="template_name"/>
+        <result property="businessCode" column="business_code"/>
+        <result property="businessSource" column="business_source"/>
+        <result property="businessId" column="business_id"/>
+        <result property="businessSubtype" column="business_subtype"/>
+        <result property="businessRound" column="business_round"/>
+        <result property="idempotencyKey" column="idempotency_key"/>
+        <result property="applicantUserId" column="applicant_user_id"/>
+        <result property="applicantName" column="applicant_name"/>
+        <result property="applicantDeptId" column="applicant_dept_id"/>
+        <result property="applicantDeptName" column="applicant_dept_name"/>
+        <result property="anchorDeptId" column="anchor_dept_id"/>
+        <result property="anchorDeptName" column="anchor_dept_name"/>
+        <result property="ruleId" column="rule_id"/>
+        <result property="ruleVersionId" column="rule_version_id"/>
+        <result property="ruleVersionNo" column="rule_version_no"/>
+        <result property="businessSnapshot" column="business_snapshot"/>
+        <result property="businessDigest" column="business_digest"/>
+        <result property="routeSnapshot" column="route_snapshot"/>
+        <result property="status" column="status"/>
+        <result property="currentNodeId" column="current_node_id"/>
+        <result property="currentNodeOrder" column="current_node_order"/>
+        <result property="currentNodeName" column="current_node_name"/>
+        <result property="callbackStatus" column="callback_status"/>
+        <result property="approvedActionCount" column="approved_action_count"/>
+        <result property="startedTime" column="started_time"/>
+        <result property="finishedTime" column="finished_time"/>
+        <result property="lockVersion" column="lock_version"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateBy" column="update_by"/>
+        <result property="updateTime" column="update_time"/>
+        <result property="remark" column="remark"/>
+    </resultMap>
+
+    <resultMap id="ApprovalTaskResult" type="ApprovalTask">
+        <id property="taskId" column="task_id"/>
+        <result property="instanceId" column="instance_id"/>
+        <result property="nodeId" column="node_id"/>
+        <result property="nodeOrder" column="node_order"/>
+        <result property="nodeCode" column="node_code"/>
+        <result property="nodeName" column="node_name"/>
+        <result property="taskStatus" column="task_status"/>
+        <result property="approvalMode" column="approval_mode"/>
+        <result property="requiredCount" column="required_count"/>
+        <result property="completedCount" column="completed_count"/>
+        <result property="activatedTime" column="activated_time"/>
+        <result property="completedTime" column="completed_time"/>
+        <result property="lockVersion" column="lock_version"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateBy" column="update_by"/>
+        <result property="updateTime" column="update_time"/>
+        <result property="remark" column="remark"/>
+    </resultMap>
+
+    <resultMap id="ApprovalCandidateResult" type="ApprovalTaskCandidate">
+        <id property="candidateId" column="candidate_id"/>
+        <result property="taskId" column="task_id"/>
+        <result property="instanceId" column="instance_id"/>
+        <result property="userId" column="user_id"/>
+        <result property="userName" column="user_name"/>
+        <result property="deptId" column="dept_id"/>
+        <result property="deptName" column="dept_name"/>
+        <result property="candidateSourceType" column="candidate_source_type"/>
+        <result property="candidateSourceCode" column="candidate_source_code"/>
+        <result property="candidateOrder" column="candidate_order"/>
+        <result property="candidateStatus" column="candidate_status"/>
+        <result property="candidateReason" column="candidate_reason"/>
+        <result property="actedTime" column="acted_time"/>
+        <result property="reassignedFromCandidateId" column="reassigned_from_candidate_id"/>
+        <result property="lockVersion" column="lock_version"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateBy" column="update_by"/>
+        <result property="updateTime" column="update_time"/>
+        <result property="remark" column="remark"/>
+    </resultMap>
+
+    <resultMap id="ApprovalActionResult" type="ApprovalActionLog">
+        <id property="actionId" column="action_id"/>
+        <result property="actionKey" column="action_key"/>
+        <result property="instanceId" column="instance_id"/>
+        <result property="taskId" column="task_id"/>
+        <result property="candidateId" column="candidate_id"/>
+        <result property="actionType" column="action_type"/>
+        <result property="operatorUserId" column="operator_user_id"/>
+        <result property="operatorName" column="operator_name"/>
+        <result property="operatorSource" column="operator_source"/>
+        <result property="fromStatus" column="from_status"/>
+        <result property="toStatus" column="to_status"/>
+        <result property="actionReason" column="action_reason"/>
+        <result property="requestId" column="request_id"/>
+        <result property="actionSnapshot" column="action_snapshot"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="remark" column="remark"/>
+    </resultMap>
+
+    <resultMap id="ApprovalCallbackResult" type="ApprovalCallbackOutbox">
+        <id property="outboxId" column="outbox_id"/>
+        <result property="eventKey" column="event_key"/>
+        <result property="instanceId" column="instance_id"/>
+        <result property="businessCode" column="business_code"/>
+        <result property="businessSource" column="business_source"/>
+        <result property="businessId" column="business_id"/>
+        <result property="businessRound" column="business_round"/>
+        <result property="callbackAction" column="callback_action"/>
+        <result property="callbackService" column="callback_service"/>
+        <result property="callbackCode" column="callback_code"/>
+        <result property="payload" column="payload"/>
+        <result property="callbackStatus" column="callback_status"/>
+        <result property="retryCount" column="retry_count"/>
+        <result property="maxRetryCount" column="max_retry_count"/>
+        <result property="nextRetryTime" column="next_retry_time"/>
+        <result property="lockedBy" column="locked_by"/>
+        <result property="lockUntil" column="lock_until"/>
+        <result property="lastErrorCode" column="last_error_code"/>
+        <result property="lastErrorMessage" column="last_error_message"/>
+        <result property="deliveredTime" column="delivered_time"/>
+        <result property="lockVersion" column="lock_version"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateBy" column="update_by"/>
+        <result property="updateTime" column="update_time"/>
+        <result property="remark" column="remark"/>
+    </resultMap>
+
+    <resultMap id="ApprovalTodoResult" type="ApprovalTodoRow">
+        <id property="taskId" column="task_id"/>
+        <result property="instanceId" column="instance_id"/>
+        <result property="businessCode" column="business_code"/>
+        <result property="businessSource" column="business_source"/>
+        <result property="businessId" column="business_id"/>
+        <result property="businessSubtype" column="business_subtype"/>
+        <result property="candidateSourceCode" column="candidate_source_code"/>
+        <result property="nodeName" column="node_name"/>
+        <result property="applicantName" column="applicant_name"/>
+        <result property="anchorDeptId" column="anchor_dept_id"/>
+        <result property="anchorDeptName" column="anchor_dept_name"/>
+        <result property="anchorDeptType" column="anchor_dept_type"/>
+        <result property="createdTime" column="created_time"/>
+    </resultMap>
+
+    <resultMap id="ApprovalTodoCountResult" type="ApprovalTodoCountRow">
+        <result property="todoType" column="todo_type"/>
+        <result property="todoCount" column="todo_count"/>
+    </resultMap>
+
+    <sql id="instanceColumns">
+        instance_id, root_instance_id, previous_instance_id, template_id,
+        business_code, business_source, business_id, business_subtype,
+        business_round, idempotency_key, applicant_user_id, applicant_name,
+        applicant_dept_id, applicant_dept_name, anchor_dept_id,
+        anchor_dept_name, rule_id, rule_version_id, rule_version_no,
+        business_snapshot, business_digest, route_snapshot, status,
+        current_node_id, current_node_order, callback_status,
+        approved_action_count, started_time, finished_time, lock_version,
+        create_by, create_time, update_by, update_time, remark
+    </sql>
+
+    <sql id="instanceListColumns">
+        i.instance_id, i.root_instance_id, i.previous_instance_id,
+        i.template_id, template.template_name,
+        i.business_code, i.business_source, i.business_id,
+        i.business_subtype, i.business_round, i.idempotency_key,
+        i.applicant_user_id, i.applicant_name, i.applicant_dept_id,
+        i.applicant_dept_name, i.anchor_dept_id, i.anchor_dept_name,
+        i.rule_id, i.rule_version_id, i.rule_version_no,
+        i.business_snapshot, i.business_digest, i.route_snapshot, i.status,
+        i.current_node_id, i.current_node_order,
+        current_task.node_name as current_node_name,
+        i.callback_status, i.approved_action_count, i.started_time,
+        i.finished_time, i.lock_version, i.create_by, i.create_time,
+        i.update_by, i.update_time, i.remark
+    </sql>
+
+    <select id="selectInstanceById" parameterType="Long"
+            resultMap="ApprovalInstanceResult">
+        select <include refid="instanceColumns"/>
+        from approval_instance
+        where instance_id = #{instanceId}
+    </select>
+
+    <select id="selectInstanceByIdForShare" parameterType="Long"
+            resultMap="ApprovalInstanceResult">
+        select <include refid="instanceColumns"/>
+        from approval_instance
+        where instance_id = #{instanceId}
+        lock in share mode
+    </select>
+
+    <select id="selectInstanceByIdempotencyKey" parameterType="String"
+            resultMap="ApprovalInstanceResult">
+        select <include refid="instanceColumns"/>
+        from approval_instance
+        where idempotency_key = #{idempotencyKey}
+    </select>
+
+    <select id="selectInstanceByBusinessRound" resultMap="ApprovalInstanceResult">
+        select <include refid="instanceColumns"/>
+        from approval_instance
+        where business_code = #{businessCode}
+          and business_id = #{businessId}
+          and business_round = #{businessRound}
+    </select>
+
+    <select id="selectInstanceList" parameterType="ApprovalInstance"
+            resultMap="ApprovalInstanceResult">
+        select <include refid="instanceListColumns"/>
+        from approval_instance i
+        left join approval_template template
+          on template.template_id = i.template_id
+        left join approval_task current_task
+          on current_task.instance_id = i.instance_id
+         and current_task.node_id = i.current_node_id
+        <where>
+            <if test="instanceId != null">and i.instance_id = #{instanceId}</if>
+            <if test="businessCode != null and businessCode != ''">
+                and i.business_code = #{businessCode}
+            </if>
+            <if test="businessSource != null and businessSource != ''">
+                and i.business_source = #{businessSource}
+            </if>
+            <if test="businessId != null and businessId != ''">
+                and i.business_id = #{businessId}
+            </if>
+            <if test="status != null and status != ''">and i.status = #{status}</if>
+            <if test="callbackStatus != null and callbackStatus != ''">
+                and i.callback_status = #{callbackStatus}
+            </if>
+            <if test="applicantUserId != null">
+                and i.applicant_user_id = #{applicantUserId}
+            </if>
+            <if test="anchorDeptId != null">and i.anchor_dept_id = #{anchorDeptId}</if>
+        </where>
+        order by i.started_time desc, i.instance_id desc
+    </select>
+
+    <select id="countInstanceParticipant" resultType="java.lang.Integer">
+        select count(*)
+        from approval_instance i
+        where i.instance_id = #{instanceId}
+          and (
+              i.applicant_user_id = #{userId}
+              or exists (
+                  select 1 from approval_task_candidate participant_candidate
+                  where participant_candidate.instance_id = i.instance_id
+                    and participant_candidate.user_id = #{userId}
+              )
+              or exists (
+                  select 1 from approval_action_log participant_action
+                  where participant_action.instance_id = i.instance_id
+                    and participant_action.operator_user_id = #{userId}
+              )
+          )
+    </select>
+
+    <select id="selectTaskById" resultMap="ApprovalTaskResult">
+        select task_id, instance_id, node_id, node_order, node_code,
+               node_name, task_status, approval_mode, required_count,
+               completed_count, activated_time, completed_time, lock_version,
+               create_by, create_time, update_by, update_time, remark
+        from approval_task
+        where task_id = #{taskId}
+    </select>
+
+    <select id="selectNextWaitingTask" resultMap="ApprovalTaskResult">
+        select task_id, instance_id, node_id, node_order, node_code,
+               node_name, task_status, approval_mode, required_count,
+               completed_count, activated_time, completed_time, lock_version,
+               create_by, create_time, update_by, update_time, remark
+        from approval_task
+        where instance_id = #{instanceId}
+          and task_status = 'WAITING'
+          and node_order &gt; #{afterOrder}
+        order by node_order
+        limit 1
+    </select>
+
+    <select id="selectTasksByInstanceId" parameterType="Long"
+            resultMap="ApprovalTaskResult">
+        select task_id, instance_id, node_id, node_order, node_code,
+               node_name, task_status, approval_mode, required_count,
+               completed_count, activated_time, completed_time, lock_version,
+               create_by, create_time, update_by, update_time, remark
+        from approval_task
+        where instance_id = #{instanceId}
+        order by node_order, task_id
+    </select>
+
+    <select id="selectCandidatesByTaskId" parameterType="Long"
+            resultMap="ApprovalCandidateResult">
+        select candidate_id, task_id, instance_id, user_id, user_name,
+               dept_id, dept_name, candidate_source_type,
+               candidate_source_code, candidate_order, candidate_status,
+               candidate_reason, acted_time, reassigned_from_candidate_id,
+               lock_version, create_by, create_time, update_by,
+               update_time, remark
+        from approval_task_candidate
+        where task_id = #{taskId}
+        order by candidate_order, candidate_id
+    </select>
+
+    <select id="selectCandidatesByInstanceId" resultMap="ApprovalCandidateResult">
+        select candidate_id, task_id, instance_id, user_id, user_name,
+               dept_id, dept_name, candidate_source_type,
+               candidate_source_code, candidate_order, candidate_status,
+               candidate_reason, acted_time, reassigned_from_candidate_id,
+               lock_version, create_by, create_time, update_by,
+               update_time, remark
+        from approval_task_candidate
+        where instance_id = #{instanceId}
+        order by task_id, candidate_order, candidate_id
+    </select>
+
+    <select id="selectPendingCandidate" resultMap="ApprovalCandidateResult">
+        select candidate_id, task_id, instance_id, user_id, user_name,
+               dept_id, dept_name, candidate_source_type,
+               candidate_source_code, candidate_order, candidate_status,
+               candidate_reason, acted_time, reassigned_from_candidate_id,
+               lock_version, create_by, create_time, update_by,
+               update_time, remark
+        from approval_task_candidate
+        where task_id = #{taskId} and user_id = #{userId}
+          and candidate_status = 'PENDING'
+    </select>
+
+    <select id="selectCandidateById" resultMap="ApprovalCandidateResult">
+        select candidate_id, task_id, instance_id, user_id, user_name,
+               dept_id, dept_name, candidate_source_type,
+               candidate_source_code, candidate_order, candidate_status,
+               candidate_reason, acted_time, reassigned_from_candidate_id,
+               lock_version, create_by, create_time, update_by,
+               update_time, remark
+        from approval_task_candidate
+        where candidate_id = #{candidateId}
+    </select>
+
+    <select id="selectReassignedCandidateForShare"
+            resultMap="ApprovalCandidateResult">
+        select candidate_id, task_id, instance_id, user_id, user_name,
+               dept_id, dept_name, candidate_source_type,
+               candidate_source_code, candidate_order, candidate_status,
+               candidate_reason, acted_time, reassigned_from_candidate_id,
+               lock_version, create_by, create_time, update_by,
+               update_time, remark
+        from approval_task_candidate
+        where task_id = #{taskId}
+          and reassigned_from_candidate_id = #{fromCandidateId}
+          and user_id = #{toUserId}
+        lock in share mode
+    </select>
+
+    <select id="selectActionsByInstanceId" parameterType="Long"
+            resultMap="ApprovalActionResult">
+        select action_id, action_key, instance_id, task_id, candidate_id,
+               action_type, operator_user_id, operator_name, operator_source,
+               from_status, to_status, action_reason, request_id,
+               action_snapshot, create_by, create_time, remark
+        from approval_action_log
+        where instance_id = #{instanceId}
+        order by create_time, action_id
+    </select>
+
+    <select id="selectActionByKey" resultMap="ApprovalActionResult">
+        select action_id, action_key, instance_id, task_id, candidate_id,
+               action_type, operator_user_id, operator_name, operator_source,
+               from_status, to_status, action_reason, request_id,
+               action_snapshot, create_by, create_time, remark
+        from approval_action_log
+        where action_key = #{actionKey}
+    </select>
+
+    <select id="selectActionByKeyForShare"
+            resultMap="ApprovalActionResult">
+        select action_id, action_key, instance_id, task_id, candidate_id,
+               action_type, operator_user_id, operator_name, operator_source,
+               from_status, to_status, action_reason, request_id,
+               action_snapshot, create_by, create_time, remark
+        from approval_action_log
+        where action_key = #{actionKey}
+        lock in share mode
+    </select>
+
+    <select id="selectCallbacksByInstanceId" parameterType="Long"
+            resultMap="ApprovalCallbackResult">
+        select outbox_id, event_key, instance_id, business_code,
+               business_source, business_id, business_round, callback_action,
+               callback_service, callback_code, payload, callback_status,
+               retry_count, max_retry_count, next_retry_time, locked_by,
+               lock_until, last_error_code, last_error_message,
+               delivered_time, lock_version, create_by, create_time,
+               update_by, update_time, remark
+        from approval_callback_outbox
+        where instance_id = #{instanceId}
+        order by outbox_id
+    </select>
+
+    <select id="selectCallbackById" resultMap="ApprovalCallbackResult">
+        select outbox_id, event_key, instance_id, business_code,
+               business_source, business_id, business_round, callback_action,
+               callback_service, callback_code, payload, callback_status,
+               retry_count, max_retry_count, next_retry_time, locked_by,
+               lock_until, last_error_code, last_error_message,
+               delivered_time, lock_version, create_by, create_time,
+               update_by, update_time, remark
+        from approval_callback_outbox
+        where outbox_id = #{outboxId}
+    </select>
+
+    <select id="selectDispatchableCallbacks" resultMap="ApprovalCallbackResult">
+        select outbox_id, event_key, instance_id, business_code,
+               business_source, business_id, business_round, callback_action,
+               callback_service, callback_code, payload, callback_status,
+               retry_count, max_retry_count, next_retry_time, locked_by,
+               lock_until, last_error_code, last_error_message,
+               delivered_time, lock_version, create_by, create_time,
+               update_by, update_time, remark
+        from approval_callback_outbox
+        where (
+            callback_status in ('PENDING', 'RETRY')
+            and (next_retry_time is null or next_retry_time &lt;= sysdate())
+        ) or (
+            callback_status = 'PROCESSING' and lock_until &lt; sysdate()
+        )
+        order by outbox_id
+        limit #{limit}
+    </select>
+
+    <sql id="todoRowsFromAndWhere">
+        from approval_task t
+        join approval_instance i on i.instance_id = t.instance_id
+        join approval_task_candidate c on c.task_id = t.task_id
+        left join sys_dept d on d.dept_id = i.anchor_dept_id
+        where c.user_id = #{userId}
+          and c.candidate_status = 'PENDING'
+          and t.task_status = 'PENDING'
+          and i.status = 'RUNNING'
+          <choose>
+              <when test="accessRules != null and accessRules.size() > 0">
+                  and (
+                      <foreach collection="accessRules" item="accessRule"
+                              separator=" or ">
+                          (i.business_code = #{accessRule.businessCode}
+                           and (
+                              <if test="accessRule.basePermissionAllowed">
+                                  <choose>
+                                      <when test="accessRule.specialCandidatePermissions != null
+                                              and accessRule.specialCandidatePermissions.size() > 0">
+                                          (c.candidate_source_code is null
+                                           or c.candidate_source_code not in
+                                           <foreach collection="accessRule.specialCandidatePermissions"
+                                                   item="specialPermission"
+                                                   open="(" separator="," close=")">
+                                               #{specialPermission}
+                                           </foreach>)
+                                      </when>
+                                      <otherwise>1 = 1</otherwise>
+                                  </choose>
+                              </if>
+                              <if test="accessRule.allowedSpecialCandidatePermissions != null
+                                      and accessRule.allowedSpecialCandidatePermissions.size() > 0">
+                                  <if test="accessRule.basePermissionAllowed">or</if>
+                                  c.candidate_source_code in
+                                  <foreach collection="accessRule.allowedSpecialCandidatePermissions"
+                                          item="allowedSpecialPermission"
+                                          open="(" separator="," close=")">
+                                      #{allowedSpecialPermission}
+                                  </foreach>
+                              </if>
+                           ))
+                      </foreach>
+                  )
+              </when>
+              <otherwise>and 1 = 0</otherwise>
+          </choose>
+          <if test="query.category != null and query.category != ''">
+              and #{query.category} = 'approval'
+          </if>
+          <if test="query.source != null and query.source != ''">
+              and i.business_source = #{query.source}
+          </if>
+          <if test="query.type != null and query.type != ''">
+              and #{query.type} = case i.business_code
+                    when 'OA_PURCHASE' then 'OA_PURCHASE_APPROVAL'
+                    when 'OA_REIMBURSEMENT' then 'OA_REIMBURSEMENT_APPROVAL'
+                    when 'INV_TRANSFER' then 'INV_TRANSFER_APPROVAL'
+                    when 'INV_STOCK_CHECK' then 'INV_STOCK_CHECK_APPROVAL'
+                    when 'HR_HEALTH_CERTIFICATE' then 'HR_HEALTH_CERT_REVIEW'
+                    else concat(i.business_code, '_APPROVAL') end
+          </if>
+          <if test="query.keyword != null and query.keyword != ''">
+              and (i.business_id like concat('%', #{query.keyword}, '%')
+                   or i.applicant_name like concat('%', #{query.keyword}, '%')
+                   or t.node_name like concat('%', #{query.keyword}, '%')
+                   or (case i.business_code
+                         when 'OA_PURCHASE' then 'OA采购申请'
+                         when 'OA_REIMBURSEMENT' then '费用报销'
+                         when 'INV_TRANSFER' then '调拨申请'
+                         when 'INV_STOCK_CHECK' then '库存盘点'
+                         when 'HR_HEALTH_CERTIFICATE' then '健康证审核'
+                         else '审批申请'
+                       end) like concat('%', #{query.keyword}, '%'))
+          </if>
+    </sql>
+
+    <sql id="todoBusinessTypeExpression">
+        case i.business_code
+            when 'OA_PURCHASE' then 'OA_PURCHASE_APPROVAL'
+            when 'OA_REIMBURSEMENT' then 'OA_REIMBURSEMENT_APPROVAL'
+            when 'INV_TRANSFER' then 'INV_TRANSFER_APPROVAL'
+            when 'INV_STOCK_CHECK' then 'INV_STOCK_CHECK_APPROVAL'
+            when 'HR_HEALTH_CERTIFICATE' then 'HR_HEALTH_CERT_REVIEW'
+            else concat(i.business_code, '_APPROVAL')
+        end
+    </sql>
+
+    <select id="selectTodoRows" resultMap="ApprovalTodoResult">
+        select distinct t.task_id, i.instance_id, i.business_code,
+               i.business_source, i.business_id, i.business_subtype,
+               c.candidate_source_code, t.node_name, i.applicant_name,
+               i.anchor_dept_id,
+               i.anchor_dept_name, d.dept_type anchor_dept_type,
+               t.activated_time created_time,
+               cast(i.business_id as unsigned) sort_business_id,
+               <include refid="todoBusinessTypeExpression"/> sort_todo_type
+        <include refid="todoRowsFromAndWhere"/>
+        order by t.activated_time asc, sort_business_id asc,
+                 i.business_source asc, sort_todo_type asc, t.task_id asc
+    </select>
+
+    <select id="selectTodoTypeCounts" resultMap="ApprovalTodoCountResult">
+        select <include refid="todoBusinessTypeExpression"/> todo_type,
+               count(distinct t.task_id) todo_count
+        <include refid="todoRowsFromAndWhere"/>
+        group by <include refid="todoBusinessTypeExpression"/>
+    </select>
+
+    <select id="selectRecentTodoRows" resultMap="ApprovalTodoResult">
+        select distinct t.task_id, i.instance_id, i.business_code,
+               i.business_source, i.business_id, i.business_subtype,
+               c.candidate_source_code, t.node_name, i.applicant_name,
+               i.anchor_dept_id,
+               i.anchor_dept_name, d.dept_type anchor_dept_type,
+               t.activated_time created_time,
+               cast(i.business_id as unsigned) sort_business_id,
+               <include refid="todoBusinessTypeExpression"/> sort_todo_type
+        <include refid="todoRowsFromAndWhere"/>
+        order by t.activated_time asc, sort_business_id asc,
+                 i.business_source asc, sort_todo_type asc, t.task_id asc
+        limit 5
+    </select>
+
+    <insert id="insertInstance" parameterType="ApprovalInstance"
+            useGeneratedKeys="true" keyProperty="instanceId">
+        insert into approval_instance (
+            root_instance_id, previous_instance_id, template_id,
+            business_code, business_source, business_id, business_subtype,
+            business_round, idempotency_key, applicant_user_id,
+            applicant_name, applicant_dept_id, applicant_dept_name,
+            anchor_dept_id, anchor_dept_name, rule_id, rule_version_id,
+            rule_version_no, business_snapshot, business_digest,
+            route_snapshot, status, current_node_id, current_node_order,
+            callback_status, approved_action_count, started_time,
+            lock_version, create_by, create_time, remark
+        ) values (
+            #{rootInstanceId}, #{previousInstanceId}, #{templateId},
+            #{businessCode}, #{businessSource}, #{businessId},
+            #{businessSubtype}, #{businessRound}, #{idempotencyKey},
+            #{applicantUserId}, #{applicantName}, #{applicantDeptId},
+            #{applicantDeptName}, #{anchorDeptId}, #{anchorDeptName},
+            #{ruleId}, #{ruleVersionId}, #{ruleVersionNo},
+            #{businessSnapshot}, #{businessDigest}, #{routeSnapshot},
+            #{status}, #{currentNodeId}, #{currentNodeOrder},
+            #{callbackStatus}, #{approvedActionCount},
+            coalesce(#{startedTime}, sysdate()), 0, #{createBy}, sysdate(),
+            #{remark}
+        )
+    </insert>
+
+    <insert id="insertTask" parameterType="ApprovalTask"
+            useGeneratedKeys="true" keyProperty="taskId">
+        insert into approval_task (
+            instance_id, node_id, node_order, node_code, node_name,
+            task_status, approval_mode, required_count, completed_count,
+            activated_time, completed_time, lock_version, create_by,
+            create_time, remark
+        ) values (
+            #{instanceId}, #{nodeId}, #{nodeOrder}, #{nodeCode}, #{nodeName},
+            #{taskStatus}, #{approvalMode}, #{requiredCount},
+            #{completedCount}, #{activatedTime},
+            #{completedTime}, 0, #{createBy}, sysdate(), #{remark}
+        )
+    </insert>
+
+    <insert id="insertCandidate" parameterType="ApprovalTaskCandidate"
+            useGeneratedKeys="true" keyProperty="candidateId">
+        insert into approval_task_candidate (
+            task_id, instance_id, user_id, user_name, dept_id, dept_name,
+            candidate_source_type, candidate_source_code, candidate_order,
+            candidate_status, candidate_reason, reassigned_from_candidate_id,
+            lock_version, create_by, create_time, remark
+        ) values (
+            #{taskId}, #{instanceId}, #{userId}, #{userName}, #{deptId},
+            #{deptName}, #{candidateSourceType}, #{candidateSourceCode},
+            #{candidateOrder}, #{candidateStatus}, #{candidateReason},
+            #{reassignedFromCandidateId}, 0, #{createBy}, sysdate(), #{remark}
+        )
+    </insert>
+
+    <insert id="insertAction" parameterType="ApprovalActionLog"
+            useGeneratedKeys="true" keyProperty="actionId">
+        insert into approval_action_log (
+            action_key, instance_id, task_id, candidate_id, action_type,
+            operator_user_id, operator_name, operator_source, from_status,
+            to_status, action_reason, request_id, action_snapshot,
+            create_by, create_time, remark
+        ) values (
+            #{actionKey}, #{instanceId}, #{taskId}, #{candidateId},
+            #{actionType}, #{operatorUserId}, #{operatorName},
+            #{operatorSource}, #{fromStatus}, #{toStatus}, #{actionReason},
+            #{requestId}, #{actionSnapshot}, #{createBy}, sysdate(), #{remark}
+        )
+    </insert>
+
+    <insert id="insertCallback" parameterType="ApprovalCallbackOutbox"
+            useGeneratedKeys="true" keyProperty="outboxId">
+        insert into approval_callback_outbox (
+            event_key, instance_id, business_code, business_source,
+            business_id, business_round, callback_action, callback_service,
+            callback_code, payload, callback_status, retry_count,
+            max_retry_count, next_retry_time, lock_version, create_by,
+            create_time, remark
+        ) values (
+            #{eventKey}, #{instanceId}, #{businessCode}, #{businessSource},
+            #{businessId}, #{businessRound}, #{callbackAction},
+            #{callbackService}, #{callbackCode}, #{payload},
+            #{callbackStatus}, #{retryCount}, #{maxRetryCount},
+            #{nextRetryTime}, 0, #{createBy}, sysdate(), #{remark}
+        )
+    </insert>
+
+    <update id="setRootInstanceIdIfNull">
+        update approval_instance set root_instance_id = instance_id
+        where instance_id = #{instanceId} and root_instance_id is null
+    </update>
+
+    <update id="updateInstanceWithLock">
+        update approval_instance
+        set status = #{instance.status},
+            current_node_id = #{instance.currentNodeId},
+            current_node_order = #{instance.currentNodeOrder},
+            callback_status = #{instance.callbackStatus},
+            approved_action_count = #{instance.approvedActionCount},
+            finished_time = #{instance.finishedTime},
+            lock_version = lock_version + 1,
+            update_by = #{instance.updateBy}, update_time = sysdate(),
+            remark = #{instance.remark}
+        where instance_id = #{instance.instanceId}
+          and status = #{expectedStatus}
+          and lock_version = #{expectedVersion}
+    </update>
+
+    <update id="updateTaskWithLock">
+        update approval_task
+        set task_status = #{task.taskStatus},
+            required_count = #{task.requiredCount},
+            completed_count = #{task.completedCount},
+            activated_time = #{task.activatedTime},
+            completed_time = #{task.completedTime},
+            lock_version = lock_version + 1,
+            update_by = #{task.updateBy}, update_time = sysdate(),
+            remark = #{task.remark}
+        where task_id = #{task.taskId}
+          and task_status = #{expectedStatus}
+          and lock_version = #{expectedVersion}
+    </update>
+
+    <update id="updateCandidateWithLock">
+        update approval_task_candidate
+        set candidate_status = #{candidate.candidateStatus},
+            candidate_reason = #{candidate.candidateReason},
+            acted_time = #{candidate.actedTime},
+            lock_version = lock_version + 1,
+            update_by = #{candidate.updateBy}, update_time = sysdate(),
+            remark = #{candidate.remark}
+        where candidate_id = #{candidate.candidateId}
+          and candidate_status = #{expectedStatus}
+          and lock_version = #{expectedVersion}
+    </update>
+
+    <update id="cancelOtherCandidates">
+        update approval_task_candidate
+        set candidate_status = 'CANCELLED', candidate_reason = #{reason},
+            acted_time = sysdate(), lock_version = lock_version + 1,
+            update_by = #{updateBy}, update_time = sysdate()
+        where task_id = #{taskId} and candidate_status = 'PENDING'
+          <if test="exceptCandidateId != null">
+              and candidate_id &lt;&gt; #{exceptCandidateId}
+          </if>
+    </update>
+
+    <update id="cancelOpenCandidatesByInstance">
+        update approval_task_candidate
+        set candidate_status = 'CANCELLED', candidate_reason = #{reason},
+            acted_time = sysdate(), lock_version = lock_version + 1,
+            update_by = #{updateBy}, update_time = sysdate()
+        where instance_id = #{instanceId} and candidate_status = 'PENDING'
+    </update>
+
+    <update id="cancelOpenTasksByInstance">
+        update approval_task
+        set task_status = 'CANCELLED', completed_time = sysdate(),
+            lock_version = lock_version + 1, update_by = #{updateBy},
+            update_time = sysdate(), remark = #{reason}
+        where instance_id = #{instanceId}
+          and task_status in ('WAITING', 'PENDING')
+    </update>
+
+    <update id="claimCallback">
+        update approval_callback_outbox
+        set callback_status = 'PROCESSING', locked_by = #{worker},
+            lock_until = #{lockUntil}, lock_version = lock_version + 1,
+            update_by = #{worker}, update_time = sysdate()
+        where outbox_id = #{outboxId} and lock_version = #{expectedVersion}
+          and ((callback_status in ('PENDING', 'RETRY')
+                and (next_retry_time is null or next_retry_time &lt;= sysdate()))
+               or (callback_status = 'PROCESSING' and lock_until &lt; sysdate()))
+    </update>
+
+    <update id="markCallbackSucceeded">
+        update approval_callback_outbox
+        set callback_status = 'SUCCEEDED', delivered_time = sysdate(),
+            locked_by = null, lock_until = null, last_error_code = null,
+            last_error_message = null, lock_version = lock_version + 1,
+            update_by = #{updateBy}, update_time = sysdate()
+        where outbox_id = #{outboxId} and callback_status = 'PROCESSING'
+          and lock_version = #{expectedVersion}
+    </update>
+
+    <update id="markCallbackFailure">
+        update approval_callback_outbox
+        set callback_status = #{status}, retry_count = #{retryCount},
+            next_retry_time = #{nextRetryTime}, locked_by = null,
+            lock_until = null, last_error_code = #{errorCode},
+            last_error_message = #{errorMessage},
+            lock_version = lock_version + 1, update_by = #{updateBy},
+            update_time = sysdate()
+        where outbox_id = #{outboxId} and callback_status = 'PROCESSING'
+          and lock_version = #{expectedVersion}
+    </update>
+
+    <update id="replayCallback">
+        update approval_callback_outbox
+        set callback_status = 'PENDING', retry_count = 0,
+            next_retry_time = sysdate(), locked_by = null, lock_until = null,
+            last_error_code = null, last_error_message = null,
+            lock_version = lock_version + 1, update_by = #{updateBy},
+            update_time = sysdate()
+        where outbox_id = #{outboxId}
+          and callback_status in ('DEAD', 'RETRY')
+          and lock_version = #{expectedVersion}
+    </update>
+
+</mapper>

@@ -1,0 +1,184 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.inventory.mapper.InvPurchaseOrderMapper">
+
+    <resultMap type="InvPurchaseOrder" id="InvPurchaseOrderResult">
+        <id property="orderId" column="order_id"/>
+        <result property="orderNo" column="order_no"/>
+        <result property="orderTitle" column="order_title"/>
+        <result property="supplierId" column="supplier_id"/>
+        <result property="supplierName" column="supplier_name"/>
+        <result property="totalAmount" column="total_amount"/>
+        <result property="orderDate" column="order_date"/>
+        <result property="status" column="status"/>
+        <result property="qcStatus" column="qc_status"/>
+        <result property="shopDeptId" column="shop_dept_id"/>
+        <result property="shopDeptName" column="shop_dept_name"/>
+        <result property="applicantId" column="applicant_id"/>
+        <result property="applicantName" column="applicant_name"/>
+        <result property="applicantNickName" column="applicant_nick_name"/>
+        <result property="applicantDeptId" column="applicant_dept_id"/>
+        <result property="applicantDeptName" column="applicant_dept_name"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateBy" column="update_by"/>
+        <result property="updateTime" column="update_time"/>
+        <result property="remark" column="remark"/>
+        <result property="totalQuantity" column="total_quantity"/>
+        <result property="receivedQuantity" column="received_quantity"/>
+        <result property="remainingQuantity" column="remaining_quantity"/>
+    </resultMap>
+
+    <sql id="selectInvPurchaseOrderVo">
+        select o.order_id, o.order_no, o.order_title, o.supplier_id, o.supplier_name, o.total_amount,
+               o.order_date, o.status, o.qc_status, o.shop_dept_id,
+               shop_dept.dept_name as shop_dept_name,
+               o.applicant_id, o.applicant_name, u.nick_name as applicant_nick_name,
+               o.applicant_dept_id, applicant_dept.dept_name as applicant_dept_name,
+               o.create_by, o.create_time, o.update_by, o.update_time, o.remark,
+               (select coalesce(sum(d.quantity), 0) from inv_purchase_detail d where d.order_id = o.order_id) as total_quantity,
+               (select coalesce(sum(ifnull(d.received_quantity, 0)), 0) from inv_purchase_detail d where d.order_id = o.order_id) as received_quantity,
+               (select coalesce(sum(d.quantity - ifnull(d.received_quantity, 0)), 0) from inv_purchase_detail d where d.order_id = o.order_id) as remaining_quantity
+        from inv_purchase_order o
+             left join sys_dept shop_dept on shop_dept.dept_id = o.shop_dept_id
+             left join sys_user u on u.user_id = o.applicant_id
+             left join sys_dept applicant_dept on applicant_dept.dept_id = o.applicant_dept_id
+    </sql>
+
+    <select id="selectInvPurchaseOrderById" parameterType="Long" resultMap="InvPurchaseOrderResult">
+        <include refid="selectInvPurchaseOrderVo"/>
+        where o.order_id = #{orderId}
+    </select>
+
+    <select id="selectInvPurchaseOrderByIdForUpdate" parameterType="Long" resultMap="InvPurchaseOrderResult">
+        select order_id, order_no, order_title, supplier_id, supplier_name, total_amount,
+               order_date, status, qc_status, shop_dept_id, applicant_id, applicant_name,
+               applicant_dept_id, create_by, create_time, update_by, update_time, remark
+        from inv_purchase_order
+        where order_id = #{orderId} for update
+    </select>
+
+    <select id="selectInvPurchaseOrderList" parameterType="InvPurchaseOrder" resultMap="InvPurchaseOrderResult">
+        <include refid="selectInvPurchaseOrderVo"/>
+        <where>
+            <if test="orderNo != null and orderNo != ''">and o.order_no like concat('%', #{orderNo}, '%')</if>
+            <if test="orderTitle != null and orderTitle != ''">and o.order_title like concat('%', #{orderTitle}, '%')</if>
+            <if test="supplierName != null and supplierName != ''">and o.supplier_name like concat('%', #{supplierName}, '%')</if>
+            <if test="status != null and status != ''">and o.status = #{status}</if>
+            <if test="params.beginOrderDate != null and params.beginOrderDate != ''">and o.order_date &gt;= #{params.beginOrderDate}</if>
+            <if test="params.endOrderDate != null and params.endOrderDate != ''">and o.order_date &lt;= #{params.endOrderDate}</if>
+            <if test="applicantName != null and applicantName != ''">and o.applicant_name like concat('%', #{applicantName}, '%')</if>
+            <if test="shopDeptId != null">and o.shop_dept_id = #{shopDeptId}</if>
+        </where>
+        order by o.create_time desc
+    </select>
+
+    <select id="selectReturnablePurchaseOrderList" parameterType="InvPurchaseOrder" resultMap="InvPurchaseOrderResult">
+        <include refid="selectInvPurchaseOrderVo"/>
+        where o.shop_dept_id = #{shopDeptId}
+          and o.status not in ('draft', 'cancelled')
+        <if test="orderNo != null and orderNo != ''">
+          and (o.order_no like concat('%', #{orderNo}, '%')
+               or o.supplier_name like concat('%', #{orderNo}, '%'))
+        </if>
+        <if test="supplierName != null and supplierName != ''">
+          and o.supplier_name like concat('%', #{supplierName}, '%')
+        </if>
+          and exists (
+              select 1
+              from inv_purchase_detail source_detail
+              where source_detail.order_id = o.order_id
+                and coalesce(source_detail.received_quantity, 0) &gt; coalesce((
+                    select sum(return_detail.quantity)
+                    from inv_purchase_return_detail return_detail
+                    inner join inv_purchase_return purchase_return
+                            on purchase_return.return_id = return_detail.return_id
+                    where purchase_return.purchase_order_id = o.order_id
+                      and purchase_return.status in ('submitted', 'returned')
+                      and return_detail.purchase_detail_id = source_detail.detail_id
+                ), 0)
+          )
+        order by o.create_time desc
+    </select>
+
+    <select id="selectMyInvPurchaseOrderList" parameterType="InvPurchaseOrder" resultMap="InvPurchaseOrderResult">
+        <include refid="selectInvPurchaseOrderVo"/>
+        <where>
+            o.applicant_id = #{applicantId}
+            <if test="orderNo != null and orderNo != ''">and o.order_no like concat('%', #{orderNo}, '%')</if>
+            <if test="status != null and status != ''">and o.status = #{status}</if>
+            <if test="params.beginOrderDate != null and params.beginOrderDate != ''">and o.order_date &gt;= #{params.beginOrderDate}</if>
+            <if test="params.endOrderDate != null and params.endOrderDate != ''">and o.order_date &lt;= #{params.endOrderDate}</if>
+            <if test="shopDeptId != null">and o.shop_dept_id = #{shopDeptId}</if>
+        </where>
+        order by o.create_time desc
+    </select>
+
+    <select id="countBySupplierNameAndShop" resultType="int">
+        select count(1)
+        from inv_purchase_order
+        where supplier_name = #{supplierName}
+          and shop_dept_id = #{shopDeptId}
+    </select>
+
+    <insert id="insertInvPurchaseOrder" parameterType="InvPurchaseOrder" useGeneratedKeys="true" keyProperty="orderId">
+        insert into inv_purchase_order (
+            order_no, order_title, supplier_id, supplier_name, total_amount, order_date, status,
+            qc_status,
+            shop_dept_id, applicant_id, applicant_name, applicant_dept_id,
+            create_by, create_time, remark
+        ) values (
+            #{orderNo}, #{orderTitle}, #{supplierId}, #{supplierName}, #{totalAmount}, #{orderDate}, #{status},
+            #{qcStatus},
+            #{shopDeptId}, #{applicantId}, #{applicantName}, #{applicantDeptId},
+            #{createBy}, sysdate(), #{remark}
+        )
+    </insert>
+
+    <update id="updateInvPurchaseOrder" parameterType="InvPurchaseOrder">
+        update inv_purchase_order
+        <set>
+            <if test="orderTitle != null">order_title = #{orderTitle},</if>
+            <if test="supplierId != null">supplier_id = #{supplierId},</if>
+            <if test="supplierName != null">supplier_name = #{supplierName},</if>
+            <if test="totalAmount != null">total_amount = #{totalAmount},</if>
+            <if test="orderDate != null">order_date = #{orderDate},</if>
+            <if test="status != null">status = #{status},</if>
+            <if test="qcStatus != null">qc_status = #{qcStatus},</if>
+            update_by = #{updateBy}, update_time = sysdate()
+        </set>
+        where order_id = #{orderId}
+    </update>
+
+    <update id="updatePurchaseContent" parameterType="InvPurchaseOrder">
+        update inv_purchase_order
+        set order_title = #{orderTitle},
+            supplier_id = #{supplierId},
+            supplier_name = #{supplierName},
+            total_amount = #{totalAmount},
+            order_date = #{orderDate},
+            remark = #{remark},
+            update_by = #{updateBy},
+            update_time = sysdate()
+        where order_id = #{orderId}
+          and status = 'draft'
+    </update>
+
+    <update id="transitionPurchaseStatus">
+        update inv_purchase_order
+        set status = #{status},
+            <if test="qcStatus != null">qc_status = #{qcStatus},</if>
+            update_by = #{updateBy},
+            update_time = sysdate()
+        where order_id = #{orderId}
+          and status = #{expectedStatus}
+    </update>
+
+    <delete id="deleteInvPurchaseOrderByIds" parameterType="Long">
+        delete from inv_purchase_order where order_id in
+        <foreach collection="array" item="orderId" open="(" close=")" separator=",">
+            #{orderId}
+        </foreach>
+    </delete>
+
+</mapper>

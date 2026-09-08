@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.system.mapper.HrHealthCertificateLegacyApprovalMapper">
+
+    <!--
+      A legacy health review never had an instance table. certificate_id is a
+      stable synthetic legacyInstanceId. Native rows are excluded by the
+      approval_instance_id predicate; DRAFT was never an approval instance.
+    -->
+    <sql id="legacyHealthFrom">
+        from hr_employee_health_certificate certificate
+        left join sys_user applicant
+          on applicant.user_id = certificate.user_id
+         and applicant.del_flag = '0'
+        left join sys_dept anchor_dept
+          on anchor_dept.dept_id = certificate.dept_id_snapshot
+    </sql>
+
+    <sql id="legacyHealthFilter">
+        where certificate.del_flag = '0'
+          and certificate.approval_instance_id is null
+          and certificate.review_status in
+              ('PENDING_REVIEW', 'APPROVED', 'REJECTED')
+        <if test="query != null and query.businessId != null and query.businessId != ''">
+            and cast(certificate.certificate_id as char) = #{query.businessId}
+        </if>
+        <if test="query != null and query.status != null and query.status != ''">
+            and case certificate.review_status
+                    when 'PENDING_REVIEW' then 'RUNNING'
+                    else certificate.review_status
+                end = upper(#{query.status})
+        </if>
+    </sql>
+
+    <sql id="legacyHealthColumns">
+        'LEGACY' engineMode,
+        'HR_HEALTH_CERTIFICATE' businessCode,
+        certificate.certificate_id legacyInstanceId,
+        cast(certificate.certificate_id as char) businessId,
+        certificate.certificate_no businessNo,
+        1 businessRound,
+        case certificate.review_status
+            when 'PENDING_REVIEW' then 'RUNNING'
+            else certificate.review_status
+        end status,
+        case when certificate.review_status = 'PENDING_REVIEW'
+             then 1 else null end currentNodeOrder,
+        case when certificate.review_status = 'PENDING_REVIEW'
+             then '旧健康证人事审核' else null end currentNodeName,
+        certificate.user_id applicantUserId,
+        coalesce(nullif(trim(applicant.nick_name), ''),
+                 nullif(trim(applicant.user_name), ''),
+                 certificate.create_by) applicantName,
+        certificate.dept_id_snapshot anchorDeptId,
+        anchor_dept.dept_name anchorDeptName,
+        certificate.create_time startedTime,
+        case when certificate.review_status = 'PENDING_REVIEW' then null
+             else coalesce(certificate.reviewed_time,
+                           certificate.update_time) end finishedTime
+    </sql>
+
+    <select id="countInstances" resultType="long">
+        select count(1)
+        <include refid="legacyHealthFrom"/>
+        <include refid="legacyHealthFilter"/>
+    </select>
+
+    <select id="selectInstances"
+            resultType="com.erp.approval.api.domain.LegacyApprovalInstanceSummary">
+        select <include refid="legacyHealthColumns"/>
+        <include refid="legacyHealthFrom"/>
+        <include refid="legacyHealthFilter"/>
+        order by certificate.create_time desc,
+                 certificate.certificate_id desc
+        limit #{offset}, #{limit}
+    </select>
+
+    <select id="selectInstance"
+            resultType="com.erp.approval.api.domain.LegacyApprovalInstanceSummary">
+        select <include refid="legacyHealthColumns"/>
+        <include refid="legacyHealthFrom"/>
+        where certificate.certificate_id = #{certificateId}
+          and certificate.del_flag = '0'
+          and certificate.approval_instance_id is null
+          and certificate.review_status in
+              ('PENDING_REVIEW', 'APPROVED', 'REJECTED')
+        limit 1
+    </select>
+
+    <select id="selectTasks"
+            resultType="com.erp.approval.api.domain.LegacyApprovalTaskSummary">
+        select certificate.certificate_id taskId,
+               1 nodeOrder,
+               '旧健康证人事审核' nodeName,
+               '旧流程健康证审核负责人' candidateNames,
+               case certificate.review_status
+                   when 'PENDING_REVIEW' then 'PENDING'
+                   else certificate.review_status
+               end status,
+               case certificate.review_status
+                   when 'APPROVED' then 'APPROVE'
+                   when 'REJECTED' then 'REJECT'
+                   else null
+               end action,
+               certificate.reviewed_by_user_id operatorUserId,
+               certificate.reviewed_by_name operatorName,
+               certificate.rejection_reason comment,
+               certificate.reviewed_time actionTime
+        from hr_employee_health_certificate certificate
+        where certificate.certificate_id = #{certificateId}
+          and certificate.del_flag = '0'
+          and certificate.approval_instance_id is null
+          and certificate.review_status in
+              ('PENDING_REVIEW', 'APPROVED', 'REJECTED')
+    </select>
+</mapper>

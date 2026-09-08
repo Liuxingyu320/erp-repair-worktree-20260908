@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.system.mapper.HrOnboardingImportMapper">
+    <resultMap id="Batch" type="com.erp.system.domain.HrOnboardingImportBatch">
+        <id property="batchId" column="batch_id"/><result property="batchNo" column="batch_no"/>
+        <result property="fileName" column="file_name"/><result property="fileSize" column="file_size"/>
+        <result property="fileHash" column="file_hash"/><result property="status" column="status"/>
+        <result property="version" column="version"/><result property="totalRows" column="total_rows"/>
+        <result property="importableRows" column="importable_rows"/><result property="warningRows" column="warning_rows"/>
+        <result property="invalidRows" column="invalid_rows"/><result property="duplicateRows" column="duplicate_rows"/>
+        <result property="bindableRows" column="bindable_rows"/><result property="successRows" column="success_rows"/>
+        <result property="failureRows" column="failure_rows"/><result property="creatorUserId" column="creator_user_id"/>
+        <result property="creatorName" column="creator_name"/><result property="confirmedByUserId" column="confirmed_by_user_id"/>
+        <result property="confirmedBy" column="confirmed_by"/><result property="confirmedTime" column="confirmed_time"/>
+        <result property="expiresTime" column="expires_time"/><result property="resultSummary" column="result_summary"/>
+        <result property="createBy" column="create_by"/><result property="createTime" column="create_time"/>
+        <result property="updateBy" column="update_by"/><result property="updateTime" column="update_time"/>
+    </resultMap>
+    <resultMap id="ImportRow" type="com.erp.system.domain.HrOnboardingImportRow">
+        <id property="rowId" column="row_id"/><result property="batchId" column="batch_id"/>
+        <result property="sourceRowNumber" column="source_row_number"/><result property="category" column="category"/>
+        <result property="rowStatus" column="row_status"/><result property="version" column="version"/>
+        <result property="payloadJson" column="payload_json"/><result property="warningCodes" column="warning_codes"/>
+        <result property="errorCodes" column="error_codes"/><result property="candidateSummary" column="candidate_summary"/>
+        <result property="candidateType" column="candidate_type"/><result property="candidateUserId" column="candidate_user_id"/>
+        <result property="candidateOnboardingId" column="candidate_onboarding_id"/><result property="decision" column="decision"/>
+        <result property="bindUserId" column="bind_user_id"/><result property="resultOnboardingId" column="result_onboarding_id"/>
+        <result property="resultCode" column="result_code"/><result property="resultMessage" column="result_message"/>
+        <result property="processedByUserId" column="processed_by_user_id"/><result property="processedBy" column="processed_by"/>
+    </resultMap>
+
+    <insert id="insertBatch" useGeneratedKeys="true" keyProperty="batchId">
+        insert into hr_onboarding_import_batch
+        (batch_no,file_name,file_size,file_hash,status,version,total_rows,importable_rows,warning_rows,
+         invalid_rows,duplicate_rows,bindable_rows,success_rows,failure_rows,creator_user_id,creator_name,
+         expires_time,create_by,update_by)
+        values (#{batchNo},#{fileName},#{fileSize},#{fileHash},'PREVIEWED',0,#{totalRows},#{importableRows},
+         #{warningRows},#{invalidRows},#{duplicateRows},#{bindableRows},0,0,#{creatorUserId},#{creatorName},
+         #{expiresTime},#{createBy},#{updateBy})
+    </insert>
+    <insert id="insertRow" useGeneratedKeys="true" keyProperty="rowId">
+        insert into hr_onboarding_import_row
+        (batch_id,source_row_number,category,row_status,version,payload_json,warning_codes,error_codes,
+         candidate_summary,candidate_type,candidate_user_id,candidate_onboarding_id,create_by,update_by)
+        values (#{batchId},#{sourceRowNumber},#{category},'PREVIEWED',0,#{payloadJson},#{warningCodes},#{errorCodes},
+         #{candidateSummary},#{candidateType},#{candidateUserId},#{candidateOnboardingId},#{createBy},#{updateBy})
+    </insert>
+    <select id="selectBatchById" resultMap="Batch">select * from hr_onboarding_import_batch where batch_id=#{batchId}</select>
+    <select id="selectRowsByBatchId" resultMap="ImportRow">
+        select * from hr_onboarding_import_row where batch_id=#{batchId} order by source_row_number
+    </select>
+    <select id="selectRowByIdForUpdate" resultMap="ImportRow">
+        select * from hr_onboarding_import_row where row_id=#{rowId} for update
+    </select>
+    <update id="claimPreviewedBatch">
+        update hr_onboarding_import_batch set status='PROCESSING',version=version+1,update_by=#{operator},update_time=sysdate()
+        where batch_id=#{batchId} and status='PREVIEWED' and version=#{version} and creator_user_id=#{operatorUserId}
+    </update>
+    <update id="claimStaleProcessingBatch">
+        update hr_onboarding_import_batch set version=version+1,update_by=#{operator},update_time=sysdate()
+        where batch_id=#{batchId} and status='PROCESSING' and version=#{version}
+        and creator_user_id=#{operatorUserId} and update_time&lt;#{leaseCutoff}
+    </update>
+    <update id="heartbeatProcessingBatch">
+        update hr_onboarding_import_batch set update_by=#{operator},update_time=sysdate()
+        where batch_id=#{batchId} and status='PROCESSING' and version=#{version}
+        and creator_user_id=#{operatorUserId}
+    </update>
+    <update id="touchProcessingBatchLease">
+        update hr_onboarding_import_batch set update_by=#{operator},update_time=sysdate()
+        where batch_id=#{batchId} and status='PROCESSING' and version=#{version}
+    </update>
+    <update id="finishBatch">
+        update hr_onboarding_import_batch set status=#{status},success_rows=#{successRows},failure_rows=#{failureRows},
+        confirmed_by_user_id=#{operatorUserId},confirmed_by=#{operator},confirmed_time=sysdate(),
+        result_summary=concat('success=',#{successRows},';failure=',#{failureRows}),update_by=#{operator},update_time=sysdate()
+        where batch_id=#{batchId} and status='PROCESSING' and version=#{version}
+    </update>
+    <update id="markRowSuccess">
+        update hr_onboarding_import_row set row_status='SUCCESS',decision=decision,result_onboarding_id=#{onboardingId},
+        result_code='SUCCESS',result_message='导入成功',processed_by_user_id=#{operatorUserId},processed_by=#{operator},
+        processed_time=sysdate(),update_by=#{operator},update_time=sysdate(),version=version+1
+        where row_id=#{rowId} and batch_id=#{batchId} and row_status='PREVIEWED'
+    </update>
+    <update id="recordRowDecision">
+        update hr_onboarding_import_row set decision=#{decision},bind_user_id=#{bindUserId},update_by=#{operator},
+        update_time=sysdate() where row_id=#{rowId} and batch_id=#{batchId} and row_status='PREVIEWED'
+    </update>
+    <update id="markRowFailure">
+        update hr_onboarding_import_row set row_status='FAILED',result_code=#{resultCode},result_message=#{resultMessage},
+        processed_by_user_id=#{operatorUserId},processed_by=#{operator},processed_time=sysdate(),update_by=#{operator},
+        update_time=sysdate(),version=version+1 where row_id=#{rowId} and batch_id=#{batchId} and row_status='PREVIEWED'
+    </update>
+    <delete id="deleteRowsForExpiredBatches">
+        delete r from hr_onboarding_import_row r join
+        (select batch_id from hr_onboarding_import_batch where status in
+         <foreach collection="statuses" item="s" open="(" separator="," close=")">#{s}</foreach>
+         and create_time&lt;#{cutoff} order by batch_id limit #{limit}) expired
+        on expired.batch_id=r.batch_id
+    </delete>
+    <delete id="deleteExpiredBatches">
+        delete from hr_onboarding_import_batch where batch_id in
+        (select batch_id from (select batch_id from hr_onboarding_import_batch where status in
+         <foreach collection="statuses" item="s" open="(" separator="," close=")">#{s}</foreach>
+         and create_time&lt;#{cutoff} order by batch_id limit #{limit}) expired)
+    </delete>
+</mapper>

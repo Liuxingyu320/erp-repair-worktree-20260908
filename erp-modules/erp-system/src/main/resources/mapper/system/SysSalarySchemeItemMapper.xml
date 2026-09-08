@@ -1,0 +1,140 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.system.mapper.SysSalarySchemeItemMapper">
+
+    <resultMap id="SysSalarySchemeItemResult" type="SysSalarySchemeItem">
+        <id     property="itemId"               column="item_id"                 />
+        <result property="schemeId"             column="scheme_id"               />
+        <result property="postName"             column="post_name"               />
+        <result property="gradeName"            column="grade_name"              />
+        <result property="regionName"           column="region_name"             />
+        <result property="baseSalary"           column="base_salary"             />
+        <result property="managementAllowance"  column="management_allowance"    />
+        <result property="overtimePay"          column="overtime_pay"            />
+        <result property="rewardAllowance"      column="reward_allowance"        />
+        <result property="fullAttendanceBonus"  column="full_attendance_bonus"   />
+        <result property="socialSubsidy"        column="social_subsidy"          />
+        <result property="commuteSubsidy"       column="commute_subsidy"         />
+        <result property="totalSalary"          column="total_salary"            />
+        <result property="itemSort"             column="item_sort"               />
+        <result property="createBy"             column="create_by"               />
+        <result property="createTime"           column="create_time"             />
+        <result property="updateBy"             column="update_by"               />
+        <result property="updateTime"           column="update_time"             />
+        <result property="remark"               column="remark"                  />
+    </resultMap>
+
+    <sql id="selectSalarySchemeItemVo">
+        select item_id,
+               scheme_id,
+               post_name,
+               grade_name,
+               region_name,
+               base_salary,
+               management_allowance,
+               overtime_pay,
+               reward_allowance,
+               full_attendance_bonus,
+               social_subsidy,
+               commute_subsidy,
+               total_salary,
+               item_sort,
+               create_by,
+               create_time,
+               update_by,
+               update_time,
+               remark
+        from sys_salary_scheme_item
+    </sql>
+
+    <select id="selectSalarySchemeItemList" parameterType="SysSalarySchemeItem" resultMap="SysSalarySchemeItemResult">
+        <include refid="selectSalarySchemeItemVo"/>
+        <where>
+            <if test="schemeId != null">and scheme_id = #{schemeId}</if>
+            <if test="postName != null and postName != ''">and post_name like concat('%', #{postName}, '%')</if>
+            <if test="regionName != null and regionName != ''">and region_name like concat('%', #{regionName}, '%')</if>
+        </where>
+        order by item_sort asc, item_id asc
+    </select>
+
+    <select id="selectSalarySchemeItemsBySchemeId" parameterType="Long" resultMap="SysSalarySchemeItemResult">
+        <include refid="selectSalarySchemeItemVo"/>
+        where scheme_id = #{schemeId}
+        order by item_sort asc, item_id asc
+    </select>
+
+    <select id="selectSalarySchemeItemById" parameterType="Long" resultMap="SysSalarySchemeItemResult">
+        <include refid="selectSalarySchemeItemVo"/>
+        where item_id = #{itemId}
+    </select>
+
+    <insert id="insertSalarySchemeItem" parameterType="SysSalarySchemeItem" useGeneratedKeys="true" keyProperty="itemId">
+        insert into sys_salary_scheme_item (
+            scheme_id,
+            post_name,
+            grade_name,
+            region_name,
+            base_salary,
+            management_allowance,
+            overtime_pay,
+            reward_allowance,
+            full_attendance_bonus,
+            social_subsidy,
+            commute_subsidy,
+            total_salary,
+            item_sort,
+            remark,
+            create_by,
+            create_time
+        ) values (
+            #{schemeId},
+            #{postName},
+            #{gradeName},
+            #{regionName},
+            #{baseSalary},
+            #{managementAllowance},
+            #{overtimePay},
+            #{rewardAllowance},
+            #{fullAttendanceBonus},
+            #{socialSubsidy},
+            #{commuteSubsidy},
+            #{totalSalary},
+            #{itemSort},
+            #{remark},
+            #{createBy},
+            sysdate()
+        )
+    </insert>
+
+    <update id="updateSalarySchemeItem" parameterType="SysSalarySchemeItem">
+        update sys_salary_scheme_item
+        <set>
+            <if test="postName != null and postName != ''">post_name = #{postName},</if>
+            <if test="gradeName != null">grade_name = #{gradeName},</if>
+            <if test="regionName != null and regionName != ''">region_name = #{regionName},</if>
+            <if test="baseSalary != null">base_salary = #{baseSalary},</if>
+            <if test="managementAllowance != null">management_allowance = #{managementAllowance},</if>
+            <if test="overtimePay != null">overtime_pay = #{overtimePay},</if>
+            <if test="rewardAllowance != null">reward_allowance = #{rewardAllowance},</if>
+            <if test="fullAttendanceBonus != null">full_attendance_bonus = #{fullAttendanceBonus},</if>
+            <if test="socialSubsidy != null">social_subsidy = #{socialSubsidy},</if>
+            <if test="commuteSubsidy != null">commute_subsidy = #{commuteSubsidy},</if>
+            <if test="totalSalary != null">total_salary = #{totalSalary},</if>
+            <if test="itemSort != null">item_sort = #{itemSort},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            <if test="updateBy != null and updateBy != ''">update_by = #{updateBy},</if>
+            update_time = sysdate()
+        </set>
+        where item_id = #{itemId}
+    </update>
+
+    <delete id="deleteSalarySchemeItemsBySchemeId" parameterType="Long">
+        delete from sys_salary_scheme_item where scheme_id = #{schemeId}
+    </delete>
+
+    <delete id="deleteSalarySchemeItemById" parameterType="Long">
+        delete from sys_salary_scheme_item where item_id = #{itemId}
+    </delete>
+</mapper>

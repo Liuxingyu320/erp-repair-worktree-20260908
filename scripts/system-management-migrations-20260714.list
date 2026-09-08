@@ -1,0 +1,5 @@
+# Release A 只打包并校验这些有序迁移；executionPolicy=manual-phased，禁止一键串行执行。
+erp_system_management_expand_20260714.sql
+erp_system_management_permissions_20260714.sql
+erp_system_management_finalize_20260714.sql
+# 历史日志脱敏为单独审批作业，不进入此清单。

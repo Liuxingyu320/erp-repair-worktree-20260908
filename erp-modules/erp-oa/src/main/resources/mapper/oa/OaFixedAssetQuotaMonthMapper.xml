@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.oa.mapper.OaFixedAssetQuotaMonthMapper">
+
+    <resultMap id="OaFixedAssetQuotaMonthResult" type="OaFixedAssetQuotaMonth">
+        <id property="monthId" column="month_id"/>
+        <result property="shopDeptId" column="shop_dept_id"/>
+        <result property="shopDeptName" column="shop_dept_name"/>
+        <result property="quotaYear" column="quota_year"/>
+        <result property="quotaMonth" column="quota_month"/>
+        <result property="annualRepairRatio" column="annual_repair_ratio"/>
+        <result property="assetTotalAmount" column="asset_total_amount"/>
+        <result property="monthlyQuotaAmount" column="monthly_quota_amount"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateBy" column="update_by"/>
+        <result property="updateTime" column="update_time"/>
+        <result property="remark" column="remark"/>
+    </resultMap>
+
+    <select id="selectMonthQuota" resultMap="OaFixedAssetQuotaMonthResult">
+        select m.month_id, m.shop_dept_id, sd.dept_name as shop_dept_name, m.quota_year, m.quota_month,
+               m.annual_repair_ratio, m.asset_total_amount, m.monthly_quota_amount,
+               m.create_by, m.create_time, m.update_by, m.update_time, m.remark
+        from oa_fixed_asset_quota_month m
+        left join sys_dept sd on sd.dept_id = m.shop_dept_id
+        where m.shop_dept_id = #{shopDeptId}
+          and m.quota_year = #{quotaYear}
+          and m.quota_month = #{quotaMonth}
+    </select>
+
+    <select id="sumReleasedQuotaAmount" resultType="java.math.BigDecimal">
+        select coalesce(sum(monthly_quota_amount), 0)
+        from oa_fixed_asset_quota_month
+        where shop_dept_id = #{shopDeptId}
+          and quota_year = #{quotaYear}
+          and quota_month &lt;= #{throughMonth}
+    </select>
+
+    <insert id="insertMonthQuota" parameterType="OaFixedAssetQuotaMonth" useGeneratedKeys="true" keyProperty="monthId">
+        insert into oa_fixed_asset_quota_month (
+            shop_dept_id, quota_year, quota_month, annual_repair_ratio, asset_total_amount,
+            monthly_quota_amount, create_by, create_time, remark
+        ) values (
+            #{shopDeptId}, #{quotaYear}, #{quotaMonth}, #{annualRepairRatio}, #{assetTotalAmount},
+            #{monthlyQuotaAmount}, #{createBy}, sysdate(), #{remark}
+        )
+    </insert>
+
+    <update id="updateMonthQuota" parameterType="OaFixedAssetQuotaMonth">
+        update oa_fixed_asset_quota_month
+        set annual_repair_ratio = #{annualRepairRatio},
+            asset_total_amount = #{assetTotalAmount},
+            monthly_quota_amount = #{monthlyQuotaAmount},
+            update_by = #{updateBy},
+            update_time = sysdate(),
+            remark = #{remark}
+        where month_id = #{monthId}
+    </update>
+</mapper>

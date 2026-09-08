@@ -1,0 +1,552 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.oa.mapper.OaReimbursementMapper">
+
+    <resultMap id="ReimbursementResult" type="OaReimbursement">
+        <id property="reimbursementId" column="reimbursement_id"/>
+        <result property="reimbursementNo" column="reimbursement_no"/>
+        <result property="title" column="title"/>
+        <result property="purpose" column="purpose"/>
+        <result property="applicantId" column="applicant_id"/>
+        <result property="applicantName" column="applicant_name"/>
+        <result property="applicantNickName" column="applicant_nick_name"/>
+        <result property="applicantDeptId" column="applicant_dept_id"/>
+        <result property="applicantDeptName" column="applicant_dept_name"/>
+        <result property="shopDeptId" column="shop_dept_id"/>
+        <result property="shopDeptName" column="shop_dept_name"/>
+        <result property="totalAmount" column="total_amount"/>
+        <result property="status" column="status"/>
+        <result property="exportStatus" column="export_status"/>
+        <result property="submittedTime" column="submitted_time"/>
+        <result property="approvedTime" column="approved_time"/>
+        <result property="lastExportTime" column="last_export_time"/>
+        <result property="approvalInstanceId" column="approval_instance_id"/>
+        <result property="approvalRound" column="approval_round"/>
+        <result property="rowVersion" column="row_version"/>
+        <result property="lastApprovalEventKey" column="last_approval_event_key"/>
+        <result property="invoiceCount" column="invoice_count"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateBy" column="update_by"/>
+        <result property="updateTime" column="update_time"/>
+        <result property="remark" column="remark"/>
+    </resultMap>
+
+    <resultMap id="ItemResult" type="OaReimbursementItem">
+        <id property="itemId" column="item_id"/>
+        <result property="reimbursementId" column="reimbursement_id"/>
+        <result property="sourceInvoiceId" column="source_invoice_id"/>
+        <result property="expenseType" column="expense_type"/>
+        <result property="expenseDate" column="expense_date"/>
+        <result property="merchantName" column="merchant_name"/>
+        <result property="description" column="description"/>
+        <result property="claimedAmount" column="claimed_amount"/>
+        <result property="sortNo" column="sort_no"/>
+    </resultMap>
+
+    <resultMap id="InvoiceResult" type="OaReimbursementInvoice">
+        <id property="invoiceId" column="invoice_id"/>
+        <result property="reimbursementId" column="reimbursement_id"/>
+        <result property="itemId" column="item_id"/>
+        <result property="originalName" column="original_name"/>
+        <result property="storedName" column="stored_name"/>
+        <result property="storagePath" column="storage_path"/>
+        <result property="contentType" column="content_type"/>
+        <result property="fileExtension" column="file_extension"/>
+        <result property="fileSize" column="file_size"/>
+        <result property="sha256" column="sha256"/>
+        <result property="duplicateStatus" column="duplicate_status"/>
+        <result property="duplicateReimbursementId" column="duplicate_reimbursement_id"/>
+        <result property="recognitionStatus" column="recognition_status"/>
+        <result property="requestedEngine" column="requested_engine"/>
+        <result property="recognitionEngine" column="recognition_engine"/>
+        <result property="recognitionProvider" column="recognition_provider"/>
+        <result property="recognitionMessage" column="recognition_message"/>
+        <result property="invoiceType" column="invoice_type"/>
+        <result property="invoiceCode" column="invoice_code"/>
+        <result property="invoiceNumber" column="invoice_number"/>
+        <result property="invoiceDate" column="invoice_date"/>
+        <result property="sellerName" column="seller_name"/>
+        <result property="sellerTaxNo" column="seller_tax_no"/>
+        <result property="purchaserName" column="purchaser_name"/>
+        <result property="purchaserTaxNo" column="purchaser_tax_no"/>
+        <result property="amountWithoutTax" column="amount_without_tax"/>
+        <result property="taxAmount" column="tax_amount"/>
+        <result property="invoiceTotalAmount" column="invoice_total_amount"/>
+        <result property="checkCode" column="check_code"/>
+        <result property="serviceType" column="service_type"/>
+        <result property="commoditySummary" column="commodity_summary"/>
+        <result property="recognitionConfidence" column="recognition_confidence"/>
+        <result property="recognitionRawText" column="recognition_raw_text"/>
+        <result property="recognitionRawPayload" column="recognition_raw_payload"/>
+        <result property="recognizedTime" column="recognized_time"/>
+        <result property="correctedBy" column="corrected_by"/>
+        <result property="correctedTime" column="corrected_time"/>
+        <result property="sortNo" column="sort_no"/>
+        <result property="uploadedBy" column="uploaded_by"/>
+        <result property="uploadedByName" column="uploaded_by_name"/>
+        <result property="createTime" column="create_time"/>
+    </resultMap>
+
+    <sql id="invoiceColumns">
+        i.invoice_id, i.reimbursement_id, i.item_id, i.original_name,
+        i.stored_name, i.storage_path, i.content_type, i.file_extension,
+        i.file_size, i.sha256, i.duplicate_status,
+        i.duplicate_reimbursement_id, i.sort_no, i.uploaded_by,
+        i.uploaded_by_name, i.create_time,
+        coalesce(rec.recognition_status, 'pending') as recognition_status,
+        coalesce(rec.requested_engine, 'auto') as requested_engine,
+        rec.recognition_engine, rec.recognition_provider,
+        rec.recognition_message, rec.invoice_type, rec.invoice_code,
+        rec.invoice_number, rec.invoice_date, rec.seller_name,
+        rec.seller_tax_no, rec.purchaser_name, rec.purchaser_tax_no,
+        rec.amount_without_tax, rec.tax_amount, rec.invoice_total_amount,
+        rec.check_code, rec.service_type, rec.commodity_summary,
+        rec.recognition_confidence, rec.recognition_raw_text,
+        rec.recognition_raw_payload, rec.recognized_time,
+        rec.corrected_by, rec.corrected_time
+    </sql>
+
+    <resultMap id="ExportBatchResult" type="OaReimbursementExportBatch">
+        <id property="batchId" column="batch_id"/>
+        <result property="batchNo" column="batch_no"/>
+        <result property="reimbursementCount" column="reimbursement_count"/>
+        <result property="itemCount" column="item_count"/>
+        <result property="invoiceCount" column="invoice_count"/>
+        <result property="totalAmount" column="total_amount"/>
+        <result property="archiveName" column="archive_name"/>
+        <result property="archivePath" column="archive_path"/>
+        <result property="archiveSize" column="archive_size"/>
+        <result property="archiveSha256" column="archive_sha256"/>
+        <result property="createdByUserId" column="created_by_user_id"/>
+        <result property="createdByName" column="created_by_name"/>
+        <result property="createTime" column="create_time"/>
+    </resultMap>
+
+    <sql id="baseColumns">
+        r.reimbursement_id, r.reimbursement_no, r.title, r.purpose,
+        r.applicant_id, r.applicant_name, u.nick_name as applicant_nick_name,
+        r.applicant_dept_id, applicant_dept.dept_name as applicant_dept_name,
+        r.shop_dept_id, shop_dept.dept_name as shop_dept_name,
+        r.total_amount, r.status, r.export_status, r.submitted_time,
+        r.approved_time, r.last_export_time, r.approval_instance_id,
+        r.approval_round, r.row_version, r.last_approval_event_key,
+        (select count(*) from oa_reimbursement_invoice invoice_count_row
+         where invoice_count_row.reimbursement_id = r.reimbursement_id) as invoice_count,
+        r.create_by, r.create_time, r.update_by, r.update_time, r.remark
+    </sql>
+
+    <sql id="fromReadable">
+        from oa_reimbursement r
+        left join sys_user u on u.user_id = r.applicant_id
+        left join sys_dept applicant_dept
+          on applicant_dept.dept_id = r.applicant_dept_id
+        left join sys_dept shop_dept on shop_dept.dept_id = r.shop_dept_id
+    </sql>
+
+    <sql id="listFilters">
+        <if test="title != null and title != ''">
+            and (
+                r.title like concat('%', #{title}, '%')
+                or r.reimbursement_no like concat('%', #{title}, '%')
+            )
+        </if>
+        <if test="status != null and status != ''">
+            and r.status = #{status}
+        </if>
+        <if test="exportStatus != null and exportStatus != ''">
+            and r.export_status = #{exportStatus}
+        </if>
+        <if test="applicantName != null and applicantName != ''">
+            and (r.applicant_name like concat('%', #{applicantName}, '%')
+              or u.nick_name like concat('%', #{applicantName}, '%'))
+        </if>
+        <if test="params.beginTime != null and params.beginTime != ''">
+            and r.create_time &gt;= #{params.beginTime}
+        </if>
+        <if test="params.endTime != null and params.endTime != ''">
+            and r.create_time &lt;= #{params.endTime}
+        </if>
+        <if test="params.scopeDeptIds != null and params.scopeDeptIds.size() > 0">
+            and r.shop_dept_id in
+            <foreach collection="params.scopeDeptIds" item="deptId"
+                    open="(" close=")" separator=",">
+                #{deptId}
+            </foreach>
+        </if>
+    </sql>
+
+    <insert id="insertReimbursement" parameterType="OaReimbursement"
+            useGeneratedKeys="true" keyProperty="reimbursementId">
+        insert into oa_reimbursement (
+            reimbursement_no, title, purpose, applicant_id, applicant_name,
+            applicant_dept_id, shop_dept_id, total_amount, status,
+            export_status, approval_instance_id, approval_round, row_version,
+            last_approval_event_key, create_by, create_time, remark
+        ) values (
+            #{reimbursementNo}, #{title}, #{purpose}, #{applicantId},
+            #{applicantName}, #{applicantDeptId}, #{shopDeptId},
+            #{totalAmount}, #{status}, #{exportStatus},
+            #{approvalInstanceId}, coalesce(#{approvalRound}, 0), 0,
+            #{lastApprovalEventKey}, #{createBy}, sysdate(), #{remark}
+        )
+    </insert>
+
+    <update id="updateReimbursement" parameterType="OaReimbursement">
+        update oa_reimbursement
+        <set>
+            <if test="title != null">title = #{title},</if>
+            <if test="purpose != null">purpose = #{purpose},</if>
+            <if test="totalAmount != null">total_amount = #{totalAmount},</if>
+            <if test="status != null and status != ''">status = #{status},</if>
+            <if test="exportStatus != null and exportStatus != ''">
+                export_status = #{exportStatus},
+            </if>
+            <if test="approvalInstanceId != null">
+                approval_instance_id = #{approvalInstanceId},
+            </if>
+            <if test="approvalRound != null">approval_round = #{approvalRound},</if>
+            <if test="lastApprovalEventKey != null and lastApprovalEventKey != ''">
+                last_approval_event_key = #{lastApprovalEventKey},
+            </if>
+            <if test="submittedTime != null">submitted_time = #{submittedTime},</if>
+            <if test="approvedTime != null">approved_time = #{approvedTime},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            update_time = sysdate(), row_version = row_version + 1
+        </set>
+        where reimbursement_id = #{reimbursementId}
+          and row_version = #{rowVersion}
+    </update>
+
+    <update id="markApprovalSubmitting">
+        update oa_reimbursement
+        set status = 'submitting', approval_instance_id = null,
+            approval_round = #{businessRound},
+            last_approval_event_key = null, submitted_time = sysdate(),
+            update_by = #{updateBy}, update_time = sysdate(),
+            row_version = row_version + 1
+        where reimbursement_id = #{reimbursementId}
+          and status = #{expectedStatus}
+          and row_version = #{expectedVersion}
+    </update>
+
+    <update id="finalizeApprovalStart">
+        update oa_reimbursement
+        set status = 'pending', approval_instance_id = #{instanceId},
+            update_by = #{updateBy}, update_time = sysdate(),
+            row_version = row_version + 1
+        where reimbursement_id = #{reimbursementId}
+          and status = 'submitting'
+          and approval_round = #{businessRound}
+          and row_version = #{expectedVersion}
+          and approval_instance_id is null
+    </update>
+
+    <select id="selectById" resultMap="ReimbursementResult">
+        select <include refid="baseColumns"/> <include refid="fromReadable"/>
+        where r.reimbursement_id = #{reimbursementId}
+    </select>
+
+    <select id="selectByIdForUpdate" resultMap="ReimbursementResult">
+        select <include refid="baseColumns"/> <include refid="fromReadable"/>
+        where r.reimbursement_id = #{reimbursementId}
+        for update
+    </select>
+
+    <select id="selectMyList" parameterType="OaReimbursement"
+            resultMap="ReimbursementResult">
+        select <include refid="baseColumns"/> <include refid="fromReadable"/>
+        <where>
+            r.applicant_id = #{applicantId}
+            <include refid="listFilters"/>
+        </where>
+        order by r.reimbursement_id desc
+    </select>
+
+    <select id="selectFinanceList" parameterType="OaReimbursement"
+            resultMap="ReimbursementResult">
+        select <include refid="baseColumns"/> <include refid="fromReadable"/>
+        <where>
+            r.status = 'approved'
+            <include refid="listFilters"/>
+        </where>
+        order by r.approved_time desc, r.reimbursement_id desc
+    </select>
+
+    <select id="selectFinanceListByIds" resultMap="ReimbursementResult">
+        select <include refid="baseColumns"/> <include refid="fromReadable"/>
+        where r.status = 'approved'
+          and r.reimbursement_id in
+          <foreach collection="reimbursementIds" item="id"
+                  open="(" close=")" separator=",">#{id}</foreach>
+        <if test="scopeDeptIds != null and scopeDeptIds.size() > 0">
+          and r.shop_dept_id in
+          <foreach collection="scopeDeptIds" item="deptId"
+                  open="(" close=")" separator=",">#{deptId}</foreach>
+        </if>
+        order by r.reimbursement_id
+    </select>
+
+    <delete id="deleteItemsByReimbursementId">
+        delete from oa_reimbursement_item
+        where reimbursement_id = #{reimbursementId}
+    </delete>
+
+    <update id="clearInvoiceItemLinks">
+        update oa_reimbursement_invoice
+        set item_id = null
+        where reimbursement_id = #{reimbursementId}
+    </update>
+
+    <insert id="insertItem" parameterType="OaReimbursementItem"
+            useGeneratedKeys="true" keyProperty="itemId">
+        insert into oa_reimbursement_item (
+            reimbursement_id, expense_type, expense_date, merchant_name,
+            description, claimed_amount, sort_no, create_time
+        ) values (
+            #{reimbursementId}, #{expenseType}, #{expenseDate}, #{merchantName},
+            #{description}, #{claimedAmount}, #{sortNo}, sysdate()
+        )
+    </insert>
+
+    <update id="bindInvoiceItem">
+        update oa_reimbursement_invoice
+        set item_id = #{itemId}
+        where invoice_id = #{invoiceId}
+          and reimbursement_id = #{reimbursementId}
+    </update>
+
+    <delete id="deleteItem">
+        delete from oa_reimbursement_item
+        where item_id = #{itemId}
+          and reimbursement_id = #{reimbursementId}
+    </delete>
+
+    <select id="selectItemsByReimbursementId" resultMap="ItemResult">
+        select item_id, reimbursement_id, expense_type, expense_date,
+               merchant_name, description, claimed_amount, sort_no,
+               (select min(invoice.invoice_id)
+                from oa_reimbursement_invoice invoice
+                where invoice.reimbursement_id = item.reimbursement_id
+                  and invoice.item_id = item.item_id)
+                    as source_invoice_id
+        from oa_reimbursement_item item
+        where item.reimbursement_id = #{reimbursementId}
+        order by item.sort_no, item.item_id
+    </select>
+
+    <select id="countInvoices" resultType="java.lang.Integer">
+        select count(*) from oa_reimbursement_invoice
+        where reimbursement_id = #{reimbursementId}
+    </select>
+
+    <select id="selectInvoiceByReimbursementAndSha"
+            resultMap="InvoiceResult">
+        select <include refid="invoiceColumns"/>
+        from oa_reimbursement_invoice i
+        left join oa_reimbursement_invoice_recognition rec
+          on rec.invoice_id = i.invoice_id
+        where i.reimbursement_id = #{reimbursementId}
+          and i.sha256 = #{sha256}
+        order by i.invoice_id
+        limit 1
+    </select>
+
+    <insert id="insertInvoice" parameterType="OaReimbursementInvoice"
+            useGeneratedKeys="true" keyProperty="invoiceId">
+        insert into oa_reimbursement_invoice (
+            reimbursement_id, item_id, original_name, stored_name,
+            storage_path, content_type, file_extension, file_size, sha256,
+            duplicate_status, duplicate_reimbursement_id, sort_no,
+            uploaded_by, uploaded_by_name, create_time
+        ) values (
+            #{reimbursementId}, #{itemId}, #{originalName}, #{storedName},
+            #{storagePath}, #{contentType}, #{fileExtension}, #{fileSize},
+            #{sha256}, #{duplicateStatus}, #{duplicateReimbursementId},
+            #{sortNo}, #{uploadedBy}, #{uploadedByName}, sysdate()
+        )
+    </insert>
+
+    <select id="selectInvoiceById" resultMap="InvoiceResult">
+        select <include refid="invoiceColumns"/>
+        from oa_reimbursement_invoice i
+        left join oa_reimbursement_invoice_recognition rec
+          on rec.invoice_id = i.invoice_id
+        where i.invoice_id = #{invoiceId}
+    </select>
+
+    <select id="selectInvoicesByReimbursementId" resultMap="InvoiceResult">
+        select <include refid="invoiceColumns"/>
+        from oa_reimbursement_invoice i
+        left join oa_reimbursement_invoice_recognition rec
+          on rec.invoice_id = i.invoice_id
+        where i.reimbursement_id = #{reimbursementId}
+        order by i.sort_no, i.invoice_id
+    </select>
+
+    <insert id="upsertInvoiceRecognition"
+            parameterType="OaReimbursementInvoice">
+        insert into oa_reimbursement_invoice_recognition (
+            invoice_id, reimbursement_id, recognition_status,
+            requested_engine, recognition_engine, recognition_provider,
+            recognition_message, invoice_type, invoice_code, invoice_number,
+            invoice_date, seller_name, seller_tax_no, purchaser_name,
+            purchaser_tax_no, amount_without_tax, tax_amount,
+            invoice_total_amount, check_code, service_type,
+            commodity_summary, recognition_confidence,
+            recognition_raw_text, recognition_raw_payload, recognized_time,
+            corrected_by, corrected_time, create_time, update_time
+        ) values (
+            #{invoiceId}, #{reimbursementId}, #{recognitionStatus},
+            #{requestedEngine}, #{recognitionEngine}, #{recognitionProvider},
+            #{recognitionMessage}, #{invoiceType}, #{invoiceCode},
+            #{invoiceNumber}, #{invoiceDate}, #{sellerName}, #{sellerTaxNo},
+            #{purchaserName}, #{purchaserTaxNo}, #{amountWithoutTax},
+            #{taxAmount}, #{invoiceTotalAmount}, #{checkCode},
+            #{serviceType}, #{commoditySummary}, #{recognitionConfidence},
+            #{recognitionRawText}, #{recognitionRawPayload}, sysdate(),
+            #{correctedBy}, #{correctedTime}, sysdate(), sysdate()
+        )
+        on duplicate key update
+            recognition_status = values(recognition_status),
+            requested_engine = values(requested_engine),
+            recognition_engine = values(recognition_engine),
+            recognition_provider = values(recognition_provider),
+            recognition_message = values(recognition_message),
+            invoice_type = values(invoice_type),
+            invoice_code = values(invoice_code),
+            invoice_number = values(invoice_number),
+            invoice_date = values(invoice_date),
+            seller_name = values(seller_name),
+            seller_tax_no = values(seller_tax_no),
+            purchaser_name = values(purchaser_name),
+            purchaser_tax_no = values(purchaser_tax_no),
+            amount_without_tax = values(amount_without_tax),
+            tax_amount = values(tax_amount),
+            invoice_total_amount = values(invoice_total_amount),
+            check_code = values(check_code),
+            service_type = values(service_type),
+            commodity_summary = values(commodity_summary),
+            recognition_confidence = values(recognition_confidence),
+            recognition_raw_text = values(recognition_raw_text),
+            recognition_raw_payload = values(recognition_raw_payload),
+            recognized_time = values(recognized_time),
+            corrected_by = values(corrected_by),
+            corrected_time = values(corrected_time),
+            update_time = sysdate()
+    </insert>
+
+    <select id="selectApprovedDuplicateReimbursement"
+            resultType="java.lang.Long">
+        select i.reimbursement_id
+        from oa_reimbursement_invoice i
+        join oa_reimbursement r
+          on r.reimbursement_id = i.reimbursement_id
+        where i.sha256 = #{sha256}
+          and i.reimbursement_id != #{reimbursementId}
+          and r.status = 'approved'
+        order by i.invoice_id
+        limit 1
+    </select>
+
+    <select id="selectApprovedDuplicateByNumber"
+            resultType="java.lang.Long">
+        select rec.reimbursement_id
+        from oa_reimbursement_invoice_recognition rec
+        join oa_reimbursement r
+          on r.reimbursement_id = rec.reimbursement_id
+        where rec.invoice_number = #{invoiceNumber}
+          and rec.reimbursement_id != #{reimbursementId}
+          and r.status = 'approved'
+        <if test="invoiceCode != null and invoiceCode != ''">
+          and rec.invoice_code = #{invoiceCode}
+        </if>
+        order by rec.invoice_id
+        limit 1
+    </select>
+
+    <select id="countInvoicesNotReady"
+            resultType="java.lang.Integer">
+        select count(*)
+        from oa_reimbursement_invoice i
+        left join oa_reimbursement_invoice_recognition rec
+          on rec.invoice_id = i.invoice_id
+        where i.reimbursement_id = #{reimbursementId}
+          and (rec.recognition_status is null
+            or rec.recognition_status not in
+                ('succeeded', 'partial', 'corrected'))
+    </select>
+
+    <update id="updateInvoiceDuplicate">
+        update oa_reimbursement_invoice
+        set duplicate_status = #{duplicateStatus},
+            duplicate_reimbursement_id = #{duplicateReimbursementId}
+        where invoice_id = #{invoiceId}
+          and reimbursement_id = #{reimbursementId}
+    </update>
+
+    <delete id="deleteInvoiceRecognition">
+        delete from oa_reimbursement_invoice_recognition
+        where invoice_id = #{invoiceId}
+          and reimbursement_id = #{reimbursementId}
+    </delete>
+
+    <delete id="deleteInvoice">
+        delete from oa_reimbursement_invoice
+        where invoice_id = #{invoiceId}
+          and reimbursement_id = #{reimbursementId}
+    </delete>
+
+    <insert id="insertExportBatch" parameterType="OaReimbursementExportBatch"
+            useGeneratedKeys="true" keyProperty="batchId">
+        insert into oa_reimbursement_export_batch (
+            batch_no, reimbursement_count, item_count, invoice_count,
+            total_amount, archive_name, archive_path, archive_size,
+            archive_sha256, created_by_user_id, created_by_name, create_time
+        ) values (
+            #{batchNo}, #{reimbursementCount}, #{itemCount}, #{invoiceCount},
+            #{totalAmount}, #{archiveName}, #{archivePath}, #{archiveSize},
+            #{archiveSha256}, #{createdByUserId}, #{createdByName}, sysdate()
+        )
+    </insert>
+
+    <insert id="insertExportBatchItem">
+        insert into oa_reimbursement_export_batch_item (
+            batch_id, reimbursement_id, reimbursement_no, applicant_id,
+            applicant_name, shop_dept_id, total_amount, approved_time,
+            create_time
+        ) values (
+            #{batchId}, #{reimbursement.reimbursementId},
+            #{reimbursement.reimbursementNo},
+            #{reimbursement.applicantId},
+            coalesce(#{reimbursement.applicantNickName},
+                     #{reimbursement.applicantName}),
+            #{reimbursement.shopDeptId},
+            #{reimbursement.totalAmount},
+            #{reimbursement.approvedTime}, sysdate()
+        )
+    </insert>
+
+    <select id="selectExportBatchById" resultMap="ExportBatchResult">
+        select batch_id, batch_no, reimbursement_count, item_count,
+               invoice_count, total_amount, archive_name, archive_path,
+               archive_size, archive_sha256, created_by_user_id,
+               created_by_name, create_time
+        from oa_reimbursement_export_batch
+        where batch_id = #{batchId}
+    </select>
+
+    <update id="markExported">
+        update oa_reimbursement
+        set export_status = 'exported', last_export_time = sysdate(),
+            update_by = #{updateBy}, update_time = sysdate(),
+            row_version = row_version + 1
+        where status = 'approved'
+          and reimbursement_id in
+          <foreach collection="reimbursementIds" item="id"
+                  open="(" close=")" separator=",">#{id}</foreach>
+    </update>
+</mapper>

@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.inventory.mapper.InvSalesDetailMapper">
+
+    <resultMap type="InvSalesDetail" id="InvSalesDetailResult">
+        <id property="detailId" column="detail_id"/>
+        <result property="orderId" column="order_id"/>
+        <result property="itemType" column="item_type"/>
+        <result property="itemId" column="item_id"/>
+        <result property="itemCode" column="item_code"/>
+        <result property="itemName" column="item_name"/>
+        <result property="productId" column="product_id"/>
+        <result property="warehouseId" column="warehouse_id"/>
+        <result property="productName" column="product_name"/>
+        <result property="sku" column="sku"/>
+        <result property="spec" column="spec"/>
+        <result property="unit" column="unit"/>
+        <result property="quantity" column="quantity"/>
+        <result property="unitPrice" column="unit_price"/>
+        <result property="amount" column="amount"/>
+        <result property="deliveredQuantity" column="delivered_quantity"/>
+    </resultMap>
+
+    <select id="selectInvSalesDetailByOrderId" parameterType="Long" resultMap="InvSalesDetailResult">
+        select detail_id, order_id, item_type, item_id, item_code, item_name,
+               product_id, warehouse_id, product_name, sku, spec, unit,
+               quantity, unit_price, amount, delivered_quantity
+        from inv_sales_detail
+        where order_id = #{orderId}
+    </select>
+
+    <select id="selectInvSalesDetailByOrderIdForUpdate" parameterType="Long" resultMap="InvSalesDetailResult">
+        select detail_id, order_id, item_type, item_id, item_code, item_name,
+               product_id, warehouse_id, product_name, sku, spec, unit,
+               quantity, unit_price, amount, delivered_quantity
+        from inv_sales_detail
+        where order_id = #{orderId} for update
+    </select>
+
+    <insert id="insertInvSalesDetail" parameterType="InvSalesDetail" useGeneratedKeys="true" keyProperty="detailId">
+        insert into inv_sales_detail (
+            order_id, item_type, item_id, item_code, item_name,
+            product_id, warehouse_id, product_name, sku, spec, unit,
+            quantity, unit_price, amount, delivered_quantity
+        ) values (
+            #{orderId}, coalesce(#{itemType}, 'product'), coalesce(#{itemId}, #{productId}), #{itemCode}, #{itemName},
+            #{productId}, #{warehouseId}, #{productName}, #{sku}, #{spec}, #{unit},
+            #{quantity}, #{unitPrice}, #{amount}, #{deliveredQuantity}
+        )
+    </insert>
+
+    <update id="updateInvSalesDetail" parameterType="InvSalesDetail">
+        update inv_sales_detail
+        <set>
+            <if test="warehouseId != null">warehouse_id = #{warehouseId},</if>
+            <if test="deliveredQuantity != null">delivered_quantity = #{deliveredQuantity},</if>
+        </set>
+        where detail_id = #{detailId}
+    </update>
+
+    <delete id="deleteInvSalesDetailByOrderId" parameterType="Long">
+        delete from inv_sales_detail where order_id = #{orderId}
+    </delete>
+
+    <insert id="batchInsertInvSalesDetail" parameterType="list">
+        insert into inv_sales_detail (
+            order_id, item_type, item_id, item_code, item_name,
+            product_id, warehouse_id, product_name, sku, spec, unit,
+            quantity, unit_price, amount, delivered_quantity
+        ) values
+        <foreach collection="list" item="item" separator=",">
+            (#{item.orderId}, coalesce(#{item.itemType}, 'product'), coalesce(#{item.itemId}, #{item.productId}), #{item.itemCode}, #{item.itemName},
+            #{item.productId}, #{item.warehouseId}, #{item.productName}, #{item.sku}, #{item.spec}, #{item.unit},
+            #{item.quantity}, #{item.unitPrice}, #{item.amount}, #{item.deliveredQuantity})
+        </foreach>
+    </insert>
+
+</mapper>

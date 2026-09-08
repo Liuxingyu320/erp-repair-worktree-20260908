@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.oa.mapper.OaSignFinalConfirmationMapper">
+    <resultMap id="FinalConfirmationResult" type="com.erp.oa.domain.OaSignFinalConfirmation">
+        <id property="confirmationId" column="confirmation_id"/>
+        <result property="packageId" column="package_id"/>
+        <result property="employeeId" column="employee_id"/>
+        <result property="finalDocumentVersion" column="final_document_version"/>
+        <result property="documentRootHash" column="document_root_hash"/>
+        <result property="confirmationText" column="confirmation_text"/>
+        <result property="identityMethod" column="identity_method"/>
+        <result property="requestId" column="request_id"/>
+        <result property="ipAddress" column="ip_address"/>
+        <result property="userAgent" column="user_agent"/>
+        <result property="confirmedTime" column="confirmed_time"/>
+    </resultMap>
+
+    <resultMap id="FinalConfirmationDocumentResult"
+            type="com.erp.oa.domain.OaSignFinalConfirmationDocument">
+        <id property="confirmationDocumentId" column="confirmation_document_id"/>
+        <result property="confirmationId" column="confirmation_id"/>
+        <result property="packageId" column="package_id"/>
+        <result property="documentId" column="document_id"/>
+        <result property="finalDocumentVersion" column="final_document_version"/>
+        <result property="finalPdfHash" column="final_pdf_hash"/>
+    </resultMap>
+
+    <select id="selectByRequestId" resultMap="FinalConfirmationResult">
+        select confirmation_id, package_id, employee_id, final_document_version,
+               document_root_hash, confirmation_text, identity_method, request_id,
+               ip_address, user_agent, confirmed_time
+        from oa_sign_final_confirmation where request_id = #{requestId} limit 1
+    </select>
+
+    <select id="selectByPackageAndVersion" resultMap="FinalConfirmationResult">
+        select confirmation_id, package_id, employee_id, final_document_version,
+               document_root_hash, confirmation_text, identity_method, request_id,
+               ip_address, user_agent, confirmed_time
+        from oa_sign_final_confirmation
+        where package_id = #{packageId} and final_document_version = #{finalDocumentVersion}
+        limit 1
+    </select>
+
+    <select id="selectDocumentsByPackageAndVersion"
+            resultMap="FinalConfirmationDocumentResult">
+        select confirmation_document_id, confirmation_id, package_id, document_id,
+               final_document_version, final_pdf_hash
+        from oa_sign_final_confirmation_document
+        where package_id = #{packageId}
+          and final_document_version = #{finalDocumentVersion}
+        order by document_id, confirmation_document_id
+    </select>
+
+    <insert id="insertConfirmation" parameterType="com.erp.oa.domain.OaSignFinalConfirmation"
+            useGeneratedKeys="true" keyProperty="confirmationId">
+        insert into oa_sign_final_confirmation (
+            package_id, employee_id, final_document_version, document_root_hash,
+            confirmation_text, identity_method, request_id, ip_address, user_agent,
+            confirmed_time, create_time
+        ) values (
+            #{packageId}, #{employeeId}, #{finalDocumentVersion}, #{documentRootHash},
+            #{confirmationText}, #{identityMethod}, #{requestId}, #{ipAddress}, #{userAgent},
+            #{confirmedTime}, sysdate()
+        )
+    </insert>
+
+    <insert id="insertConfirmationDocument"
+            parameterType="com.erp.oa.domain.OaSignFinalConfirmationDocument"
+            useGeneratedKeys="true" keyProperty="confirmationDocumentId">
+        insert into oa_sign_final_confirmation_document (
+            confirmation_id, package_id, document_id, final_document_version,
+            final_pdf_hash, create_time
+        ) values (
+            #{confirmationId}, #{packageId}, #{documentId}, #{finalDocumentVersion},
+            #{finalPdfHash}, sysdate()
+        )
+    </insert>
+
+    <select id="countByPackageId" resultType="int">
+        select count(*) from oa_sign_final_confirmation where package_id = #{packageId}
+    </select>
+
+    <delete id="deleteConfirmationDocumentsByPackageId">
+        delete from oa_sign_final_confirmation_document where package_id = #{packageId}
+    </delete>
+
+    <delete id="deleteConfirmationsByPackageId">
+        delete from oa_sign_final_confirmation where package_id = #{packageId}
+    </delete>
+</mapper>

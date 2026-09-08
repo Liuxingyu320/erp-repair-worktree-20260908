@@ -1,0 +1,416 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.inventory.mapper.InvStockMapper">
+
+    <resultMap type="InvStock" id="InvStockResult">
+        <id property="stockId" column="stock_id"/>
+        <result property="itemType" column="item_type"/>
+        <result property="itemId" column="item_id"/>
+        <result property="productId" column="product_id"/>
+        <result property="itemCode" column="item_code"/>
+        <result property="itemName" column="item_name"/>
+        <result property="productName" column="product_name"/>
+        <result property="productCode" column="product_code"/>
+        <result property="categoryId" column="category_id"/>
+        <result property="categoryName" column="category_name"/>
+        <result property="categoryFullPath" column="category_full_path"/>
+        <result property="itemCategoryName" column="item_category_name"/>
+        <result property="itemCategoryFullPath" column="item_category_full_path"/>
+        <result property="grade" column="grade"/>
+        <result property="spec" column="spec"/>
+        <result property="unit" column="unit"/>
+        <result property="itemUnit" column="item_unit"/>
+        <result property="itemSpec" column="item_spec"/>
+        <result property="itemGrade" column="item_grade"/>
+        <result property="imageUrl" column="image_url"/>
+        <result property="packageImageUrl" column="package_image_url"/>
+        <result property="dryTeaImageUrl" column="dry_tea_image_url"/>
+        <result property="teaSoupImageUrl" column="tea_soup_image_url"/>
+        <result property="leafBottomImageUrl" column="leaf_bottom_image_url"/>
+        <result property="extraImageUrl" column="extra_image_url"/>
+        <result property="shopDeptId" column="shop_dept_id"/>
+        <result property="shopDeptName" column="shop_dept_name"/>
+        <result property="warehouseId" column="warehouse_id"/>
+        <result property="warehouseName" column="warehouse_name"/>
+        <result property="batchNo" column="batch_no"/>
+        <result property="expiryDate" column="expiry_date"/>
+        <result property="serialNo" column="serial_no"/>
+        <result property="locationCode" column="location_code"/>
+        <result property="locationName" column="location_name"/>
+        <result property="currentQuantity" column="current_quantity"/>
+        <result property="lockedQuantity" column="locked_quantity"/>
+        <result property="availableQuantity" column="available_quantity"/>
+        <result property="costPrice" column="cost_price"/>
+        <result property="referenceCostPrice" column="reference_cost_price"/>
+        <result property="totalCost" column="total_cost"/>
+        <result property="version" column="version"/>
+        <result property="safetyStockMin" column="safety_stock_min"/>
+        <result property="lastInTime" column="last_in_time"/>
+        <result property="lastOutTime" column="last_out_time"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateBy" column="update_by"/>
+        <result property="updateTime" column="update_time"/>
+        <result property="remark" column="remark"/>
+    </resultMap>
+
+    <resultMap type="com.erp.inventory.domain.vo.InvStockSummary" id="InvStockSummaryResult">
+        <result property="stockItemCount" column="stock_item_count"/>
+        <result property="shopCount" column="shop_count"/>
+        <result property="warehouseCount" column="warehouse_count"/>
+        <result property="warningCount" column="warning_count"/>
+        <result property="lowStockCount" column="low_stock_count"/>
+        <result property="zeroStockCount" column="zero_stock_count"/>
+        <result property="totalCurrentQuantity" column="total_current_quantity"/>
+        <result property="totalLockedQuantity" column="total_locked_quantity"/>
+        <result property="totalAvailableQuantity" column="total_available_quantity"/>
+        <result property="totalCost" column="total_cost"/>
+        <result property="myWarehouseQuantity" column="my_warehouse_quantity"/>
+        <result property="otherShopQuantity" column="other_shop_quantity"/>
+    </resultMap>
+
+    <sql id="selectInvStockVo">
+        select s.stock_id, coalesce(s.item_type, 'product') as item_type,
+               coalesce(s.item_id, s.product_id) as item_id,
+               s.product_id,
+               case coalesce(s.item_type, 'product')
+                    when 'oe' then oe.oe_item_code
+                    when 'gift' then gift.gift_code
+                    else p.product_code
+               end as item_code,
+               case coalesce(s.item_type, 'product')
+                    when 'oe' then oe.oe_item_name
+                    when 'gift' then gift.gift_name
+                    else p.product_name
+               end as item_name,
+               s.shop_dept_id, shop_dept.dept_name as shop_dept_name,
+               s.warehouse_id, warehouse_dept.dept_name as warehouse_name, s.current_quantity,
+               s.locked_quantity, s.available_quantity, s.cost_price, s.total_cost,
+               case coalesce(s.item_type, 'product')
+                    when 'oe' then oe.cost_price
+                    when 'gift' then gift.cost_price
+                    else p.cost_price
+               end as reference_cost_price,
+               s.version,
+               s.batch_no, s.expiry_date, s.serial_no, s.location_code, s.location_name,
+               s.last_in_time, s.last_out_time,
+               p.product_name, p.product_code, p.category_id, c.category_name,
+               (
+                   select group_concat(pc.category_name order by find_in_set(pc.category_id, concat(c.ancestors, ',', c.category_id)) separator ' / ')
+                   from inv_product_category pc
+                   where pc.del_flag = '0'
+                     and find_in_set(pc.category_id, concat(c.ancestors, ',', c.category_id)) > 0
+               ) as category_full_path,
+               case coalesce(s.item_type, 'product')
+                    when 'oe' then oc.category_name
+                    when 'gift' then gc.category_name
+                    else c.category_name
+               end as item_category_name,
+               case coalesce(s.item_type, 'product')
+                    when 'oe' then (
+                        select group_concat(oct.category_name order by find_in_set(oct.category_id, concat(oc.ancestors, ',', oc.category_id)) separator ' / ')
+                        from inv_oe_category oct
+                        where oct.del_flag = '0'
+                          and find_in_set(oct.category_id, concat(oc.ancestors, ',', oc.category_id)) > 0
+                    )
+                    when 'gift' then (
+                        select group_concat(gct.category_name order by find_in_set(gct.category_id, concat(gc.ancestors, ',', gc.category_id)) separator ' / ')
+                        from inv_gift_category gct
+                        where gct.del_flag = '0'
+                          and find_in_set(gct.category_id, concat(gc.ancestors, ',', gc.category_id)) > 0
+                    )
+                    else (
+                        select group_concat(pc.category_name order by find_in_set(pc.category_id, concat(c.ancestors, ',', c.category_id)) separator ' / ')
+                        from inv_product_category pc
+                        where pc.del_flag = '0'
+                          and find_in_set(pc.category_id, concat(c.ancestors, ',', c.category_id)) > 0
+                    )
+               end as item_category_full_path,
+               p.grade, p.spec, p.unit, p.safety_stock_min,
+               case coalesce(s.item_type, 'product')
+                    when 'oe' then oe.image_url
+                    when 'gift' then gift.image_url
+                    else p.image_url
+               end as image_url,
+               p.package_image_url,
+               case coalesce(s.item_type, 'product')
+                    when 'oe' then oe.order_unit
+                    when 'gift' then gift.replenishment_unit
+                    else p.unit
+               end as item_unit,
+               case coalesce(s.item_type, 'product')
+                    when 'oe' then oe.item_description
+                    when 'gift' then gift.spec
+                    else p.spec
+               end as item_spec,
+               case coalesce(s.item_type, 'product')
+                    when 'gift' then gift.grade
+                    else p.grade
+               end as item_grade,
+               p.dry_tea_image_url, p.tea_soup_image_url, p.leaf_bottom_image_url, p.extra_image_url,
+               s.create_by, s.create_time, s.update_by, s.update_time, s.remark
+        from inv_stock s
+        left join inv_product p on p.product_id = s.product_id and p.del_flag = '0'
+        left join inv_product_category c on c.category_id = p.category_id and c.del_flag = '0'
+        left join inv_oe_item oe on coalesce(s.item_type, 'product') = 'oe' and oe.oe_item_id = coalesce(s.item_id, s.product_id) and oe.del_flag = '0'
+        left join inv_oe_category oc on oc.category_id = oe.category_id and oc.del_flag = '0'
+        left join inv_gift_box gift on coalesce(s.item_type, 'product') = 'gift' and gift.gift_id = coalesce(s.item_id, s.product_id) and gift.del_flag = '0'
+        left join inv_gift_category gc on gc.category_id = gift.category_id and gc.del_flag = '0'
+        left join sys_dept shop_dept on shop_dept.dept_id = s.shop_dept_id
+        left join sys_dept warehouse_dept on warehouse_dept.dept_id = s.warehouse_id
+    </sql>
+
+    <sql id="InvStockWhere">
+        <where>
+            <if test="itemType != null and itemType != ''">and coalesce(s.item_type, 'product') = #{itemType}</if>
+            <if test="itemId != null">and coalesce(s.item_id, s.product_id) = #{itemId}</if>
+            <if test="productId != null">and s.product_id = #{productId}</if>
+            <if test="productName != null and productName != ''">
+                and (
+                    p.product_name like concat('%', #{productName}, '%')
+                    or p.product_code like concat('%', #{productName}, '%')
+                    or oe.oe_item_name like concat('%', #{productName}, '%')
+                    or oe.oe_item_code like concat('%', #{productName}, '%')
+                    or gift.gift_name like concat('%', #{productName}, '%')
+                    or gift.gift_code like concat('%', #{productName}, '%')
+                    or s.batch_no like concat('%', #{productName}, '%')
+                    or s.serial_no like concat('%', #{productName}, '%')
+                    or s.location_code like concat('%', #{productName}, '%')
+                    or s.location_name like concat('%', #{productName}, '%')
+                )
+            </if>
+            <if test="productCode != null and productCode != ''">
+                and (
+                    p.product_code like concat('%', #{productCode}, '%')
+                    or oe.oe_item_code like concat('%', #{productCode}, '%')
+                    or gift.gift_code like concat('%', #{productCode}, '%')
+                )
+            </if>
+            <if test="categoryId != null">
+                <choose>
+                    <when test="itemType == 'oe'">
+                        and (oe.category_id = #{categoryId} or find_in_set(#{categoryId}, oc.ancestors))
+                    </when>
+                    <when test="itemType == 'gift'">
+                        and (gift.category_id = #{categoryId} or find_in_set(#{categoryId}, gc.ancestors))
+                    </when>
+                    <otherwise>
+                        and (p.category_id = #{categoryId} or find_in_set(#{categoryId}, c.ancestors))
+                    </otherwise>
+                </choose>
+            </if>
+            <if test="shopDeptId != null">and s.shop_dept_id = #{shopDeptId}</if>
+            <if test="warehouseId != null">and s.warehouse_id = #{warehouseId}</if>
+            <if test="batchNo != null and batchNo != ''">and s.batch_no = #{batchNo}</if>
+            <if test="expiryDate != null">and s.expiry_date = #{expiryDate}</if>
+            <if test="serialNo != null and serialNo != ''">and s.serial_no = #{serialNo}</if>
+            <if test="locationCode != null and locationCode != ''">and s.location_code = #{locationCode}</if>
+            <if test="locationName != null and locationName != ''">and s.location_name like concat('%', #{locationName}, '%')</if>
+            <if test="params.scopeDeptIds != null">and s.shop_dept_id in <foreach collection="params.scopeDeptIds" item="deptId" open="(" close=")" separator=",">#{deptId}</foreach></if>
+            <if test="params.transferSourceItemQualified == true">
+                and (
+                    (
+                        coalesce(s.item_type, 'product') = 'product'
+                        and p.product_id is not null
+                        and p.status = '0'
+                    )
+                    or (
+                        coalesce(s.item_type, 'product') = 'gift'
+                        and gift.gift_id is not null
+                        and gift.status = '0'
+                    )
+                )
+            </if>
+            <if test="params.itemOwnerScopeDeptIds != null">
+                <choose>
+                    <when test="params.itemOwnerScopeDeptIds.size() > 0">
+                        and (
+                            coalesce(s.item_type, 'product') != 'product'
+                            or p.shop_dept_id in
+                            <foreach collection="params.itemOwnerScopeDeptIds" item="deptId" open="(" close=")" separator=",">#{deptId}</foreach>
+                        )
+                    </when>
+                    <otherwise>
+                        and coalesce(s.item_type, 'product') != 'product'
+                    </otherwise>
+                </choose>
+            </if>
+            <if test="stockScope != null and stockScope == 'mine' and selectedWarehouseId != null">and s.warehouse_id = #{selectedWarehouseId}</if>
+            <if test="stockScope != null and stockScope == 'other' and selectedWarehouseId != null">and (s.warehouse_id is null or s.warehouse_id != #{selectedWarehouseId})</if>
+            <if test="stockScope != null and stockScope == 'warning'">and coalesce(s.available_quantity, s.current_quantity, 0) &lt;= coalesce(p.safety_stock_min, 10)</if>
+            <if test="stockStatus != null and stockStatus == 'empty'">and coalesce(s.available_quantity, s.current_quantity, 0) &lt;= 0</if>
+            <if test="stockStatus != null and stockStatus == 'low'">and coalesce(s.available_quantity, s.current_quantity, 0) &gt; 0 and coalesce(s.available_quantity, s.current_quantity, 0) &lt;= coalesce(p.safety_stock_min, 10)</if>
+            <if test="stockStatus != null and stockStatus == 'normal'">and coalesce(s.available_quantity, s.current_quantity, 0) &gt; coalesce(p.safety_stock_min, 10)</if>
+            <if test="stockStatus != null and stockStatus == 'available'">and coalesce(s.available_quantity, s.current_quantity, 0) &gt; 0</if>
+            ${params.dataScope}
+        </where>
+    </sql>
+
+    <select id="selectInvStockList" parameterType="InvStock" resultMap="InvStockResult">
+        <include refid="selectInvStockVo"/>
+        <include refid="InvStockWhere"/>
+        order by s.create_time desc
+    </select>
+
+    <select id="selectInvStockSummary" parameterType="InvStock" resultMap="InvStockSummaryResult">
+        select count(1) as stock_item_count,
+               count(distinct s.shop_dept_id) as shop_count,
+               count(distinct s.warehouse_id) as warehouse_count,
+               coalesce(sum(case when coalesce(s.available_quantity, s.current_quantity, 0) &lt;= coalesce(p.safety_stock_min, 10) then 1 else 0 end), 0) as warning_count,
+               coalesce(sum(case when coalesce(s.available_quantity, s.current_quantity, 0) &gt; 0 and coalesce(s.available_quantity, s.current_quantity, 0) &lt;= coalesce(p.safety_stock_min, 10) then 1 else 0 end), 0) as low_stock_count,
+               coalesce(sum(case when coalesce(s.available_quantity, s.current_quantity, 0) &lt;= 0 then 1 else 0 end), 0) as zero_stock_count,
+               coalesce(sum(s.current_quantity), 0) as total_current_quantity,
+               coalesce(sum(s.locked_quantity), 0) as total_locked_quantity,
+               coalesce(sum(s.available_quantity), 0) as total_available_quantity,
+               coalesce(sum(s.total_cost), 0) as total_cost,
+               coalesce(sum(case when #{selectedWarehouseId} is not null and s.warehouse_id = #{selectedWarehouseId} then s.current_quantity else 0 end), 0) as my_warehouse_quantity,
+               coalesce(sum(case when #{selectedWarehouseId} is null or s.warehouse_id is null or s.warehouse_id != #{selectedWarehouseId} then s.current_quantity else 0 end), 0) as other_shop_quantity
+        from inv_stock s
+        left join inv_product p on p.product_id = s.product_id and p.del_flag = '0'
+        left join inv_product_category c on c.category_id = p.category_id and c.del_flag = '0'
+        left join inv_oe_item oe on coalesce(s.item_type, 'product') = 'oe' and oe.oe_item_id = coalesce(s.item_id, s.product_id) and oe.del_flag = '0'
+        left join inv_oe_category oc on oc.category_id = oe.category_id and oc.del_flag = '0'
+        left join inv_gift_box gift on coalesce(s.item_type, 'product') = 'gift' and gift.gift_id = coalesce(s.item_id, s.product_id) and gift.del_flag = '0'
+        left join inv_gift_category gc on gc.category_id = gift.category_id and gc.del_flag = '0'
+        <include refid="InvStockWhere"/>
+    </select>
+
+    <select id="selectInvStockById" parameterType="Long" resultMap="InvStockResult">
+        <include refid="selectInvStockVo"/>
+        where s.stock_id = #{stockId}
+    </select>
+
+    <select id="selectInvStockByIdForUpdate" parameterType="Long" resultMap="InvStockResult">
+        <include refid="selectInvStockVo"/>
+        where s.stock_id = #{stockId}
+        for update
+    </select>
+
+    <select id="selectInvStockByProductAndShop" resultMap="InvStockResult">
+        <include refid="selectInvStockVo"/>
+        where s.product_id = #{productId}
+          and s.shop_dept_id = #{shopDeptId}
+          and s.warehouse_id = #{shopDeptId}
+    </select>
+
+    <select id="selectInvStockByProductAndShopForUpdate" resultMap="InvStockResult">
+        <include refid="selectInvStockVo"/>
+        where s.product_id = #{productId}
+          and s.shop_dept_id = #{shopDeptId}
+          and s.warehouse_id = #{shopDeptId}
+        for update
+    </select>
+
+    <select id="selectInvStockByProductShopWarehouse" resultMap="InvStockResult">
+        <include refid="selectInvStockVo"/>
+        where s.product_id = #{productId}
+          and s.shop_dept_id = #{shopDeptId}
+          and s.warehouse_id = coalesce(#{warehouseId}, #{shopDeptId})
+    </select>
+
+    <select id="selectInvStockByProductShopWarehouseForUpdate" resultMap="InvStockResult">
+        <include refid="selectInvStockVo"/>
+        where s.product_id = #{productId}
+          and s.shop_dept_id = #{shopDeptId}
+          and s.warehouse_id = coalesce(#{warehouseId}, #{shopDeptId})
+        for update
+    </select>
+
+    <select id="selectInvStockByItemShopWarehouse" resultMap="InvStockResult">
+        <include refid="selectInvStockVo"/>
+        where coalesce(s.item_type, 'product') = #{itemType}
+          and coalesce(s.item_id, s.product_id) = #{itemId}
+          and s.shop_dept_id = #{shopDeptId}
+          and s.warehouse_id = coalesce(#{warehouseId}, #{shopDeptId})
+    </select>
+
+    <select id="selectInvStockByItemShopWarehouseForUpdate" resultMap="InvStockResult">
+        <include refid="selectInvStockVo"/>
+        where coalesce(s.item_type, 'product') = #{itemType}
+          and coalesce(s.item_id, s.product_id) = #{itemId}
+          and s.shop_dept_id = #{shopDeptId}
+          and s.warehouse_id = coalesce(#{warehouseId}, #{shopDeptId})
+        for update
+    </select>
+
+    <insert id="insertInvStock" parameterType="InvStock" useGeneratedKeys="true" keyProperty="stockId">
+        insert into inv_stock (
+            item_type, item_id, product_id, shop_dept_id, warehouse_id, current_quantity, locked_quantity,
+            available_quantity, cost_price, total_cost, version,
+            batch_no, expiry_date, serial_no, location_code, location_name,
+            last_in_time, last_out_time, create_by, create_time, remark
+        ) values (
+            coalesce(#{itemType}, 'product'), coalesce(#{itemId}, #{productId}), #{productId}, #{shopDeptId}, #{warehouseId}, #{currentQuantity}, #{lockedQuantity},
+            #{availableQuantity}, #{costPrice}, #{totalCost}, coalesce(#{version}, 0),
+            #{batchNo}, #{expiryDate}, #{serialNo}, #{locationCode}, #{locationName},
+            #{lastInTime}, #{lastOutTime}, #{createBy}, sysdate(), #{remark}
+        )
+    </insert>
+
+    <update id="updateInvStock" parameterType="InvStock">
+        update inv_stock
+        <set>
+            <if test="currentQuantity != null">current_quantity = #{currentQuantity},</if>
+            <if test="lockedQuantity != null">locked_quantity = #{lockedQuantity},</if>
+            <if test="availableQuantity != null">available_quantity = #{availableQuantity},</if>
+            <if test="batchNo != null">batch_no = #{batchNo},</if>
+            <if test="expiryDate != null">expiry_date = #{expiryDate},</if>
+            <if test="serialNo != null">serial_no = #{serialNo},</if>
+            <if test="locationCode != null">location_code = #{locationCode},</if>
+            <if test="locationName != null">location_name = #{locationName},</if>
+            <if test="lastInTime != null">last_in_time = #{lastInTime},</if>
+            <if test="lastOutTime != null">last_out_time = #{lastOutTime},</if>
+            version = version + 1,
+            update_by = #{updateBy}, update_time = sysdate()
+        </set>
+        where stock_id = #{stockId} and version = #{version}
+    </update>
+
+    <update id="addInvStock">
+        update inv_stock
+        set current_quantity = current_quantity + #{quantity},
+            available_quantity = available_quantity + #{quantity},
+            last_in_time = sysdate(),
+            version = version + 1,
+            update_by = #{updateBy},
+            update_time = sysdate()
+        where stock_id = #{stockId} and version = #{version}
+    </update>
+
+    <update id="addInvStockWithCost">
+        update inv_stock
+        set cost_price = (coalesce(total_cost, 0) + #{incomingCost}) / (coalesce(current_quantity, 0) + #{quantity}),
+            current_quantity = coalesce(current_quantity, 0) + #{quantity},
+            available_quantity = coalesce(available_quantity, 0) + #{quantity},
+            total_cost = coalesce(total_cost, 0) + #{incomingCost},
+            last_in_time = sysdate(),
+            version = version + 1,
+            update_by = #{updateBy},
+            update_time = sysdate()
+        where stock_id = #{stockId} and version = #{version}
+    </update>
+
+    <update id="deductInvStock">
+        update inv_stock
+        set current_quantity = current_quantity - #{quantity},
+            available_quantity = available_quantity - #{quantity},
+            last_out_time = sysdate(),
+            version = version + 1,
+            update_by = #{updateBy},
+            update_time = sysdate()
+        where stock_id = #{stockId} and version = #{version} and available_quantity >= #{quantity}
+    </update>
+
+    <update id="deductInvStockWithCost">
+        update inv_stock
+        set current_quantity = coalesce(current_quantity, 0) - #{quantity},
+            available_quantity = coalesce(available_quantity, 0) - #{quantity},
+            total_cost = coalesce(total_cost, 0) - #{deductCost},
+            last_out_time = sysdate(),
+            version = version + 1,
+            update_by = #{updateBy},
+            update_time = sysdate()
+        where stock_id = #{stockId} and version = #{version} and coalesce(available_quantity, 0) >= #{quantity}
+    </update>
+
+</mapper>
