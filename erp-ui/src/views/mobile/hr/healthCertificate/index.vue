@@ -147,18 +147,20 @@ export default {
 
 .mobile-business-page ::v-deep .mine-health-table .el-table__row td:nth-child(1)::before { content: "证件编号"; }
 .mobile-business-page ::v-deep .mine-health-table .el-table__row td:nth-child(2)::before { content: "办理日期"; }
-.mobile-business-page ::v-deep .mine-health-table .el-table__row td:nth-child(3)::before { content: "到期日期"; }
-.mobile-business-page ::v-deep .mine-health-table .el-table__row td:nth-child(4)::before { content: "状态"; }
-.mobile-business-page ::v-deep .mine-health-table .el-table__row td:nth-child(5)::before { content: "附件"; }
-.mobile-business-page ::v-deep .mine-health-table .el-table__row td:nth-child(6)::before { content: "审核说明"; }
-.mobile-business-page ::v-deep .mine-health-table .el-table__row td:nth-child(7)::before { content: "操作"; }
+.mobile-business-page ::v-deep .mine-health-table .el-table__row td:nth-child(3)::before { content: "生效日期"; }
+.mobile-business-page ::v-deep .mine-health-table .el-table__row td:nth-child(4)::before { content: "到期日期"; }
+.mobile-business-page ::v-deep .mine-health-table .el-table__row td:nth-child(5)::before { content: "状态"; }
+.mobile-business-page ::v-deep .mine-health-table .el-table__row td:nth-child(6)::before { content: "附件"; }
+.mobile-business-page ::v-deep .mine-health-table .el-table__row td:nth-child(7)::before { content: "审核说明"; }
+.mobile-business-page ::v-deep .mine-health-table .el-table__row td:nth-child(8)::before { content: "操作"; }
 .mobile-business-page ::v-deep .admin-health-table .el-table__row td:nth-child(1)::before { content: "员工"; }
 .mobile-business-page ::v-deep .admin-health-table .el-table__row td:nth-child(2)::before { content: "当前组织"; }
 .mobile-business-page ::v-deep .admin-health-table .el-table__row td:nth-child(3)::before { content: "证件编号"; }
 .mobile-business-page ::v-deep .admin-health-table .el-table__row td:nth-child(4)::before { content: "办理日期"; }
-.mobile-business-page ::v-deep .admin-health-table .el-table__row td:nth-child(5)::before { content: "到期日期"; }
-.mobile-business-page ::v-deep .admin-health-table .el-table__row td:nth-child(6)::before { content: "状态"; }
-.mobile-business-page ::v-deep .admin-health-table .el-table__row td:nth-child(7)::before { content: "操作"; }
+.mobile-business-page ::v-deep .admin-health-table .el-table__row td:nth-child(5)::before { content: "生效日期"; }
+.mobile-business-page ::v-deep .admin-health-table .el-table__row td:nth-child(6)::before { content: "到期日期"; }
+.mobile-business-page ::v-deep .admin-health-table .el-table__row td:nth-child(7)::before { content: "状态"; }
+.mobile-business-page ::v-deep .admin-health-table .el-table__row td:nth-child(8)::before { content: "操作"; }
 
 .mobile-business-page ::v-deep .el-table__row td:last-child .cell {
   display: flex;
@@ -223,6 +225,7 @@ export default {
 
 <style lang="scss">
 @media (max-width: 760px) {
+  .health-certificate-start-recovery-dialog,
   .health-certificate-mine-dialog,
   .health-certificate-review-dialog,
   .health-approval-dialog {
@@ -238,6 +241,7 @@ export default {
     max-width: 920px;
   }
 
+  .health-certificate-start-recovery-dialog .el-dialog__body,
   .health-certificate-mine-dialog .el-dialog__body,
   .health-certificate-review-dialog .el-dialog__body,
   .health-approval-dialog .el-dialog__body {
@@ -246,6 +250,7 @@ export default {
     padding: 14px;
   }
 
+  .health-certificate-start-recovery-dialog .el-dialog__footer,
   .health-certificate-mine-dialog .el-dialog__footer,
   .health-certificate-review-dialog .el-dialog__footer,
   .health-approval-dialog .el-dialog__footer {

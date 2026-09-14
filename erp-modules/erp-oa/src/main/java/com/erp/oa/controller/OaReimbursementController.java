@@ -80,6 +80,8 @@ public class OaReimbursementController extends OaBaseController
     public AjaxResult submit(@Validated @RequestBody OaReimbursement value,
             HttpServletRequest request)
     {
+        if (value == null || value.getReimbursementId() == null || value.getExpectedBaseRound() == null || value.getExpectedVersion() == null)
+            throw new com.erp.common.core.exception.ServiceException("缺少本次提交的草稿版本和审批轮次，请刷新页面后重试");
         return success(reimbursementService.submit(value,
                 resolveShopDeptId(request)));
     }
@@ -94,9 +96,13 @@ public class OaReimbursementController extends OaBaseController
                     OaReimbursementWithdrawRequest body,
             HttpServletRequest request)
     {
+        if (body == null || body.getExpectedApprovalInstanceId() == null || body.getExpectedApprovalRound() == null)
+            throw new com.erp.common.core.exception.ServiceException("缺少本次撤回的审批实例和轮次，请刷新页面后重试");
         return success(reimbursementService.withdraw(reimbursementId,
                 body == null ? null : body.getReason(),
-                resolveShopDeptId(request)));
+                resolveShopDeptId(request),
+                body == null ? null : body.getExpectedApprovalInstanceId(),
+                body == null ? null : body.getExpectedApprovalRound()));
     }
 
     @RequiresPermissions(SELF)
@@ -243,8 +249,27 @@ public class OaReimbursementController extends OaBaseController
             @Validated @RequestBody OaReimbursementExportRequest body,
             HttpServletRequest request)
     {
+        if (body == null || body.getRequestId() == null || body.getRequestId().isBlank())
+            throw new com.erp.common.core.exception.ServiceException("导出请求号不能为空，请刷新页面后重试");
         return success(exportService.createExport(body,
                 resolveShopDeptId(request)));
+    }
+
+    @RequiresPermissions(FINANCE_EXPORT)
+    @GetMapping("/finance/exports")
+    public TableDataInfo exportHistory(@org.springframework.web.bind.annotation.RequestParam(defaultValue = "false") boolean allCreators)
+    {
+        startPage();
+        try { return getDataTable(exportService.exportHistory(allCreators)); }
+        finally { com.github.pagehelper.PageHelper.clearPage(); }
+    }
+
+    @RequiresPermissions(FINANCE_EXPORT)
+    @GetMapping("/finance/exports/commands/{requestId}")
+    public AjaxResult exportCommand(@PathVariable("requestId") String requestId)
+    {
+        com.erp.oa.domain.OaReimbursementExportBatch batch = exportService.exportByRequestId(requestId);
+        return success(java.util.Map.of("state", batch == null ? "NOT_OBSERVED" : "SUCCEEDED", "batch", batch == null ? java.util.Map.of() : batch));
     }
 
     @RequiresPermissions(FINANCE_EXPORT)

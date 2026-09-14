@@ -48,6 +48,36 @@ const deterministic = {
 }
 
 ;(async () => {
+  // Real business-body contract, including negative controls that must stay unknown.
+  for (const kind of ['definite', 'different-request', 'generic-500', 'unknown-business']) {
+    const storage = new MemoryStorage()
+    const result = await runAttendancePunch(base, {
+      execute: async attempt => {
+        const error = new Error('OUTSIDE_ATTENDANCE_GEOFENCE')
+        error.code = kind === 'generic-500' ? 500 : 422
+        error.response = { status: 200, data: {
+          code: error.code,
+          msg: error.message,
+          businessCode: kind === 'generic-500' ? undefined
+            : kind === 'unknown-business' ? 'DATABASE_UNKNOWN' : 'ATTENDANCE_PUNCH_REJECTED',
+          clientRequestId: kind === 'different-request' ? 'another-request-0001' : attempt.requestId
+        } }
+        throw error
+      }
+    }, { storage, ...deterministic })
+    if (kind === 'definite') {
+      assert.strictEqual(result.status, 'not-accepted')
+      assert.strictEqual(result.attempt.outcome, 'not-accepted')
+      assert.strictEqual(clearAttendancePunchAttempt(owner, {
+        storage, expectedRequestId: result.attempt.requestId
+      }), true)
+      assert.strictEqual(readAttendancePunchAttempt(owner, { storage }).status, 'absent')
+    } else {
+      assert.strictEqual(result.status, 'outcome-unknown', kind)
+      assert.strictEqual(readAttendancePunchAttempt(owner, { storage }).status, 'pending', kind)
+    }
+  }
+
   {
     const storage = new MemoryStorage()
     let dispatched = 0

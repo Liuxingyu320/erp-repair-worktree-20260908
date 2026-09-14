@@ -1,5 +1,6 @@
 <template>
   <div class="app-container oa-workspace-page labor-contract-page">
+    <legacy-salary-notice />
     <section class="oa-page-hero">
       <div class="oa-hero__copy">
         <span class="oa-hero__eyebrow">OA 协同 · 合同档案</span>
@@ -82,7 +83,7 @@
 
     </el-tabs>
 
-    <el-dialog :title="contractTitle" :visible.sync="contractOpen" width="960px" append-to-body>
+    <el-dialog :title="contractTitle" :visible.sync="contractOpen" width="960px" append-to-body @close="contractLoadEpoch += 1">
       <el-form ref="contractForm" :model="contractForm" :rules="contractRules" label-width="116px" size="small">
         <el-row :gutter="12">
           <el-col :xs="24" :sm="12">
@@ -115,6 +116,12 @@
           <el-col :xs="24" :sm="12">
             <el-form-item label="手机号" prop="employeePhone">
               <el-input v-model="contractForm.employeePhone" maxlength="32" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="24">
+            <el-form-item label="身份核对">
+              <el-checkbox v-model="contractForm.identityManuallyVerified">档案未登记身份证时，我已核对员工本人证件</el-checkbox>
+              <el-input v-if="contractForm.identityManuallyVerified" v-model="contractForm.identityVerificationNote" maxlength="200" placeholder="填写核对方式或依据（至少4字，不填写完整证件号码）" />
             </el-form-item>
           </el-col>
           <el-col :xs="24" :sm="12">
@@ -202,7 +209,7 @@
       </el-form>
       <div slot="footer">
         <el-button @click="contractOpen = false">取 消</el-button>
-        <el-button type="primary" :loading="saving" @click="submitContract" v-hasPermi="['oa:laborContract:add']">保 存</el-button>
+
       </div>
     </el-dialog>
 
@@ -292,7 +299,7 @@
       </el-form>
       <div slot="footer">
         <el-button @click="templateOpen = false">取 消</el-button>
-        <el-button type="primary" :loading="templateSaving" @click="submitTemplate" v-hasPermi="['oa:laborContract:template:add']">保 存</el-button>
+
       </div>
     </el-dialog>
 
@@ -313,13 +320,14 @@
       </el-form>
       <div slot="footer">
         <el-button @click="sealOpen = false">取 消</el-button>
-        <el-button type="primary" :loading="sealSaving" @click="submitSeal" v-hasPermi="['oa:laborContract:template:add']">保 存</el-button>
+
       </div>
     </el-dialog>
   </div>
 </template>
 
 <script>
+import LegacySalaryNotice from "@/views/hr/components/LegacySalaryNotice"
 import {
   downloadLaborContractFile,
   getLaborContract,
@@ -340,6 +348,7 @@ import { getSelectedDeptContext, hasValidatedSelectedDeptContext } from "@/utils
 const { normalizeProtectedFileBlob } = require("@/utils/protectedFileBlob")
 
 export default {
+  components: { LegacySalaryNotice },
   name: "OaLaborContract",
   data() {
     return {
@@ -354,6 +363,7 @@ export default {
       contractList: [],
       templateList: [],
       employeeOptions: [],
+      contractLoadEpoch: 0,
       schemeOptions: [],
       salaryItemOptions: [],
       queryParams: { pageNum: 1, pageSize: 10 },
@@ -485,6 +495,8 @@ export default {
         employeeName: "",
         employeeIdCard: "",
         employeePhone: "",
+        identityManuallyVerified: false,
+        identityVerificationNote: "",
         employeeDeptId: undefined,
         employeeDeptName: "",
         schemeId: undefined,
@@ -609,6 +621,7 @@ export default {
       if (!this.ensureShopContextForEmployeeOptions()) {
         return
       }
+      this.contractLoadEpoch += 1
       if (!this.canManageLaborContractTemplates) {
         this.$modal.msgWarning("当前账号缺少合同模板权限，暂不能发起签约")
         return
@@ -620,8 +633,10 @@ export default {
       this.$nextTick(() => this.$refs.contractForm && this.$refs.contractForm.clearValidate())
     },
     handleEdit(row) {
+      const epoch = ++this.contractLoadEpoch
       this.contractTitle = "编辑签约单"
       getLaborContract(row.contractId).then(res => {
+        if (epoch !== this.contractLoadEpoch) return
         this.contractForm = Object.assign(this.defaultContractForm(), res.data || {})
         if (this.contractForm.schemeId) {
           this.handleSchemeChange(this.contractForm.schemeId, true)
@@ -698,12 +713,14 @@ export default {
       })
     },
     handleEmployeeChange(userId) {
-      const user = this.employeeOptions.find(item => item.userId === userId)
-      if (!user) return
-      this.contractForm.employeeName = user.nickName || user.userName
-      this.contractForm.employeePhone = user.phonenumber || this.contractForm.employeePhone
-      this.contractForm.employeeDeptId = user.deptId
-      this.contractForm.employeeDeptName = user.dept ? user.dept.deptName : user.deptName
+      const user = this.employeeOptions.find(item => String(item.userId) === String(userId))
+      this.contractForm.employeeName = user ? (user.nickName || user.userName || "") : ""
+      this.contractForm.employeeIdCard = ""
+      this.contractForm.employeePhone = user ? (user.phonenumber || "") : ""
+      this.contractForm.employeeDeptId = user ? user.deptId : undefined
+      this.contractForm.employeeDeptName = user ? ((user.dept && user.dept.deptName) || user.deptName || "") : ""
+      this.contractForm.identityManuallyVerified = false
+      this.contractForm.identityVerificationNote = ""
     },
     employeeOptionLabel(user) {
       const name = user.nickName || user.userName

@@ -6,6 +6,10 @@
         <id property="detailId" column="detail_id"/>
         <result property="returnId" column="return_id"/>
         <result property="salesDetailId" column="sales_detail_id"/>
+        <result property="itemType" column="item_type"/>
+        <result property="itemId" column="item_id"/>
+        <result property="itemCode" column="item_code"/>
+        <result property="itemName" column="item_name"/>
         <result property="productId" column="product_id"/>
         <result property="productName" column="product_name"/>
         <result property="sku" column="sku"/>
@@ -15,46 +19,65 @@
         <result property="unitPrice" column="unit_price"/>
         <result property="amount" column="amount"/>
         <result property="returnedQuantity" column="returned_quantity"/>
+        <result property="returnedCostAmount" column="returned_cost_amount"/>
     </resultMap>
 
     <select id="selectInvSalesReturnDetailByReturnId" parameterType="Long" resultMap="InvSalesReturnDetailResult">
-        select detail_id, return_id, sales_detail_id, product_id, product_name, sku, spec, unit,
-               quantity, unit_price, amount, returned_quantity
+        select detail_id, return_id, sales_detail_id, item_type, item_id, item_code, item_name, product_id, product_name, sku, spec, unit,
+               quantity, unit_price, amount, returned_quantity, returned_cost_amount
         from inv_sales_return_detail
         where return_id = #{returnId}
     </select>
 
     <select id="selectInvSalesReturnDetailByReturnIdForUpdate" parameterType="Long" resultMap="InvSalesReturnDetailResult">
-        select detail_id, return_id, sales_detail_id, product_id, product_name, sku, spec, unit,
-               quantity, unit_price, amount, returned_quantity
+        select detail_id, return_id, sales_detail_id, item_type, item_id, item_code, item_name, product_id, product_name, sku, spec, unit,
+               quantity, unit_price, amount, returned_quantity, returned_cost_amount
         from inv_sales_return_detail
         where return_id = #{returnId} for update
     </select>
 
+    <!-- Actual completed movement only; submitted reservations with no movement do not consume cost.
+         Include unresolved old same-material rows so the service rejects unknown allocation. -->
+    <select id="selectReturnedCostFacts" resultMap="InvSalesReturnDetailResult">
+        select d.detail_id, d.return_id, d.sales_detail_id, d.item_type, d.item_id, d.product_id,
+               d.quantity, d.returned_quantity, d.returned_cost_amount
+        from inv_sales_return_detail d
+        inner join inv_sales_return r on r.return_id = d.return_id
+        where r.sales_order_id = #{salesOrderId}
+          and (d.sales_detail_id = #{salesDetailId}
+               or (d.sales_detail_id is null
+                   and coalesce(nullif(d.item_type, ''), 'product') = #{itemType}
+                   and coalesce(d.item_id, d.product_id) = #{itemId}))
+          and (coalesce(d.returned_quantity, 0) &gt; 0 or r.status = 'returned')
+        order by d.detail_id
+        for update
+    </select>
+
     <insert id="insertInvSalesReturnDetail" parameterType="InvSalesReturnDetail" useGeneratedKeys="true" keyProperty="detailId">
         insert into inv_sales_return_detail (
-            return_id, sales_detail_id, product_id, product_name, sku, spec, unit,
-            quantity, unit_price, amount, returned_quantity
+            return_id, sales_detail_id, item_type, item_id, item_code, item_name, product_id, product_name, sku, spec, unit,
+            quantity, unit_price, amount, returned_quantity, returned_cost_amount
         ) values (
-            #{returnId}, #{salesDetailId}, #{productId}, #{productName}, #{sku}, #{spec}, #{unit},
-            #{quantity}, #{unitPrice}, #{amount}, 0
+            #{returnId}, #{salesDetailId}, #{itemType}, #{itemId}, #{itemCode}, #{itemName}, #{productId}, #{productName}, #{sku}, #{spec}, #{unit},
+            #{quantity}, #{unitPrice}, #{amount}, 0, 0
         )
     </insert>
 
     <insert id="batchInsertInvSalesReturnDetail" parameterType="java.util.List">
         insert into inv_sales_return_detail (
-            return_id, sales_detail_id, product_id, product_name, sku, spec, unit,
-            quantity, unit_price, amount, returned_quantity
+            return_id, sales_detail_id, item_type, item_id, item_code, item_name, product_id, product_name, sku, spec, unit,
+            quantity, unit_price, amount, returned_quantity, returned_cost_amount
         ) values
         <foreach collection="list" item="item" separator=",">
-            (#{item.returnId}, #{item.salesDetailId}, #{item.productId}, #{item.productName}, #{item.sku}, #{item.spec}, #{item.unit},
-             #{item.quantity}, #{item.unitPrice}, #{item.amount}, 0)
+            (#{item.returnId}, #{item.salesDetailId}, #{item.itemType}, #{item.itemId}, #{item.itemCode}, #{item.itemName}, #{item.productId}, #{item.productName}, #{item.sku}, #{item.spec}, #{item.unit},
+             #{item.quantity}, #{item.unitPrice}, #{item.amount}, 0, 0)
         </foreach>
     </insert>
 
     <update id="updateInvSalesReturnDetail" parameterType="InvSalesReturnDetail">
         update inv_sales_return_detail
-        set returned_quantity = #{returnedQuantity}
+        set returned_quantity = #{returnedQuantity}, returned_cost_amount = #{returnedCostAmount},
+            sales_detail_id = #{salesDetailId}, item_type = #{itemType}, item_id = #{itemId}
         where detail_id = #{detailId}
     </update>
 
@@ -74,16 +97,37 @@
         </if>
     </select>
 
+    <select id="sumHistoricalReturnQuantityByItem" resultType="java.math.BigDecimal">
+        select coalesce(sum(d.quantity), 0)
+        from inv_sales_return_detail d
+        inner join inv_sales_return r on r.return_id = d.return_id
+        where r.sales_order_id = #{salesOrderId}
+          and coalesce(nullif(d.item_type, ''), 'product') = #{itemType}
+          and coalesce(d.item_id, d.product_id) = #{itemId}
+          and r.status in ('submitted', 'returned')
+        <if test="excludeReturnId != null">
+          and r.return_id != #{excludeReturnId}
+        </if>
+        for update
+    </select>
+
     <select id="sumHistoricalReturnQuantityBySalesDetailId" resultType="java.math.BigDecimal">
         select coalesce(sum(d.quantity), 0)
         from inv_sales_return_detail d
         inner join inv_sales_return r on r.return_id = d.return_id
         where r.sales_order_id = #{salesOrderId}
-          and d.sales_detail_id = #{salesDetailId}
+          and (d.sales_detail_id = #{salesDetailId}
+               or (d.sales_detail_id is null and exists (
+                   select 1 from inv_sales_detail sd
+                   where sd.detail_id = #{salesDetailId} and sd.order_id = r.sales_order_id
+                     and coalesce(nullif(sd.item_type, ''), 'product') = coalesce(nullif(d.item_type, ''), 'product')
+                     and coalesce(sd.item_id, sd.product_id) = coalesce(d.item_id, d.product_id)
+               )))
           and r.status in ('submitted', 'returned')
         <if test="excludeReturnId != null">
           and r.return_id != #{excludeReturnId}
         </if>
+        for update
     </select>
 
 </mapper>

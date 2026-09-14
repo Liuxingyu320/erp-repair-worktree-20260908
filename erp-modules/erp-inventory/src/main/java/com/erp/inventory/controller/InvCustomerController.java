@@ -1,5 +1,8 @@
 package com.erp.inventory.controller;
 
+import com.erp.inventory.domain.vo.InvCustomerServiceRecordQuery;
+import com.erp.inventory.domain.vo.InvCustomerServiceRecordPage;
+
 import java.io.InputStream;
 import java.util.Collection;
 import java.util.List;
@@ -121,6 +124,15 @@ public class InvCustomerController extends InvBaseController
     {
         response.setHeader("Cache-Control", "no-store");
         return success(customerServiceCardService.selectById(customerId, resolveShopDeptId(request)));
+    }
+
+    @RequiresPermissions("inv:customerCard:query")
+    @GetMapping("/service-card/{customerId}/records")
+    public AjaxResult serviceRecords(@PathVariable Long customerId, InvCustomerServiceRecordQuery query,
+            HttpServletRequest request, HttpServletResponse response)
+    {
+        response.setHeader("Cache-Control", "no-store");
+        return success(customerServiceCardService.selectRecords(customerId, query, resolveShopDeptId(request)));
     }
 
     @RequiresPermissions("inv:customerCard:query")

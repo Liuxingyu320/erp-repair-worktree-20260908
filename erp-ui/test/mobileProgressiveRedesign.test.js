@@ -427,7 +427,7 @@ if (mobileNavigationSource.includes("isMobileBottomNavItemActive")) {
 })
 
 assert.ok(
-  profileSource.includes("padding-bottom: calc(var(--mobile-bottom-nav-total)") &&
+  /padding-bottom:\s*calc\(var\(--mobile-bottom-nav-total(?:,\s*[^)]+)?\)/.test(profileSource) &&
     profileSource.includes("backdrop-filter: none"),
   "profile should share the opaque navigation and page-spacing system"
 )

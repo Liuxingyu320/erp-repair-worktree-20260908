@@ -23,13 +23,15 @@ public class OaAttendanceApprovalCallbackService
 
     private final OaAttendanceApprovalCallbackMapper mapper;
     private final ObjectMapper objectMapper;
+    private final com.erp.oa.attendance.leave.balance.AttendanceLeaveQuotaService quota;
 
     public OaAttendanceApprovalCallbackService(
             OaAttendanceApprovalCallbackMapper mapper,
-            ObjectMapper objectMapper)
+            ObjectMapper objectMapper, com.erp.oa.attendance.leave.balance.AttendanceLeaveQuotaService quota)
     {
         this.mapper = mapper;
         this.objectMapper = objectMapper;
+        this.quota = quota;
     }
 
     public boolean supports(String businessCode)
@@ -144,10 +146,12 @@ public class OaAttendanceApprovalCallbackService
             return actionResponse(false, "REQUIRED_ATTACHMENT_MISSING",
                     "该请假申请必须包含证明附件");
         }
+        try{quota.validateApprovalSnapshot(businessId,snapshot);}
+        catch(com.erp.common.core.exception.ServiceException invalidQuota){return actionResponse(false,"QUOTA_SNAPSHOT_CHANGED",invalidQuota.getMessage());}
         return actionResponse(true, "ACCEPTED", "请假审批证据校验通过");
     }
 
-    @Transactional(rollbackFor = Exception.class)
+    @Transactional(rollbackFor = Exception.class, isolation=org.springframework.transaction.annotation.Isolation.READ_COMMITTED)
     public ApprovalBusinessCallbackResponse apply(
             ApprovalBusinessCallbackRequest request)
     {
@@ -211,6 +215,7 @@ public class OaAttendanceApprovalCallbackService
             return stale(request, "BUSINESS_STATUS_CHANGED",
                     "考勤申请已不处于审批中");
         }
+        if(LEAVE.equals(request.getBusinessCode()))quota.decision(businessId,current.getBusinessRound(),request.getAction(),request.getEventKey());
         String expectedStatus = current.getStatus();
         Date now = new Date();
         int updated = LEAVE.equals(request.getBusinessCode())
@@ -222,6 +227,7 @@ public class OaAttendanceApprovalCallbackService
                         request.getEventKey(), now);
         if (updated != 1)
         {
+            if(LEAVE.equals(request.getBusinessCode()))throw new com.erp.common.core.exception.ServiceException("LEAVE_QUOTA_CALLBACK_CONCURRENT_UPDATE");
             return retry("CONCURRENT_UPDATE", "考勤审批回调并发冲突");
         }
         // Every terminal decision changes the evidence set. Reopen the daily

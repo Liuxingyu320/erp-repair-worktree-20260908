@@ -1,6 +1,12 @@
 package com.erp.inventory.service.impl;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.*;
+import static org.mockito.ArgumentMatchers.*;
+import com.erp.inventory.service.IInvReportService;
+import com.erp.inventory.domain.InvStock;
+import com.erp.inventory.domain.vo.InvReportSummary;
+import java.time.LocalDate;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.Collections;
@@ -190,6 +196,8 @@ class InvMobileServiceImplPermissionTest
         typeCounts.put(InvTodoTypes.INV_LOW_STOCK, 15L);
         typeCounts.put(InvTodoTypes.INV_OUT_OF_STOCK, 8L);
         typeCounts.put(InvTodoTypes.INV_SALES_NOTICE_CREATE, 44L);
+        typeCounts.put(InvTodoTypes.INV_SALES_RETURN_CONFIRM, 9L);
+        typeCounts.put(InvTodoTypes.INV_PURCHASE_RETURN_CONFIRM, 6L);
         providerSummary.setTypeCounts(typeCounts);
         FakeTodoService todoService = new FakeTodoService(providerSummary);
         FakeMobileMapper mobileMapper = new FakeMobileMapper(Collections.emptyList());
@@ -203,6 +211,7 @@ class InvMobileServiceImplPermissionTest
         assertThat(result.getSelectedDeptId()).isEqualTo(88L);
         assertThat(result.getSelectedDeptType()).isEqualTo(InvBaseService.DEPT_TYPE_STORE);
         assertThat(result.getTodoCount()).isEqualTo(101L);
+        assertThat(result.getPendingReturnCount()).isEqualTo(9L);
         assertThat(result.getPendingApprovalCount()).isEqualTo(17L);
         assertThat(result.getPurchaseReceiveCount()).isEqualTo(2L);
         assertThat(result.getPurchaseQcCount()).isEqualTo(11L);
@@ -258,6 +267,63 @@ class InvMobileServiceImplPermissionTest
         service.selectPendingTransferApprovals(88L);
 
         assertThat(mobileMapper.lastCandidateUserId).isEqualTo(1L);
+    }
+
+    @Test
+    void storeSalesMetricUsesExistingReportWithServerDayAndReturnsCountOnly()
+    {
+        setLoginUser(7L, Set.of("inv:report:list"));
+        InvMobileServiceImpl service = service(new FakeMobileMapper(Collections.emptyList()), new FakeDeptScopeMapper());
+        IInvReportService reports = mock(IInvReportService.class);
+        ReflectionTestUtils.setField(service, "reportService", reports);
+        when(reports.selectReportSummary(any(), eq(88L))).thenAnswer(call -> {
+            InvStock query = call.getArgument(0);
+            assertThat(query.getParams()).containsEntry("beginTime", LocalDate.now().toString())
+                    .containsEntry("endTime", LocalDate.now().toString()).doesNotContainKey("scopeDeptIds");
+            assertThat(query.getProductId()).isNull();
+            InvReportSummary summary = new InvReportSummary(); summary.setSalesOrderCount(4L); return summary;
+        });
+        MobileWorkbenchSummary result = service.selectWorkbenchSummary(88L);
+        assertThat(result.getTodaySalesCount()).isEqualTo(4L);
+        assertThat(result.getTodaySalesStatus()).isEqualTo("ready");
+        verify(reports).selectReportSummary(any(), eq(88L));
+    }
+
+    @Test
+    void salesListPermissionDoesNotGrantReportCountAndFailureIsUnknown()
+    {
+        setLoginUser(7L, Set.of("inv:sales:list"));
+        InvMobileServiceImpl service = service(new FakeMobileMapper(Collections.emptyList()), new FakeDeptScopeMapper());
+        IInvReportService reports = mock(IInvReportService.class);
+        ReflectionTestUtils.setField(service, "reportService", reports);
+        MobileWorkbenchSummary denied = service.selectWorkbenchSummary(88L);
+        assertThat(denied.getTodaySalesCount()).isNull();
+        assertThat(denied.getTodaySalesStatus()).isEqualTo("forbidden"); verifyNoInteractions(reports);
+        setLoginUser(7L, Set.of("inv:report:list"));
+        when(reports.selectReportSummary(any(), anyLong())).thenThrow(new ServiceException("report unavailable"));
+        MobileWorkbenchSummary failed = service.selectWorkbenchSummary(88L);
+        assertThat(failed.getTodaySalesCount()).isNull();
+        assertThat(failed.getTodaySalesStatus()).isEqualTo("unavailable");
+        assertThat(failed.getPendingDeliverCount()).isZero();
+    }
+
+    @Test
+    void warehouseDoesNotQuerySalesAndUsesWarehouseReturnAndExecutionTypes()
+    {
+        setLoginUser(7L, Set.of("inv:report:list"));
+        FakeDeptScopeMapper scope = new FakeDeptScopeMapper() {
+            @Override public String selectDeptTypeById(Long id) { return InvBaseService.DEPT_TYPE_WAREHOUSE; }
+        };
+        TodoSummary todos = new TodoSummary(); todos.setTypeCounts(Map.of(
+                InvTodoTypes.INV_STOCK_CHECK_EXECUTE, 2L,
+                InvTodoTypes.INV_PURCHASE_RETURN_CONFIRM, 3L,
+                InvTodoTypes.INV_SALES_RETURN_CONFIRM, 5L));
+        InvMobileServiceImpl service = service(new FakeMobileMapper(Collections.emptyList()), scope, new FakeTodoService(todos));
+        IInvReportService reports = mock(IInvReportService.class); ReflectionTestUtils.setField(service, "reportService", reports);
+        MobileWorkbenchSummary result = service.selectWorkbenchSummary(88L);
+        assertThat(result.getTodaySalesCount()).isNull(); assertThat(result.getTodaySalesStatus()).isNull();
+        assertThat(result.getPendingStockCheckCount()).isEqualTo(2L); assertThat(result.getPendingReturnCount()).isEqualTo(3L);
+        verifyNoInteractions(reports);
     }
 
     private static InvMobileServiceImpl service(FakeMobileMapper mobileMapper, FakeDeptScopeMapper deptScopeMapper)

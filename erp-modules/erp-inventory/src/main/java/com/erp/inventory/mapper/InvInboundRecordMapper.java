@@ -8,6 +8,7 @@ public interface InvInboundRecordMapper
 {
     List<InvInboundRecord> selectInvInboundRecordByOrderId(@Param("orderId") Long orderId);
     List<InvInboundRecord> selectPendingInvInboundRecordByOrderId(@Param("orderId") Long orderId);
+    List<InvInboundRecord> selectByOrderIdForUpdate(@Param("orderId") Long orderId);
     InvInboundRecord selectByBatchDetailIdForUpdate(@Param("batchDetailId") Long batchDetailId);
     int insertInvInboundRecord(InvInboundRecord record);
     int updateInvInboundRecord(InvInboundRecord record);

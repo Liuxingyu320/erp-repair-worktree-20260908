@@ -221,6 +221,76 @@ class InvSalesServiceImplTest
         assertThat(second.getReturnableQuantity()).isEqualByComparingTo("0");
     }
 
+    @Test
+    void formalSubmitRejectsMissingWarehouseBeforeAnyInsert()
+    {
+        loginAsAdmin();
+        FakeSalesOrderMapper orders = new FakeSalesOrderMapper();
+        FakeSalesDetailMapper details = new FakeSalesDetailMapper();
+        InvSalesServiceImpl service = salesService(orders, details, new FakeProductMapper());
+        assertThatThrownBy(() -> service.submitSales(salesOrder(), List.of(salesDetail()), 201L))
+                .isInstanceOf(ServiceException.class).hasMessageContaining("出库仓库");
+        assertThat(orders.stored).isNull();
+        assertThat(details.details).isEmpty();
+    }
+
+    @Test
+    void existingEditorRejectsLockedSubmittedStateBeforeReplacingDetails()
+    {
+        loginAsAdmin();
+        FakeSalesOrderMapper orders = new FakeSalesOrderMapper();
+        orders.stored = salesOrder(); orders.stored.setOrderId(900L); orders.stored.setShopDeptId(201L);
+        orders.stored.setStatus("submitted");
+        FakeSalesDetailMapper details = new FakeSalesDetailMapper(); details.details.add(salesDetail());
+        InvSalesServiceImpl service = salesService(orders, details, new FakeProductMapper());
+        InvSalesOrder request = salesOrder(); request.setOrderId(900L);
+        assertThatThrownBy(() -> service.saveDraft(request, List.of(salesDetail()), 201L)).isInstanceOf(ServiceException.class);
+        assertThat(details.details).hasSize(1); assertThat(orders.stored.getStatus()).isEqualTo("submitted");
+    }
+
+    @Test
+    void staleDraftVersionCannotOverwriteCurrentDraft()
+    {
+        loginAsAdmin();
+        FakeSalesOrderMapper orders = new FakeSalesOrderMapper();
+        orders.stored = salesOrder(); orders.stored.setOrderId(900L); orders.stored.setShopDeptId(201L);
+        orders.stored.setStatus("draft"); orders.stored.setVersion(2L);
+        FakeSalesDetailMapper details = new FakeSalesDetailMapper(); details.details.add(salesDetail());
+        InvSalesServiceImpl service = salesService(orders, details, new FakeProductMapper());
+        InvSalesOrder request = salesOrder(); request.setOrderId(900L); request.setVersion(1L);
+        assertThatThrownBy(() -> service.saveDraft(request, List.of(salesDetail()), 201L))
+                .isInstanceOf(ServiceException.class).hasMessageContaining("已变化");
+        assertThat(orders.stored.getVersion()).isEqualTo(2L); assertThat(details.details).hasSize(1);
+    }
+
+    @Test
+    void submitPreservesMultipleWarehouseAssignmentsAndIncrementsVersion()
+    {
+        loginAsAdmin();
+        FakeSalesOrderMapper orders = new FakeSalesOrderMapper(); FakeSalesDetailMapper details = new FakeSalesDetailMapper();
+        FakeProductMapper products = new FakeProductMapper(); products.products.put(1001L, product());
+        FakeDeptScopeMapper scope = new FakeDeptScopeMapper(); scope.deptTypes.put(501L, "WAREHOUSE"); scope.deptTypes.put(502L, "WAREHOUSE");
+        InvSalesServiceImpl service = salesService(orders, details, products, scope);
+        InvSalesDetail a = salesDetail(); a.setWarehouseId(501L); InvSalesDetail b = salesDetail(); b.setWarehouseId(502L);
+        InvSalesOrder saved = service.submitSales(salesOrder(), List.of(a, b), 201L);
+        assertThat(saved.getStatus()).isEqualTo("submitted"); assertThat(saved.getVersion()).isEqualTo(1L);
+        assertThat(details.details).extracting(InvSalesDetail::getWarehouseId).containsExactly(501L, 502L);
+    }
+
+    @Test
+    void cancellationRequiresTheOriginalVersionAndLockedCancelableState()
+    {
+        loginAsAdmin(); FakeSalesOrderMapper orders = new FakeSalesOrderMapper(); orders.stored = salesOrder();
+        orders.stored.setOrderId(900L); orders.stored.setShopDeptId(201L); orders.stored.setStatus("noticed"); orders.stored.setVersion(2L);
+        InvSalesServiceImpl service = salesService(orders, new FakeSalesDetailMapper(), new FakeProductMapper());
+        assertThatThrownBy(() -> service.cancelSales(900L, 201L, 2L)).isInstanceOf(ServiceException.class);
+        assertThat(orders.stored.getStatus()).isEqualTo("noticed");
+        orders.stored.setStatus("submitted");
+        assertThatThrownBy(() -> service.cancelSales(900L, 201L, 1L)).hasMessageContaining("已变化");
+        service.cancelSales(900L, 201L, 2L);
+        assertThat(orders.stored.getStatus()).isEqualTo("cancelled"); assertThat(orders.stored.getVersion()).isEqualTo(3L);
+    }
+
     private InvSalesServiceImpl salesService(FakeSalesOrderMapper orderMapper, FakeSalesDetailMapper detailMapper,
             FakeProductMapper productMapper)
     {
@@ -238,22 +308,10 @@ class InvSalesServiceImplTest
         InvCustomerMapper customerMapper = mock(InvCustomerMapper.class);
         when(customerMapper.selectInvCustomerById(301L)).thenReturn(customer());
         ReflectionTestUtils.setField(service, "customerMapper", customerMapper);
-        injectIfPresent(service, "productMapper", productMapper);
         InventoryItemResolver itemResolver = new InventoryItemResolver();
         ReflectionTestUtils.setField(itemResolver, "productMapper", productMapper);
         ReflectionTestUtils.setField(service, "itemResolver", itemResolver);
         return service;
-    }
-
-    private void injectIfPresent(Object target, String fieldName, Object value)
-    {
-        try
-        {
-            ReflectionTestUtils.setField(target, fieldName, value);
-        }
-        catch (IllegalArgumentException ignored)
-        {
-        }
     }
 
     private void loginAsAdmin()
@@ -311,6 +369,11 @@ class InvSalesServiceImplTest
 
     private static class FakeSalesOrderMapper implements InvSalesOrderMapper
     {
+        @Override
+        public List<InvSalesOrder> selectReturnableSalesOrderList(
+                com.erp.inventory.domain.dto.InvSalesReturnSourceQuery query, Long shopDeptId)
+        { return Collections.emptyList(); }
+
         private InvSalesOrder stored;
 
         @Override

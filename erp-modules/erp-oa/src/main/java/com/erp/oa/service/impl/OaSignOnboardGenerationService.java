@@ -62,6 +62,7 @@ public class OaSignOnboardGenerationService
     private final OaSignCompanyService companyService;
     private final OaSignOnboardDataRequestMapper dataRequestMapper;
     private final IOaSignPackageService packageService;
+    private final OaSignSalarySourceService salarySources;
 
     public OaSignOnboardGenerationService(OaSignOnboardImportService importService,
             OaSignOnboardImportBatchMapper batchMapper,
@@ -74,7 +75,7 @@ public class OaSignOnboardGenerationService
             OaSignTaskOrchestrator orchestrator,
             OaSignCompanyService companyService,
             OaSignOnboardDataRequestMapper dataRequestMapper,
-            IOaSignPackageService packageService)
+            IOaSignPackageService packageService, OaSignSalarySourceService salarySources)
     {
         this.importService = importService;
         this.batchMapper = batchMapper;
@@ -88,6 +89,7 @@ public class OaSignOnboardGenerationService
         this.companyService = companyService;
         this.dataRequestMapper = dataRequestMapper;
         this.packageService = packageService;
+        this.salarySources = salarySources;
     }
 
     public OaSignOnboardGenerateResult generate(Long batchId, OaSignOnboardGenerateRequest action,
@@ -418,6 +420,8 @@ public class OaSignOnboardGenerationService
             {
                 throw new ServiceException("导入行与已生成签约任务绑定不完整");
             }
+            String sourceId = salarySources.requireConfirmed(batch, row, importService.snapshot(row));
+            salarySources.bind(packageMapper.selectOaSignPackageById(row.getPackageId()), sourceId);
             result.setTaskId(row.getTaskId()); result.setPackageId(row.getPackageId());
             result.setResult("REUSED"); result.setStatus("GENERATED"); result.setMessage("已复用生成结果");
             return result;
@@ -498,6 +502,7 @@ public class OaSignOnboardGenerationService
             return blockClaimedRow(batch, row, initiatingOperatorUserId,
                     "PLAN_CHANGED_REPREVIEW", templateErrors,
                     "签约套餐文件不完整，请重新预览");
+        String salarySourceId = salarySources.requireConfirmed(batch, row, snapshot);
         SigningContext signing = signingContext(row);
         HrSignBusinessEvent event = eventFactory.create(batch, row, snapshot, candidate,
                 initiatingOperatorUserId, requestId);
@@ -532,14 +537,14 @@ public class OaSignOnboardGenerationService
             taskId = orchestrator.orchestrate(event);
         }
         return finishClaimedGeneration(batch, row, signing, snapshot, currentDecision,
-                taskId, stagedSignatureFirst, initiatingOperatorUserId);
+                taskId, stagedSignatureFirst, initiatingOperatorUserId, salarySourceId);
     }
 
     private OaSignOnboardGenerateResult.Item finishClaimedGeneration(
             OaSignOnboardImportBatch batch, OaSignOnboardImportRow row,
             SigningContext signing, OaSignOnboardContractSnapshot snapshot,
             OaSignDraftDecision currentDecision, Long taskId, boolean stagedSignatureFirst,
-            Long initiatingOperatorUserId)
+            Long initiatingOperatorUserId, String salarySourceId)
     {
         OaSignOnboardGenerateResult.Item result = item(row);
         return orchestrator.withLockedExcelImportTask(row, batch, taskId,
@@ -643,6 +648,7 @@ public class OaSignOnboardGenerationService
                 throw new GenerationFailureException(
                         "PACKAGE_DRAFT_STATE_CHANGED", "签约包草稿状态已变化");
             }
+            salarySources.bind(frozenPackage, salarySourceId);
             if (rowMapper.completeGeneration(row.getRowId(), taskId, task.getPackageId(),
                     row.getGenerationRequestId(), row.getVersion()) != 1)
             {

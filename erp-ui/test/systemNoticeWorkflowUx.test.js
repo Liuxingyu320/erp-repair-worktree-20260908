@@ -78,7 +78,8 @@ assert.ok(
   "header notice detail must use the recipient-scoped inbox endpoint"
 )
 assert.ok(
-  readUsersSource.includes("已读 <strong>{{ total }}</strong> / {{ recipientCount }} 人") &&
+  readUsersSource.includes("总体已读 <strong>{{ readCount }}</strong> / {{ recipientCount }} 人") &&
+    readUsersSource.includes("筛选结果 {{ total }} 人") &&
     readUsersSource.includes('aria-label="筛选已读用户"') &&
     readUsersSource.includes("focusSearch"),
   "read statistics must use recipient cardinality and provide an accessible focused search"

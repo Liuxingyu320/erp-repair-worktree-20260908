@@ -8,6 +8,7 @@ public interface InvReceiptBatchDetailMapper
 {
     List<InvReceiptBatchDetail> selectByBatchId(@Param("batchId") Long batchId);
     List<InvReceiptBatchDetail> selectByBatchIdForUpdate(@Param("batchId") Long batchId);
+    List<InvReceiptBatchDetail> selectByOrderIdForUpdate(@Param("orderId") Long orderId);
     int insertInvReceiptBatchDetail(InvReceiptBatchDetail detail);
     int updateInspectionProgress(InvReceiptBatchDetail detail);
 }

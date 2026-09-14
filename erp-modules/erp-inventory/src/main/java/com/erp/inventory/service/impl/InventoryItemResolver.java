@@ -1,6 +1,12 @@
 package com.erp.inventory.service.impl;
 
 import java.math.BigDecimal;
+import java.util.Collection;
+import java.util.Comparator;
+import java.util.Objects;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
+import com.erp.inventory.mapper.InvCatalogReferenceMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import com.erp.common.core.exception.ServiceException;
@@ -17,6 +23,9 @@ import com.erp.inventory.mapper.InvProductMapper;
 public class InventoryItemResolver
 {
     @Autowired
+    private InvCatalogReferenceMapper catalogReferenceMapper;
+
+    @Autowired
     private InvProductMapper productMapper;
 
     @Autowired
@@ -24,6 +33,31 @@ public class InventoryItemResolver
 
     @Autowired
     private InvGiftMapper giftMapper;
+
+    public record ReferenceKey(String itemType, Long itemId) {}
+
+    public static ReferenceKey referenceKey(String itemType, Long itemId, Long productId)
+    {
+        String type = InvItemTypes.normalize(itemType);
+        Long id = InvItemTypes.resolveItemId(type, itemId, productId);
+        if (id == null || id <= 0) throw new ServiceException("请选择有效物料");
+        return new ReferenceKey(type, id);
+    }
+
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void lockReferences(Collection<ReferenceKey> keys)
+    {
+        if (keys == null) return;
+        for (ReferenceKey key : keys.stream().filter(Objects::nonNull)
+                .filter(key -> !InvItemTypes.PRODUCT.equals(key.itemType()))
+                .distinct().sorted(Comparator.comparing(ReferenceKey::itemType).thenComparing(ReferenceKey::itemId)).toList())
+        {
+            if (!java.util.List.of(InvItemTypes.OE, InvItemTypes.GIFT).contains(key.itemType()))
+                throw new ServiceException("物料类型无效");
+            String status = catalogReferenceMapper.selectStatusForUpdate(key.itemType(), key.itemId());
+            if (!"0".equals(status)) throw new ServiceException("物料不存在、已删除或已停用，请重新选择");
+        }
+    }
 
     public InventoryItemSnapshot resolve(String itemType, Long itemId, Long productId)
     {

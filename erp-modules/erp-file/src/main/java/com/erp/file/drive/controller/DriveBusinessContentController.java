@@ -11,6 +11,7 @@ import com.erp.file.drive.exception.DriveException;
 import com.erp.file.drive.service.DriveActorResolver;
 import com.erp.file.drive.service.DriveContentService;
 import com.erp.file.drive.service.DriveFeatureGuard;
+import com.erp.file.drive.service.DriveFilePolicy;
 import com.erp.system.api.domain.DriveBusinessFile;
 import org.springframework.core.io.Resource;
 import org.springframework.http.ContentDisposition;
@@ -33,18 +34,21 @@ public class DriveBusinessContentController
     private static final String NOSNIFF = "X-Content-Type-Options";
     private static final String HEALTH_CERTIFICATE = "HEALTH_CERTIFICATE";
     private static final String CUSTOMER_PHOTO = "CUSTOMER_PHOTO";
+    private static final String TRANSFER_EVIDENCE = "TRANSFER_EVIDENCE";
 
     private final DriveFeatureGuard featureGuard;
     private final DriveActorResolver actorResolver;
     private final DriveContentService contentService;
+    private final DriveFilePolicy filePolicy;
 
     public DriveBusinessContentController(DriveFeatureGuard featureGuard,
             DriveActorResolver actorResolver,
-            DriveContentService contentService)
+            DriveContentService contentService, DriveFilePolicy filePolicy)
     {
         this.featureGuard = featureGuard;
         this.actorResolver = actorResolver;
         this.contentService = contentService;
+        this.filePolicy = filePolicy;
     }
 
     @InnerAuth(isUser = true)
@@ -85,7 +89,7 @@ public class DriveBusinessContentController
         return ResponseEntity.ok().headers(headers).body(content.resource());
     }
 
-    private static void requireAllowedUsage(DriveBusinessFile file,
+    private void requireAllowedUsage(DriveBusinessFile file,
             String usage)
     {
         String normalized = usage == null ? ""
@@ -94,6 +98,11 @@ public class DriveBusinessContentController
                 : file.getContentType().toLowerCase(Locale.ROOT);
         boolean image = type.startsWith("image/")
                 && !"image/svg+xml".equals(type);
+        if (TRANSFER_EVIDENCE.equals(normalized) && file != null && file.getSize() != null)
+        {
+            filePolicy.validate(file.getFileName(), file.getContentType(), file.getSize());
+            return;
+        }
         boolean allowed = CUSTOMER_PHOTO.equals(normalized) ? image
                 : HEALTH_CERTIFICATE.equals(normalized)
                         && (image || "application/pdf".equals(type));

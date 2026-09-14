@@ -86,16 +86,16 @@
         </if>
           and exists (
               select 1
-              from inv_purchase_detail source_detail
-              where source_detail.order_id = o.order_id
-                and coalesce(source_detail.received_quantity, 0) &gt; coalesce((
+              from inv_purchase_detail d
+              where d.order_id = o.order_id
+                and <include refid="com.erp.inventory.mapper.InvPurchaseDetailMapper.stockedQuantity"/> &gt; coalesce((
                     select sum(return_detail.quantity)
                     from inv_purchase_return_detail return_detail
                     inner join inv_purchase_return purchase_return
                             on purchase_return.return_id = return_detail.return_id
                     where purchase_return.purchase_order_id = o.order_id
                       and purchase_return.status in ('submitted', 'returned')
-                      and return_detail.purchase_detail_id = source_detail.detail_id
+                      and return_detail.purchase_detail_id = d.detail_id
                 ), 0)
           )
         order by o.create_time desc

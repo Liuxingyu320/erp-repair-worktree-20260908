@@ -18,6 +18,7 @@ import com.erp.common.security.annotation.RequiresPermissions;
 import com.erp.common.security.utils.SecurityUtils;
 import com.erp.inventory.domain.InvStock;
 import com.erp.inventory.domain.vo.InvReportProductOption;
+import com.erp.inventory.domain.vo.InvReportItemOption;
 import com.erp.inventory.domain.vo.InvReportSummary;
 import com.erp.inventory.domain.vo.InvReportWarningExportRow;
 import com.erp.inventory.service.IInvReportService;
@@ -65,6 +66,18 @@ public class InvReportController extends InvBaseController
         List<InvReportProductOption> options = reportService.selectProductOptions(
                 keyword, limit, resolveShopDeptId(request));
         return success(options);
+    }
+
+    @RequiresPermissions("inv:report:list")
+    @GetMapping("/item-options")
+    public AjaxResult itemOptions(
+            @RequestParam(value = "itemType", required = false) String itemType,
+            @RequestParam(value = "keyword", required = false) String keyword,
+            @RequestParam(value = "limit", defaultValue = "20") Integer limit,
+            HttpServletRequest request, HttpServletResponse response)
+    {
+        disableCaching(response);
+        return success(reportService.selectItemOptions(itemType, keyword, limit, resolveShopDeptId(request)));
     }
 
     @RequiresPermissions("inv:report:export")

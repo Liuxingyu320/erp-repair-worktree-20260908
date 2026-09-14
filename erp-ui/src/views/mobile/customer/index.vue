@@ -128,21 +128,7 @@
             <div><dt>最后修改时间</dt><dd>{{ dateTimeText(selected.updateTime || selected.createTime) }}</dd></div>
           </dl>
 
-          <section class="service-history">
-            <div class="service-history-title">
-              <h3>历史服务记录</h3>
-              <span>{{ serviceRecords.length }} 条</span>
-            </div>
-            <article v-for="record in serviceRecords" :key="record.recordId || record.requestKey || record.serviceDate">
-              <div>
-                <strong>{{ record.teaServed || "到店服务" }}</strong>
-                <time>{{ record.serviceDate }}</time>
-              </div>
-              <p>{{ record.serviceNote || record.preferenceSnapshot || "无服务备注" }}</p>
-              <small>{{ record.serviceUserName || record.createBy || "-" }} · {{ record.partySize || "-" }} 人 · {{ moneyText(record.consumptionAmount) }}</small>
-            </article>
-            <p v-if="!serviceRecords.length" class="empty-history">暂无服务记录</p>
-          </section>
+          <customer-service-history :customer-id="selected.customerId" :active="!!selected" :refresh-token="selected.version" />
         </div>
 
         <footer>
@@ -154,6 +140,7 @@
     </section>
 
     <mobile-form-sheet
+      v-if="formSheet.open"
       :value="formSheet.data"
       :open="formSheet.open"
       :feature="feature"
@@ -182,6 +169,7 @@
 </template>
 
 <script>
+import CustomerServiceHistory from "@/views/inventory/components/CustomerServiceHistory.vue"
 import {
   addCustomerServiceRecord,
   createCustomerServiceCard,
@@ -191,9 +179,10 @@ import {
   listCustomerServiceCards,
   updateCustomerServiceCard
 } from "@/api/inventory/customer"
-import { getSelectedDeptContext } from "@/utils/shopContext"
+const { createUiOperationScope } = require("@/utils/uiOperationScope")
+import { getSelectedDeptId, getSelectedDeptContext } from "@/utils/shopContext"
 import MobileCustomerRecordDialog from "@/views/mobile/feature/components/MobileCustomerRecordDialog.vue"
-import MobileFormSheet from "@/views/mobile/feature/components/MobileFormSheet.vue"
+const MobileFormSheet = () => import("@/views/mobile/feature/components/MobileFormSheet.vue")
 
 const { getMobileFormConfig } = require("@/views/mobile/feature/mobileFormConfigs")
 const { createMobileFormData, buildMobileFormPayload } = require("@/views/mobile/feature/mobileFormPayloads")
@@ -205,7 +194,7 @@ const PAGE_SIZE = 20
 
 export default {
   name: "MobileCustomerServiceCard",
-  components: { MobileCustomerRecordDialog, MobileFormSheet },
+  components: { CustomerServiceHistory, MobileCustomerRecordDialog, MobileFormSheet },
   data() {
     return {
       context: getSelectedDeptContext(),
@@ -280,17 +269,24 @@ export default {
       }
     }
   },
+  watch: { '$store.getters.id'(){this.resetRecordContext()}, '$store.getters.token'(){this.resetRecordContext()} },
   created() {
+    this._recordContextChanged=()=>this.resetRecordContext()
+    window.addEventListener('erp:dept-changed',this._recordContextChanged)
     this.loadCapabilities()
     this.loadRows(false)
   },
   beforeDestroy() {
+    window.removeEventListener('erp:dept-changed',this._recordContextChanged)
+    this.recordScope().deactivate()
     this.listRequestSeq += 1
     this.detailRequestSeq += 1
     this.releasePhoto()
     this.unlockBody()
   },
   methods: {
+    recordScope(){if(!this._recordScope)this._recordScope=createUiOperationScope(()=>({actorId:String(this.$store.getters.id||''),session:String(this.$store.getters.token||''),deptId:String(getSelectedDeptId()||'')}));return this._recordScope},
+    resetRecordContext(){this.recordScope().invalidate();this.context=getSelectedDeptContext();this.listRequestSeq+=1;this.detailRequestSeq+=1;this.selected=null;this.formSheet={open:false,saving:false,error:'',data:{}};this.recordDialog={open:false,saving:false,error:''};this.releasePhoto();this.unlockBody();this.rows=[];this.total=0;this.pageNum=1;this.loadCapabilities();this.loadRows(false)},
     loadCapabilities() {
       return getCustomerServiceCardCapabilities().then(response => {
         this.writeEnabled = !!(response && response.data && response.data.writeEnabled === true)
@@ -458,36 +454,9 @@ export default {
         this.formSheet.saving = false
       })
     },
-    openRecord() {
-      if (!this.canAddRecord || !this.selected || this.selected.status !== "0") return
-      this.recordDialog = { open: true, saving: false, error: "" }
-    },
-    closeRecord() {
-      if (!this.recordDialog.saving) this.recordDialog.open = false
-    },
-    submitRecord(form) {
-      if (!this.selected || this.recordDialog.saving) return
-      let payload
-      try {
-        payload = buildCustomerServiceRecordPayload(form)
-      } catch (error) {
-        this.recordDialog.error = error.message
-        return
-      }
-      const customerId = this.selected.customerId
-      this.recordDialog.saving = true
-      this.recordDialog.error = ""
-      addCustomerServiceRecord(customerId, payload).then(() => {
-        this.recordDialog.open = false
-        this.$modal.msgSuccess("服务记录已追加")
-        this.loadDetail(customerId)
-        this.refresh()
-      }).catch(error => {
-        this.recordDialog.error = this.errorMessage(error, "服务记录追加失败")
-      }).finally(() => {
-        this.recordDialog.saving = false
-      })
-    },
+    openRecord(){if(!this.canAddRecord||!this.selected||this.selected.status!=="0")return;this.recordScope().invalidate('record');this.recordDialog={open:true,saving:false,error:""}},
+    closeRecord(){if(!this.recordDialog.saving){this.recordScope().invalidate('record');this.recordDialog.open=false}},
+    submitRecord(form){if(!this.canAddRecord||!this.selected||!this.recordDialog.open||this.recordDialog.saving)return;let payload;try{payload=buildCustomerServiceRecordPayload(form)}catch(error){this.recordDialog.error=error.message;return}const customerId=String(this.selected.customerId),dialog=this.recordDialog,scope=this.recordScope(),operation=scope.begin('record',customerId);const current=()=>scope.isCurrent(operation,String(this.selected&&this.selected.customerId||''))&&this.recordDialog===dialog&&dialog.open;dialog.saving=true;dialog.error="";return addCustomerServiceRecord(customerId,payload).then(()=>{if(!current())return;dialog.saving=false;dialog.open=false;this.$modal.msgSuccess("服务记录已追加");this.loadDetail(customerId);this.refresh()}).catch(error=>{if(current())dialog.error=this.errorMessage(error,"服务记录追加失败")}).finally(()=>{if(current())dialog.saving=false})},
     avatarText(row) {
       return String(row && row.customerName || "客").trim().slice(0, 1)
     },

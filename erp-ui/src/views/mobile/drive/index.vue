@@ -113,17 +113,20 @@
         >
 
         <div v-if="uploadState" class="mobile-drive-upload__status" role="status" aria-live="polite">
+          <p v-if="uploadReceiptStorageUnavailable" role="alert">浏览器未能保存上传进度，请保留此页面，核对上传结果后再关闭。</p>
           <div>
             <strong>{{ uploadState.displayName || uploadState.file && uploadState.file.name }}</strong>
             <span v-if="uploadState.status === 'uploading'">正在上传 {{ uploadState.progress }}%</span>
             <span v-else-if="uploadState.status === 'done'">上传完成</span>
-            <span v-else-if="uploadState.status === 'canceled'">已取消上传</span>
+            <span v-else-if="uploadState.status === 'pending'">{{ uploadState.error || '上传结果待核对' }}</span>
+            <span v-else-if="uploadState.status === 'canceled'">已取消尚未发送的任务</span>
             <span v-else>{{ uploadState.error || '上传失败' }}</span>
           </div>
           <div v-if="uploadState.status === 'uploading'" class="mobile-drive-upload__progress" aria-hidden="true">
             <span :style="{ transform: 'scaleX(' + uploadState.progress / 100 + ')' }" />
           </div>
-          <button v-if="uploadState.status === 'uploading'" type="button" @click="cancelUpload">取消上传</button>
+          <button v-if="uploadState.status === 'uploading'" type="button" @click="cancelUpload">停止等待</button>
+          <button v-else-if="uploadState.status === 'pending'" type="button" :disabled="uploadState.querying" @click="queryUpload">查询结果</button>
           <button v-else-if="uploadState.status === 'failed'" type="button" @click="retryUpload">重试上传</button>
         </div>
       </section>
@@ -351,7 +354,8 @@ import {
   renameDriveNode,
   restoreDriveNode,
   trashDriveNode,
-  uploadDriveFile
+  uploadDriveFile,
+  getDriveUploadReceipt
 } from '@/api/drive'
 import MobileConfirmDialog from '@/views/mobile/feature/components/MobileConfirmDialog.vue'
 import MobileDriveActionSheet from './components/MobileDriveActionSheet.vue'
@@ -361,7 +365,6 @@ import MobileDriveRenameDialog from './components/MobileDriveRenameDialog.vue'
 const {
   clearDriveTimer,
   driveErrorMessage,
-  isDriveRequestCanceled,
   parseDriveBlobError,
   releaseDriveObjectUrl
 } = require('@/views/drive/driveState')
@@ -375,9 +378,6 @@ const {
   getMobileFolderParentId,
   isMobileUploadDestinationCurrent,
   isMobilePreviewable,
-  markMobileUploadCanceled,
-  markMobileUploadDone,
-  markMobileUploadFailed,
   popMobileFolder,
   prepareCapturedFile,
   pushMobileFolder,
@@ -386,6 +386,8 @@ const {
   selectInitialDriveSpace,
   updateMobileUploadProgress
 } = require('./mobileDriveState')
+
+const { uploadActor, uploadContext, pendingUpload, applyPreClaimRejection, applyUploadReceipt, persistUploadReceipts, restoreUploadReceipts, matchesUploadFile } = require('../../drive/uploadReceipt')
 
 export default {
   name: 'MobileCloudDrive',
@@ -422,6 +424,7 @@ export default {
       previewError: '',
       previewSequence: 0,
       uploadState: null,
+      uploadReceiptStorageUnavailable: false,
       uploadSequence: 0,
       uploadController: null,
       downloadingNodeId: null,
@@ -436,10 +439,12 @@ export default {
       },
       searchTimer: null,
       loadSequence: 0,
+      spacesSequence: 0,
       trashSequence: 0
     }
   },
   computed: {
+    uploadIdentity() { return uploadContext(this) },
     activeSpace() {
       return this.spaces.find(space => Number(space.spaceId) === Number(this.activeSpaceId)) || null
     },
@@ -486,7 +491,24 @@ export default {
       }
     }
   },
+  watch: {
+    uploadIdentity() {
+      this.uploadReceiptStorageUnavailable = false
+      this.loadSequence += 1
+      this.spacesSequence += 1
+      this.trashSequence += 1
+      this.spaces = []
+      this.nodes = []
+      this.trashItems = []
+      this.folderStack = []
+      this.total = 0
+      this.cancelActiveUpload(false)
+      this.uploadSequence += 1
+      this.uploadState = restoreUploadReceipts(uploadActor(this), 'mobile')[0] || null
+    }
+  },
   created() {
+    this.uploadState = restoreUploadReceipts(uploadActor(this), 'mobile')[0] || null
     this.initialize()
   },
   beforeDestroy() {
@@ -503,6 +525,7 @@ export default {
     disposeTransientState() {
       this.searchTimer = clearDriveTimer(this.searchTimer, clearTimeout)
       this.loadSequence += 1
+      this.spacesSequence += 1
       this.trashSequence += 1
       this.previewSequence += 1
       this.cancelActiveUpload(false)
@@ -514,15 +537,21 @@ export default {
       if (this.activeSpaceId != null) await this.loadCurrentView()
     },
     async loadSpaces(preferredSpaceId) {
+      const sequence = ++this.spacesSequence
+      const identity = uploadContext(this)
+      const current = () => sequence === this.spacesSequence && identity === uploadContext(this)
       try {
         const response = await listDriveSpaces()
+        if (!current()) return
         this.spaces = Array.isArray(response.data) ? response.data : []
         const requestedSpaceId = preferredSpaceId == null ? this.activeSpaceId : preferredSpaceId
         const preferred = this.spaces.find(space => Number(space.spaceId) === Number(requestedSpaceId))
         const selected = preferred || selectInitialDriveSpace(this.spaces)
         this.activeSpaceId = selected ? selected.spaceId : null
       } catch (error) {
+        if (!current()) return
         const parsed = await parseDriveBlobError(error)
+        if (!current()) return
         this.errorMessage = driveErrorMessage(parsed.code, parsed.message)
       }
     },
@@ -931,76 +960,103 @@ export default {
       if (input) input.value = ''
       if (!selected || !canStartMobileUpload(this.uploadState)) return
       const file = camera ? prepareCapturedFile(selected) : selected
+      const previous = this.uploadState
+      if (previous && ['pending', 'failed'].includes(previous.status)) {
+        if (!matchesUploadFile(previous, file, this.activeSpaceId, this.parentId)) {
+          this.$message.info('请先核对上一次上传；重试时在原目录选择同一个文件')
+          return
+        }
+        this.uploadState = { ...previous, file }
+        if (previous.status === 'pending') this.queryUpload()
+        else this.retryUpload()
+        return
+      }
       this.uploadSelectedFile(file)
     },
     async uploadSelectedFile(file, originalTarget) {
       if (!file || !canStartMobileUpload(this.uploadState)) return
       const uploadSequence = ++this.uploadSequence
+      const context = uploadContext(this)
       const controller = new AbortController()
       this.uploadController = controller
       const targetSpaceId = originalTarget ? originalTarget.targetSpaceId : this.activeSpaceId
       const targetParentId = originalTarget ? originalTarget.targetParentId : this.parentId
-      this.uploadState = createMobileUploadState(file, targetSpaceId, targetParentId)
+      this.uploadState = originalTarget
+        ? { ...originalTarget, file, status: 'uploading', progress: 0, error: '' }
+        : createMobileUploadState(file, targetSpaceId, targetParentId)
+      const firstAttempt = !originalTarget && this.uploadState.freshUpload === true
+      this.uploadState = { ...this.uploadState, freshUpload: false }
+      this.persistUploadState()
       const onUploadProgress = event => {
-        if (uploadSequence !== this.uploadSequence || !this.uploadState ||
+        if (context !== uploadContext(this) || uploadSequence !== this.uploadSequence || !this.uploadState ||
           this.uploadState.file !== file || this.uploadState.status !== 'uploading') return
         this.uploadState = updateMobileUploadProgress(this.uploadState, event)
       }
       try {
-        const response = await uploadDriveFile(
-          file,
-          targetSpaceId,
-          targetParentId,
-          onUploadProgress,
-          controller.signal
-        )
-        if (uploadSequence !== this.uploadSequence) return
-        this.uploadState = markMobileUploadDone(
-          this.uploadState,
-          response && response.data
-        )
-        await this.loadSpaces()
-        if (uploadSequence !== this.uploadSequence) return
-        if (isMobileUploadDestinationCurrent(this.uploadState, this.activeSpaceId, this.parentId)) {
-          await this.loadNodes(true)
+        const response = await uploadDriveFile(file, targetSpaceId, targetParentId, onUploadProgress,
+          controller.signal, this.uploadState.operationId)
+        if (context !== uploadContext(this) || uploadSequence !== this.uploadSequence) return
+        this.uploadState = applyUploadReceipt(this.uploadState, response && response.data)
+        this.persistUploadState()
+        if (this.uploadState.status === 'done') {
+          await this.loadSpaces()
+          if (context !== uploadContext(this) || uploadSequence !== this.uploadSequence) return
+          if (isMobileUploadDestinationCurrent(this.uploadState, this.activeSpaceId, this.parentId)) await this.loadNodes(true)
         }
       } catch (error) {
-        if (uploadSequence !== this.uploadSequence) return
-        if (isDriveRequestCanceled(error)) {
-          this.uploadState = markMobileUploadCanceled(this.uploadState)
-          return
-        }
-        const parsed = await parseDriveBlobError(error)
-        if (uploadSequence !== this.uploadSequence) return
-        this.uploadState = markMobileUploadFailed(
-          this.uploadState,
-          driveErrorMessage(parsed.code, parsed.message)
-        )
+        if (context !== uploadContext(this) || uploadSequence !== this.uploadSequence) return
+        const rejected = applyPreClaimRejection(this.uploadState, error, firstAttempt)
+        this.uploadState = rejected || pendingUpload(this.uploadState)
+        this.persistUploadState()
+        if (!rejected) await this.queryUpload()
       } finally {
-        if (uploadSequence === this.uploadSequence && this.uploadController === controller) {
+        if (context === uploadContext(this) && uploadSequence === this.uploadSequence && this.uploadController === controller) {
           this.uploadController = null
         }
+      }
+    },
+    persistUploadState() {
+      const saved = persistUploadReceipts(uploadActor(this), 'mobile', this.uploadState ? [this.uploadState] : [])
+      this.uploadReceiptStorageUnavailable = !saved && Boolean(this.uploadState && ['uploading', 'pending'].includes(this.uploadState.status))
+    },
+    async queryUpload() {
+      const item = this.uploadState
+      if (!item || !item.operationId || item.querying) return
+      const sequence = this.uploadSequence
+      const context = uploadContext(this)
+      const current = () => context === uploadContext(this) && sequence === this.uploadSequence &&
+        this.uploadState && this.uploadState.operationId === item.operationId
+      this.uploadState = { ...item, querying: true }
+      try {
+        const response = await getDriveUploadReceipt(item.operationId)
+        if (!current()) return
+        this.uploadState = applyUploadReceipt(this.uploadState, response && response.data)
+        this.persistUploadState()
+        if (this.uploadState.status === 'done') {
+          await this.loadSpaces()
+          if (current() && isMobileUploadDestinationCurrent(this.uploadState, this.activeSpaceId, this.parentId)) await this.loadNodes(true)
+        }
+      } catch (_) {
+        if (current()) this.uploadState = pendingUpload(this.uploadState, '暂时无法查询上传结果，请稍后重试查询')
+      } finally {
+        if (current()) { this.uploadState = { ...this.uploadState, querying: false }; this.persistUploadState() }
       }
     },
     cancelUpload() {
       this.cancelActiveUpload()
     },
     cancelActiveUpload(markCanceled = true) {
-      if (this.uploadController && typeof this.uploadController.abort === 'function') {
-        this.uploadController.abort()
-      }
+      if (this.uploadController && typeof this.uploadController.abort === 'function') this.uploadController.abort()
       this.uploadController = null
       if (markCanceled && this.uploadState && this.uploadState.status === 'uploading') {
-        this.uploadState = markMobileUploadCanceled(this.uploadState)
+        this.uploadState = pendingUpload(this.uploadState, '已停止等待，服务器上传结果仍需核对')
+        this.persistUploadState()
       }
     },
     retryUpload() {
       if (!this.uploadState || this.uploadState.status !== 'failed') return
-      const failed = this.uploadState
-      this.uploadSelectedFile(failed.file, {
-        targetSpaceId: failed.targetSpaceId,
-        targetParentId: failed.targetParentId
-      })
+      if (!this.uploadState.file) { this.$message.info('请在原目录重新选择同一个文件继续'); return }
+      this.uploadSelectedFile(this.uploadState.file, this.uploadState)
     },
     async openPreview(node) {
       const requestSequence = ++this.previewSequence
@@ -1119,7 +1175,7 @@ export default {
 .mobile-drive-upload__status strong,
 .mobile-drive-upload__status span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mobile-drive-upload__status strong { font-size: 12px; }
-.mobile-drive-upload__status span { color: #7f8fa3; font-size: 11px; }
+.mobile-drive-upload__status > div > span { color: #60736f; font-size: 12px; line-height: 1.5; white-space: normal; overflow-wrap: anywhere; }
 .mobile-drive-upload__status button { min-height: 44px; border: 0; background: transparent; color: #bd4141; font-weight: 700; }
 .mobile-drive-upload__progress { position: absolute; right: 0; bottom: 0; left: 0; height: 3px; background: #dbe7f5; }
 .mobile-drive-upload__progress span { width: 100%; height: 100%; display: block; background: #3479c6; transform: scaleX(0); transform-origin: left center; transition: transform 180ms cubic-bezier(.22,1,.36,1); }

@@ -273,7 +273,7 @@ assert.ok(
 assert.ok(
   desktopSource.includes("发布方案版本前检查") &&
     desktopSource.includes("publishBlockingReasons") &&
-    desktopSource.includes("publishSignPlan(this.publishDetail.planId)") &&
+    desktopSource.includes("publishSignPlan(planId, { previewToken: preview.previewToken, restoreVersionId: preview.restoreVersionId })") &&
     desktopSource.includes("公司确定方式") &&
     desktopSource.includes("首次签名后按部门识别") &&
     desktopSource.includes('label="适用范围">全部签约组织') &&

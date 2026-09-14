@@ -40,9 +40,11 @@
         </div>
 
         <div class="desktop-shop-body">
+          <el-alert v-if="treeError" :title="treeError" type="error" :closable="false" />
           <el-tree
             v-if="deptTree.length > 0"
             ref="deptTree"
+            @hook:mounted="handleTreeReady"
             v-loading="loading"
             :data="deptTree"
             :props="treeProps"
@@ -75,7 +77,7 @@
           <div>
             <el-button class="desktop-exit-btn" size="small" @click="handleCancel">退出</el-button>
             <el-button class="desktop-clear-btn" size="small" plain @click="handleClearSelection">清除</el-button>
-            <el-button class="desktop-enter-btn" type="primary" size="small" @click="handleConfirm">进入系统</el-button>
+            <el-button class="desktop-enter-btn" type="primary" size="small" :disabled="!treeReady || loading" @click="handleConfirm">进入系统</el-button>
           </div>
         </div>
       </section>
@@ -130,6 +132,7 @@
           </section>
 
           <section class="glass-panel shop-tree-panel">
+            <el-alert v-if="treeError" :title="treeError" type="error" :closable="false" />
             <div class="panel-head">
               <h2>组织列表</h2>
               <span>{{ loading ? "加载中" : selectedDeptName || "未选择" }}</span>
@@ -137,6 +140,7 @@
             <el-tree
               v-if="deptTree.length > 0"
               ref="deptTree"
+              @hook:mounted="handleTreeReady"
               v-loading="loading"
               :data="deptTree"
               :props="treeProps"
@@ -166,7 +170,7 @@
             <div class="footer-actions">
               <el-button size="mini" class="cancel-btn" @click="handleCancel">退出</el-button>
               <el-button size="mini" plain class="clear-btn" @click="handleClearSelection">清除</el-button>
-              <el-button type="primary" class="enter-btn" :disabled="mobileNoBusinessAccess" @click="handleConfirm">进入工作台</el-button>
+              <el-button type="primary" class="enter-btn" :disabled="mobileNoBusinessAccess || !treeReady || loading" @click="handleConfirm">进入工作台</el-button>
             </div>
           </section>
         </div>
@@ -179,9 +183,10 @@
 import { listShopTree } from "@/api/system/dept"
 import { MessageBox } from "@/plugins/element-services"
 import { requiresInventoryContext } from "@/utils/desktopContextPolicy"
-import { clearSelectedDept, findBusinessDeptNodes, findUniqueBusinessDept, getSelectedDeptId, getSelectedDeptType, isSelectableDeptType, isValidInventoryDeptType, setSelectedDept } from "@/utils/shopContext"
+import { clearSelectedDept, findDeptNodeById, findBusinessDeptNodes, findUniqueBusinessDept, getSelectedDeptId, getSelectedDeptType, isSelectableDeptType, isValidInventoryDeptType, setSelectedDept } from "@/utils/shopContext"
 import { consumePendingPasswordResetReminder, getPasswordResetRedirect } from "@/utils/passwordResetReminder"
 import { getMobileHomePath } from "@/views/mobile/mobileNavigation"
+const { createUiOperationScope } = require("@/utils/uiOperationScope")
 const { isMobileClient } = require("@/utils/clientPlatform")
 const {
   resolveNoBusinessContextRedirect,
@@ -198,6 +203,8 @@ export default {
   data() {
     return {
       loading: false,
+      treeReady: false,
+      treeError: "",
       isMobileViewport: false,
       filterText: "",
       deptTree: [],
@@ -214,6 +221,10 @@ export default {
     }
   },
   computed: {
+    actorContextKey() {
+      const store = this.$store || {}
+      return String((store.getters || {}).id || "") + ":" + String(((store.state || {}).user || {}).sessionRevision || 0)
+    },
     userPermissions() {
       const getters = this.$store && this.$store.getters ? this.$store.getters : {}
       return Array.isArray(getters.permissions) ? getters.permissions : []
@@ -246,6 +257,18 @@ export default {
     }
   },
   watch: {
+    actorContextKey() {
+      this.shopScope().invalidate()
+      this.deptTree = []
+      this.clearSelectionState()
+      this.treeReady = false
+      this.treeError = ""
+      this.loading = false
+      if ((this.$store.getters || {}).id) {
+        this.selectedDeptId = getSelectedDeptId()
+        this.fetchDeptTree()
+      }
+    },
     filterText(val) {
       this.$refs.deptTree && this.$refs.deptTree.filter(val)
     }
@@ -257,20 +280,46 @@ export default {
   mounted() {
     window.addEventListener("resize", this.updateViewport)
   },
+  activated() {
+    this.shopScope().activate()
+    if (this._refreshTreeOnActivate) {
+      this._refreshTreeOnActivate = false
+      this.fetchDeptTree()
+    }
+  },
+  deactivated() {
+    this.shopScope().deactivate()
+    this.treeReady = false
+    this.loading = false
+    this._refreshTreeOnActivate = true
+  },
   beforeDestroy() {
+    this.shopScope().deactivate()
     window.removeEventListener("resize", this.updateViewport)
   },
   methods: {
+    shopScope() {
+      if (!this._shopScope) this._shopScope = createUiOperationScope(() => ({ actor: this.actorContextKey }))
+      return this._shopScope
+    },
     updateViewport() {
       this.isMobileViewport = isMobileClient()
     },
     fetchDeptTree() {
+      const scope = this.shopScope()
+      const token = scope.begin("tree")
+      this._treeToken = token
       this.loading = true
-      listShopTree({ silentError: true }).then(res => {
-        this.deptTree = res.data || []
+      this.treeReady = false
+      this.treeError = ""
+      return listShopTree({ silentError: true }).then(res => {
+        if (!scope.isCurrent(token)) return
+        this.deptTree = Array.isArray(res.data) ? res.data : []
+        this.treeReady = true
         this.emptyDescription = this.deptTree.length > 0 ? "暂无可选组织" : "当前账号无可选组织"
         this.prepareTreeAfterLoad()
       }).catch(error => {
+        if (!scope.isCurrent(token)) return
         if (isProfileCompletionRequiredError(error)) {
           const missingFields = getProfileCompletionErrorFields(error)
           clearSelectedDept()
@@ -283,9 +332,9 @@ export default {
           return
         }
         this.emptyDescription = "获取可选组织失败"
-        this.$message.error("获取可选组织失败，请稍后重试")
+        this.treeError = "获取可选组织失败，已保留原选择，请点击刷新重试"
       }).finally(() => {
-        this.loading = false
+        if (scope.isCurrent(token)) this.loading = false
       })
     },
     prepareTreeAfterLoad() {
@@ -305,27 +354,54 @@ export default {
       if (this.deptTree.length > 0) {
         this.defaultExpandedKeys = [this.deptTree[0].deptId]
       }
+      if (this.selectedDeptId) {
+        const applied = this.applySelectedDept(this.selectedDeptId)
+        if (!applied) this.handleInvalidCachedDept()
+      } else {
+        const autoDept = this.findAutoBusinessDept()
+        if (autoDept) this.applyAutoBusinessDept(autoDept)
+      }
+    },
+    handleTreeReady() {
+      // The authorized data is authoritative; a delayed ElTree only affects visuals.
+      const token = this._treeToken
+      const selectedId = this.selectedDeptId
       this.$nextTick(() => {
-        if (this.selectedDeptId) {
-          const applied = this.applySelectedDept(this.selectedDeptId)
-          if (!applied) {
-            this.handleInvalidCachedDept()
-          }
-        } else {
-          const autoDept = this.findAutoBusinessDept()
-          if (autoDept) {
-            this.applyAutoBusinessDept(autoDept)
-            return
-          }
-        }
+        if (!this.treeReady || !this.shopScope().isCurrent(token) ||
+            String(selectedId || "") !== String(this.selectedDeptId || "")) return
+        this.syncSelectedDeptVisual(token, selectedId)
       })
+    },
+    syncSelectedDeptVisual(token, selectedId) {
+      if (!this.treeReady || !this.shopScope().isCurrent(token) ||
+          String(selectedId || "") !== String(this.selectedDeptId || "")) return false
+      const tree = this.$refs.deptTree
+      if (!tree) return false
+      tree.filter(this.filterText)
+      tree.setCurrentKey(selectedId || null)
+      const node = selectedId ? tree.getNode(selectedId) : null
+      if (node) {
+        this.expandToNode(node)
+        this.scrollToCurrentNode(token, selectedId)
+      }
+      return true
+    },
+    getDeptDataPath(nodes, deptId, ancestors = []) {
+      for (const data of nodes || []) {
+        const names = ancestors.concat(data.deptName || "")
+        if (String(data.deptId) === String(deptId)) return names
+        const childPath = this.getDeptDataPath(data.children || [], deptId, names)
+        if (childPath.length) return childPath
+      }
+      return []
     },
     filterNode(value, data) {
       if (!value) return true
       return data.deptName && data.deptName.indexOf(value) > -1
     },
     handleNodeClick(data) {
-      const currentNode = this.$refs.deptTree.getNode(data.deptId)
+      if (!this.treeReady || this.loading || !this.shopScope().isCurrent(this._treeToken)) return
+      const currentNode = this.$refs.deptTree && this.$refs.deptTree.getNode(data.deptId)
       if (currentNode && this.hasBusinessChildren(data)) {
         currentNode.expanded = true
       }
@@ -348,6 +424,10 @@ export default {
       this.selectedDeptPath = currentNode ? this.getNodePath(currentNode).join(" / ") : data.deptName
     },
     handleConfirm() {
+      if (!this.treeReady || this.loading || !this.shopScope().isCurrent(this._treeToken)) {
+        this.$message.warning("请先成功获取组织列表后再进入")
+        return
+      }
       if (!this.selectedDeptId) {
         this.$message.warning("请先选择公司、组织、店铺或仓库")
         return
@@ -358,6 +438,10 @@ export default {
       }
       if (!isValidInventoryDeptType(this.selectedDeptType)) {
         this.$message.warning("请选择具体门店或仓库进入业务工作台")
+        return
+      }
+      if (!this.applySelectedDept(this.selectedDeptId)) {
+        this.handleInvalidCachedDept()
         return
       }
       setSelectedDept(this.selectedDeptId, this.selectedDeptName, this.selectedDeptType)
@@ -419,20 +503,13 @@ export default {
       return "/"
     },
     applySelectedDept(deptId) {
-      if (!this.$refs.deptTree) {
-        return false
-      }
-      const currentNode = this.$refs.deptTree.getNode(deptId)
-      if (!currentNode || !currentNode.data) {
-        return false
-      }
-      this.$refs.deptTree.setCurrentKey(deptId)
-      this.selectedDeptId = currentNode.data.deptId
-      this.selectedDeptName = currentNode.data.deptName
-      this.selectedDeptType = currentNode.data.deptType || ""
-      this.selectedDeptPath = this.getNodePath(currentNode).join(" / ")
-      this.expandToNode(currentNode)
-      this.scrollToCurrentNode()
+      const data = findDeptNodeById(this.deptTree, deptId)
+      if (!data || !isValidInventoryDeptType(data.deptType)) return false
+      this.selectedDeptId = data.deptId
+      this.selectedDeptName = data.deptName
+      this.selectedDeptType = data.deptType || ""
+      this.selectedDeptPath = this.getDeptDataPath(this.deptTree, deptId).join(" / ")
+      this.handleTreeReady()
       return true
     },
     findAutoBusinessDept() {
@@ -489,8 +566,9 @@ export default {
         current = current.parent
       }
     },
-    scrollToCurrentNode() {
+    scrollToCurrentNode(token, selectedId) {
       this.$nextTick(() => {
+        if (!this.shopScope().isCurrent(token) || String(selectedId || "") !== String(this.selectedDeptId || "")) return
         const el = this.$el.querySelector(".liquid-tree .el-tree-node.is-current, .desktop-shop-tree .el-tree-node.is-current")
         if (el && typeof el.scrollIntoView === "function") {
           el.scrollIntoView({ block: "center", behavior: "smooth" })

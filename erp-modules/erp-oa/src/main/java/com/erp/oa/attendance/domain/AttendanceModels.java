@@ -16,6 +16,13 @@ public final class AttendanceModels
 {
     private AttendanceModels() { }
 
+    /** Two representations of the same database clock sample. */
+    public static class DatabaseClock
+    {
+        public LocalDateTime localTime;
+        public Long epochMillis;
+    }
+
     public static class Shift extends BaseEntity
     {
         private static final long serialVersionUID = 1L;
@@ -275,6 +282,9 @@ public final class AttendanceModels
         public Integer rawOvertimeMinutes;
         /** Net APPLY - REVERSE minutes consumed from this overtime day. */
         public Integer timeCreditUsedMinutes;
+        /** Independently confirmed overtime allocated to compensatory leave. */
+        public Integer overtimeTransferredMinutes;
+        public Integer overtimeTransferInvalid;
         public Integer netOvertimeMinutes;
         /** Net APPLY - REVERSE minutes applied to this early-leave day. */
         public Integer timeCreditOffsetMinutes;

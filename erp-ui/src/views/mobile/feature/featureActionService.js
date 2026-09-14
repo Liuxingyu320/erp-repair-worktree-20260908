@@ -1,8 +1,8 @@
 import { getSalesDetail, saveSales, submitSales, cancelSales } from "@/api/inventory/sales"
-import { getPurchaseDetail, savePurchase as saveInventoryPurchase, submitPurchase, receivePurchase, qualityCheckPurchase, listPendingReceiptBatches, qualityCheckPurchaseBatch, cancelPurchase, deleteDraftPurchase } from "@/api/inventory/purchase"
+import { getPurchaseDetail, getPurchaseReceiveContext, submitPurchaseDraft, savePurchase as saveInventoryPurchase, submitPurchase, qualityCheckPurchase, listPendingReceiptBatches, qualityCheckPurchaseBatch, cancelPurchase, deleteDraftPurchase } from "@/api/inventory/purchase"
 import { createDeliveryNotice, getDeliveryNotice, deliverDeliveryNotice, cancelDeliveryNotice } from "@/api/inventory/deliveryNotice"
-import { getSalesReturn, saveSalesReturn, submitSalesReturn, confirmSalesReturn, cancelSalesReturn } from "@/api/inventory/salesReturn"
-import { getPurchaseReturn, savePurchaseReturn, submitPurchaseReturn, confirmPurchaseReturn, cancelPurchaseReturn } from "@/api/inventory/purchaseReturn"
+import { getSalesReturn, submitSalesReturnDraft, saveSalesReturn, submitSalesReturn, confirmSalesReturn, cancelSalesReturn } from "@/api/inventory/salesReturn"
+import { getPurchaseReturn, submitPurchaseReturnDraft, savePurchaseReturn, submitPurchaseReturn, confirmPurchaseReturn, cancelPurchaseReturn } from "@/api/inventory/purchaseReturn"
 import {
   createStockCheck,
   getStockCheck,
@@ -29,7 +29,7 @@ import {
   deleteTransferDraft
 } from "@/api/inventory/transfer"
 import { getPurchaseDetail as getOaPurchaseDetail, savePurchase as saveOaPurchaseApi, submitPurchase as submitOaPurchaseApi } from "@/api/oa/purchase"
-import { submitFixedAssetRepair } from "@/api/oa/fixedAsset"
+import { precheckFixedAssetRepair, submitFixedAssetRepair } from "@/api/oa/fixedAsset"
 import { calculateSalary } from "@/api/oa/salary"
 import { markNoticeRead, markNoticeReadAll } from "@/api/system/notice"
 import { runJob, changeJobStatus } from "@/api/monitor/job"
@@ -39,15 +39,19 @@ import { approveApprovalTask, rejectApprovalTask, returnApprovalTask } from "@/a
 
 const { createMobileActionRuntime } = require("./featureActionRuntime")
 
+const { getPurchaseReceiveRecovery } = require("@/utils/purchaseReceiveRecovery")
+
 const runtime = createMobileActionRuntime({
+  purchaseReceiveRecovery: getPurchaseReceiveRecovery(),
   getSalesDetail,
   saveSales,
   submitSales,
   cancelSales,
   getPurchaseDetail,
+  getPurchaseReceiveContext,
+  submitPurchaseDraft,
   saveInventoryPurchase,
   submitPurchase,
-  receivePurchase,
   qualityCheckPurchase,
   listPendingReceiptBatches,
   qualityCheckPurchaseBatch,
@@ -58,11 +62,13 @@ const runtime = createMobileActionRuntime({
   deliverDeliveryNotice,
   cancelDeliveryNotice,
   getSalesReturn,
+  submitSalesReturnDraft,
   saveSalesReturn,
   submitSalesReturn,
   confirmSalesReturn,
   cancelSalesReturn,
   getPurchaseReturn,
+  submitPurchaseReturnDraft,
   savePurchaseReturn,
   submitPurchaseReturn,
   confirmPurchaseReturn,
@@ -91,6 +97,7 @@ const runtime = createMobileActionRuntime({
   getOaPurchaseDetail,
   saveOaPurchaseApi,
   submitOaPurchaseApi,
+  precheckFixedAssetRepair,
   submitFixedAssetRepair,
   calculateSalary,
   markNoticeRead,
@@ -110,6 +117,6 @@ export function runMobileFeatureAction(featureKey, actionId, item, options = {})
   return runtime.runMobileFeatureAction(featureKey, actionId, item, options)
 }
 
-export function saveMobileFeatureForm(featureKey, data) {
-  return runtime.saveMobileFeatureForm(featureKey, data)
+export function saveMobileFeatureForm(featureKey, data, options) {
+  return runtime.saveMobileFeatureForm(featureKey, data, options)
 }

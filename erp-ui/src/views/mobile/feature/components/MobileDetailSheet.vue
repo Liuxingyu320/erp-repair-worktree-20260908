@@ -11,6 +11,7 @@
         </button>
       </header>
       <div class="detail-sheet-body mobile-system-sheet__body">
+        <image-gallery v-if="item.imageUrls" :value="item.imageUrls" />
         <dl class="detail-list">
           <div>
             <dt>单号</dt>
@@ -106,11 +107,13 @@
 </template>
 
 <script>
+import ImageGallery from "@/components/ImageGallery"
 import { mountMobileOverlay, releaseMobileOverlay } from "./mobileOverlayStack"
 import { createMobileDialogFocusManager } from "./mobileDialogFocus"
 
 export default {
   name: "MobileDetailSheet",
+  components: { ImageGallery },
   props: {
     feature: { type: Object, required: true },
     item: { type: Object, default: null },

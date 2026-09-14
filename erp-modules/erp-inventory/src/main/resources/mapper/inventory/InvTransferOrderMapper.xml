@@ -415,4 +415,26 @@
         delete from inv_transfer_order where transfer_id = #{transferId}
     </delete>
 
+    <!-- Current locking reads also see rows committed while waiting for the transfer root under RR. -->
+    <select id="selectShipmentIdsForDeletionForUpdate" resultType="Long">
+        select shipment_id from inv_transfer_shipment where transfer_id = #{transferId}
+        order by shipment_id for update
+    </select>
+    <select id="selectDiscrepancyIdsForDeletionForUpdate" resultType="Long">
+        select discrepancy_id from inv_transfer_discrepancy where transfer_id = #{transferId}
+        order by discrepancy_id for update
+    </select>
+    <select id="selectReservationIdsForDeletionForUpdate" resultType="Long">
+        select reservation_id from inv_transfer_reservation where transfer_id = #{transferId}
+        order by reservation_id for update
+    </select>
+
+    <delete id="deleteDraftIfVersionMatches">
+        delete from inv_transfer_order
+        where transfer_id = #{transferId}
+          and status = #{expectedStatus}
+          and status in ('draft', 'cancelled')
+          and coalesce(version, 0) = #{expectedVersion}
+    </delete>
+
 </mapper>

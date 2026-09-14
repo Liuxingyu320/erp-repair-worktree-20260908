@@ -31,7 +31,7 @@ assert.ok(
   jobPage.includes("writeActionsDisabled") &&
     jobPage.includes(':disabled="writeActionsDisabled"') &&
     jobPage.includes(':disabled="single || writeActionsDisabled"') &&
-    jobPage.includes(':disabled="multiple || writeActionsDisabled"'),
+    jobPage.includes(':disabled="multiple || writeActionsDisabled || deletionPending"'),
   "job mutations must be disabled while the list is loading or failed"
 )
 assert.ok(

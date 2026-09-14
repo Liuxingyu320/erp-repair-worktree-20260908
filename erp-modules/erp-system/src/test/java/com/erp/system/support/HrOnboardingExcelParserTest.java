@@ -97,6 +97,42 @@ class HrOnboardingExcelParserTest
     }
 
     @Test
+    void templateTextFormatCoversFourWholeColumnsAndAllSupportedBlankEntryRows() throws Exception
+    {
+        HrOnboardingExcelParser parser = parser(row -> HrOnboardingExcelParser.ValidationOutcome.clean());
+        byte[] bytes;
+        try (XSSFWorkbook workbook = parser.createTemplate(); ByteArrayOutputStream output = new ByteArrayOutputStream())
+        {
+            Sheet sheet = workbook.getSheetAt(0);
+            for (String label : List.of("手机号", "证件号码", "银行卡号", "紧急联系人电话"))
+            {
+                int column = find(sheet.getRow(0), label);
+                assertThat(sheet.getColumnStyle(column).getDataFormatString()).isEqualTo("@");
+                for (int row : List.of(1, 2, 100, HrOnboardingExcelParser.MAX_ROWS))
+                    assertThat(sheet.getRow(row).getCell(column).getCellStyle().getDataFormatString()).isEqualTo("@");
+            }
+            workbook.write(output); bytes = output.toByteArray();
+        }
+        assertThat(parser.parse(new ByteArrayInputStream(bytes))).isEmpty();
+        try (XSSFWorkbook workbook = new XSSFWorkbook(new ByteArrayInputStream(bytes)); ByteArrayOutputStream output = new ByteArrayOutputStream())
+        {
+            Sheet sheet = workbook.getSheetAt(0);
+            Row row = sheet.getRow(100);
+            row.createCell(find(sheet.getRow(0), "姓名"), CellType.STRING).setCellValue("模板输入验证");
+            row.getCell(find(sheet.getRow(0), "手机号")).setCellValue("13800138000");
+            row.getCell(find(sheet.getRow(0), "证件号码")).setCellValue("350203199001011234");
+            row.getCell(find(sheet.getRow(0), "银行卡号")).setCellValue("6222020200001234567");
+            row.getCell(find(sheet.getRow(0), "紧急联系人电话")).setCellValue("13900139000");
+            workbook.write(output);
+            List<HrOnboardingImportRow> result = parser.parse(new ByteArrayInputStream(output.toByteArray()));
+            assertThat(result).hasSize(1);
+            assertThat(result.get(0).getSourceRowNumber()).isEqualTo(101);
+            assertThat(result.get(0).getPayload().getBankAccount()).isEqualTo("6222020200001234567");
+            assertThat(result.get(0).getErrorCodeList()).doesNotContain("TEXT_CELL_REQUIRED");
+        }
+    }
+
+    @Test
     void convertsRealExcelNumericDateCellsWithoutDisplayTextRoundTrip() throws Exception
     {
         byte[] workbook;

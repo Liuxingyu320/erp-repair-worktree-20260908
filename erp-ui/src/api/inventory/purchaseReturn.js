@@ -34,3 +34,23 @@ export function confirmPurchaseReturn(returnId) {
 export function cancelPurchaseReturn(returnId) {
   return request({ url: '/inventory/purchaseReturn/' + returnId, method: 'delete' })
 }
+
+export function submitPurchaseReturnDraft(returnId) {
+  return request({ url: '/inventory/purchaseReturn/submit/' + returnId, method: 'post' })
+}
+
+export function listPurchaseReturnSourceOrders(query, config = {}) {
+  return request(Object.assign({ url: '/inventory/purchaseReturn/source-orders', method: 'get', params: query }, config && config.silentError === true ? { silentError: true } : {}))
+}
+
+export function getPurchaseReturnSourceOrder(orderId, config = {}) {
+  return request(Object.assign({ url: '/inventory/purchaseReturn/source-orders/' + orderId, method: 'get' }, config && config.silentError === true ? { silentError: true } : {}))
+}
+
+export function getPurchaseReturnDraft(returnId, config) {
+  return request(Object.assign({ url: '/inventory/purchaseReturn/draft/' + returnId, method: 'get' }, config && config.silentError === true ? { silentError: true } : {}))
+}
+
+export function getPurchaseReturnActionContext(id, config) {
+  return request(Object.assign({ url: '/inventory/purchaseReturn/action-context/' + id, method: 'get' }, config && config.silentError === true ? { silentError: true } : {}))
+}

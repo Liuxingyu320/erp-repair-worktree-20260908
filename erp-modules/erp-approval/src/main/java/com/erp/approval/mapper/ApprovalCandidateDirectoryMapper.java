@@ -31,6 +31,13 @@ public interface ApprovalCandidateDirectoryMapper
             @Param("userId") Long userId,
             @Param("permission") String permission);
 
+    List<ApprovalDirectoryUser> selectReassignOptions(
+            @Param("taskId") Long taskId,
+            @Param("permission") String permission,
+            @Param("keyword") String keyword,
+            @Param("offset") int offset,
+            @Param("limit") int limit);
+
     List<ApprovalDirectoryDept> selectActiveAnchors(
             @Param("scopeType") String scopeType,
             @Param("scopeId") Long scopeId,

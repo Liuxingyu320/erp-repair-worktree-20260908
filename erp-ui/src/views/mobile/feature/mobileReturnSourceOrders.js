@@ -48,8 +48,12 @@ function normalizeReturnDetails(details, type) {
     const unitPrice = normalizeNumber(firstValue(detail, ["unitPrice", "price", "costPrice"])) || 0
     const initialQuantity = 0
     const row = {
+      itemType: firstText(detail, ["itemType"]) || "product",
+      itemId: normalizeIdValue(detail.itemId || detail.productId),
+      itemCode: firstText(detail, ["itemCode", "productCode", "sku"]),
+      itemName: firstText(detail, ["itemName", "productName"]),
       productId: normalizeIdValue(detail.productId),
-      productName: firstText(detail, ["productName"]),
+      productName: firstText(detail, ["itemName", "productName"]),
       sku: firstText(detail, ["sku"]),
       spec: firstText(detail, ["spec"]),
       unit: firstText(detail, ["unit"]),

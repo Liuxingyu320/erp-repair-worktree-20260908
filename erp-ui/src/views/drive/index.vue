@@ -172,10 +172,13 @@
       </main>
     </section>
 
+    <el-alert v-if="uploadReceiptStorageUnavailable" type="warning" :closable="false" show-icon
+      title="浏览器未能保存上传进度，请保留此页面，核对上传结果后再关闭。" />
     <DriveUploadQueue
       :items="uploadItems"
       @cancel="cancelUpload"
       @retry="retryUpload"
+      @query="queryUpload"
       @remove="removeUpload"
     />
 
@@ -221,7 +224,8 @@ import {
   restoreDriveNode,
   trashDriveNode,
   updateDriveQuota,
-  uploadDriveFile
+  uploadDriveFile,
+  getDriveUploadReceipt
 } from '@/api/drive'
 import { saveAs } from 'file-saver'
 import DriveSpaceSidebar from './components/DriveSpaceSidebar.vue'
@@ -238,12 +242,9 @@ const {
   createUploadItem,
   driveErrorMessage,
   formatBytes,
-  isDriveRequestCanceled,
   isDriveLoadCurrent,
   isPreviewable,
-  markUploadDone,
   markUploadCanceled,
-  markUploadFailed,
   normalizeRouteState,
   parseDriveBlobError,
   preserveRecentOrder,
@@ -252,6 +253,8 @@ const {
   sortNodes,
   updateUploadProgress
 } = require('./driveState')
+
+const { uploadActor, uploadContext, pendingUpload, applyPreClaimRejection, applyUploadReceipt, persistUploadReceipts, restoreUploadReceipts, matchesUploadFile } = require('./uploadReceipt')
 
 export default {
   name: 'CloudDrive',
@@ -283,6 +286,8 @@ export default {
       sortField: 'updated',
       sortDirection: 'desc',
       uploadItems: [],
+      uploadReceiptOwner: '',
+      uploadReceiptStorageUnavailable: false,
       uploadDisposed: false,
       previewNode: null,
       moveNode: null,
@@ -293,6 +298,7 @@ export default {
       previewSequence: 0,
       searchTimer: null,
       loadSequence: 0,
+      spacesSequence: 0,
       applyingRouteState: false,
       routeApplySequence: 0,
       trashPollTimer: null,
@@ -301,6 +307,7 @@ export default {
     }
   },
   computed: {
+    uploadIdentity() { return uploadContext(this) },
     activeSpace() {
       return this.spaces.find(space => Number(space.spaceId) === Number(this.activeSpaceId)) || null
     },
@@ -337,13 +344,32 @@ export default {
       return '当前文件夹暂无文件'
     }
   },
+  watch: {
+    uploadIdentity() {
+      this.loadSequence += 1
+      this.spacesSequence += 1
+      this.spaces = []
+      this.nodes = []
+      this.trashItems = []
+      this.breadcrumbs = []
+      this.total = 0
+      this.uploadItems.forEach(item => { if (item.controller) item.controller.abort() })
+      this.uploadReceiptOwner = uploadActor(this)
+      this.uploadReceiptStorageUnavailable = false
+      this.uploadItems = restoreUploadReceipts(this.uploadReceiptOwner, 'pc')
+    }
+  },
   created() {
+    this.uploadReceiptOwner = uploadActor(this)
+    this.uploadItems = restoreUploadReceipts(this.uploadReceiptOwner, 'pc')
     this.initialize()
   },
   beforeDestroy() {
     this.searchTimer = clearDriveTimer(this.searchTimer, clearTimeout)
     this.cancelTrashPolling()
     this.uploadDisposed = true
+    this.loadSequence += 1
+    this.spacesSequence += 1
     this.cancelAllUploads()
     this.previewSequence += 1
     this.revokePreviewUrl()
@@ -406,15 +432,21 @@ export default {
       }
     },
     async loadSpaces(preferredSpaceId) {
+      const sequence = ++this.spacesSequence
+      const identity = uploadContext(this)
+      const current = () => !this.uploadDisposed && sequence === this.spacesSequence && identity === uploadContext(this)
       try {
         const response = await listDriveSpaces()
+        if (!current()) return
         const nextSpaces = response.data || []
         this.spaces = nextSpaces
         const requested = preferredSpaceId == null ? this.activeSpaceId : preferredSpaceId
         const selected = nextSpaces.find(space => Number(space.spaceId) === Number(requested)) || nextSpaces[0]
         this.activeSpaceId = selected ? selected.spaceId : null
       } catch (error) {
+        if (!current()) return
         const parsed = await parseDriveBlobError(error)
+        if (!current()) return
         this.loadError = driveErrorMessage(parsed.code, parsed.message || '文件服务暂不可用，请稍后重试')
       }
     },
@@ -917,8 +949,17 @@ export default {
       const targetSpaceId = this.activeSpaceId
       const targetParentId = this.parentId
       const targetPath = this.currentLogicalPath
-      const additions = files.map(file => createUploadItem(file, targetSpaceId, targetParentId, targetPath))
-      this.uploadItems = this.uploadItems.concat(additions)
+      files.forEach(file => {
+        const existing = this.uploadItems.find(item => ['failed', 'pending', 'uploading'].includes(item.status) &&
+          matchesUploadFile(item, file, targetSpaceId, targetParentId))
+        if (existing) {
+          this.replaceUploadItem(existing.id, item => ({ ...item, file }))
+          if (existing.status === 'failed') this.retryUpload(existing.id)
+          else if (existing.status === 'pending') this.queryUpload(existing.id)
+          return
+        }
+        this.uploadItems = this.uploadItems.concat(createUploadItem(file, targetSpaceId, targetParentId, targetPath))
+      })
       this.$nextTick(() => this.pumpUploads())
     },
     openFilePickerFromEmptyState() {
@@ -930,14 +971,23 @@ export default {
       selectUploadStartCandidates(this.uploadItems, 2).forEach(item => this.startUpload(item))
     },
     async startUpload(item) {
+      if (!item.file || item.status !== 'queued' || this.uploadDisposed) return
+      const context = uploadContext(this)
+      const firstAttempt = item.freshUpload === true
+      const attemptVersion = (item.attemptVersion || 0) + 1
+      const current = () => !this.uploadDisposed && context === uploadContext(this) &&
+        this.uploadItems.some(value => value.id === item.id && value.attemptVersion === attemptVersion)
       const controller = new AbortController()
       this.replaceUploadItem(item.id, current => ({
         ...current,
         status: 'uploading',
+        freshUpload: false,
+        attemptVersion,
         error: '',
         controller
       }))
       const onUploadProgress = event => {
+        if (!current()) return
         const total = Number(event && event.total) || Number(item.size) || 0
         const loaded = Number(event && event.loaded) || 0
         const progress = total > 0 ? loaded / total * 100 : 0
@@ -946,34 +996,62 @@ export default {
           : current)
       }
       try {
-        await uploadDriveFile(
-          item.file,
-          item.targetSpaceId,
-          item.targetParentId,
-          onUploadProgress,
-          controller.signal
-        )
-        this.replaceUploadItem(item.id, current => markUploadDone(current))
-        await this.loadSpaces()
-        if (this.isCurrentDestination(item.targetSpaceId, item.targetParentId)) await this.loadNodes()
-      } catch (error) {
-        if (isDriveRequestCanceled(error)) {
-          this.replaceUploadItem(item.id, current => markUploadCanceled(current))
-          return
+        const response = await uploadDriveFile(item.file, item.targetSpaceId, item.targetParentId,
+          onUploadProgress, controller.signal, item.operationId)
+        if (!current()) return
+        this.replaceUploadItem(item.id, value => applyUploadReceipt(value, response && response.data))
+        const updated = this.uploadItems.find(value => value.id === item.id)
+        if (updated && updated.status === 'done') {
+          await this.loadSpaces()
+          if (current() && this.isCurrentDestination(item.targetSpaceId, item.targetParentId)) await this.loadNodes()
         }
-        const parsed = await parseDriveBlobError(error)
-        const message = driveErrorMessage(parsed.code, parsed.message)
-        this.replaceUploadItem(item.id, current => markUploadFailed(current, message))
+      } catch (error) {
+        if (!current()) return
+        const currentItem = this.uploadItems.find(value => value.id === item.id)
+        const rejected = applyPreClaimRejection(currentItem, error, firstAttempt)
+        this.replaceUploadItem(item.id, value => rejected || pendingUpload(value))
+        if (!rejected) await this.queryUpload(item.id)
       } finally {
-        this.pumpUploads()
+        if (current()) this.pumpUploads()
+      }
+    },
+    async queryUpload(itemId) {
+      const item = this.uploadItems.find(value => value.id === itemId)
+      if (!item || !item.operationId || item.querying) return
+      const context = uploadContext(this)
+      const attemptVersion = item.attemptVersion || 0
+      const current = () => !this.uploadDisposed && context === uploadContext(this) &&
+        this.uploadItems.some(value => value.id === itemId && (value.attemptVersion || 0) === attemptVersion)
+      this.replaceUploadItem(itemId, value => ({ ...value, querying: true }))
+      try {
+        const response = await getDriveUploadReceipt(item.operationId)
+        if (!current()) return
+        this.replaceUploadItem(itemId, value => applyUploadReceipt(value, response && response.data))
+        const updated = this.uploadItems.find(value => value.id === itemId)
+        if (updated && updated.status === 'done') {
+          await this.loadSpaces()
+          if (current() && this.isCurrentDestination(item.targetSpaceId, item.targetParentId)) await this.loadNodes()
+        }
+      } catch (_) {
+        if (current()) {
+          this.replaceUploadItem(itemId, value => pendingUpload(value, '暂时无法查询上传结果，请稍后重试查询'))
+        }
+      } finally {
+        if (current()) this.replaceUploadItem(itemId, value => ({ ...value, querying: false }))
       }
     },
     replaceUploadItem(itemId, transition) {
       this.uploadItems = this.uploadItems.map(item => item.id === itemId ? transition(item) : item)
+      this.persistUploadState()
+    },
+    persistUploadState() {
+      const saved = persistUploadReceipts(this.uploadReceiptOwner || uploadActor(this), 'pc', this.uploadItems)
+      this.uploadReceiptStorageUnavailable = !saved && this.uploadItems.some(item => ['uploading', 'pending'].includes(item.status))
     },
     retryUpload(itemId) {
       const item = this.uploadItems.find(candidate => candidate.id === itemId)
       if (!item || item.status !== 'failed') return
+      if (!item.file) { this.$message.info('请在原目录重新选择同一个文件继续'); return }
       this.replaceUploadItem(itemId, current => ({ ...current, status: 'queued', progress: 0, error: '' }))
       this.pumpUploads()
     },
@@ -981,7 +1059,7 @@ export default {
       const item = this.uploadItems.find(candidate => candidate.id === itemId)
       if (!item || item.status !== 'uploading') return
       if (item.controller && typeof item.controller.abort === 'function') item.controller.abort()
-      this.replaceUploadItem(itemId, current => markUploadCanceled(current))
+      this.replaceUploadItem(itemId, current => pendingUpload(current, '已停止等待，服务器上传结果仍需核对'))
       this.$nextTick(() => this.pumpUploads())
     },
     cancelAllUploads() {
@@ -990,18 +1068,19 @@ export default {
           item.controller.abort()
         }
       })
-      this.uploadItems = this.uploadItems.map(item => ['uploading', 'queued'].includes(item.status)
-        ? markUploadCanceled(item)
-        : item)
+      this.uploadItems = this.uploadItems.map(item => item.status === 'uploading'
+        ? pendingUpload(item) : item.status === 'queued' ? markUploadCanceled(item) : item)
+      this.persistUploadState()
     },
     removeUpload(itemId) {
       const item = this.uploadItems.find(candidate => candidate.id === itemId)
       const removable = item && item.status !== 'uploading' && (
-        item.status === 'queued' || item.status === 'failed' || item.status === 'done' ||
+        item.status === 'queued' || item.status === 'failed' || item.status === 'rejected' || item.status === 'done' ||
         item.status === 'canceled'
       )
       if (!removable) return
       this.uploadItems = this.uploadItems.filter(candidate => candidate.id !== itemId)
+      this.persistUploadState()
     },
     isCurrentDestination(spaceId, parentId) {
       return this.activeView === 'files' &&

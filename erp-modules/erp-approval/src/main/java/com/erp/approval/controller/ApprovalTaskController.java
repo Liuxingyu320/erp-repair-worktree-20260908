@@ -2,6 +2,8 @@ package com.erp.approval.controller;
 
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -49,6 +51,17 @@ public class ApprovalTaskController
     {
         return AjaxResult.success(taskService.reject(id, request,
                 SecurityUtils.getUserId(), SecurityUtils.getUsername()));
+    }
+
+    @RequiresPermissions("approval:task:reassign")
+    @GetMapping("/{id}/reassign-options")
+    public AjaxResult reassignOptions(@PathVariable Long id,
+            @RequestParam Long fromCandidateId,
+            @RequestParam(defaultValue = "") String keyword,
+            @RequestParam(defaultValue = "1") int pageNum)
+    {
+        return AjaxResult.success(taskService.reassignOptions(id,
+                fromCandidateId, keyword, pageNum, SecurityUtils.getUserId()));
     }
 
     @RequiresPermissions("approval:task:reassign")

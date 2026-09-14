@@ -16,6 +16,7 @@ public class HrEmployeeCompletenessVo extends HrEmployeeListVo
     private List<HrOnboardingCompletionVo.MissingField> missingOnboardingFields = new java.util.ArrayList<>();
     private String positionConfigurationUrl;
 
+    @com.fasterxml.jackson.databind.annotation.JsonSerialize(using = com.fasterxml.jackson.databind.ser.std.ToStringSerializer.class)
     public Long getOnboardingId() { return onboardingId; }
     public void setOnboardingId(Long value) { onboardingId=value; }
     public String getOnboardingStatus() { return onboardingStatus; }

@@ -8,6 +8,7 @@ public interface InvGiftMapper
 {
     List<InvGiftBox> selectInvGiftList(InvGiftBox gift);
     InvGiftBox selectInvGiftById(Long giftId);
+    InvGiftBox selectInvGiftByIdForUpdate(Long giftId);
     InvGiftBox selectInvGiftByCode(@Param("giftCode") String giftCode);
     InvGiftBox selectInvGiftByNaturalKey(@Param("categoryId") Long categoryId,
                                          @Param("giftName") String giftName,

@@ -69,6 +69,9 @@ import com.erp.system.api.domain.SysUser;
 public class InvTransferServiceImpl extends InvBaseService implements IInvTransferService
 {
     @Autowired
+    private InvTransferEvidenceService transferEvidenceService;
+
+    @Autowired
     private InvTransferOrderMapper transferOrderMapper;
 
     @Autowired
@@ -144,7 +147,7 @@ public class InvTransferServiceImpl extends InvBaseService implements IInvTransf
         InvTransferOrder existing = null;
         if (order.getTransferId() != null)
         {
-            existing = assertAndGetScopedTransfer(order.getTransferId(),
+            existing = lockScopedTransfer(order.getTransferId(),
                     selectedShopDeptId);
             if (!order.getTransferType().equals(
                     InvTransferTypes.requireSupported(
@@ -176,6 +179,10 @@ public class InvTransferServiceImpl extends InvBaseService implements IInvTransf
             validatePersistedTransferItems(detailsToValidate,
                     order.getTransferType(), itemOwnerScopeDeptIds);
         }
+        // Frozen sales-delivery derivatives already have a sales/stock reference and may hold stock locks.
+        if (!salesDeliveryInTransit && details != null) itemResolver.lockReferences(details.stream()
+                .filter(java.util.Objects::nonNull)
+                .map(detail -> InventoryItemResolver.referenceKey(detail.getItemType(), detail.getItemId(), detail.getProductId())).toList());
         prepareSourceConfirmationForDraft(order, existing);
         if (order.getTransferId() == null)
         {
@@ -982,12 +989,22 @@ public class InvTransferServiceImpl extends InvBaseService implements IInvTransf
     @Transactional(rollbackFor = Exception.class)
     public void deleteTransfer(Long transferId, Long selectedShopDeptId)
     {
-        InvTransferOrder order = assertAndGetScopedTransfer(transferId, selectedShopDeptId);
+        InvTransferOrder order = lockScopedTransfer(transferId, selectedShopDeptId);
         InvStateGuard.require(order.getStatus(), Set.of(InvStatusConstants.DRAFT, InvStatusConstants.CANCELLED), "删除");
         directionPolicy().validateDraftManagement(order,
                 selectedShopDeptId);
+        if (!transferOrderMapper.selectShipmentIdsForDeletionForUpdate(transferId).isEmpty()
+                || !transferOrderMapper.selectDiscrepancyIdsForDeletionForUpdate(transferId).isEmpty()
+                || !transferOrderMapper.selectReservationIdsForDeletionForUpdate(transferId).isEmpty())
+        {
+            throw new ServiceException("调拨单已有预留、发收货或差异记录，请保留单据查看历史");
+        }
         transferDetailMapper.deleteByTransferId(transferId);
-        transferOrderMapper.deleteInvTransferOrderById(transferId);
+        if (transferOrderMapper.deleteDraftIfVersionMatches(transferId,
+                order.getStatus(), order.getVersion() == null ? 0L : order.getVersion()) != 1)
+        {
+            throw new ServiceException("调拨单状态或版本已变化，删除未生效，请刷新后重试");
+        }
     }
 
     @Override
@@ -1030,8 +1047,20 @@ public class InvTransferServiceImpl extends InvBaseService implements IInvTransf
 
     private InvTransferOrder assertAndGetScopedTransfer(Long transferId, Long selectedShopDeptId)
     {
+        return readScopedTransfer(transferId, selectedShopDeptId, false);
+    }
+
+    private InvTransferOrder lockScopedTransfer(Long transferId, Long selectedShopDeptId)
+    {
+        return readScopedTransfer(transferId, selectedShopDeptId, true);
+    }
+
+    private InvTransferOrder readScopedTransfer(Long transferId, Long selectedShopDeptId, boolean lock)
+    {
         Long scopeRoot = resolveAndValidateShopDept(selectedShopDeptId);
-        InvTransferOrder db = transferOrderMapper.selectInvTransferOrderById(transferId);
+        InvTransferOrder db = lock
+                ? transferOrderMapper.selectInvTransferOrderByIdForUpdate(transferId)
+                : transferOrderMapper.selectInvTransferOrderById(transferId);
         if (db == null)
         {
             throw new ServiceException("调拨单不存在");
@@ -1389,7 +1418,7 @@ public class InvTransferServiceImpl extends InvBaseService implements IInvTransf
                 numberSequenceMapper,
                 statusLogMapper, businessFeatureGate, businessMetrics,
                 deptScopeMapper, shopScopeService,
-                transferReservationService);
+                transferReservationService, transferEvidenceService);
     }
 
     private void fillAndValidateDeptNames(InvTransferOrder order,

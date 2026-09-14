@@ -85,7 +85,7 @@
           :key="row.onboardingId"
           type="button"
           class="onboarding-row"
-          :class="{ 'is-selected': row.onboardingId === selectedId, 'is-disabled': !canSelect }"
+          :class="{ 'is-selected': String(row.onboardingId) === String(selectedId), 'is-disabled': !canSelect }"
           :disabled="!canSelect"
           :title="canSelect ? '查看入职详情' : '暂无详情查看权限'"
           @click="handleSelect(row)"

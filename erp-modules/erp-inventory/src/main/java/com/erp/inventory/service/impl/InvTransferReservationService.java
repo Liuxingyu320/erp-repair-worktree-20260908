@@ -530,6 +530,62 @@ public class InvTransferReservationService
         }
     }
 
+    /** Locks the complete batch before reusing the single-line reservation mutation. */
+    @Transactional(propagation = Propagation.MANDATORY, rollbackFor = Exception.class)
+    public void reserveForReshipments(InvTransferOrder order, List<InvTransferDetail> details,
+            Map<Long, BigDecimal> quantities, String username)
+    {
+        requireOrder(order);
+        if (quantities == null || quantities.isEmpty())
+        {
+            return;
+        }
+        Map<Long, InvTransferDetail> byId = new HashMap<>();
+        for (InvTransferDetail detail : details == null ? List.<InvTransferDetail>of() : details)
+        {
+            if (detail != null) byId.put(detail.getDetailId(), detail);
+        }
+        int round = requireCurrentReservationRound(order);
+        List<InvTransferReservation> reservations = reservationMapper
+                .selectByTransferRoundForUpdate(order.getTransferId(), round);
+        Map<Long, InvTransferReservation> byDetail = new HashMap<>();
+        for (InvTransferReservation reservation : reservations)
+        {
+            byDetail.put(reservation.getTransferDetailId(), reservation);
+        }
+        Map<Long, BigDecimal> stockTotals = new HashMap<>();
+        List<InvTransferReservation> requested = new ArrayList<>();
+        for (Map.Entry<Long, BigDecimal> entry : quantities.entrySet())
+        {
+            BigDecimal quantity = requirePositive(entry.getValue(), "补发数量必须大于0");
+            InvTransferDetail detail = byId.get(entry.getKey());
+            InvTransferReservation reservation = byDetail.get(entry.getKey());
+            if (detail == null) throw new ServiceException("补发明细不属于当前调拨单");
+            assertReservationOwnership(order, detail, reservation);
+            requested.add(reservation);
+            stockTotals.merge(reservation.getStockId(), quantity, BigDecimal::add);
+        }
+        List<Long> stockIds = stockTotals.keySet().stream().sorted().toList();
+        Map<Long, InvStock> stocks = new HashMap<>();
+        for (InvStock stock : reservationMapper.selectStocksByIdsForUpdate(stockIds))
+        {
+            stocks.put(stock.getStockId(), stock);
+        }
+        for (Map.Entry<Long, BigDecimal> entry : stockTotals.entrySet())
+        {
+            InvStock stock = stocks.get(entry.getKey());
+            if (stock == null || nullToZero(stock.getAvailableQuantity()).compareTo(entry.getValue()) < 0)
+                throw new ServiceException("补发可用库存不足，请补充库存后重试");
+        }
+        requested.sort(Comparator.comparing(InvTransferReservation::getStockId)
+                .thenComparing(InvTransferReservation::getReservationId));
+        for (InvTransferReservation reservation : requested)
+        {
+            Long detailId = reservation.getTransferDetailId();
+            reserveForReshipment(order, byId.get(detailId), quantities.get(detailId), username);
+        }
+    }
+
     @Transactional(propagation = Propagation.MANDATORY,
             rollbackFor = Exception.class)
     public void reserveForReshipment(InvTransferOrder order,

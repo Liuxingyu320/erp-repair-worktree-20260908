@@ -40,6 +40,10 @@ import com.erp.oa.service.BusinessFeatureGate;
 @Service
 public class OaSalaryServiceImpl implements IOaSalaryService
 {
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.erp.common.security.service.LegacySalaryWriteGuard legacySalaryWrites =
+            new com.erp.common.security.service.LegacySalaryWriteGuard();
+
     @Autowired
     private OaSalaryConfigMapper configMapper;
 
@@ -87,6 +91,7 @@ public class OaSalaryServiceImpl implements IOaSalaryService
     @Transactional(rollbackFor = Exception.class)
     public OaSalaryConfig saveConfig(OaSalaryConfig config, Long selectedShopDeptId)
     {
+        legacySalaryWrites.reject();
         Long shopDeptId = shopScopeService.resolveRequiredShopDept(selectedShopDeptId);
         config.setShopDeptId(shopDeptId);
         OaSalaryConfig existing = configMapper.selectOaSalaryConfigByShopDeptId(shopDeptId);
@@ -141,15 +146,18 @@ public class OaSalaryServiceImpl implements IOaSalaryService
     }
 
     @Override
-    @Transactional(rollbackFor = Exception.class)
+    @Transactional(rollbackFor = Exception.class, isolation=org.springframework.transaction.annotation.Isolation.READ_COMMITTED)
     public List<OaSalaryRecord> calculateSalary(Long shopDeptId, String salaryMonth, Long selectedShopDeptId)
     {
+        legacySalaryWrites.reject();
+        com.erp.oa.attendance.leave.balance.AttendanceOvertimeTransferSourceGuard.requireReadCommittedWriteTransaction();
         requireAttendanceV2();
         Long targetShopId = shopScopeService.resolveRequiredShopDept(shopDeptId != null ? shopDeptId : selectedShopDeptId);
         YearMonth month = salaryMonth(salaryMonth);
         attendanceTimeCreditMapper.ensurePeriodLock(targetShopId,
                 salaryMonth);
         attendanceTimeCreditMapper.lockPeriod(targetShopId, salaryMonth);
+        attendanceTimeCreditMapper.lockMonthDayResults(targetShopId, month.atDay(1), month.atEndOfMonth());
         List<DayResult> allResults = attendanceResults(targetShopId, month);
         List<OaSalaryEmployee> employees = salaryEmployees(targetShopId,
                 salaryMonth);
@@ -206,7 +214,7 @@ public class OaSalaryServiceImpl implements IOaSalaryService
             int rawOvertime = rawOvertime(row, worked, scheduled);
             int overtimeUsed = nonNegative(row.timeCreditUsedMinutes);
             agg.earlyTotalMinutes += rawEarly - earlyOffset;
-            agg.overtimeMinutes += rawOvertime - overtimeUsed;
+            agg.overtimeMinutes += rawOvertime - overtimeUsed - nonNegative(row.overtimeTransferredMinutes);
             if (worked > 0) agg.workDays++;
             if (paidLeave + unpaidLeave > 0) agg.leaveDays++;
             if (absence > 0) agg.absentDays++;
@@ -399,18 +407,20 @@ public class OaSalaryServiceImpl implements IOaSalaryService
         int early = value(row.earlyLeaveMinutes);
         int rawOvertime = rawOvertime(row, worked, scheduled);
         int overtimeUsed = value(row.timeCreditUsedMinutes);
+        int transferred = value(row.overtimeTransferredMinutes);
+        if (value(row.overtimeTransferInvalid) > 0) return "已核定转休来源失效或重算，请先核对原核定";
         int earlyOffset = value(row.timeCreditOffsetMinutes);
         if (scheduled < 0 || worked < 0 || paid < 0 || unpaid < 0
                 || absence < 0 || value(row.lateMinutes) < 0
                 || early < 0 || rawOvertime < 0 || overtimeUsed < 0
-                || earlyOffset < 0)
+                || earlyOffset < 0 || transferred < 0)
             return "每日结果存在负数";
-        if (overtimeUsed > rawOvertime)
+        if ((long)overtimeUsed + transferred > rawOvertime)
             return "加班抵扣超过当前可核定加班分钟";
         if (earlyOffset > early)
             return "早退抵扣超过当前早退分钟";
         if (row.netOvertimeMinutes != null
-                && row.netOvertimeMinutes != rawOvertime - overtimeUsed)
+                && row.netOvertimeMinutes != rawOvertime - overtimeUsed - transferred)
             return "加班抵扣净额投影不一致";
         if (row.netEarlyLeaveMinutes != null
                 && row.netEarlyLeaveMinutes != early - earlyOffset)

@@ -115,6 +115,39 @@ class AttendanceDaySettlementServiceTest
         verify(mapper, never()).selectShiftSegments(anyLong());
     }
 
+    @Test
+    void changedRemainingWorkIsIncludedByNormalSettlementAfterInvalidation()
+    {
+        Schedule schedule = schedule();
+        DayResult current = settledResult();
+        current.settledAt = null;
+        current.resultStatus = "PENDING";
+        current.exceptionCodes = "REMAINING_WORK_CONFIRMATION_CHANGED";
+        current.workedMinutes = 420;
+        stubRange(schedule, current);
+        when(calculator.bounds(schedule)).thenReturn(new Bounds(
+                schedule.businessDate.atTime(9, 0), schedule.businessDate.atTime(18, 0)));
+        DayResult recalculated = new DayResult();
+        recalculated.scheduleId = schedule.scheduleId;
+        recalculated.workedMinutes = 0;
+        recalculated.absenceMinutes = 420;
+        when(calculator.evaluate(any(), anyList(), anyList(), anyList(),
+                anyList(), anyList(), anyList(), any()))
+                .thenReturn(new Evaluation(recalculated, List.of()));
+        when(mapper.upsertDayResult(recalculated)).thenReturn(1);
+        when(mapper.selectDayResultByScheduleId(31L)).thenReturn(recalculated);
+
+        Result result = service.settle(command(false), 101L);
+
+        assertThat(result.skippedCount).isZero();
+        assertThat(result.settledCount).isEqualTo(1);
+        assertThat(result.recalculated).isFalse();
+        assertThat(result.dayResults.get(0).workedMinutes).isZero();
+        assertThat(result.dayResults.get(0).absenceMinutes).isEqualTo(420);
+        assertThat(result.dayResults.get(0).settledAt).isNotNull();
+        verify(mapper).selectRemainingWorkConfirmationSources(31L, true);
+    }
+
     private void stubRange(Schedule schedule, DayResult current)
     {
         when(shopScope.resolveRequiredShopDept(101L)).thenReturn(101L);

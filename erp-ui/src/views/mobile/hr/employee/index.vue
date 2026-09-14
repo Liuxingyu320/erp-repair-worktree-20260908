@@ -23,6 +23,8 @@
         <p>{{ deptText(row) }}</p>
         <p v-if="row.contractEndDate">合同到期：{{ row.contractEndDate }}</p>
         <div class="card-actions">
+          <button type="button" :aria-label="`办理转正：${employeeAriaName(row)}`" @click="openLifecycle(row, 'REGULARIZE')" v-hasPermi="['hr:employee:regularize']">办理转正</button>
+          <button type="button" :aria-label="`办理续签：${employeeAriaName(row)}`" @click="openLifecycle(row, 'RENEWAL')" v-hasPermi="['hr:employee:renewal']">办理续签</button>
           <button type="button" :aria-label="`编辑资料：${employeeAriaName(row)}`" @click="openEditor(row)" v-hasPermi="['hr:employee:edit']">编辑资料</button>
           <button v-if="offboardAccountOnly && row.userId && row.accountEnabled === true" type="button" class="danger" :aria-label="`停用账号：${employeeAriaName(row)}`" @click="disableAccount(row)" v-hasPermi="['system:user:edit']">停用账号</button>
         </div>
@@ -31,22 +33,46 @@
     <div v-else-if="!loading" class="empty-state">{{ emptyText }}</div>
     <button v-if="hasMore" type="button" class="load-more" :disabled="loading" @click="loadMore">{{ loading ? '加载中…' : '加载更多' }}</button>
 
-    <mobile-hr-profile-editor :visible="editorOpen" :detail="editing" :saving="saving" @close="editorOpen=false" @save="saveProfile" />
+    <hr-employee-lifecycle-dialog :visible.sync="lifecycleOpen" :employee-id="lifecycleEmployeeId" :scenario="lifecycleScenario" @confirmed="handleLifecycleConfirmed" />
+    <mobile-hr-profile-editor :visible="editorOpen" :detail="editing" :saving="saving" @close="closeEditor" @save="saveProfile" />
   </main>
 </template>
 
 <script>
 import { getHrEmployee, listHrEmployees, updateHrEmployee } from "@/api/hr/employee"
 import { changeUserStatus } from "@/api/system/user"
-import { getSelectedDeptContext } from "@/utils/shopContext"
+import { getSelectedDeptContext, getSelectedDeptId } from "@/utils/shopContext"
 import MobileHrProfileEditor from "../components/MobileHrProfileEditor"
 import { mobileHrErrorMessage } from "../mobileHrError"
 
+const { normalizePositiveDecimalId } = require("@/utils/positiveDecimalId")
+
 export default {
   name: "MobileHrEmployee",
-  components: { MobileHrProfileEditor },
+  components: { MobileHrProfileEditor, HrEmployeeLifecycleDialog: () => import("@/views/hr/components/HrEmployeeLifecycleDialog") },
   data() {
-    return { rows: [], total: 0, pageNum: 1, pageSize: 10, loading: false, message: "", keyword: "", editorOpen: false, editing: null, saving: false, routeFocusHandled: false }
+    return {
+      lifecycleOpen: false,
+      lifecycleEmployeeId: "",
+      lifecycleScenario: "REGULARIZE",
+      rows: [],
+      total: 0,
+      pageNum: 1,
+      pageSize: 10,
+      loading: false,
+      message: "",
+      keyword: "",
+      editorOpen: false,
+      editing: null,
+      saving: false,
+      routeFocusHandled: false,
+      editorReadEpoch: 0,
+      profileSaveSequence: 0,
+      listReadEpoch: 0,
+      editorTargetId: null,
+      pageInactive: false,
+      deptListenerBound: false
+    }
   },
   computed: {
     offboardAccountOnly() { return this.$route.query.offboardAccountOnly === true || this.$route.query.offboardAccountOnly === "true" },
@@ -60,10 +86,39 @@ export default {
       return `数据范围：${context.deptName || "指定组织"}`
     },
     hasMore() { return this.rows.length < this.total },
-    emptyText() { return this.$route.query.todoType ? "事项已处理" : "暂无员工档案" }
+    emptyText() {
+      if (this.message) return "员工档案暂未加载"
+      if (this.$route.query.userId !== undefined) return "未找到指定员工档案"
+      return this.$route.query.todoType ? "事项已处理" : "暂无员工档案"
+    }
   },
-  created() { this.reload() },
-  watch: { "$route.fullPath"() { this.routeFocusHandled = false; this.reload() } },
+  created() {
+    this.bindDeptListener()
+    this.reload()
+  },
+  activated() {
+    if (!this.pageInactive) return
+    this.pageInactive = false
+    this.bindDeptListener()
+    this.reload()
+  },
+  deactivated() {
+    this.pageInactive = true
+    this.invalidatePageReads()
+  },
+  beforeDestroy() {
+    this.pageInactive = true
+    this.invalidatePageReads()
+    this.unbindDeptListener()
+  },
+  watch: {
+    "$store.state.user.sessionRevision"() { this.closeEditor(); this.reload() },
+    "$route.fullPath"() {
+      this.routeFocusHandled = false
+      this.closeEditor()
+      this.reload()
+    }
+  },
   methods: {
     profile(row) { return (row && row.profile) || row || {} },
     employeeAriaName(row) { return String(row && row.employeeName || "").trim() || "该员工" },
@@ -72,6 +127,7 @@ export default {
       return {
         pageNum: this.pageNum,
         pageSize: this.pageSize,
+        userId: normalizePositiveDecimalId(this.$route.query.userId) || undefined,
         keyword: this.keyword || undefined,
         contractDue: this.contractDue || undefined,
         offboardAccountOnly: this.offboardAccountOnly || undefined,
@@ -79,46 +135,158 @@ export default {
         deptId: this.$route.query.deptId || this.$route.query.contextDeptId || undefined
       }
     },
-    reload() { this.pageNum = 1; this.rows = []; return this.load() },
-    loadMore() { if (!this.loading && this.hasMore) { this.pageNum += 1; this.load() } },
-    load() {
+    liveDeptId() {
+      return getSelectedDeptId()
+    },
+    sameDeptId(deptId) {
+      return String(this.liveDeptId() || "") === String(deptId || "")
+    },
+    isCurrentListRead(listEpoch, deptId) {
+      return !this.pageInactive && listEpoch === this.listReadEpoch && this.sameDeptId(deptId)
+    },
+    isCurrentEditorRead(epoch, userId, deptId) {
+      return !this.pageInactive
+        && epoch === this.editorReadEpoch
+        && this.editorTargetId === userId
+        && this.sameDeptId(deptId)
+    },
+    invalidateEditorReads() {
+      this.profileSaveSequence += 1
+      this.saving = false
+      this.editorReadEpoch += 1
+    },
+    invalidateListReads() {
+      this.listReadEpoch += 1
+      this.loading = false
+    },
+    invalidatePageReads() {
+      this.invalidateEditorReads()
+      this.invalidateListReads()
+    },
+    closeEditor() {
+      this.invalidateEditorReads()
+      this.editorTargetId = null
+      this.editorOpen = false
+    },
+    bindDeptListener() {
+      if (typeof window === "undefined" || this.deptListenerBound) return
+      window.addEventListener("erp:dept-changed", this.handleDeptChanged)
+      this.deptListenerBound = true
+    },
+    unbindDeptListener() {
+      if (typeof window === "undefined" || !this.deptListenerBound) return
+      window.removeEventListener("erp:dept-changed", this.handleDeptChanged)
+      this.deptListenerBound = false
+    },
+    handleDeptChanged() {
+      this.invalidatePageReads()
+      if (this.pageInactive) return
+      this.routeFocusHandled = false
+      this.reload()
+    },
+    reload() {
+      if (this.pageInactive) return Promise.resolve()
+      this.listReadEpoch += 1
+      this.pageNum = 1
+      this.rows = []
+      this.total = 0
+      return this.load()
+    },
+    loadMore() { if (!this.loading && this.hasMore) return this.load(this.pageNum + 1) },
+    load(requestedPage = this.pageNum) {
+      if (this.pageInactive) return Promise.resolve()
+      const listEpoch = this.listReadEpoch
+      const deptId = this.liveDeptId()
+      const params = { ...this.query(), pageNum: requestedPage }
+      if (this.$route.query.userId !== undefined && !params.userId) {
+        this.loading = false
+        this.message = "员工标识无效，请返回后重新选择员工"
+        return Promise.resolve()
+      }
       this.loading = true
       this.message = ""
-      return listHrEmployees(this.query()).then(response => {
+      return listHrEmployees(params, { silentError: true }).then(response => {
+        if (!this.isCurrentListRead(listEpoch, deptId)) return
         const next = response.rows || []
-        this.rows = this.pageNum === 1 ? next : this.rows.concat(next)
+        this.rows = requestedPage === 1 ? next : this.rows.concat(next)
         this.total = Number(response.total || this.rows.length)
-        const userId = String(this.$route.query.userId || "")
-        if (userId && this.pageNum === 1 && !this.routeFocusHandled) {
-          this.routeFocusHandled = true
-          const focused = this.rows.find(row => String(row.userId || "") === userId)
-          if (focused) this.openEditor(focused)
-          else { this.message = "事项已处理"; this.$store.dispatch("todo/refreshSummaries").catch(() => {}) }
+        this.pageNum = requestedPage
+        const userId = params.userId
+        if (userId && requestedPage === 1 && !this.routeFocusHandled) {
+          const focused = this.rows.find(row => normalizePositiveDecimalId(row.userId) === userId)
+          if (focused) return this.openEditor(focused, true)
+          this.message = "未找到指定员工，请核对当前组织或返回待办刷新"
         }
-      }).catch(() => { this.message = "员工档案加载失败，请稍后重试" }).finally(() => { this.loading = false })
+      }).catch(() => {
+        if (!this.isCurrentListRead(listEpoch, deptId)) return
+        this.message = "员工档案加载失败，请稍后重试"
+      }).finally(() => {
+        if (listEpoch === this.listReadEpoch) this.loading = false
+      })
     },
-    openEditor(row) {
-      const userId = Number(row && row.userId)
-      if (!Number.isSafeInteger(userId) || userId <= 0) return Promise.resolve(null)
+    openLifecycle(row, scenario) {
+      if (this.pageInactive) return
+      const id = normalizePositiveDecimalId(row && row.userId)
+      if (!id) return
+      this.lifecycleEmployeeId = id
+      this.lifecycleScenario = scenario
+      this.lifecycleOpen = true
+    },
+    handleLifecycleConfirmed() {
+      this.reload()
+      if (this.$store && this.$store.dispatch) this.$store.dispatch("todo/refreshSummaries").catch(() => null)
+    },
+    openEditor(row, routeFocus = false) {
+      if (this.pageInactive) return Promise.resolve(null)
+      const userId = normalizePositiveDecimalId(row && row.userId)
+      if (!userId) {
+        this.closeEditor()
+        this.message = "员工标识无效，请返回后重新选择员工"
+        return Promise.resolve(null)
+      }
+      this.routeFocusHandled = true
+      this.invalidateEditorReads()
+      const epoch = this.editorReadEpoch
+      const deptId = this.liveDeptId()
+      this.editorTargetId = userId
       this.message = ""
-      return getHrEmployee(userId).then(response => {
+      return getHrEmployee(userId, { silentError: true }).then(response => {
+        if (!this.isCurrentEditorRead(epoch, userId, deptId)) return null
         this.editing = response.data || null
         this.editorOpen = Boolean(this.editing)
+        if (!this.editing) {
+          if (routeFocus) this.routeFocusHandled = false
+          this.message = "未找到指定员工，请核对当前组织或返回待办刷新"
+        }
         return this.editing
       }).catch(error => {
+        if (!this.isCurrentEditorRead(epoch, userId, deptId)) return null
+        if (routeFocus) this.routeFocusHandled = false
         this.message = mobileHrErrorMessage(error, "员工档案加载失败，请重试")
         return null
       })
     },
     saveProfile(payload) {
+      const userId = normalizePositiveDecimalId(payload && payload.userId)
+      if (this.saving || !this.editorOpen || !userId || userId !== this.editorTargetId) return Promise.resolve(null)
+      const epoch = this.editorReadEpoch, deptId = this.liveDeptId(), sequence = ++this.profileSaveSequence
+      const user = this.$store && this.$store.state && this.$store.state.user || {}
+      const actor = String(user.id || ""), session = user.sessionRevision || 0
+      const current = () => {
+        const currentUser = this.$store && this.$store.state && this.$store.state.user || {}
+        return this.editorOpen && this.isCurrentEditorRead(epoch, userId, deptId) && sequence === this.profileSaveSequence &&
+          actor === String(currentUser.id || "") && session === (currentUser.sessionRevision || 0)
+      }
+      const patch = JSON.parse(JSON.stringify(payload.patch || {}))
       this.saving = true
-      return updateHrEmployee(payload.userId, payload.patch).then(() => {
+      return updateHrEmployee(userId, patch).then(() => {
+        if (!current()) return null
         this.$message.success("员工资料已保存")
-        this.editorOpen = false
+        this.closeEditor()
         return Promise.all([this.reload(), this.$store.dispatch("todo/refreshSummaries")])
       }).catch(error => {
-        this.message = mobileHrErrorMessage(error, "员工资料保存失败，请重试")
-      }).finally(() => { this.saving = false })
+        if (current()) this.message = mobileHrErrorMessage(error, "员工资料保存失败，请重试")
+      }).finally(() => { if (current()) this.saving = false })
     },
     disableAccount(row) {
       return this.$modal.confirm(`确认停用 ${row.employeeName || '该员工'} 的账号？`).then(() => changeUserStatus(row.userId, "1")).then(() => {

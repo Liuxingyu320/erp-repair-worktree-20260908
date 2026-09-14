@@ -70,6 +70,7 @@
     </div>
 
     <div class="table-card role-member-table-card">
+    <div v-if="loadError" role="alert" class="system-list-error"><span>加载失败：{{ loadError }}</span> <el-button type="text" :disabled="loading" @click="getList">重新加载</el-button></div>
     <el-table v-loading="loading" :data="userList" @selection-change="handleSelectionChange">
       <el-table-column type="selection" width="55" align="center" />
       <el-table-column label="用户名称" prop="userName" :show-overflow-tooltip="true" />
@@ -106,10 +107,12 @@
 </template>
 
 <script>
+import systemListRecovery from "@/mixins/systemListRecovery"
 import { allocatedUserList, authUserCancel, authUserCancelAll } from "@/api/system/role"
 import selectUser from "./selectUser"
 
 export default {
+  mixins: [systemListRecovery],
   name: "AuthUser",
   dicts: ['sys_normal_disable'],
   components: { selectUser },
@@ -137,23 +140,23 @@ export default {
       }
     }
   },
-  created() {
-    const roleId = this.$route.params && this.$route.params.roleId
-    if (roleId) {
+  watch: {
+    "$route.params.roleId": { immediate: true, handler(roleId) {
       this.queryParams.roleId = roleId
-      this.getList()
-    }
+      this.userIds = []
+      if (roleId) this.getList()
+      else { this.loading = false; this.loadError = "角色不存在，请返回重试" }
+    } }
   },
   methods: {
     /** 查询授权用户列表 */
     getList() {
-      this.loading = true
-      allocatedUserList(this.queryParams).then(response => {
-          this.userList = response.rows
-          this.total = response.total
-          this.loading = false
-        }
-      )
+      const query = { ...this.queryParams }
+      return this.runSystemListRequest(() => allocatedUserList(query, { silentError: true }), response => {
+        if (!response || !Array.isArray(response.rows)) throw new Error("列表响应无效，请重试")
+        this.userList = response.rows
+        this.total = Number(response.total) || 0
+      })
     },
     // 返回按钮
     handleClose() {

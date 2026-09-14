@@ -8,6 +8,8 @@ public interface InvSupplierMapper
 {
     List<InvSupplier> selectInvSupplierList(InvSupplier supplier);
     InvSupplier selectInvSupplierById(Long supplierId);
+    InvSupplier selectInvSupplierByIdForUpdate(Long supplierId);
+    List<Long> selectReferencingOeIdsForUpdate(@Param("supplierName") String supplierName);
     InvSupplier selectInvSupplierByNameAndShop(@Param("supplierName") String supplierName, @Param("shopDeptId") Long shopDeptId);
     InvSupplier selectActiveSupplierByNameInDeptChain(@Param("supplierName") String supplierName, @Param("deptId") Long deptId);
     int countDuplicateSupplierName(@Param("supplierName") String supplierName,

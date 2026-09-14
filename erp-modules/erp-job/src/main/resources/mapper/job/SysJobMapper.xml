@@ -6,6 +6,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
 	<resultMap type="SysJob" id="SysJobResult">
 		<id     property="jobId"          column="job_id"          />
+        <result property="revision" column="revision"/>
 		<result property="jobName"        column="job_name"        />
 		<result property="jobGroup"       column="job_group"       />
 		<result property="invokeTarget"   column="invoke_target"   />
@@ -21,7 +22,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 	</resultMap>
 	
 	<sql id="selectJobVo">
-        select job_id, job_name, job_group, invoke_target, cron_expression, misfire_policy, concurrent, status, create_by, create_time, update_by, update_time, remark  
+        select job_id, revision, job_name, job_group, invoke_target, cron_expression, misfire_policy, concurrent, status, create_by, create_time, update_by, update_time, remark  
 		from sys_job
     </sql>
 	
@@ -52,7 +53,13 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 		where job_id = #{jobId}
 	</select>
 	
-	<delete id="deleteJobById" parameterType="Long">
+	<select id="selectJobByIdForUpdate" resultMap="SysJobResult">
+        <include refid="selectJobVo"/> where job_id=#{jobId} for update
+    </select>
+    <select id="selectReconcilePage" resultMap="SysJobResult">
+        <include refid="selectJobVo"/> where job_id &gt; #{afterId} order by job_id limit #{limit}
+    </select>
+    <delete id="deleteJobById" parameterType="Long">
  		delete from sys_job where job_id = #{jobId}
  	</delete>
  	
@@ -66,6 +73,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
  	<update id="updateJob" parameterType="SysJob">
  		update sys_job
  		<set>
+            revision = #{revision},
  			<if test="jobName != null and jobName != ''">job_name = #{jobName},</if>
  			<if test="jobGroup != null and jobGroup != ''">job_group = #{jobGroup},</if>
  			<if test="invokeTarget != null and invokeTarget != ''">invoke_target = #{invokeTarget},</if>
@@ -82,6 +90,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
  	
  	<insert id="insertJob" parameterType="SysJob" useGeneratedKeys="true" keyProperty="jobId">
  		insert into sys_job(
+            revision,
  			<if test="jobId != null and jobId != 0">job_id,</if>
  			<if test="jobName != null and jobName != ''">job_name,</if>
  			<if test="jobGroup != null and jobGroup != ''">job_group,</if>
@@ -94,6 +103,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
  			<if test="createBy != null and createBy != ''">create_by,</if>
  			create_time
  		)values(
+            #{revision},
  			<if test="jobId != null and jobId != 0">#{jobId},</if>
  			<if test="jobName != null and jobName != ''">#{jobName},</if>
  			<if test="jobGroup != null and jobGroup != ''">#{jobGroup},</if>

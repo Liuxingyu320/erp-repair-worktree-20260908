@@ -168,6 +168,64 @@ class OaReimbursementApprovalStartFlowTest
         verify(mapper, never()).updateReimbursement(any());
     }
 
+    @Test
+    void originalSubmitCannotCreateAnotherRoundAfterReturnOrUseEditedVersion()
+    {
+        loginAsAdmin();
+        OaReimbursementMapper mapper = mock(OaReimbursementMapper.class);
+        RemoteApprovalService remote = mock(RemoteApprovalService.class);
+        OaReimbursementApprovalStartOutboxService outbox = mock(OaReimbursementApprovalStartOutboxService.class);
+        OaReimbursementApprovalStartAfterCommitTrigger trigger = mock(OaReimbursementApprovalStartAfterCommitTrigger.class);
+        OaReimbursementServiceImpl service = service(mapper, remote, mock(BusinessFeatureGate.class), outbox, trigger);
+        OaReimbursement request = reimbursement("draft", 3L, 0, null);
+        request.setExpectedBaseRound(0); request.setExpectedVersion(3L);
+        when(mapper.selectByIdForUpdate(88L)).thenReturn(reimbursement("returned", 8L, 1, 9001L));
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.submit(request, 201L))
+                .hasMessageContaining("原提交请求不能发起新的审批轮次");
+        when(mapper.selectByIdForUpdate(88L)).thenReturn(reimbursement("draft", 4L, 0, null));
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.submit(request, 201L))
+                .hasMessageContaining("原提交请求不能发起新的审批轮次");
+        verify(mapper, never()).updateReimbursement(any());
+        verify(outbox, never()).enqueue(any(), any(), any());
+    }
+
+    @Test
+    void originalSubmitReadsBackOnlyItsTargetRoundAndMissingHalfBoundaryIsRejected()
+    {
+        loginAsAdmin();
+        OaReimbursementMapper mapper = mock(OaReimbursementMapper.class);
+        OaReimbursement current = reimbursement("pending", 8L, 1, 9001L);
+        when(mapper.selectByIdForUpdate(88L)).thenReturn(current);
+        when(mapper.selectById(88L)).thenReturn(current);
+        OaReimbursementServiceImpl service = service(mapper, mock(RemoteApprovalService.class), mock(BusinessFeatureGate.class),
+                mock(OaReimbursementApprovalStartOutboxService.class), mock(OaReimbursementApprovalStartAfterCommitTrigger.class));
+        OaReimbursement request = reimbursement("draft", 3L, 0, null);
+        request.setExpectedBaseRound(0); request.setExpectedVersion(3L);
+        assertThat(service.submit(request, 201L)).isSameAs(current);
+        request.setExpectedBaseRound(1);
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.submit(request, 201L)).hasMessageContaining("审批轮次已变化");
+        request.setExpectedVersion(null);
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.submit(request, 201L)).hasMessageContaining("缺少有效");
+        verify(mapper, never()).updateReimbursement(any());
+    }
+
+    @Test
+    void originalWithdrawCannotWithdrawNewRoundOrAttributeAnotherRoundAlreadyWithdrawn()
+    {
+        loginAsAdmin();
+        OaReimbursementMapper mapper = mock(OaReimbursementMapper.class);
+        RemoteApprovalService remote = mock(RemoteApprovalService.class);
+        OaReimbursementServiceImpl service = service(mapper, remote, mock(BusinessFeatureGate.class),
+                mock(OaReimbursementApprovalStartOutboxService.class), mock(OaReimbursementApprovalStartAfterCommitTrigger.class));
+        for (String state : List.of("pending", "withdrawn"))
+        {
+            when(mapper.selectByIdForUpdate(88L)).thenReturn(reimbursement(state, 12L, 2, 9002L));
+            org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.withdraw(88L, "原请求", 201L, 9001L, 1))
+                    .hasMessageContaining("原撤回请求不能用于新的审批");
+        }
+        org.mockito.Mockito.verifyNoInteractions(remote);
+    }
+
     private static OaReimbursementServiceImpl service(
             OaReimbursementMapper mapper, RemoteApprovalService remote,
             BusinessFeatureGate featureGate,

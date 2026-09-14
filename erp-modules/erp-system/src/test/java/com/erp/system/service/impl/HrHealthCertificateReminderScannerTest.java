@@ -35,7 +35,7 @@ class HrHealthCertificateReminderScannerTest
         ISysConfigService config=mock(ISysConfigService.class);
         ISysUserNotificationService notifications=mock(ISysUserNotificationService.class);
         when(config.selectConfigByKey(HrHealthCertificateReminderScanner.WARNING_DAYS_KEY)).thenReturn("30,15,7");
-        when(mapper.selectReminderCandidates(TODAY.plusDays(30),0L,200)).thenReturn(List.of(
+        when(mapper.selectReminderCandidates(TODAY,TODAY.plusDays(30),0L,200)).thenReturn(List.of(
                 certificate(1L,7L,10L,TODAY.plusDays(30)),
                 certificate(2L,7L,10L,TODAY.plusDays(15)),
                 certificate(3L,7L,10L,TODAY.plusDays(7)),
@@ -67,7 +67,7 @@ class HrHealthCertificateReminderScannerTest
         ISysConfigService config=mock(ISysConfigService.class);
         ISysUserNotificationService notifications=mock(ISysUserNotificationService.class);
         when(config.selectConfigByKey(HrHealthCertificateReminderScanner.WARNING_DAYS_KEY)).thenReturn("invalid");
-        when(mapper.selectReminderCandidates(TODAY.plusDays(30),0L,200)).thenReturn(List.of(
+        when(mapper.selectReminderCandidates(TODAY,TODAY.plusDays(30),0L,200)).thenReturn(List.of(
                 certificate(1L,7L,10L,TODAY.plusDays(30)),
                 certificate(2L,9L,11L,TODAY.plusDays(15))));
         when(mapper.selectReminderRecipientUserIds(any())).thenReturn(List.of());

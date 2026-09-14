@@ -175,10 +175,16 @@ export function updateSignPlan(data) {
   })
 }
 
-export function publishSignPlan(planId) {
+export function previewPublishSignPlan(planId) {
+  return request({ url: '/oa/signPackage/plan/' + planId + '/publish-preview', method: 'get', silentError: true })
+}
+
+export function publishSignPlan(planId, data) {
   return request({
     url: '/oa/signPackage/plan/' + planId + '/publish',
-    method: 'post'
+    method: 'post',
+    data,
+    silentError: true
   })
 }
 

@@ -145,7 +145,7 @@ assert_within_baseline()
 }
 
 command -v redis-cli >/dev/null 2>&1 || fail "redis-cli is required"
-command -v mvn >/dev/null 2>&1 || fail "mvn is required"
+[[ -x "${ROOT_DIR}/mvnw" ]] || fail "repository Maven wrapper is required"
 [[ -n "${HOST}" ]] || fail "ERP_IT_REDIS_HOST is required"
 [[ "${PORT}" =~ ^[0-9]+$ ]] && (( PORT >= 1 && PORT <= 65535 )) \
     || fail "ERP_IT_REDIS_PORT must be between 1 and 65535"
@@ -185,14 +185,14 @@ printf '[native-redis-it] host=%s:%s version=%s role=%s db=%s run_id=%s existing
     "${EXISTING_LOGIN_KEYS}" "${BLOCKED_BEFORE}"
 
 mkdir -p "${REPORT_DIR}"
-EXPECTED_CLASSES=(TokenServiceRedisIT SysUserOnlineControllerRedisIT)
+EXPECTED_CLASSES=(TokenServiceRedisIT TokenSessionCasRedisIT SysUserOnlineControllerRedisIT)
 for class_name in "${EXPECTED_CLASSES[@]}"; do
     rm -f "${REPORT_DIR}/TEST-com.erp.system.redis.${class_name}.xml"
 done
 
 (
     cd "${ROOT_DIR}"
-    mvn -pl erp-modules/erp-system -am -Pnative-redis-it verify
+    ./mvnw -pl erp-modules/erp-system -am -Pnative-redis-it verify
 ) | tee "${LOG_FILE}"
 
 TOTAL_TESTS=0

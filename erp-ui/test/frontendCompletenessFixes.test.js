@@ -53,9 +53,12 @@ assert.ok(
 )
 
 assert.ok(
-  fileUploadSource.includes("deleteFile") &&
-    imageUploadSource.includes("deleteFile"),
-  "file and image upload components should call backend deletion when a user removes uploaded files"
+  !fileUploadSource.includes("deleteRemoteFile") &&
+    !fileUploadSource.includes("import { deleteFile }") &&
+    fileUploadSource.includes('this.$emit("input", this.listToString(this.fileList))') &&
+    /deleteOnRemove:\s*\{[\s\S]*?default: false/.test(imageUploadSource) &&
+    imageUploadSource.includes("if (this.deleteOnRemove) this.deleteRemoteFile(existing)"),
+  "removing draft file/image references must not physically delete files before business save"
 )
 
 assert.ok(

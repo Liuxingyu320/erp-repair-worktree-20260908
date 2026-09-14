@@ -11,6 +11,7 @@ import java.util.Set;
 import java.util.Collection;
 import java.lang.reflect.Array;
 import java.time.ZoneId;
+import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.Comparator;
 import java.util.regex.Pattern;
@@ -116,6 +117,7 @@ public class HrEmployeeProfileServiceImpl implements IHrEmployeeProfileService
 
     private List<HrEmployeeListVo> employeeList(HrEmployeeQuery query,boolean activeGovernanceOnly)
     {
+        if (query == null) query = new HrEmployeeQuery();
         List<SysUser> rows = scopedEmployees(query,activeGovernanceOnly);
         List<HrEmployeeListVo> result;
         if (rows instanceof Page<?> sourcePage)
@@ -126,7 +128,9 @@ public class HrEmployeeProfileServiceImpl implements IHrEmployeeProfileService
             result=mappedPage;
         }
         else result = new ArrayList<>(rows.size());
-        Map<Long,HrHealthCertificateVo> health = currentHealth(rows);
+        Map<Long,HrHealthCertificateVo> health = healthCertificateService == null ? Collections.emptyMap()
+                : healthCertificateService.selectCurrentProjectionAt(rows.stream().map(SysUser::getUserId).toList(),
+                    (LocalDate) query.getParams().get("healthAsOfDate"));
         for (SysUser row : rows)
         {
             HrEmployeeListVo item=toListVo(row);
@@ -481,6 +485,7 @@ public class HrEmployeeProfileServiceImpl implements IHrEmployeeProfileService
 
     private void applyHealth(HrEmployeeListVo target,HrHealthCertificateVo health)
     {
+        target.setHealthCertificateNextValidFrom(health==null?null:health.getNextValidFrom());
         target.setHealthCertificateStatus(health==null?"NOT_SUBMITTED":health.getHealthCertificateStatus());
         target.setHealthCertificateIssuedDate(health==null?null:health.getIssuedDate());
         target.setHealthCertificateExpiresOn(health==null?null:health.getExpiresOn());
@@ -490,6 +495,7 @@ public class HrEmployeeProfileServiceImpl implements IHrEmployeeProfileService
 
     private void applyHealth(HrEmployeeProfileVo target,HrHealthCertificateVo health)
     {
+        target.setHealthCertificateNextValidFrom(health==null?null:health.getNextValidFrom());
         target.setHealthCertificateStatus(health==null?"NOT_SUBMITTED":health.getHealthCertificateStatus());
         target.setHealthCertificateIssuedDate(health==null?null:health.getIssuedDate());
         target.setHealthCertificateExpiresOn(health==null?null:health.getExpiresOn());

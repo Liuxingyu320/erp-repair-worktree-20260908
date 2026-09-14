@@ -92,7 +92,7 @@ class OaSignOnboardGenerationServiceTest
         service = new OaSignOnboardGenerationService(importService,
                 batchMapper, rowMapper, taskMapper,
                 packageMapper, planVersionMapper, eventFactory, onboardRule,
-                orchestrator, companyService, dataRequestMapper, packageService);
+                orchestrator, companyService, dataRequestMapper, packageService, org.mockito.Mockito.mock(com.erp.oa.service.impl.OaSignSalarySourceService.class));
     }
 
     @AfterEach
@@ -521,7 +521,7 @@ class OaSignOnboardGenerationServiceTest
 
         assertThatThrownBy(() -> ReflectionTestUtils.invokeMethod(service,
                 "finishClaimedGeneration", batch, claimed, signing, snapshot,
-                decision, 198L, false, 101L))
+                decision, 198L, false, 101L, "salary-source-test"))
                 .isInstanceOf(com.erp.common.core.exception.ServiceException.class)
                 .hasMessageContaining("已改派");
         assertThatThrownBy(() -> ReflectionTestUtils.invokeMethod(service,
@@ -1159,7 +1159,7 @@ class OaSignOnboardGenerationServiceTest
 
         assertThatThrownBy(() -> ReflectionTestUtils.invokeMethod(service,
                 "finishClaimedGeneration", batch, claimed, signing, snapshot,
-                new OaSignDraftDecision(), 198L, false, 101L))
+                new OaSignDraftDecision(), 198L, false, 101L, "salary-source-test"))
                 .isInstanceOf(RuntimeException.class)
                 .hasMessageContaining("未生成到待发送状态");
 
@@ -1181,7 +1181,7 @@ class OaSignOnboardGenerationServiceTest
 
         assertThatThrownBy(() -> ReflectionTestUtils.invokeMethod(service,
                 "finishClaimedGeneration", batch, claimed, signing, snapshot,
-                new OaSignDraftDecision(), 198L, false, 101L))
+                new OaSignDraftDecision(), 198L, false, 101L, "salary-source-test"))
                 .isInstanceOf(RuntimeException.class)
                 .hasMessageContaining("草稿状态已变化");
         verify(rowMapper, never()).completeGeneration(any(), any(), any(), any(), any());

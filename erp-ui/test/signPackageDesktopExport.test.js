@@ -59,6 +59,7 @@ function loadComponent() {
     signDictionaryLabel: value => value,
     signPackageStatusLabel: value => value,
     require(request) {
+      if (request === "@/utils/uiOperationScope") return require("../src/utils/uiOperationScope")
       if (request === "@/utils/signDisplayText") return { signVersionLabel: value => value }
       if (request === "@/utils/signDateTime") {
         return { formatSignDateTimeWithSeconds: value => String(value == null ? "-" : value) }

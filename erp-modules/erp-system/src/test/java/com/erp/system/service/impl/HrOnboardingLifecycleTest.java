@@ -78,7 +78,7 @@ class HrOnboardingLifecycleTest
                 mock(com.erp.system.mapper.SysDeptMapper.class),
                 mock(com.erp.system.mapper.SysUserMapper.class),
                 mock(SysUserPostMapper.class), userShopService,
-                objectMapper);
+                objectMapper, org.mockito.Mockito.mock(com.erp.system.service.impl.HrSalarySourceService.class));
         ReflectionTestUtils.setField(service, "clock", java.time.Clock.fixed(
                 java.time.Instant.parse("2026-07-12T02:03:04Z"), java.time.ZoneOffset.UTC));
     }

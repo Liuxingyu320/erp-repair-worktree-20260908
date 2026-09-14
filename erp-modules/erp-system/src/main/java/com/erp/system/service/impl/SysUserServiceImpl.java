@@ -41,7 +41,6 @@ import com.erp.system.api.domain.SysUser;
 import com.erp.system.api.domain.SysUserProfile;
 import com.erp.system.domain.SysPost;
 import com.erp.system.domain.SysUserPost;
-import com.erp.system.domain.SysUserRole;
 import com.erp.system.domain.vo.SysTemporaryCredentialVo;
 import com.erp.system.domain.vo.SysUserImportResultVo;
 import com.erp.system.domain.vo.SysUserOptionVo;
@@ -72,6 +71,7 @@ import com.erp.system.service.support.TemporaryPasswordGenerator;
 import com.erp.system.service.support.SysUserPiiAuditService;
 import com.erp.system.service.support.SigningProfileFactsHash;
 import com.erp.system.service.support.UserSessionInvalidationService;
+import com.erp.system.service.support.RoleAssignmentGuard;
 import com.erp.system.support.HrEmployeeStatusCatalog;
 
 /**
@@ -703,6 +703,7 @@ public class SysUserServiceImpl implements ISysUserService
             user.setMustChangePassword("1");
         }
         // 新增用户信息
+        List<SysRole> assignedRoles = RoleAssignmentGuard.lockNewUserRoles(roleMapper, user.getRoleIds());
         int rows = userMapper.insertUser(user);
         if (rows > 0)
         {
@@ -711,7 +712,7 @@ public class SysUserServiceImpl implements ISysUserService
         // 新增用户岗位关联
         insertUserPost(user);
         // 新增用户与角色管理
-        insertUserRole(user);
+        RoleAssignmentGuard.insertNewUserRoles(userRoleMapper, user.getUserId(), assignedRoles);
         if (rows > 0)
         {
             configMapper.syncSignHrPermissions();
@@ -774,10 +775,9 @@ public class SysUserServiceImpl implements ISysUserService
         applyEmployeeAccountStatus(user);
         assertConfiguredHrRemainsValid(userId, user.getStatus(), user.getDelFlag(), false);
         assertAssignedEmployeePostUnchanged(user);
-        // 删除用户与角色关联
-        userRoleMapper.deleteUserRoleByUserId(userId);
-        // 新增用户与角色管理
-        insertUserRole(user);
+        // Omitted roles in an ordinary profile save preserve the current assignments.
+        if (user.getRoleIds() != null)
+            RoleAssignmentGuard.replaceRoles(roleMapper, userRoleMapper, userId, user.getRoleIds());
         // 删除用户与岗位关联
         userPostMapper.deleteUserPostByUserId(userId);
         // 新增用户与岗位管理
@@ -826,11 +826,11 @@ public class SysUserServiceImpl implements ISysUserService
     @Transactional(rollbackFor = Exception.class)
     public void insertUserAuth(Long userId, Long[] roleIds)
     {
+        if (roleIds == null) throw new ServiceException("角色选择不能为空，请明确提交角色列表");
         checkUserAllowed(new SysUser(userId));
         checkUserDataScope(userId);
         configMapper.lockSignHrState();
-        userRoleMapper.deleteUserRoleByUserId(userId);
-        insertUserRole(userId, roleIds);
+        RoleAssignmentGuard.replaceRoles(roleMapper, userRoleMapper, userId, roleIds);
         configMapper.syncSignHrPermissions();
         userSessionInvalidationService.record(userId,
                 UserSessionInvalidationService.USER_ROLES_CHANGED);
@@ -968,19 +968,25 @@ public class SysUserServiceImpl implements ISysUserService
         return userMapper.activateUserPassword(userId, password, updateBy);
     }
 
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public int changeOwnPassword(Long userId, String expectedPasswordHash, String passwordHash,
+            String updateBy, String retainedUserKey)
+    {
+        if (userId == null || userId <= 0 || StringUtils.isEmpty(expectedPasswordHash)
+                || StringUtils.isEmpty(passwordHash) || StringUtils.isEmpty(retainedUserKey))
+            throw new ServiceException("登录状态已过期，请重新登录", 401);
+        int rows = userMapper.changeOwnPasswordIfCurrent(userId, expectedPasswordHash, passwordHash, updateBy);
+        if (rows != 1)
+            throw new ServiceException("账号状态或密码已变更，请重新登录后再试", 409);
+        userSessionInvalidationService.record(userId,
+                UserSessionInvalidationService.PASSWORD_CHANGED, retainedUserKey);
+        return rows;
+    }
+
     private Date temporaryCredentialExpiry()
     {
         return temporaryCredentialPolicy.expiresAt(clock);
-    }
-
-    /**
-     * 新增用户角色信息
-     * 
-     * @param user 用户对象
-     */
-    public void insertUserRole(SysUser user)
-    {
-        this.insertUserRole(user.getUserId(), user.getRoleIds());
     }
 
     /**
@@ -1003,29 +1009,6 @@ public class SysUserServiceImpl implements ISysUserService
                 list.add(up);
             }
             userPostMapper.batchUserPost(list);
-        }
-    }
-
-    /**
-     * 新增用户角色信息
-     * 
-     * @param userId 用户ID
-     * @param roleIds 角色组
-     */
-    public void insertUserRole(Long userId, Long[] roleIds)
-    {
-        if (StringUtils.isNotEmpty(roleIds))
-        {
-            // 新增用户与角色管理
-            List<SysUserRole> list = new ArrayList<SysUserRole>();
-            for (Long roleId : roleIds)
-            {
-                SysUserRole ur = new SysUserRole();
-                ur.setUserId(userId);
-                ur.setRoleId(roleId);
-                list.add(ur);
-            }
-            userRoleMapper.batchUserRole(list);
         }
     }
 
@@ -1292,6 +1275,16 @@ public class SysUserServiceImpl implements ISysUserService
         }
         profile.setUpdateBy(user.getUpdateBy());
         SysUserProfile existing = profileMapper.selectUserProfileByUserId(user.getUserId());
+        java.math.BigDecimal[] submittedSalary = { profile.getBaseSalary(), profile.getPostSalary(),
+                profile.getFieldAllowance(), profile.getPerformanceSalary(), profile.getSalaryTotal() };
+        java.math.BigDecimal[] currentSalary = existing == null ? new java.math.BigDecimal[5]
+                : new java.math.BigDecimal[] { existing.getBaseSalary(), existing.getPostSalary(),
+                    existing.getFieldAllowance(), existing.getPerformanceSalary(), existing.getSalaryTotal() };
+        for (int index = 0; index < submittedSalary.length; index++)
+            if (submittedSalary[index] != null && (currentSalary[index] == null
+                    || submittedSalary[index].compareTo(currentSalary[index]) != 0))
+                throw new ServiceException("普通员工资料不能修改工资，请在员工档案批量入职合同中确认");
+
         if (StringUtils.isNull(existing))
         {
             if (StringUtils.isEmpty(profile.getCreateBy()))

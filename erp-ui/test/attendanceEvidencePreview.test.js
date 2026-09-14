@@ -20,6 +20,7 @@ function loadComponent(runtime) {
     clearAttendancePunchAttempt: () => true,
     dataOf: value => value,
     normalizeTodayContext: () => ({}),
+    punchTimeText: () => '',
     readAttendancePunchAttempt: () => ({ status: 'absent' }),
     reconcileAttendancePunch: () => ({ status: 'absent' }),
     resolvePunchGate: () => ({ ready: false }),
@@ -160,6 +161,39 @@ function todayTarget(component, overrides) {
     $refs: {},
     $nextTick: callback => callback()
   }, overrides || {}))
+}
+
+async function shouldFenceCaptureAndLoadDataOnHistoryNavigation() {
+  const page = todayTarget(component, {
+    activeView: 'today', recordRows: [], attendanceContextEpoch: 5,
+    pending: { challengeToken: 'old-token', location: { latitude: 30 } },
+    pendingOwner: { userId: 1, orgId: 1 }, pendingContextEpoch: 5,
+    photo: new Blob(['old-photo']), photoPreviewUrl: 'blob:history-photo',
+    $route: { query: { tab: 'records' } }
+  })
+  let todayLoads = 0
+  let recordLoads = 0
+  page.loadToday = () => { todayLoads += 1 }
+  page.loadRecords = () => { recordLoads += 1 }
+  const oldOwner = page.pendingOwner
+  page.applyRouteView()
+  assert.strictEqual(page.activeView, 'records')
+  assert.strictEqual(page.attendanceContextValid(oldOwner, 5), false,
+    'browser history must retire in-flight capture callbacks just like a tab click')
+  assert.strictEqual(page.pending.challengeToken, '')
+  assert.strictEqual(page.photo, null)
+  assert.strictEqual(recordLoads, 1, 'history navigation must load records')
+  page.$route.query = { tab: 'today' }
+  page.applyRouteView()
+  assert.strictEqual(todayLoads, 1, 'returning through history must refresh the punch gate')
+  page.applyRouteView()
+  assert.strictEqual(todayLoads, 1, 'a query watcher echo must not refresh twice')
+
+  const initial = todayTarget(component, { activeView: 'today', $route: { query: { tab: 'records' } } })
+  let initialLoads = 0
+  initial.loadRecords = () => { initialLoads += 1 }
+  component.created.call(initial)
+  assert.strictEqual(initialLoads, 1, 'initial records deep links must load exactly once')
 }
 
 async function shouldRestoreLatestPrivateEvidenceWithoutBlockingNextPunch() {
@@ -321,12 +355,196 @@ async function shouldRetireEvidenceMissingFromNewTodayContext() {
   assert.deepStrictEqual(revoked, ['blob:evidence-yesterday'])
 }
 
+async function shouldClearPendingCaptureOnRefreshAndAllowAFreshStart() {
+  const revoked = []
+  let stopped = 0
+  const component = loadComponent({
+    policy: {
+      normalizeTodayContext: value => value,
+      stopMediaStream: stream => { if (stream) stopped += 1 }
+    },
+    getTodayAttendanceContext: () => Promise.resolve({ canPunch: true }),
+    URL: { revokeObjectURL: url => revoked.push(url) }
+  })
+  const page = todayTarget(component, {
+    attendanceContextEpoch: 7,
+    pendingOwner: { userId: 1, orgId: 1 },
+    pendingContextEpoch: 7,
+    pending: { challengeToken: 'old-token', location: { latitude: 39.9 } },
+    photo: { name: 'capture.jpg' },
+    photoCapturedAt: '2026-09-08T09:00:00',
+    photoPreviewUrl: 'blob:old-photo',
+    cameraStream: {}, cameraOpen: true, cameraReady: true
+  })
+  await page.loadToday()
+  assert.strictEqual(page.pending.challengeToken, '')
+  assert.strictEqual(page.pending.location, null)
+  assert.strictEqual(page.pendingOwner, null)
+  assert.strictEqual(page.pendingContextEpoch, null)
+  assert.strictEqual(page.photo, null)
+  assert.strictEqual(page.cameraOpen, false)
+  assert.strictEqual(stopped, 1)
+  assert.deepStrictEqual(revoked, ['blob:old-photo'])
+  assert.match(page.flowError, /重新定位/)
+  assert.strictEqual(page.context.canPunch, true)
+  assert.strictEqual(page.loading, false)
+  assert.strictEqual(page.busy, false)
+}
+
+async function shouldIgnoreRetiredPunchCallbacksWithoutClearingTheNewCapture() {
+  for (const rejectOld of [false, true]) {
+    let currentDept = 1
+    let completeOld
+    let failOld
+    const oldRequest = new Promise((resolve, reject) => { completeOld = resolve; failOld = reject })
+    const component = loadComponent({
+      policy: { runAttendancePunch: () => oldRequest },
+      getSelectedDeptContext: () => ({ deptId: currentDept })
+    })
+    const page = todayTarget(component, {
+      attendanceContextEpoch: 1,
+      pendingOwner: { userId: 1, orgId: 1 },
+      pendingContextEpoch: 1,
+      pending: { challengeToken: 'old-token', expiresAt: '2099-01-01T00:00:00',
+        scheduleId: 31, punchType: 'IN', location: { latitude: 39.9 } },
+      photo: { name: 'old.jpg' }
+    })
+    const result = page.submitPunch()
+    currentDept = 2
+    page.nextAttendanceContextEpoch()
+    const newPending = { challengeToken: 'new-token', location: { latitude: 40 } }
+    const newPhoto = { name: 'new.jpg' }
+    page.pending = newPending
+    page.pendingOwner = { userId: 1, orgId: 2 }
+    page.pendingContextEpoch = page.currentAttendanceContextEpoch()
+    page.photo = newPhoto
+    page.busy = true
+    page.flowError = 'new-flow-message'
+    if (rejectOld) failOld(new Error('old request failed'))
+    else completeOld({ status: 'outcome-unknown' })
+    await result
+    assert.strictEqual(page.pending, newPending, 'old response must not clear a new store capture')
+    assert.strictEqual(page.photo, newPhoto)
+    assert.strictEqual(page.busy, true)
+    assert.strictEqual(page.flowError, 'new-flow-message')
+  }
+}
+
+async function shouldKeepNewCameraWhenAnOldPermissionRequestFinishes() {
+  for (const oldSucceeds of [false, true]) {
+    let deptId = 1
+    let resolveOld, rejectOld
+    const oldRequest = new Promise((resolve, reject) => { resolveOld = resolve; rejectOld = reject })
+    const stopped = []
+    const component = loadComponent({
+      policy: {
+        requireLiveCamera: () => ({ getUserMedia: () => oldRequest }),
+        liveCameraConstraints: () => ({}),
+        stopMediaStream: stream => { if (stream) stopped.push(stream) }
+      },
+      getSelectedDeptContext: () => ({ deptId })
+    })
+    const page = todayTarget(component, {
+      attendanceContextEpoch: 1, pendingContextEpoch: 1,
+      pendingOwner: { userId: 1, orgId: 1 }
+    })
+    const request = page.startBrowserCamera()
+    deptId = 2
+    page.nextAttendanceContextEpoch()
+    const newStream = { name: 'new-camera' }
+    page.cameraStream = newStream
+    page.cameraOpen = true
+    page.busy = true
+    if (oldSucceeds) resolveOld({ name: 'old-camera' })
+    else rejectOld(new Error('old permission denied'))
+    await request
+    assert.strictEqual(page.cameraStream, newStream)
+    assert.strictEqual(page.cameraOpen, true)
+    assert.strictEqual(page.busy, true)
+    assert.strictEqual(stopped.includes(newStream), false)
+  }
+}
+
+async function shouldCancelBrowserCameraAcrossHiddenAndVisibleTransitions() {
+  for (const phase of ['permission', 'playback', 'frame']) {
+    let finish
+    const pending = new Promise(resolve => { finish = resolve })
+    const stopped = []
+    const stream = { name: phase }
+    const doc = { visibilityState: 'visible', addEventListener() {} }
+    const component = loadComponent({
+      document: doc,
+      policy: {
+        requireLiveCamera: () => ({ getUserMedia: () => phase === 'permission' ? pending : Promise.resolve(stream) }),
+        requireEnvironmentStream: value => value,
+        liveCameraConstraints: () => ({}),
+        captureLiveFrame: () => pending,
+        stopMediaStream: value => { if (value) stopped.push(value) }
+      }
+    })
+    const page = todayTarget(component, {
+      attendanceContextEpoch: 1, pendingContextEpoch: 1, pendingOwner: { userId: 1, orgId: 1 },
+      $nextTick: () => Promise.resolve(),
+      $refs: { liveCameraVideo: { srcObject: null, play: () => phase === 'playback' ? pending : Promise.resolve() } }
+    })
+    component.mounted.call(page)
+    let request
+    if (phase === 'frame') {
+      page.cameraOpen = true; page.cameraReady = true; page.cameraStream = stream
+      request = page.captureBrowserPhoto()
+    } else {
+      request = page.startBrowserCamera()
+      await Promise.resolve(); await Promise.resolve(); await Promise.resolve()
+    }
+    doc.visibilityState = 'hidden'
+    page.cameraVisibilityHandler()
+    assert.strictEqual(page.busy, false, 'a cancelled camera request must release its own busy state')
+    doc.visibilityState = 'visible'
+    const newStream = { name: 'new stream' }
+    page.cameraStream = newStream; page.cameraOpen = true
+    page.busy = true
+    finish(phase === 'frame' ? new Blob(['old frame']) : stream)
+    await request
+    assert.strictEqual(page.cameraStream, newStream, phase)
+    assert.strictEqual(page.cameraOpen, true, phase)
+    assert.strictEqual(page.busy, true, 'retired camera work must not unlock a new flow')
+    assert.strictEqual(page.photo, null, 'retired frame must not become the current photo')
+    assert.strictEqual(stopped.includes(newStream), false)
+    assert.ok(stopped.includes(stream), 'old camera stream must be released')
+  }
+}
+
+function shouldDistinguishCorrectedAndRetiredSlotsFromPhysicalPunches() {
+  assert.strictEqual(target.punchSlotStatusText({ status: 'REMAINING_WORK_CONFIRMED', completed: true }), '已核验')
+  assert.strictEqual(target.punchSlotStatusText({ status: 'REMAINING_WORK_EVIDENCE_REQUIRED' }), '待补证')
+  assert.strictEqual(target.punchSlotStatusText({ status: 'REMAINING_WORK_INVALID' }), '核验记录异常')
+  for (const status of ['REMAINING_WORK_PENDING', 'REMAINING_WORK_EVIDENCE_REQUIRED', 'REMAINING_WORK_INVALID']) {
+    assert.strictEqual(target.punchSlotCompleted({ status, punchEventId: 9, completed: true }), false)
+  }
+  for (const [state, expected] of Object.entries({
+    REMAINING_WORK_CONFIRMED: '已核验', REMAINING_WORK_CONFIRMATION_REQUIRED: '待核验',
+    REMAINING_WORK_EVIDENCE_REQUIRED: '待补证', REMAINING_WORK_CONFIRMATION_INVALID: '核验异常'
+  })) {
+    assert.strictEqual(component.computed.stateLabel.call({ context: { state }, gate: { ready: false } }), expected)
+  }
+  assert.strictEqual(target.punchSlotStatusText({ status: 'CORRECTED', completed: true }), '已补卡')
+  assert.strictEqual(target.punchSlotCompleted({ status: 'CORRECTION_REQUIRED', punchEventId: 9 }), false)
+  assert.strictEqual(target.punchSlotStatusText({ status: 'MISSED' }), '缺卡')
+  assert.strictEqual(target.punchSlotStatusText({ status: 'EXEMPT_LEAVE', completed: true }), '请假免打卡')
+}
+
 Promise.resolve()
+  .then(shouldFenceCaptureAndLoadDataOnHistoryNavigation)
+  .then(shouldDistinguishCorrectedAndRetiredSlotsFromPhysicalPunches)
+  .then(shouldCancelBrowserCameraAcrossHiddenAndVisibleTransitions)
   .then(shouldRestoreLatestPrivateEvidenceWithoutBlockingNextPunch)
   .then(shouldKeepTodayContextAndOfferRetryWhenEvidenceFails)
   .then(shouldRejectLateEvidenceAfterAnAbaDeptSwitch)
   .then(shouldReleaseRetiredGenerationLocks)
   .then(shouldRetireEvidenceMissingFromNewTodayContext)
+  .then(shouldClearPendingCaptureOnRefreshAndAllowAFreshStart)
+  .then(shouldIgnoreRetiredPunchCallbacksWithoutClearingTheNewCapture)
+  .then(shouldKeepNewCameraWhenAnOldPermissionRequestFinishes)
   .then(() => console.log('attendance evidence preview tests passed'))
   .catch(error => {
     console.error(error)

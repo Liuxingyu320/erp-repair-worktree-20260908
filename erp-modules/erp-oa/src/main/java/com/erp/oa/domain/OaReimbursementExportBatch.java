@@ -4,12 +4,21 @@ import java.io.Serializable;
 import java.math.BigDecimal;
 import java.util.Date;
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 
 public class OaReimbursementExportBatch implements Serializable
 {
     private static final long serialVersionUID = 1L;
 
+    @JsonSerialize(using = ToStringSerializer.class)
     private Long batchId;
+    private String requestId;
+    private String archiveStatus;
+    public String getRequestId() { return requestId; }
+    public void setRequestId(String value) { requestId = value; }
+    public String getArchiveStatus() { return archiveStatus; }
+    public void setArchiveStatus(String value) { archiveStatus = value; }
     private String batchNo;
     private Integer reimbursementCount;
     private Integer itemCount;

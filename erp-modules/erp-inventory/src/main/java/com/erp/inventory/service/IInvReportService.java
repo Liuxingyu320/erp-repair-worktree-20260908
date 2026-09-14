@@ -3,10 +3,13 @@ package com.erp.inventory.service;
 import java.util.List;
 import com.erp.inventory.domain.InvStock;
 import com.erp.inventory.domain.vo.InvReportProductOption;
+import com.erp.inventory.domain.vo.InvReportItemOption;
 import com.erp.inventory.domain.vo.InvReportSummary;
 
 public interface IInvReportService
 {
+    List<InvReportItemOption> selectItemOptions(String itemType, String keyword, Integer limit, Long selectedShopDeptId);
+
     InvReportSummary selectReportSummary(InvStock stock, Long selectedShopDeptId);
 
     List<InvStock> selectStockWarningList(InvStock stock, Long selectedShopDeptId);

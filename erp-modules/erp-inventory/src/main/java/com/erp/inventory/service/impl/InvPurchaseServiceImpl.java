@@ -6,12 +6,15 @@ import java.net.URISyntaxException;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -19,6 +22,8 @@ import org.springframework.transaction.annotation.Transactional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import com.erp.common.core.exception.ServiceException;
+import com.erp.inventory.domain.vo.InvSpecialistReadVo;
+import com.erp.inventory.domain.vo.InvSpecialistActionContext;
 import com.erp.common.security.utils.SecurityUtils;
 import com.erp.inventory.constant.InvItemTypes;
 import com.erp.inventory.constant.InvStatusConstants;
@@ -35,6 +40,7 @@ import com.erp.inventory.domain.InvReceiptBatchDetail;
 import com.erp.inventory.domain.InvStock;
 import com.erp.inventory.domain.InvStockLog;
 import com.erp.inventory.domain.InvSupplier;
+import com.erp.inventory.domain.dto.InvPurchaseReceiveResult;
 import com.erp.inventory.domain.dto.InvReceiveItem;
 import com.erp.inventory.domain.dto.InvReceiveRequest;
 import com.erp.inventory.domain.dto.InvQualityCheckItem;
@@ -42,7 +48,6 @@ import com.erp.inventory.domain.dto.InvQualityCheckRequest;
 import com.erp.inventory.domain.vo.InventoryItemSnapshot;
 import com.erp.inventory.mapper.InvInboundRecordMapper;
 import com.erp.inventory.mapper.InvNumberSequenceMapper;
-import com.erp.inventory.mapper.InvProductMapper;
 import com.erp.inventory.mapper.InvPurchaseDetailMapper;
 import com.erp.inventory.mapper.InvPurchaseOrderMapper;
 import com.erp.inventory.mapper.InvQualityInspectionAttachmentMapper;
@@ -68,6 +73,9 @@ public class InvPurchaseServiceImpl extends InvBaseService implements IInvPurcha
     private static final String RECEIPT_BATCH_PENDING = "pending";
     private static final String RECEIPT_BATCH_PARTIAL = "partial";
     private static final String RECEIPT_BATCH_COMPLETED = "completed";
+    private static final String PURCHASE_RECEIVE_COMMAND = "PURCHASE_RECEIVE";
+    private static final String LEGACY_WHOLE_ORDER_QC_MESSAGE =
+            "请选择具体收货批次进行质检，旧整单入口不能处理已分批收货记录";
     private static final int MAX_PURCHASE_LINES = 200;
     private static final int MAX_QUALITY_ATTACHMENTS = 5;
     private static final int MAX_ATTACHMENT_URL_LENGTH = 2048;
@@ -77,6 +85,9 @@ public class InvPurchaseServiceImpl extends InvBaseService implements IInvPurcha
 
     @Autowired
     private InvPurchaseOrderMapper purchaseOrderMapper;
+
+    @Autowired
+    private InvQualityCommandExecutor qualityCommandExecutor;
 
     @Autowired
     private InvPurchaseReturnDetailMapper purchaseReturnDetailMapper;
@@ -109,9 +120,6 @@ public class InvPurchaseServiceImpl extends InvBaseService implements IInvPurcha
     private InvNumberSequenceMapper numberSequenceMapper;
 
     @Autowired
-    private InvProductMapper productMapper;
-
-    @Autowired
     private InventoryItemResolver itemResolver;
 
     @Autowired
@@ -130,6 +138,15 @@ public class InvPurchaseServiceImpl extends InvBaseService implements IInvPurcha
     private IInvGiftService giftService;
 
     @Override
+    public InvSpecialistActionContext getActionContext(Long orderId, Long selectedShopDeptId)
+    {
+        Long warehouseId = requireWarehouseContext(selectedShopDeptId, PURCHASE_WAREHOUSE_CONTEXT_MESSAGE);
+        InvPurchaseOrder order = assertAndGetScopedPurchase(orderId, selectedShopDeptId);
+        assertPurchaseBelongsToSelectedWarehouse(order, warehouseId);
+        return InvSpecialistActionContext.purchase(order);
+    }
+
+    @Override
     @Transactional(rollbackFor = Exception.class)
     public InvPurchaseOrder saveDraft(InvPurchaseOrder order, List<InvPurchaseDetail> details, Long selectedShopDeptId)
     {
@@ -142,6 +159,8 @@ public class InvPurchaseServiceImpl extends InvBaseService implements IInvPurcha
             InvStateGuard.requireDraftForEdit(locked.getStatus());
         }
         normalizeAndValidateDraft(order, details);
+        if (details != null) itemResolver.lockReferences(details.stream().filter(java.util.Objects::nonNull)
+                .map(detail -> InventoryItemResolver.referenceKey(detail.getItemType(), detail.getItemId(), detail.getProductId())).toList());
         applyCatalogItemsForDraft(order, details, shopDeptId);
         applySupplierSnapshot(order, shopDeptId);
         if (order.getOrderId() == null)
@@ -492,6 +511,23 @@ public class InvPurchaseServiceImpl extends InvBaseService implements IInvPurcha
     }
 
     @Override
+    public InvPurchaseOrder getPurchaseDraft(Long orderId, Long selectedShopDeptId)
+    {
+        InvPurchaseOrder draft = getPurchaseDetail(orderId, selectedShopDeptId);
+        InvStateGuard.requireDraftForEdit(draft.getStatus());
+        return InvSpecialistReadVo.purchase(draft);
+    }
+
+    @Override
+    public InvPurchaseOrder getReceiveContext(Long orderId, Long selectedShopDeptId)
+    {
+        InvPurchaseOrder order = getPurchaseDetail(orderId, selectedShopDeptId);
+        if (!InvStatusConstants.SUBMITTED.equals(order.getStatus()))
+            throw new ServiceException("当前采购单状态不可收货");
+        return InvSpecialistReadVo.purchase(order);
+    }
+
+    @Override
     public InvPurchaseOrder getPurchaseDetail(Long orderId, Long selectedShopDeptId)
     {
         Long selectedWarehouseId = requireWarehouseContext(selectedShopDeptId, PURCHASE_WAREHOUSE_CONTEXT_MESSAGE);
@@ -573,31 +609,33 @@ public class InvPurchaseServiceImpl extends InvBaseService implements IInvPurcha
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public void receivePurchase(Long orderId, InvReceiveRequest receiveRequest, Long selectedShopDeptId)
+    public InvPurchaseReceiveResult receivePurchase(Long orderId, InvReceiveRequest receiveRequest,
+            Long selectedShopDeptId, String requestId)
     {
         Long selectedWarehouseId = requireWarehouseContext(selectedShopDeptId, PURCHASE_WAREHOUSE_CONTEXT_MESSAGE);
         Long warehouseId = requireAndValidateReceiveWarehouseId(receiveRequest, selectedWarehouseId);
         Date arrivedTime = requireReceiveArrivedTime(receiveRequest);
+        String normalizedRequestId = InvQualityCommandExecutor.requireRequestId(requestId);
         InvPurchaseOrder locked = requireLockedPurchase(orderId);
         assertPurchaseBelongsToSelectedWarehouse(locked, selectedWarehouseId);
+        Map<String, Object> payload = freezeReceivePayload(orderId, receiveRequest);
+        return qualityCommandExecutor.execute(normalizedRequestId, PURCHASE_RECEIVE_COMMAND,
+                selectedWarehouseId, "purchase:" + orderId, payload, InvPurchaseReceiveResult.class,
+                () -> createReceiptBatch(orderId, receiveRequest, warehouseId, arrivedTime,
+                        locked, normalizedRequestId));
+    }
+
+    private InvPurchaseReceiveResult createReceiptBatch(Long orderId, InvReceiveRequest receiveRequest,
+            Long warehouseId, Date arrivedTime, InvPurchaseOrder locked, String requestId)
+    {
         InvStateGuard.requireSubmittedForReceive(locked.getStatus());
-        if (InvStatusConstants.QC_PENDING.equals(locked.getQcStatus()))
-        {
-            throw new ServiceException("该采购单有待检记录，请先完成质检后再收货");
-        }
-        // 之前质检被拒绝的，清理旧入库记录，允许重新收货
-        if (InvStatusConstants.QC_REJECTED.equals(locked.getQcStatus()))
-        {
-            inboundRecordMapper.deleteRejectedByOrderId(orderId);
-        }
         InvPurchaseOrder order = locked;
         List<InvPurchaseDetail> details = purchaseDetailMapper.selectInvPurchaseDetailByOrderIdForUpdate(orderId);
-        if (details.isEmpty())
+        if (details == null || details.isEmpty())
         {
             throw new ServiceException("采购单无明细");
         }
 
-        // 构建 detailId -> detail 映射
         Map<Long, InvPurchaseDetail> detailMap = new HashMap<>();
         for (InvPurchaseDetail d : details)
         {
@@ -658,7 +696,6 @@ public class InvPurchaseServiceImpl extends InvBaseService implements IInvPurcha
                 throw new ServiceException("收货批次明细新增失败");
             }
 
-            // 入库记录（待检状态）
             InvInboundRecord inbound = new InvInboundRecord();
             inbound.setPurchaseOrderId(orderId);
             inbound.setPurchaseDetailId(detail.getDetailId());
@@ -683,7 +720,6 @@ public class InvPurchaseServiceImpl extends InvBaseService implements IInvPurcha
                 throw new ServiceException("待检入库记录新增失败");
             }
 
-            // 更新明细已入库数量
             detail.setWarehouseId(warehouseId);
             detail.setReceivedQuantity(detail.getReceivedQuantity() != null
                     ? detail.getReceivedQuantity().add(toReceive) : toReceive);
@@ -696,6 +732,16 @@ public class InvPurchaseServiceImpl extends InvBaseService implements IInvPurcha
         transitionPurchaseStatus(orderId, InvStatusConstants.SUBMITTED,
                 InvStatusConstants.SUBMITTED, InvStatusConstants.QC_PENDING,
                 "采购单收货状态已变化，请刷新后重试");
+
+        InvPurchaseReceiveResult result = new InvPurchaseReceiveResult();
+        result.setRequestId(requestId);
+        result.setPurchaseOrderId(orderId);
+        result.setWarehouseId(warehouseId);
+        result.setReceiptBatchId(receiptBatch.getBatchId());
+        result.setBatchNo(receiptBatch.getBatchNo());
+        result.setArrivedTime(arrivedTime);
+        result.setReceivedQuantity(batchTotal);
+        return result;
     }
 
     static List<InvReceiveItem> validateReceiveItems(InvReceiveRequest receiveRequest,
@@ -816,6 +862,17 @@ public class InvPurchaseServiceImpl extends InvBaseService implements IInvPurcha
 
         InvPurchaseOrder locked = requireLockedPurchase(orderId);
         assertPurchaseBelongsToSelectedWarehouse(locked, selectedWarehouseId);
+        qualityCommandExecutor.execute(qualityCheckRequest.getRequestId(), "PURCHASE_QUALITY_CHECK",
+                selectedWarehouseId, "purchase:" + orderId + ":batch:" + qualityCheckRequest.getReceiptBatchId(),
+                qualityCheckRequest, Boolean.class, () -> {
+                    applyQualityCheckBatch(orderId, qualityCheckRequest, selectedWarehouseId, locked);
+                    return Boolean.TRUE;
+                });
+    }
+
+    private void applyQualityCheckBatch(Long orderId, InvQualityCheckRequest qualityCheckRequest,
+            Long selectedWarehouseId, InvPurchaseOrder locked)
+    {
         InvStateGuard.requireSubmittedForQualityCheck(locked.getStatus());
         InvStateGuard.requirePendingQualityCheck(locked.getQcStatus());
         InvPurchaseOrder order = locked;
@@ -960,29 +1017,7 @@ public class InvPurchaseServiceImpl extends InvBaseService implements IInvPurcha
             throw new ServiceException("收货批次状态更新失败");
         }
 
-        String nextQcStatus;
-        String nextStatus;
-        if (receiptBatchMapper.countPendingByOrderId(orderId) > 0)
-        {
-            nextQcStatus = InvStatusConstants.QC_PENDING;
-            nextStatus = InvStatusConstants.SUBMITTED;
-        }
-        else
-        {
-            BigDecimal accepted = batchDetails.stream().map(detail -> zero(detail.getAcceptedQuantity()))
-                    .reduce(BigDecimal.ZERO, BigDecimal::add);
-            BigDecimal rejected = batchDetails.stream().map(detail -> zero(detail.getRejectedQuantity()))
-                    .reduce(BigDecimal.ZERO, BigDecimal::add);
-            BigDecimal concession = batchDetails.stream().map(detail -> zero(detail.getConcessionQuantity()))
-                    .reduce(BigDecimal.ZERO, BigDecimal::add);
-            String qcResult = resolveQualityConclusion(accepted, rejected, concession);
-            nextQcStatus = qcResult;
-            nextStatus = (accepted.add(concession)).compareTo(BigDecimal.ZERO) > 0
-                    ? resolveStatusAfterAcceptedQualityCheck(purchaseDetails)
-                    : InvStatusConstants.SUBMITTED;
-        }
-        transitionPurchaseStatus(orderId, InvStatusConstants.SUBMITTED,
-                nextStatus, nextQcStatus, "采购单质检状态已变化，请刷新后重试");
+        refreshPurchaseQualityConclusion(orderId, purchaseDetails);
     }
 
     static void validateQualityCheckQuantities(InvQualityCheckItem item, BigDecimal pendingQuantity)
@@ -1221,6 +1256,24 @@ public class InvPurchaseServiceImpl extends InvBaseService implements IInvPurcha
 
     @Override
     @Transactional(rollbackFor = Exception.class)
+    public void qualityCheckWithRequest(Long orderId, String qcResult, String qcRemark,
+            Long selectedShopDeptId, String requestId)
+    {
+        Long warehouseId = requireWarehouseContext(selectedShopDeptId, PURCHASE_WAREHOUSE_CONTEXT_MESSAGE);
+        InvPurchaseOrder locked = requireLockedPurchase(orderId);
+        assertPurchaseBelongsToSelectedWarehouse(locked, warehouseId);
+        Map<String, String> payload = new java.util.LinkedHashMap<>();
+        payload.put("qcResult", qcResult);
+        payload.put("qcRemark", qcRemark);
+        qualityCommandExecutor.execute(requestId, "PURCHASE_QUALITY_CHECK_LEGACY", warehouseId,
+                "purchase:" + orderId, payload, Boolean.class, () -> {
+                    qualityCheck(orderId, qcResult, qcRemark, selectedShopDeptId);
+                    return Boolean.TRUE;
+                });
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
     public void qualityCheck(Long orderId, String qcResult, String qcRemark, Long selectedShopDeptId)
     {
         log.warn("legacy_purchase_qc_api orderId={} user={} result={}",
@@ -1235,46 +1288,6 @@ public class InvPurchaseServiceImpl extends InvBaseService implements IInvPurcha
             throw new ServiceException("无效的质检结果");
         }
 
-        // 旧客户端仍可提交整单结果，服务端自动投影为新的逐行质检事实。
-        if (receiptBatchMapper != null && receiptBatchDetailMapper != null)
-        {
-            List<InvReceiptBatch> pendingBatches = receiptBatchMapper.selectPendingByOrderId(orderId);
-            if (pendingBatches != null && !pendingBatches.isEmpty())
-            {
-                for (InvReceiptBatch batch : pendingBatches)
-                {
-                    List<InvQualityCheckItem> items = new ArrayList<>();
-                    for (InvReceiptBatchDetail detail : receiptBatchDetailMapper.selectByBatchId(batch.getBatchId()))
-                    {
-                        BigDecimal pending = zero(detail.getPendingQuantity());
-                        if (pending.compareTo(BigDecimal.ZERO) <= 0)
-                        {
-                            continue;
-                        }
-                        InvQualityCheckItem item = new InvQualityCheckItem();
-                        item.setBatchDetailId(detail.getBatchDetailId());
-                        item.setInspectedQuantity(pending);
-                        item.setAcceptedQuantity(InvStatusConstants.QC_PASSED.equals(qcResult)
-                                ? pending : BigDecimal.ZERO);
-                        item.setRejectedQuantity(InvStatusConstants.QC_REJECTED.equals(qcResult)
-                                ? pending : BigDecimal.ZERO);
-                        item.setConcessionQuantity(InvStatusConstants.QC_CONCESSION.equals(qcResult)
-                                ? pending : BigDecimal.ZERO);
-                        item.setDefectReason((InvStatusConstants.QC_REJECTED.equals(qcResult)
-                                || InvStatusConstants.QC_CONCESSION.equals(qcResult))
-                                ? (trimToNull(qcRemark) != null ? qcRemark : "旧客户端整单质检") : null);
-                        item.setRemark(qcRemark);
-                        items.add(item);
-                    }
-                    InvQualityCheckRequest request = new InvQualityCheckRequest();
-                    request.setReceiptBatchId(batch.getBatchId());
-                    request.setItems(items);
-                    qualityCheckBatch(orderId, request, selectedShopDeptId);
-                }
-                return;
-            }
-        }
-
         InvPurchaseOrder locked = requireLockedPurchase(orderId);
         assertPurchaseBelongsToSelectedWarehouse(locked, selectedWarehouseId);
         InvStateGuard.requireSubmittedForQualityCheck(locked.getStatus());
@@ -1282,10 +1295,14 @@ public class InvPurchaseServiceImpl extends InvBaseService implements IInvPurcha
         order = locked;
 
         List<InvPurchaseDetail> details = purchaseDetailMapper.selectInvPurchaseDetailByOrderIdForUpdate(orderId);
-        List<InvInboundRecord> inboundRecords = pendingQualityCheckRecords(
-                inboundRecordMapper.selectPendingInvInboundRecordByOrderId(orderId));
+        List<InvInboundRecord> lockedInbound = inboundRecordMapper.selectByOrderIdForUpdate(orderId);
+        List<InvInboundRecord> inboundRecords = historicalPendingInboundRecords(lockedInbound);
         if (inboundRecords.isEmpty())
         {
+            if (hasBatchBackedReceiptFacts(orderId, lockedInbound))
+            {
+                throw new ServiceException(LEGACY_WHOLE_ORDER_QC_MESSAGE);
+            }
             throw new ServiceException("采购单无待检入库记录");
         }
         if (InvStatusConstants.QC_PASSED.equals(qcResult) || InvStatusConstants.QC_CONCESSION.equals(qcResult))
@@ -1404,13 +1421,7 @@ public class InvPurchaseServiceImpl extends InvBaseService implements IInvPurcha
             }
         }
 
-        String nextStatus = InvStatusConstants.SUBMITTED;
-        if (InvStatusConstants.QC_PASSED.equals(qcResult) || InvStatusConstants.QC_CONCESSION.equals(qcResult))
-        {
-            nextStatus = resolveStatusAfterAcceptedQualityCheck(details);
-        }
-        transitionPurchaseStatus(orderId, InvStatusConstants.SUBMITTED,
-                nextStatus, qcResult, "采购单质检状态已变化，请刷新后重试");
+        refreshPurchaseQualityConclusion(orderId, details);
     }
 
     static String resolveStatusAfterAcceptedQualityCheck(List<InvPurchaseDetail> details)
@@ -1533,6 +1544,248 @@ public class InvPurchaseServiceImpl extends InvBaseService implements IInvPurcha
             }
         }
         return pendingRecords;
+    }
+
+    static boolean isBatchBackedInbound(InvInboundRecord inbound)
+    {
+        return inbound != null
+                && (inbound.getReceiptBatchId() != null || inbound.getReceiptBatchDetailId() != null);
+    }
+
+    static List<InvInboundRecord> historicalPendingInboundRecords(List<InvInboundRecord> inboundRecords)
+    {
+        List<InvInboundRecord> historicalPending = new ArrayList<>();
+        for (InvInboundRecord inbound : pendingQualityCheckRecords(inboundRecords))
+        {
+            if (!isBatchBackedInbound(inbound))
+            {
+                historicalPending.add(inbound);
+            }
+        }
+        return historicalPending;
+    }
+
+    static Map<String, Object> freezeReceivePayload(Long purchaseOrderId, InvReceiveRequest request)
+    {
+        List<InvReceiveItem> items = requireReceivePayloadItems(request);
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("arrivedTime", request.getArrivedTime() == null
+                ? null : request.getArrivedTime().getTime());
+        payload.put("deliveryNoteNo", trimToNull(request.getDeliveryNoteNo()));
+        payload.put("purchaseOrderId", purchaseOrderId);
+        payload.put("remark", trimToNull(request.getRemark()));
+        payload.put("supplierBatchNo", trimToNull(request.getSupplierBatchNo()));
+        payload.put("warehouseId", request.getWarehouseId());
+        List<InvReceiveItem> sorted = new ArrayList<>(items);
+        sorted.sort(Comparator.comparing(InvReceiveItem::getDetailId));
+        List<Map<String, Object>> frozenItems = new ArrayList<>();
+        for (InvReceiveItem item : sorted)
+        {
+            Map<String, Object> line = new LinkedHashMap<>();
+            line.put("detailId", item.getDetailId());
+            line.put("receiveQuantity", canonicalQuantity(item.getReceiveQuantity()));
+            frozenItems.add(line);
+        }
+        payload.put("items", frozenItems);
+        return payload;
+    }
+
+    static List<InvReceiveItem> requireReceivePayloadItems(InvReceiveRequest request)
+    {
+        if (request == null || request.getItems() == null)
+        {
+            throw new ServiceException("收货明细不能为空");
+        }
+        List<InvReceiveItem> items = new ArrayList<>();
+        Set<Long> seenDetailIds = new HashSet<>();
+        for (InvReceiveItem item : request.getItems())
+        {
+            if (item == null)
+            {
+                throw new ServiceException("收货明细不能为空");
+            }
+            if (item.getDetailId() == null || !seenDetailIds.add(item.getDetailId()))
+            {
+                throw new ServiceException("收货明细不能重复");
+            }
+            items.add(item);
+        }
+        if (items.isEmpty())
+        {
+            throw new ServiceException("请至少录入一条有效收货数量");
+        }
+        return items;
+    }
+
+    static String canonicalQuantity(BigDecimal quantity)
+    {
+        return quantity == null ? null : quantity.stripTrailingZeros().toPlainString();
+    }
+
+    private boolean hasBatchBackedReceiptFacts(Long orderId, List<InvInboundRecord> inboundRecords)
+    {
+        if (inboundRecords != null)
+        {
+            for (InvInboundRecord inbound : inboundRecords)
+            {
+                if (isBatchBackedInbound(inbound))
+                {
+                    return true;
+                }
+            }
+        }
+        List<InvReceiptBatch> batches = receiptBatchMapper.selectByOrderIdForUpdate(orderId);
+        return batches != null && !batches.isEmpty();
+    }
+
+    private void refreshPurchaseQualityConclusion(Long orderId, List<InvPurchaseDetail> purchaseDetails)
+    {
+        List<InvReceiptBatchDetail> allBatchDetails =
+                receiptBatchDetailMapper.selectByOrderIdForUpdate(orderId);
+        List<InvInboundRecord> allInbound = inboundRecordMapper.selectByOrderIdForUpdate(orderId);
+        PurchaseQualityTotals totals = summarizePurchaseQualityFacts(allBatchDetails, allInbound);
+        String nextQcStatus;
+        String nextStatus;
+        if (totals.anyPending)
+        {
+            nextQcStatus = InvStatusConstants.QC_PENDING;
+            nextStatus = InvStatusConstants.SUBMITTED;
+        }
+        else
+        {
+            nextQcStatus = resolveQualityConclusion(totals.accepted, totals.rejected, totals.concession);
+            nextStatus = totals.accepted.add(totals.concession).compareTo(BigDecimal.ZERO) > 0
+                    ? resolveStatusAfterAcceptedQualityCheck(purchaseDetails)
+                    : InvStatusConstants.SUBMITTED;
+        }
+        transitionPurchaseStatus(orderId, InvStatusConstants.SUBMITTED,
+                nextStatus, nextQcStatus, "采购单质检状态已变化，请刷新后重试");
+    }
+
+    static PurchaseQualityTotals summarizePurchaseQualityFacts(
+            List<InvReceiptBatchDetail> batchDetails, List<InvInboundRecord> inboundRecords)
+    {
+        PurchaseQualityTotals totals = new PurchaseQualityTotals();
+        Map<Long, InvReceiptBatchDetail> detailsById = new HashMap<>();
+        if (batchDetails != null)
+        {
+            for (InvReceiptBatchDetail detail : batchDetails)
+            {
+                if (detail == null || detail.getBatchDetailId() == null)
+                {
+                    continue;
+                }
+                detailsById.put(detail.getBatchDetailId(), detail);
+                if (zero(detail.getPendingQuantity()).compareTo(BigDecimal.ZERO) > 0)
+                {
+                    totals.anyPending = true;
+                }
+                totals.accepted = totals.accepted.add(zero(detail.getAcceptedQuantity()));
+                totals.rejected = totals.rejected.add(zero(detail.getRejectedQuantity()));
+                totals.concession = totals.concession.add(zero(detail.getConcessionQuantity()));
+            }
+        }
+        if (inboundRecords == null)
+        {
+            return totals;
+        }
+        for (InvInboundRecord inbound : inboundRecords)
+        {
+            if (inbound == null)
+            {
+                continue;
+            }
+            boolean hasBatchId = inbound.getReceiptBatchId() != null;
+            boolean hasBatchDetailId = inbound.getReceiptBatchDetailId() != null;
+            if (hasBatchId || hasBatchDetailId)
+            {
+                requireMatchingBatchBackedInbound(inbound, detailsById);
+                continue;
+            }
+            if (inbound.getQcResult() == null
+                    || InvStatusConstants.QC_PENDING.equals(inbound.getQcResult()))
+            {
+                totals.anyPending = true;
+                continue;
+            }
+            BigDecimal accepted = zero(inbound.getAcceptedQuantity());
+            BigDecimal rejected = zero(inbound.getRejectedQuantity());
+            BigDecimal concession = zero(inbound.getConcessionQuantity());
+            BigDecimal classified = accepted.add(rejected).add(concession);
+            BigDecimal quantity = zero(inbound.getQuantity());
+            if (classified.compareTo(BigDecimal.ZERO) > 0)
+            {
+                if (quantity.compareTo(BigDecimal.ZERO) > 0
+                        && classified.compareTo(quantity) != 0)
+                {
+                    throw new ServiceException(
+                            "历史无批次入库数量与质检分类不一致，已阻断自动修复 inboundId="
+                                    + inbound.getInboundId());
+                }
+                totals.accepted = totals.accepted.add(accepted);
+                totals.rejected = totals.rejected.add(rejected);
+                totals.concession = totals.concession.add(concession);
+                continue;
+            }
+            if (InvStatusConstants.QC_PASSED.equals(inbound.getQcResult()))
+            {
+                totals.accepted = totals.accepted.add(quantity);
+            }
+            else if (InvStatusConstants.QC_REJECTED.equals(inbound.getQcResult()))
+            {
+                totals.rejected = totals.rejected.add(quantity);
+            }
+            else if (InvStatusConstants.QC_CONCESSION.equals(inbound.getQcResult()))
+            {
+                totals.concession = totals.concession.add(quantity);
+            }
+            else
+            {
+                throw new ServiceException(
+                        "历史无批次入库质检结论无法识别，已阻断自动修复 inboundId="
+                                + inbound.getInboundId());
+            }
+        }
+        return totals;
+    }
+
+    static void requireMatchingBatchBackedInbound(InvInboundRecord inbound,
+            Map<Long, InvReceiptBatchDetail> detailsById)
+    {
+        if (inbound.getReceiptBatchId() == null || inbound.getReceiptBatchDetailId() == null)
+        {
+            throw new ServiceException(
+                    "入库记录缺少收货批次或批次明细标识，已阻断自动修复 inboundId="
+                            + inbound.getInboundId());
+        }
+        InvReceiptBatchDetail detail = detailsById.get(inbound.getReceiptBatchDetailId());
+        if (detail == null)
+        {
+            throw new ServiceException(
+                    "入库记录与收货批次明细不一致，已阻断自动修复 inboundId="
+                            + inbound.getInboundId());
+        }
+        if (!Objects.equals(inbound.getReceiptBatchId(), detail.getBatchId()))
+        {
+            throw new ServiceException(
+                    "入库记录收货批次与明细批次不一致，已阻断自动修复 inboundId="
+                            + inbound.getInboundId());
+        }
+        if (inbound.getPurchaseDetailId() == null || detail.getPurchaseDetailId() == null
+                || !Objects.equals(inbound.getPurchaseDetailId(), detail.getPurchaseDetailId()))
+        {
+            throw new ServiceException(
+                    "入库记录采购明细与收货批次明细不一致，已阻断自动修复 inboundId="
+                            + inbound.getInboundId());
+        }
+    }
+
+    static final class PurchaseQualityTotals
+    {
+        private boolean anyPending;
+        private BigDecimal accepted = BigDecimal.ZERO;
+        private BigDecimal rejected = BigDecimal.ZERO;
+        private BigDecimal concession = BigDecimal.ZERO;
     }
 
     static void rollbackRejectedPendingReceipts(List<InvPurchaseDetail> details, List<InvInboundRecord> pendingRecords)
@@ -1719,30 +1972,6 @@ public class InvPurchaseServiceImpl extends InvBaseService implements IInvPurcha
         {
             throw new ServiceException("只能操作当前仓库采购单");
         }
-    }
-
-    private Map<Long, InvProduct> selectProductsByDetailIds(List<InvPurchaseDetail> details, Long selectedWarehouseId)
-    {
-        Map<Long, InvProduct> productsById = new HashMap<>();
-        if (details == null)
-        {
-            return productsById;
-        }
-        for (InvPurchaseDetail detail : details)
-        {
-            if (detail == null || detail.getProductId() == null || productsById.containsKey(detail.getProductId()))
-            {
-                continue;
-            }
-            InvProduct product = productMapper.selectInvProductById(detail.getProductId());
-            if (product == null)
-            {
-                throw new ServiceException("商品不存在: " + detail.getProductId());
-            }
-            assertRelatedShopVisible(product.getShopDeptId(), selectedWarehouseId, "无权采购该商品");
-            productsById.put(detail.getProductId(), product);
-        }
-        return productsById;
     }
 
     private static void requireNoPurchaseReceiveActivity(InvPurchaseOrder order)

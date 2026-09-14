@@ -62,9 +62,9 @@ assert.ok(
 )
 
 assert.ok(
-  salarySource.includes(`v-hasPermi="['oa:salary:calculate']"`) &&
-    salarySource.indexOf("oa:salary:calculate") < salarySource.indexOf("@click=\"doCalculate\""),
-  "salary calculation button should be controlled by the salary calculate permission"
+  !salarySource.includes('@click="doCalculate"') && salarySource.includes('<legacy-salary-notice') &&
+    salarySource.includes(`v-hasPermi="['oa:salary:export']"`),
+  "retired salary page must only offer history and permission-controlled export"
 )
 
 assert.ok(

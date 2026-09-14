@@ -1,18 +1,19 @@
 <template>
   <div class="app-container oa-workspace-page oa-salary-page">
+    <legacy-salary-notice />
     <section class="oa-page-hero">
       <div class="oa-hero__copy">
-        <span class="oa-hero__eyebrow">OA 协同 · 薪资管理</span>
+        <span class="oa-hero__eyebrow">OA 协同 · 历史工资</span>
         <div class="oa-hero__title-row">
           <span class="oa-hero__icon"><i class="el-icon-money" /></span>
           <div>
-            <h1>工资管理</h1>
-            <p>以考勤结果为基础完成月度工资核算，集中维护参数、排查异常并导出结果。</p>
+            <h1>历史工资记录</h1>
+            <p>查询和导出已有工资记录；当前工资以员工档案确认的合同工资为准。</p>
           </div>
         </div>
       </div>
       <div class="oa-hero__aside">
-        <span>当前核算月份</span>
+        <span>历史记录月份</span>
         <strong>{{ salaryMonth || '未选择' }}</strong>
         <small>{{ viewScope === 'all' ? '全部员工视图' : '个人工资视图' }}</small>
       </div>
@@ -37,7 +38,7 @@
       <div class="oa-metric-card oa-metric-card--warning">
         <span>核算依据</span>
         <strong>考勤联动</strong>
-        <small>异常考勤会在计算前阻断</small>
+        <small>历史金额保持原样</small>
       </div>
     </section>
 
@@ -54,8 +55,8 @@
         </el-form-item>
         <el-form-item>
           <el-button type="primary" size="mini" icon="el-icon-search" @click="handleQuery">查询</el-button>
-          <el-button v-hasPermi="['oa:salary:calculate']" type="success" size="mini" icon="el-icon-s-marketing" :loading="calcLoading" @click="doCalculate">计算本月工资</el-button>
-          <el-button v-hasPermi="['oa:salary:config']" size="mini" icon="el-icon-setting" @click="openConfig">工资参数</el-button>
+
+
           <el-button v-hasPermi="['oa:salary:export']" size="mini" icon="el-icon-download" @click="handleExport">导出</el-button>
         </el-form-item>
       </el-form>
@@ -67,11 +68,13 @@
           <span class="oa-card-heading__icon"><i class="el-icon-s-data" /></span>
           <div>
             <h2>工资明细</h2>
-            <p>只读取已发布排班的考勤 V2 已结算分钟</p>
+            <p>按所选月份查询已保存的工资记录</p>
           </div>
         </div>
         <el-tag size="small" type="info">{{ salaryMonth || '-' }}</el-tag>
       </div>
+      <el-alert v-if="listError" :title="listError" type="error" :closable="false" />
+      <el-button v-if="listError" size="mini" @click="getList">重试当前查询</el-button>
       <el-table v-loading="loading" :data="list" size="small" border :empty-text="salaryEmptyText">
         <el-table-column label="月份" prop="salaryMonth" width="90" fixed/>
         <el-table-column label="用户" prop="userName" width="100"/>
@@ -152,21 +155,26 @@
       </el-form>
       <div slot="footer">
         <el-button @click="configOpen = false">取 消</el-button>
-        <el-button type="primary" :loading="configSaving" @click="saveConfig" v-hasPermi="['oa:salary:config']">保 存</el-button>
+
       </div>
     </el-dialog>
   </div>
 </template>
 
 <script>
+import { getSelectedDeptId } from "@/utils/shopContext"
+const { createUiOperationScope } = require("@/utils/uiOperationScope")
+import LegacySalaryNotice from "@/views/hr/components/LegacySalaryNotice"
 import { listMySalary, listAllSalary, calculateSalary, preflightSalaryAttendance, getSalaryConfig, saveSalaryConfig } from "@/api/oa/salary"
 import { getBusinessEmptyText } from "@/utils/businessEmptyState"
 
 export default {
+  components: { LegacySalaryNotice },
   name: "OaSalary",
   data() {
     return {
       loading: false,
+      listError: "",
       calcLoading: false,
       configOpen: false,
       configLoading: false,
@@ -186,12 +194,26 @@ export default {
       }
     }
   },
+  watch: {
+    actorContextKey() { this.resetSalaryContext() },
+    salaryMonth() { this.queryParams.pageNum = 1; this.getList() }
+  },
+  activated() {
+    this.salaryScope().activate()
+    if (this._refreshSalaryOnActivate) { this._refreshSalaryOnActivate = false; this.getList() }
+  },
+  deactivated() { this.salaryScope().deactivate(); this.list = []; this.total = 0; this.loading = false; this._refreshSalaryOnActivate = true },
+  beforeDestroy() { window.removeEventListener("erp:dept-changed", this.resetSalaryContext); this.salaryScope().deactivate() },
   created() {
+    window.addEventListener("erp:dept-changed", this.resetSalaryContext)
     const now = new Date()
     this.salaryMonth = now.getFullYear() + "-" + String(now.getMonth() + 1).padStart(2, "0")
-    this.getList()
   },
   computed: {
+    actorContextKey() {
+      const store = this.$store || {}, getters = store.getters || {}
+      return JSON.stringify([String(getters.id || ""), ((store.state || {}).user || {}).sessionRevision || 0, getters.permissions || []])
+    },
     salaryEmptyText() {
       return getBusinessEmptyText("salary", "missingBaseline")
     },
@@ -201,6 +223,24 @@ export default {
     }
   },
   methods: {
+    salaryScope() {
+      if (!this._salaryScope) this._salaryScope = createUiOperationScope(() => ({ actor: this.actorContextKey, dept: getSelectedDeptId(), route: this.$route && this.$route.path }))
+      return this._salaryScope
+    },
+    resetSalaryContext() {
+      this.salaryScope().invalidate()
+      this.list = []
+      this.total = 0
+      this.loading = false
+      this.configOpen = false
+      this.salaryConfig = this.defaultSalaryConfig()
+      if ((this.$store.getters || {}).id) this.getList()
+    },
+    salaryQuerySnapshot() {
+      const params = { ...this.queryParams }
+      if (this.salaryMonth) params.salaryMonth = this.salaryMonth
+      return { scope: this.viewScope === "all" && this.canViewAllSalary() ? "all" : "my", params }
+    },
     defaultSalaryConfig() {
       return {
         configId: undefined,
@@ -215,14 +255,19 @@ export default {
       }
     },
     getList() {
+      const query = this.salaryQuerySnapshot(), scope = this.salaryScope(), token = scope.begin("list", query)
       this.loading = true
-      const params = { ...this.queryParams }
-      if (this.salaryMonth) params.salaryMonth = this.salaryMonth
-      const request = this.viewScope === "all" && this.canViewAllSalary() ? listAllSalary : listMySalary
-      request(params).then(res => {
+      this.listError = ""
+      this.list = []
+      this.total = 0
+      const request = query.scope === "all" ? listAllSalary : listMySalary
+      return request(query.params, { silentError: true }).then(res => {
+        if (!scope.isCurrent(token, this.salaryQuerySnapshot())) return
         this.list = res.rows || []
-        this.total = res.total || 0
-      }).finally(() => { this.loading = false })
+        this.total = Number(res.total) || 0
+      }).catch(error => {
+        if (scope.isCurrent(token, this.salaryQuerySnapshot())) this.listError = error && error.message || "工资记录读取失败，请重试"
+      }).finally(() => { if (scope.isCurrent(token, this.salaryQuerySnapshot())) this.loading = false })
     },
     canViewAllSalary() {
       return this.$auth && this.$auth.hasPermi("oa:salary:list")
@@ -317,11 +362,15 @@ export default {
       })
     },
     handleExport() {
-      this.$modal.confirm("确认导出当前查询条件下的工资记录？", "导出提示").then(() => {
-        const params = { ...this.queryParams }
-        if (this.salaryMonth) params.salaryMonth = this.salaryMonth
-        this.download("oa/salary/export", params, this.exportFileName(this.salaryMonth ? "工资记录_" + this.salaryMonth : "工资记录"))
-      })
+      const query = this.salaryQuerySnapshot(), scope = this.salaryScope(), token = scope.begin("export", query)
+      const params = { ...query.params }
+      delete params.pageNum
+      delete params.pageSize
+      const label = query.scope === "my" ? "我的工资" : "组织工资"
+      return this.$modal.confirm(`确认导出${label}（${params.salaryMonth || "全部月份"}）？`, "导出提示").then(() => {
+        if (!scope.isCurrent(token, this.salaryQuerySnapshot())) { this.$modal.msgWarning("导出条件或访问范围已变化，请重新发起导出"); return }
+        return this.download(query.scope === "my" ? "oa/salary/export/my" : "oa/salary/export", params, this.exportFileName(label + (params.salaryMonth ? "_" + params.salaryMonth : "")))
+      }).catch(error => { if (error !== "cancel" && error !== "close" && scope.isCurrent(token) && !(error && error.notified)) this.$modal.msgError(error && error.message || "下载失败，请重试") })
     }
   }
 }

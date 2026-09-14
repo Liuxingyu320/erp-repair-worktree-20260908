@@ -26,6 +26,7 @@ class InvReportMapperBindingTest
         assertMapped(configuration, mapperType, "selectReportSummary");
         assertMapped(configuration, mapperType, "selectStockWarningList");
         assertMapped(configuration, mapperType, "selectReportProductOptions");
+        assertMapped(configuration, mapperType, "selectReportItemOptions");
     }
 
     @Test
@@ -41,7 +42,7 @@ class InvReportMapperBindingTest
         assertThat(mapperXml).contains("inv_sales_order");
         assertThat(mapperXml).contains("inv_sales_detail");
         assertThat(mapperXml).contains("inv_purchase_return", "inv_sales_return", "inv_stock_log");
-        assertThat(mapperXml).contains("d.received_quantity", "d.delivered_quantity", "d.returned_quantity");
+        assertThat(mapperXml).contains("qevent.quantity", "d.delivered_quantity", "d.returned_quantity");
         assertThat(mapperXml).contains("sales_out_cost", "sales_return_cost", "sales_cost");
         assertThat(mapperXml).contains("report_amounts.sales_amount - report_amounts.sales_cost");
         assertThat(mapperXml).doesNotContain("report_base.sales_amount - report_base.purchase_amount");

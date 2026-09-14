@@ -19,6 +19,25 @@ class AttendanceV2MapperBindingTest
     private static final String XML = "mapper/oa/AttendanceV2Mapper.xml";
 
     @Test
+    void candidateQueryBindsTheWholeWindowDateRange() throws Exception
+    {
+        Configuration configuration = new Configuration();
+        try (InputStream input = Resources.getResourceAsStream(XML))
+        {
+            new XMLMapperBuilder(input, configuration, XML,
+                    configuration.getSqlFragments()).parse();
+        }
+        var params = Map.of("userId", 9L,
+                "dateFrom", java.time.LocalDate.of(2026, 9, 6),
+                "dateTo", java.time.LocalDate.of(2026, 9, 9));
+        var bound = configuration.getMappedStatement(AttendanceV2Mapper.class.getName()
+                + ".selectPublishedScheduleCandidatesForUser").getBoundSql(params);
+        assertThat(normalize(bound.getSql())).contains("s.business_date between ? and ?");
+        assertThat(bound.getParameterMappings()).extracting(value -> value.getProperty())
+                .containsExactly("userId", "dateFrom", "dateTo");
+    }
+
+    @Test
     void challengeConsumptionAndSchedulePublishAreFailClosed()
             throws Exception
     {
@@ -32,6 +51,12 @@ class AttendanceV2MapperBindingTest
                 AttendanceV2Mapper.class.getName() + ".selectDatabaseNow")
                 .getBoundSql(null).getSql());
         assertThat(databaseNow).isEqualTo("select current_timestamp");
+        var clockStatement = configuration.getMappedStatement(AttendanceV2Mapper.class.getName() + ".selectDatabaseClock");
+        assertThat(clockStatement.getResultMaps().get(0).getResultMappings())
+                .extracting(org.apache.ibatis.mapping.ResultMapping::getProperty)
+                .containsExactly("localTime", "epochMillis");
+        assertThat(normalize(clockStatement.getBoundSql(null).getSql()))
+                .contains("current_timestamp(3)", "unix_timestamp(current_timestamp(3))", "epoch_millis");
 
         Map<String, Object> params = new HashMap<>();
         params.put("challengeId", 1L);
@@ -267,11 +292,13 @@ class AttendanceV2MapperBindingTest
         params.put("updateBy", "manager");
         String remainingWorkInvalidate = normalize(configuration
                 .getMappedStatement(AttendanceV2Mapper.class.getName()
-                        + ".invalidateUnsettledDayResultForRemainingWork")
+                        + ".invalidateDayResultForRemainingWork")
                 .getBoundSql(params).getSql());
         assertThat(remainingWorkInvalidate).contains(
                 "exception_codes='REMAINING_WORK_CONFIRMATION_CHANGED'",
-                "schedule_id=?", "settled_at is null");
+                "schedule_id=?", "settled_at=null", "result_status='PENDING'",
+                "row_version=row_version+1")
+                .doesNotContain("settled_at is null");
 
         params.clear();
         params.put("shopId", 9L);

@@ -9,6 +9,10 @@ import com.erp.oa.domain.vo.OaFixedAssetRepairPrecheckVo;
 
 public interface IOaFixedAssetService
 {
+    default com.erp.oa.domain.vo.OaFixedAssetConfigSnapshot selectConfigSnapshot(Long shopId, Long selectedShopId) { throw new UnsupportedOperationException("config snapshot unavailable"); }
+    default com.erp.oa.domain.vo.OaFixedAssetConfigSnapshot saveConfigBatch(com.erp.oa.domain.dto.OaFixedAssetConfigBatchRequest request, Long selectedShopId) { throw new UnsupportedOperationException("config batch unavailable"); }
+    default com.erp.oa.domain.vo.OaFixedAssetConfigSnapshot selectConfigCommand(String requestId, Long shopId, Long selectedShopId) { throw new UnsupportedOperationException("config command unavailable"); }
+    default int deleteConfigById(Long configId, Long selectedShopId, Long expectedVersion) { throw new UnsupportedOperationException("versioned config delete unavailable"); }
     List<OaFixedAssetConfig> selectConfigList(OaFixedAssetConfig config, Long selectedShopDeptId);
 
     OaFixedAssetConfig selectConfigById(Long configId, Long selectedShopDeptId);

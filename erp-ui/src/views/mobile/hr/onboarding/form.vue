@@ -77,11 +77,8 @@ import {
 } from "../mobileOnboardingForm"
 
 function firstQueryValue(value) { return Array.isArray(value) ? value[0] : value }
-function positiveId(value) {
-  const raw = firstQueryValue(value)
-  const text = raw === undefined || raw === null ? "" : String(raw).trim()
-  return /^\d+$/.test(text) && Number(text) > 0 ? Number(text) : null
-}
+const { normalizePositiveDecimalId } = require("@/utils/positiveDecimalId")
+function positiveId(value) { return normalizePositiveDecimalId(firstQueryValue(value)) || null }
 function errorBody(error) {
   if (!error || typeof error !== "object") return {}
   if (error.response && error.response.data && typeof error.response.data === "object") return error.response.data
@@ -430,8 +427,8 @@ export default {
         .then(response => {
           if (!this.isActiveSubmit(generation, recordId, sequence)) return null
           const result = responseData(response) || {}
-          const resultId = positiveId(result.onboardingId) || recordId
-          if (!resultId) throw new Error("创建结果缺少入职记录编号")
+          const resultId = positiveId(result.onboardingId)
+          if (!resultId || (recordId && resultId !== recordId)) throw new Error("保存结果记录编号未确认，请核对当前记录")
           this.savedOnboardingId = resultId
           return this.navigateToDetail(resultId).then(() => result)
         })

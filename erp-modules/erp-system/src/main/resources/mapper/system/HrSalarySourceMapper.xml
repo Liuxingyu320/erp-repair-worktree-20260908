@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.system.mapper.HrSalarySourceMapper">
+    <select id="contracts" resultType="java.util.LinkedHashMap">
+        select cast(p.package_id as char) packageId, cast(t.task_id as char) taskId,
+            p.status, p.signed_time signedTime
+        from oa_sign_package_salary_source b
+        join oa_sign_package p on p.package_id=b.package_id and p.employee_id=b.employee_id
+        join oa_sign_task t on t.task_id=p.task_id and t.employee_id=b.employee_id
+        where b.employee_id=#{employeeId} and b.source_id=#{sourceId}
+        order by p.package_id desc limit 20
+    </select>
+    <sql id="columns">
+        s.source_id sourceId, s.employee_id employeeId, s.previous_source_id previousSourceId,
+        s.source_type sourceType, s.business_id businessId, s.batch_id batchId, s.row_id rowId,
+        s.row_version rowVersion, s.file_sha256 fileSha256, s.command_id commandId,
+        s.request_hash requestHash, s.before_hash beforeHash, s.effective_date effectiveDate,
+        s.operator_user_id operatorUserId, s.operator_name operatorName, s.reason,
+        s.verified, s.confirmed_at confirmedAt, s.base_salary baseSalary, s.post_salary postSalary,
+        s.field_allowance fieldAllowance, s.performance_salary performanceSalary, s.salary_total salaryTotal
+    </sql>
+    <select id="current" resultType="com.erp.system.api.domain.EmployeeSalarySource">
+        select <include refid="columns"/> from sys_employee_salary_current c
+        join sys_employee_salary_source s on s.source_id = c.source_id and s.employee_id = c.employee_id
+        where c.employee_id = #{employeeId}
+    </select>
+    <select id="historicalForRow" resultType="com.erp.system.api.domain.EmployeeSalarySource">
+        select <include refid="columns"/> from sys_employee_salary_source s
+        where s.batch_id = #{batchId} and s.row_id = #{rowId}
+          and s.source_type = 'HISTORICAL_CONTRACT_EXCEL'
+        order by s.row_version desc, s.confirmed_at desc, s.source_id desc limit 1
+    </select>
+    <select id="command" resultType="com.erp.system.api.domain.EmployeeSalarySource">
+        select <include refid="columns"/> from sys_employee_salary_source s where s.command_id = #{commandId}
+    </select>
+    <select id="currentLocked" resultType="com.erp.system.api.domain.EmployeeSalarySource">
+        select <include refid="columns"/> from sys_employee_salary_current c
+        join sys_employee_salary_source s on s.source_id = c.source_id and s.employee_id = c.employee_id
+        where c.employee_id = #{employeeId}
+        for update
+    </select>
+    <select id="commandLocked" resultType="com.erp.system.api.domain.EmployeeSalarySource">
+        select <include refid="columns"/> from sys_employee_salary_source s where s.command_id = #{commandId}
+        for update
+    </select>
+    <insert id="insert">
+        insert into sys_employee_salary_source
+          (source_id, employee_id, previous_source_id, source_type, business_id, batch_id, row_id,
+           row_version, file_sha256, command_id, request_hash, before_hash, effective_date,
+           operator_user_id, operator_name, reason, verified, base_salary, post_salary,
+           field_allowance, performance_salary, salary_total)
+        values (#{sourceId}, #{employeeId}, #{previousSourceId}, #{sourceType}, #{businessId},
+          #{batchId}, #{rowId}, #{rowVersion}, #{fileSha256}, #{commandId}, #{requestHash},
+          #{beforeHash}, #{effectiveDate}, #{operatorUserId}, #{operatorName}, #{reason},
+          #{verified}, #{baseSalary}, #{postSalary}, #{fieldAllowance}, #{performanceSalary}, #{salaryTotal})
+    </insert>
+    <!-- Caller holds the employee profile row lock. Amount update and this pointer share its transaction. -->
+    <insert id="pointTo">
+        insert into sys_employee_salary_current(employee_id, source_id) values (#{employeeId}, #{sourceId})
+        on duplicate key update source_id = values(source_id)
+    </insert>
+</mapper>

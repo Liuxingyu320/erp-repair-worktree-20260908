@@ -14,6 +14,17 @@ public class HrHealthCertificateVo extends HrHealthCertificate
     private String healthCertificateStatus;
     private Long daysRemaining;
     private Boolean attachmentPresent;
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    private LocalDate asOfDate;
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    private java.time.LocalDateTime asOfTime;
+    private LocalDate nextValidFrom;
+    public LocalDate getAsOfDate() { return asOfDate; }
+    public void setAsOfDate(LocalDate value) { asOfDate = value; }
+    public java.time.LocalDateTime getAsOfTime() { return asOfTime; }
+    public void setAsOfTime(java.time.LocalDateTime value) { asOfTime = value; }
+    public LocalDate getNextValidFrom() { return nextValidFrom; }
+    public void setNextValidFrom(LocalDate value) { nextValidFrom = value; }
 
     public String getEmployeeNo() { return employeeNo; }
     public void setEmployeeNo(String employeeNo) { this.employeeNo = employeeNo; }

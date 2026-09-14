@@ -1,3 +1,4 @@
+import pushRegistration from '@/services/lazyPushRegistration'
 import router from './router'
 import store from './store'
 import { Message, MessageBox } from '@/plugins/element-services'
@@ -394,6 +395,11 @@ router.beforeEach(async (to, from, next) => {
   }
 })
 
-router.afterEach(() => {
+router.afterEach(to => {
   NProgress.done()
+  const ready = getToken() && routesGeneratedForSession && !isCredentialRestricted() &&
+    !store.getters.profileCompletionRequired &&
+    !['/login', '/lock', '/complete-profile', CREDENTIAL_CHANGE_PATH].includes(to.path)
+  // Consume queued push destinations only after authentication and navigation guards settle.
+  void pushRegistration.resumeNavigation(ready ? store.getters.id : null).catch(() => {})
 })

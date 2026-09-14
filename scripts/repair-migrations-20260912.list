@@ -1,0 +1,8 @@
+# 20260912 repair upgrade only; prerequisites must already be verified.
+erp_hr_employee_salary_edit_permission_20260912.sql
+erp_inventory_purchase_return_lock_indexes_20260912.sql
+erp_system_user_notification_page_index_20260912.sql
+erp_inventory_stock_check_restart_20260912.sql
+erp_oa_attendance_leave_balance_20260912.sql
+erp_oa_attendance_overtime_transfer_20260912.sql
+erp_oa_attendance_leave_quota_20260912.sql

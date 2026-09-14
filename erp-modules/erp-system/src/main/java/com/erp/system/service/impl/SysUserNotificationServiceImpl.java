@@ -1,6 +1,11 @@
 package com.erp.system.service.impl;
 
 import java.nio.charset.StandardCharsets;
+import com.erp.system.domain.dto.SysUserNotificationPageQuery;
+import com.erp.system.domain.dto.SysUserNotificationReadAllRequest;
+import com.erp.system.domain.vo.SysUserNotificationPageResult;
+import com.erp.system.domain.vo.SysUserNotificationReadAllResult;
+import org.springframework.transaction.annotation.Transactional;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Clock;
@@ -49,36 +54,31 @@ public class SysUserNotificationServiceImpl implements ISysUserNotificationServi
 
     private final List<PushDeliveryClient> deliveryClients;
 
+    private final InAppNotificationWriter inAppWriter;
+
     private final Clock clock;
 
     @Autowired
     public SysUserNotificationServiceImpl(SysUserNotificationMapper notificationMapper,
             SysUserDeviceTokenMapper deviceTokenMapper,
             SysUserPushDeliveryMapper pushDeliveryMapper,
-            List<PushDeliveryClient> deliveryClients)
+            List<PushDeliveryClient> deliveryClients, InAppNotificationWriter inAppWriter)
     {
         this(notificationMapper, deviceTokenMapper, pushDeliveryMapper,
-                deliveryClients, Clock.systemUTC());
+                deliveryClients, inAppWriter, Clock.systemUTC());
     }
 
     SysUserNotificationServiceImpl(SysUserNotificationMapper notificationMapper,
             SysUserDeviceTokenMapper deviceTokenMapper,
             SysUserPushDeliveryMapper pushDeliveryMapper,
-            List<PushDeliveryClient> deliveryClients, Clock clock)
+            List<PushDeliveryClient> deliveryClients, InAppNotificationWriter inAppWriter, Clock clock)
     {
         this.notificationMapper = notificationMapper;
         this.deviceTokenMapper = deviceTokenMapper;
         this.pushDeliveryMapper = pushDeliveryMapper;
         this.deliveryClients = deliveryClients == null ? Collections.emptyList() : List.copyOf(deliveryClients);
+        this.inAppWriter = inAppWriter;
         this.clock = clock == null ? Clock.systemUTC() : clock;
-    }
-
-    SysUserNotificationServiceImpl(SysUserNotificationMapper notificationMapper,
-            SysUserDeviceTokenMapper deviceTokenMapper,
-            SysUserPushDeliveryMapper pushDeliveryMapper)
-    {
-        this(notificationMapper, deviceTokenMapper, pushDeliveryMapper,
-                Collections.emptyList(), Clock.systemUTC());
     }
 
     @Override
@@ -99,7 +99,7 @@ public class SysUserNotificationServiceImpl implements ISysUserNotificationServi
         notification.setRouteParams(optional(command.getRouteParams(), 2000, "消息路由参数"));
         notification.setReadStatus("0");
 
-        int inserted = notificationMapper.insertNotification(notification);
+        int inserted = inAppWriter.insert(notification);
         if (inserted > 0)
         {
             return result(true, notification.getNotificationId(), "CREATED", "消息已创建", null);
@@ -131,7 +131,11 @@ public class SysUserNotificationServiceImpl implements ISysUserNotificationServi
 
         if ("SENT".equals(delivery.getStatus()))
         {
-            return duplicatePushResult();
+            return completedPushResult(delivery);
+        }
+        if ("SKIPPED".equals(delivery.getStatus()))
+        {
+            return noDevicePushResult();
         }
         if ("DEAD".equals(delivery.getStatus()))
         {
@@ -175,7 +179,13 @@ public class SysUserNotificationServiceImpl implements ISysUserNotificationServi
 
         String status = result == null || result.getStatus() == null
                 ? "UNKNOWN" : result.getStatus();
-        if (result != null && result.getAccepted())
+        if ("NO_DEVICE".equals(status))
+        {
+            assertPushLedgerUpdated(pushDeliveryMapper.markSkipped(delivery.getDeliveryId(),
+                    delivery.getVersion(), status));
+            return result;
+        }
+        if (result != null && result.getAccepted() && "DELIVERED".equals(status))
         {
             assertPushLedgerUpdated(pushDeliveryMapper.markSent(delivery.getDeliveryId(),
                     delivery.getVersion(), status));
@@ -197,7 +207,7 @@ public class SysUserNotificationServiceImpl implements ISysUserNotificationServi
         List<SysUserDeviceToken> devices = deviceTokenMapper.selectEnabledByUserId(command.getRecipientUserId());
         if (devices == null || devices.isEmpty())
         {
-            return result(true, null, "NO_DEVICE", "用户没有可用移动设备", null);
+            return noDevicePushResult();
         }
 
         int delivered = 0;
@@ -248,9 +258,9 @@ public class SysUserNotificationServiceImpl implements ISysUserNotificationServi
         }
         if (disabled > 0)
         {
-            return result(true, null, "DISABLED", "移动推送未启用", null);
+            return result(false, null, "DISABLED", "移动推送未启用，未投递", null);
         }
-        return result(true, null, "NO_DEVICE", "用户没有可用移动设备", null);
+        return noDevicePushResult();
     }
 
     private void normalizeMobileCommand(UserNotificationCommand command)
@@ -323,7 +333,11 @@ public class SysUserNotificationServiceImpl implements ISysUserNotificationServi
     {
         if ("SENT".equals(delivery.getStatus()))
         {
-            return duplicatePushResult();
+            return completedPushResult(delivery);
+        }
+        if ("SKIPPED".equals(delivery.getStatus()))
+        {
+            return noDevicePushResult();
         }
         if ("DEAD".equals(delivery.getStatus()))
         {
@@ -335,6 +349,23 @@ public class SysUserNotificationServiceImpl implements ISysUserNotificationServi
     private static UserNotificationResult duplicatePushResult()
     {
         return result(true, null, "DUPLICATE", "移动推送已投递", null);
+    }
+
+    private static UserNotificationResult noDevicePushResult()
+    {
+        // Terminal skip remains accepted for existing callers; it is never recorded as delivery.
+        return result(true, null, "NO_DEVICE", "用户没有可用移动设备，已跳过推送", null);
+    }
+
+    private static UserNotificationResult completedPushResult(SysUserPushDelivery delivery)
+    {
+        // Preserve the factual outcome of legacy SENT records, without replaying historical pushes.
+        if ("NO_DEVICE".equals(delivery.getLastResult())) return noDevicePushResult();
+        if ("DISABLED".equals(delivery.getLastResult()))
+        {
+            return result(false, null, "DISABLED", "历史推送未启用，未投递", null);
+        }
+        return duplicatePushResult();
     }
 
     private static UserNotificationResult retryablePushResult()
@@ -429,6 +460,34 @@ public class SysUserNotificationServiceImpl implements ISysUserNotificationServi
     {
         requireUser(userId);
         return notificationMapper.selectByUserId(userId);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public SysUserNotificationPageResult page(Long userId, SysUserNotificationPageQuery query)
+    {
+        requireUser(userId);
+        if (query == null) throw new ServiceException("消息查询参数不能为空");
+        query.validate();
+        Long snapshot = query.getParsedSnapshotMaxId();
+        if (snapshot == null) snapshot = notificationMapper.selectMaxIdByUserId(userId);
+        if (snapshot == null) snapshot = 0L;
+        long total = notificationMapper.countPage(userId, snapshot, query);
+        List<SysUserNotificationPageResult.Row> rows = notificationMapper.selectPage(userId, snapshot, query)
+                .stream().map(SysUserNotificationPageResult.Row::from).toList();
+        return new SysUserNotificationPageResult(rows, total, notificationMapper.countUnreadByUserId(userId),
+                snapshot.toString(), notificationMapper.selectRouteTypesByUserId(userId), query.getPageNum(), query.getPageSize());
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public SysUserNotificationReadAllResult markAllRead(Long userId, SysUserNotificationReadAllRequest request)
+    {
+        requireUser(userId);
+        if (request == null) throw new ServiceException("消息快照上限不能为空");
+        Long snapshot = request.validate();
+        int changed = notificationMapper.markAllRead(userId, snapshot);
+        return new SysUserNotificationReadAllResult(changed, snapshot.toString(), notificationMapper.countUnreadByUserId(userId));
     }
 
     @Override

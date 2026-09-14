@@ -32,7 +32,9 @@
             type="text"
             :aria-label="'取消上传 ' + item.name"
             @click="$emit('cancel', item.id)"
-          >取消</el-button>
+          >停止等待</el-button>
+          <el-button v-if="item.status === 'pending'" type="text" :loading="item.querying"
+            @click="$emit('query', item.id)">查询结果</el-button>
           <el-button
             v-if="item.status === 'failed'"
             type="text"
@@ -40,7 +42,7 @@
             @click="$emit('retry', item.id)"
           >重试</el-button>
           <el-button
-            v-if="item.status !== 'uploading'"
+            v-if="!['uploading', 'pending'].includes(item.status)"
             type="text"
             :aria-label="'移除上传任务 ' + item.name"
             @click="$emit('remove', item.id)"
@@ -71,7 +73,9 @@ export default {
         queued: '等待中',
         uploading: `上传中 ${progress}%`,
         done: '已完成',
-        failed: '上传失败',
+        pending: '待核对',
+        failed: '可安全重试',
+        rejected: '未受理',
         canceled: '已取消'
       }[status] || '等待中'
     },

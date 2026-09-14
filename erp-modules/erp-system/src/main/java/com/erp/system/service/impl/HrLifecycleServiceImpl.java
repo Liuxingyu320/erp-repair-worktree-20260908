@@ -20,6 +20,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 import com.erp.common.core.exception.ServiceException;
+import com.erp.common.security.auth.AuthUtil;
 import com.erp.oa.api.domain.HrEmployeeSigningSnapshot;
 import com.erp.oa.api.domain.HrRenewalGuard;
 import com.erp.oa.api.domain.HrSignBusinessEvent;
@@ -27,6 +28,7 @@ import com.erp.system.api.constant.SigningProfileCodes;
 import com.erp.system.api.domain.SysDept;
 import com.erp.system.api.domain.SysUser;
 import com.erp.system.domain.SysHrLifecycleAction;
+import com.erp.system.domain.vo.HrEmployeeLifecycleContextVo;
 import com.erp.system.domain.SysHrSignEventOutbox;
 import com.erp.system.domain.SysPost;
 import com.erp.system.domain.SysUserPost;
@@ -84,6 +86,7 @@ public class HrLifecycleServiceImpl implements IHrLifecycleService
     private final SysUserPostMapper userPostMapper;
     private final ISysUserShopService userShopService;
     private final ObjectMapper objectMapper;
+    private final HrSalarySourceService salarySources;
     private Clock clock = Clock.systemDefaultZone();
 
     public HrLifecycleServiceImpl(SysConfigMapper configMapper,
@@ -96,7 +99,7 @@ public class HrLifecycleServiceImpl implements IHrLifecycleService
             SysUserMapper userMapper,
             SysUserPostMapper userPostMapper,
             ISysUserShopService userShopService,
-            ObjectMapper objectMapper)
+            ObjectMapper objectMapper, HrSalarySourceService salarySources)
     {
         this.configMapper = configMapper;
         this.profileMapper = profileMapper;
@@ -109,6 +112,55 @@ public class HrLifecycleServiceImpl implements IHrLifecycleService
         this.userPostMapper = userPostMapper;
         this.userShopService = userShopService;
         this.objectMapper = objectMapper;
+        this.salarySources = salarySources;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public HrEmployeeLifecycleContextVo lifecycleContext(Long employeeId, String scenario, Long operatorUserId)
+    {
+        requireConfiguredHr(operatorUserId);
+        if (employeeId == null || employeeId <= 0 || scenario == null || !List.of("REGULARIZE", "RENEWAL").contains(scenario))
+            throw new ServiceException("办理上下文无效");
+        HrEmployeeLifecycleContextVo context = actionMapper.selectLifecycleContext(employeeId);
+        if (context == null) throw new ServiceException("员工档案不存在");
+        userShopService.checkUserShopScope(operatorUserId, context.scopeDeptId, false);
+        context.scenario = scenario;
+        context.businessDate = LocalDate.ofInstant(clock.instant(), BUSINESS_ZONE);
+        context.history = actionMapper.selectLifecycleHistory(employeeId, scenario);
+        if (context.history == null) context.history = List.of();
+        if ("REGULARIZE".equals(scenario))
+        {
+            if (!"试用".equals(trim(context.employeeStatus))) context.blockedReason = "仅试用员工可以办理转正";
+            else if (!"0".equals(context.accountStatus)) context.blockedReason = "员工账号已停用";
+            else if (context.postId == null) context.blockedReason = "员工原岗位未配置，请先完善档案";
+        }
+        else
+        {
+            try
+            {
+                if ("离职".equals(trim(context.employeeStatus))) throw new ServiceException("离职员工不能办理续签");
+                HrEmployeeSigningSnapshot before = new HrEmployeeSigningSnapshot();
+                before.setContractStartDate(context.contractStartDate); before.setContractEndDate(context.contractEndDate);
+                before.setContractTypeCode(context.contractTypeCode); before.setContractTermCode(context.contractTermCode);
+                before.setLegalEntityId(context.legalEntityId == null ? null : Long.valueOf(context.legalEntityId));
+                before.setLegalEntityCode(context.legalEntityCode); before.setLegalEntityName(context.legalEntityName);
+                before.setRenewalCount(context.renewalCount);
+                RENEWAL_POLICY.validateBeforeSnapshot(before);
+                context.cycleKey = RENEWAL_POLICY.cycleKey(employeeId, before.getContractEndDate(), RENEWAL_POLICY.renewalCount(before));
+                List<String> types = actionMapper.selectRenewalCycleTypes(employeeId, context.cycleKey);
+                if (types == null || !types.contains(RENEWAL_DECISION)) throw new ServiceException("当前合同尚无待处理续签决策");
+                if (types.contains(RENEWAL_CONFIRMED) || types.contains(RENEWAL_DECLINED)) throw new ServiceException("当前合同续签决定已处理");
+                HrRenewalGuard guard = renewalGuardMapper.selectCurrent(employeeId, RENEWAL_SCENARIO);
+                if ((guard != null && (!"IDLE".equals(guard.getStatus()) || guard.getActionId() != null || guard.getTaskId() != null || guard.getVersion() == null))
+                        || actionMapper.countUnfinishedRenewal(employeeId) > 0)
+                    throw new ServiceException("该员工已有未完成续签任务，请先处理已有任务");
+            }
+            catch (ServiceException invalid) { context.blockedReason = invalid.getMessage(); }
+            catch (NumberFormatException invalid) { context.blockedReason = "员工旧法律主体信息无效"; }
+        }
+        context.eligible = context.blockedReason == null;
+        return context;
     }
 
     @Override
@@ -140,6 +192,7 @@ public class HrLifecycleServiceImpl implements IHrLifecycleService
 
         HrEmployeeSigningSnapshot after = objectMapper.convertValue(before, HrEmployeeSigningSnapshot.class);
         applyRequest(after, request);
+        salarySources.requireOnboardingSalary(employeeId, before, after);
 
         Instant now = clock.instant();
         SysHrLifecycleAction action = buildAction(before, after, request, operatorUserId,
@@ -287,6 +340,17 @@ public class HrLifecycleServiceImpl implements IHrLifecycleService
 
         String cycleKey = RENEWAL_POLICY.cycleKey(employeeId,
                 before.getContractEndDate(), oldRenewalCount);
+        if (request.getExpectedCycleKey() != null)
+        {
+            if (!cycleKey.equals(request.getExpectedCycleKey()))
+                throw new ServiceException("旧合同周期已变化，请刷新后重新办理");
+            if (!Objects.equals(before.getLegalEntityId(), request.getLegalEntityId())
+                    || !Objects.equals(code(before.getLegalEntityCode()), request.getLegalEntityCode())
+                    || !Objects.equals(trim(before.getLegalEntityName()), request.getLegalEntityName())
+                    || !Objects.equals(code(before.getContractTypeCode()), request.getContractTypeCode())
+                    || !Objects.equals(code(before.getContractTermCode()), request.getContractTermCode()))
+                throw new ServiceException("续签合同类型或法律主体已变化，请刷新后重新办理");
+        }
         List<SysHrLifecycleAction> history =
                 actionMapper.selectRenewalCycleActionsForUpdate(employeeId, cycleKey);
         if (findAction(history, RENEWAL_CONFIRMED) != null
@@ -406,11 +470,18 @@ public class HrLifecycleServiceImpl implements IHrLifecycleService
             throw new ServiceException("员工原岗位未配置");
         }
 
-        SysPost canonicalPost = postMapper.selectPostByIdForUpdate(request.getPostId());
-        REGULARIZATION_POLICY.validateCanonicalPost(canonicalPost, request);
+        if (request.isPreservePositionSalary() && !"0".equals(before.getAccountStatus()))
+            throw new ServiceException("员工账号已停用，不能办理转正");
+        SysPost canonicalPost = null;
+        if (!request.isPreservePositionSalary())
+        {
+            canonicalPost = postMapper.selectPostByIdForUpdate(request.getPostId());
+            REGULARIZATION_POLICY.validateCanonicalPost(canonicalPost, request);
+        }
         HrEmployeeSigningSnapshot after =
                 objectMapper.convertValue(before, HrEmployeeSigningSnapshot.class);
         REGULARIZATION_POLICY.apply(after, request, canonicalPost);
+        if (REGULARIZATION_POLICY.salaryChanged(before, after)) AuthUtil.checkPermi("hr:employee:salary:edit");
 
         SysHrLifecycleAction action = buildRegularizationAction(before, after, request,
                 operatorUserId, operatorName, operatorIp, operatorUserAgent);
@@ -433,20 +504,25 @@ public class HrLifecycleServiceImpl implements IHrLifecycleService
         }
 
         String auditName = limit(trim(operatorName), 64);
-        if (profileMapper.updateRegularizationProfile(after, auditName) != 1)
+        if (request.isPreservePositionSalary())
         {
-            throw new ServiceException("员工转正档案更新失败，请刷新后重试");
+            if (profileMapper.updateRegularizationDateOnly(employeeId, request.getActualRegularizationDate(), auditName) != 1)
+                throw new ServiceException("员工转正状态已变化，请刷新后重试");
         }
-        if (userPostMapper.deleteUserPostByUserId(employeeId) < 1)
+        else
         {
-            throw new ServiceException("员工原岗位关联更新失败，请刷新后重试");
-        }
-        SysUserPost userPost = new SysUserPost();
-        userPost.setUserId(employeeId);
-        userPost.setPostId(canonicalPost.getPostId());
-        if (userPostMapper.batchUserPost(List.of(userPost)) != 1)
-        {
-            throw new ServiceException("员工新岗位关联写入失败");
+            if (profileMapper.updateRegularizationProfile(after, auditName) != 1)
+                throw new ServiceException("员工转正档案更新失败，请刷新后重试");
+            if (REGULARIZATION_POLICY.salaryChanged(before, after))
+                salarySources.recordChange(employeeId, "REGULARIZATION", action.getActionId(), before, after,
+                        request.getActualRegularizationDate(), operatorUserId, auditName);
+            if (userPostMapper.deleteUserPostByUserId(employeeId) < 1)
+                throw new ServiceException("员工原岗位关联更新失败，请刷新后重试");
+            SysUserPost userPost = new SysUserPost();
+            userPost.setUserId(employeeId);
+            userPost.setPostId(canonicalPost.getPostId());
+            if (userPostMapper.batchUserPost(List.of(userPost)) != 1)
+                throw new ServiceException("员工新岗位关联写入失败");
         }
 
         HrSignBusinessEvent event = buildRegularizationEvent(action, before, after,
@@ -598,6 +674,7 @@ public class HrLifecycleServiceImpl implements IHrLifecycleService
     {
         requireConfiguredHr(operatorUserId);
         TRANSFER_POLICY.normalizeAndValidate(employeeId, request);
+        if (request.isAdjustSalary()) AuthUtil.checkPermi("hr:employee:salary:edit");
         LocalDate businessToday = transferBusinessDate();
         if (request.getEffectiveDate().isAfter(businessToday))
         {
@@ -695,6 +772,11 @@ public class HrLifecycleServiceImpl implements IHrLifecycleService
         if (profileMapper.updateTransferProfile(after, auditName) != 1)
         {
             throw new ServiceException("员工调岗档案更新失败，请刷新后重试");
+        }
+        if (TRANSFER_POLICY.salaryChanged(before, after))
+        {
+            salarySources.recordChange(employeeId, "TRANSFER", action.getActionId(), before, after,
+                    request.getEffectiveDate(), operatorUserId, auditName);
         }
         if (userPostMapper.deleteUserPostByUserId(employeeId) < 1)
         {
@@ -939,7 +1021,8 @@ public class HrLifecycleServiceImpl implements IHrLifecycleService
                 existing.getBeforeSnapshotJson(), "before");
         HrEmployeeSigningSnapshot after = readTransferSnapshot(
                 existing.getAfterSnapshotJson(), "after");
-        if (!TRANSFER_POLICY.matchesRequest(after, request)
+        if ((!request.isAdjustSalary() && TRANSFER_POLICY.salaryChanged(before, after))
+                || !TRANSFER_POLICY.matchesRequest(after, request)
                 || !TRANSFER_POLICY.sameState(current, after))
         {
             throw new ServiceException("requestId对应的调岗payload不一致")
@@ -1051,13 +1134,18 @@ public class HrLifecycleServiceImpl implements IHrLifecycleService
                 existing.getBeforeSnapshotJson(), "before");
         HrEmployeeSigningSnapshot after = readRegularizationSnapshot(
                 existing.getAfterSnapshotJson(), "after");
+        HrEmployeeSigningSnapshot preserved = objectMapper.convertValue(before, HrEmployeeSigningSnapshot.class);
+        if (request.isPreservePositionSalary()) REGULARIZATION_POLICY.apply(preserved, request, null);
+        if (!request.isPreservePositionSalary() && REGULARIZATION_POLICY.salaryChanged(before, after))
+            AuthUtil.checkPermi("hr:employee:salary:edit");
         if (!employeeId.equals(before.getEmployeeId())
                 || !employeeId.equals(after.getEmployeeId())
                 || !"试用".equals(trim(before.getEmployeeStatus()))
                 || !"正式".equals(trim(after.getEmployeeStatus()))
                 || !Objects.equals(existing.getEffectiveDate(),
                         request.getActualRegularizationDate())
-                || !REGULARIZATION_POLICY.matchesRequest(after, request)
+                || (request.isPreservePositionSalary() ? !REGULARIZATION_POLICY.sameState(preserved, after)
+                        : !REGULARIZATION_POLICY.matchesRequest(after, request))
                 || (requireCurrentState
                         && !REGULARIZATION_POLICY.sameState(current, after)))
         {
@@ -1171,6 +1259,9 @@ public class HrLifecycleServiceImpl implements IHrLifecycleService
     private Long replayRenewal(SysHrLifecycleAction existing, Long employeeId,
             HrRenewalDecisionRequest request, HrEmployeeSigningSnapshot current)
     {
+        if (request.getExpectedCycleKey() != null && !Objects.equals(request.getExpectedCycleKey(), existing.getSourceBusinessId()))
+            throw new ServiceException("requestId对应的旧合同周期不一致");
+
         String expectedActionType = request.getDecision()
                 == HrRenewalDecisionRequest.Decision.RENEW
                 ? RENEWAL_CONFIRMED : RENEWAL_DECLINED;

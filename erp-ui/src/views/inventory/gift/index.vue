@@ -183,16 +183,10 @@
       </main>
     </div>
 
-    <el-dialog title="礼盒详情" :visible.sync="detailOpen" width="760px" append-to-body>
+    <el-dialog title="礼盒详情" :visible.sync="detailOpen" width="760px" append-to-body @close="handleDetailClose">
       <div v-if="detailGift" class="catalog-detail">
         <div class="catalog-detail-image">
-          <el-image
-            v-if="imageUrl(detailGift)"
-            :src="imageUrl(detailGift)"
-            fit="cover"
-            :preview-src-list="[imageUrl(detailGift)]"
-          />
-          <div v-else class="catalog-image-empty">暂无图片</div>
+          <image-gallery :value="detailGift" />
         </div>
         <el-descriptions :column="2" border size="small" class="catalog-detail-info">
           <el-descriptions-item label="礼盒编码">{{ displayText(detailGift.giftCode) }}</el-descriptions-item>
@@ -214,9 +208,14 @@
       </div>
     </el-dialog>
 
-    <el-drawer :title="drawerTitle" :visible.sync="drawerOpen" size="min(560px, 100vw)" append-to-body :close-on-click-modal="false">
+    <el-drawer :title="drawerTitle" :visible.sync="drawerOpen" size="min(560px, 100vw)" append-to-body :close-on-click-modal="false" @close="handleEditorClose">
       <div class="drawer-body">
-        <el-form ref="formRef" :model="form" :rules="rules" label-width="112px" size="small">
+        <div v-if="formLoading" class="editor-status" role="status">资料加载中</div>
+        <div v-else-if="formLoadError" class="editor-status" role="alert">
+          <div>{{ formLoadError }}</div>
+          <el-button type="primary" size="mini" @click="retryEditorLoad">重新加载</el-button>
+        </div>
+        <el-form v-else-if="formReady" ref="formRef" :model="form" :rules="rules" label-width="112px" size="small">
           <el-form-item label="上线分类" prop="categoryId">
             <el-select v-model="form.categoryId" filterable class="full-width" placeholder="请选择礼盒分类">
               <el-option v-for="item in categoryOptions" :key="item.categoryId" :label="item.categoryFullPath" :value="item.categoryId" :disabled="item.status !== '0'" />
@@ -253,7 +252,7 @@
             <el-input v-model="form.supplierName" maxlength="128" placeholder="请输入供应商名称" />
           </el-form-item>
           <el-form-item label="礼盒图片">
-            <image-upload v-model="form.imageUrl" action="/inventory/image/upload" accept=".jpg,.jpeg,.png,image/jpeg,image/png" :limit="1" :file-size="5" :drag="false" :delete-on-remove="false" />
+            <image-upload v-if="drawerOpen" v-model="form.imageUrls" action="/inventory/image/upload" accept=".jpg,.jpeg,.png,image/jpeg,image/png" :limit="5" :file-size="5" :drag="true" :delete-on-remove="false" />
           </el-form-item>
           <el-form-item label="状态">
             <el-radio-group v-model="form.status">
@@ -266,8 +265,9 @@
           </el-form-item>
         </el-form>
         <div class="drawer-footer">
-          <el-button size="small" @click="drawerOpen = false">取消</el-button>
-          <el-button v-if="!readonlyMode" v-hasPermi="['inv:gift:add','inv:gift:edit']" type="primary" size="small" :loading="saving" @click="doSave">保存</el-button>
+          <el-button size="small" @click="closeEditor">取消</el-button>
+          <el-button v-if="formLoadError" size="small" type="primary" @click="retryEditorLoad">重新加载</el-button>
+          <el-button v-if="!readonlyMode && formReady" v-hasPermi="['inv:gift:add','inv:gift:edit']" type="primary" size="small" :loading="saving" @click="doSave">保存</el-button>
         </div>
       </div>
     </el-drawer>
@@ -293,14 +293,26 @@
 </template>
 
 <script>
+import ImageGallery from "@/components/ImageGallery"
+const { imageUrls } = require("@/utils/imageGallery")
 import { listGift, getGift, addGift, updateGift, delGift, importGiftData, giftCategoryTree } from "@/api/inventory/gift"
 
 export default {
+  components: { ImageGallery },
   name: "InvGift",
   data() {
     return {
       loading: false,
       saving: false,
+      formLoading: false,
+      formReady: false,
+      formLoadError: "",
+      editorSourceRow: null,
+      editorSession: 0,
+      editorMode: "idle",
+      editorTargetId: undefined,
+      detailSession: 0,
+      detailTargetId: undefined,
       importing: false,
       drawerOpen: false,
       importOpen: false,
@@ -338,7 +350,7 @@ export default {
       return this.$route.query.mode === "readonly" || this.$route.query.readonly === "true"
     },
     drawerTitle() {
-      return this.form.giftId ? "编辑礼盒" : "新增礼盒"
+      return this.editorMode === "edit" || this.form.giftId ? "编辑礼盒" : "新增礼盒"
     },
     selectedCategoryName() {
       return this.selectedCategory && this.selectedCategory.categoryId ? this.selectedCategory.categoryFullPath : "全部礼盒"
@@ -384,9 +396,65 @@ export default {
         guidePrice2: 0,
         supplierName: "",
         imageUrl: "",
+        imageUrls: [],
         status: "0",
         remark: ""
       }
+    },
+    beginEditorSession(mode, targetId) {
+      this.editorSession += 1
+      this.editorMode = mode
+      this.editorTargetId = targetId
+      this.formReady = mode === "create"
+      this.formLoading = mode === "edit"
+      this.formLoadError = ""
+      this.saving = false
+      this.drawerOpen = true
+      return this.editorSession
+    },
+    isEditorSession(session, targetId, mode) {
+      return this.editorSession === session && this.editorMode === mode && this.editorTargetId === targetId
+    },
+    invalidateEditor() {
+      this.editorSession += 1
+      this.editorMode = "idle"
+      this.editorTargetId = undefined
+      this.editorSourceRow = null
+      this.formLoading = false
+      this.formReady = false
+      this.formLoadError = ""
+    },
+    closeEditor() {
+      this.drawerOpen = false
+      if (this.editorMode !== "idle") this.invalidateEditor()
+    },
+    handleEditorClose() {
+      if (this.drawerOpen) return
+      if (this.editorMode === "idle") return
+      this.invalidateEditor()
+    },
+    retryEditorLoad() {
+      if (this.editorMode !== "edit" || this.editorTargetId == null) return
+      this.openForm(this.editorSourceRow || { giftId: this.editorTargetId })
+    },
+    canSaveEditor() {
+      if (this.readonlyMode || this.saving) return false
+      if (this.formLoading || this.formLoadError || !this.formReady) return false
+      if (this.editorMode === "edit") {
+        return this.editorTargetId != null && this.form.giftId === this.editorTargetId
+      }
+      if (this.editorMode === "create") {
+        return !this.form.giftId && this.editorTargetId == null
+      }
+      return false
+    },
+    isDetailSession(session, targetId) {
+      return this.detailSession === session && this.detailTargetId === targetId
+    },
+    handleDetailClose() {
+      if (this.detailOpen) return
+      this.detailSession += 1
+      this.detailTargetId = undefined
     },
     loadCategories() {
       this.categoryLoading = true
@@ -476,21 +544,39 @@ export default {
     },
     openForm(row) {
       if (this.readonlyMode) return
-      if (row && row.giftId) {
-        getGift(row.giftId).then(res => {
-          this.form = Object.assign(this.emptyForm(), res.data || row)
-          this.drawerOpen = true
-        })
-      } else {
+      const targetId = row && row.giftId ? row.giftId : undefined
+      const mode = targetId ? "edit" : "create"
+      const session = this.beginEditorSession(mode, targetId)
+      this.editorSourceRow = row || null
+      if (mode === "create") {
         this.form = this.emptyForm()
-        this.drawerOpen = true
+        return
       }
+      this.form = Object.assign(this.emptyForm(), { giftId: targetId })
+      getGift(targetId).then(res => {
+        if (!this.isEditorSession(session, targetId, mode)) return
+        this.form = Object.assign(this.emptyForm(), res.data || row, { imageUrls: imageUrls(res.data || row) })
+        this.formReady = true
+        this.formLoading = false
+        this.formLoadError = ""
+      }).catch(() => {
+        if (!this.isEditorSession(session, targetId, mode)) return
+        this.formLoading = false
+        this.formReady = false
+        this.formLoadError = "资料加载失败，请重试"
+      })
     },
     openDetail(row) {
-      this.detailGift = Object.assign(this.emptyForm(), row || {})
+      const targetId = row && row.giftId ? row.giftId : undefined
+      this.detailSession += 1
+      const session = this.detailSession
+      this.detailTargetId = targetId
+      this.detailGift = Object.assign(this.emptyForm(), row || {}, { imageUrls: imageUrls(row) })
       this.detailOpen = true
-      getGift(row.giftId).then(res => {
-        this.detailGift = Object.assign(this.emptyForm(), res.data || row)
+      if (!targetId) return
+      getGift(targetId).then(res => {
+        if (!this.isDetailSession(session, targetId)) return
+        this.detailGift = Object.assign(this.emptyForm(), res.data || row, { imageUrls: imageUrls(res.data || row) })
       })
     },
     handleStatusTabChange(status) {
@@ -498,15 +584,26 @@ export default {
       this.handleQuery()
     },
     doSave() {
-      this.$refs.formRef.validate(valid => {
+      const session = this.editorSession
+      const targetId = this.editorTargetId
+      const mode = this.editorMode
+      if (!this.canSaveEditor()) return
+      const formRef = this.$refs.formRef
+      if (!formRef || typeof formRef.validate !== "function") return
+      formRef.validate(valid => {
+        if (!this.isEditorSession(session, targetId, mode)) return
         if (!valid) return
+        if (!this.canSaveEditor()) return
         this.saving = true
-        const request = this.form.giftId ? updateGift(this.form) : addGift(this.form)
+        const payload = Object.assign({}, this.form)
+        const request = mode === "edit" ? updateGift(payload) : addGift(payload)
         request.then(() => {
+          if (!this.isEditorSession(session, targetId, mode)) return
           this.$modal.msgSuccess("保存成功")
-          this.drawerOpen = false
+          this.closeEditor()
           this.getList()
-        }).finally(() => {
+        }).catch(() => undefined).finally(() => {
+          if (!this.isEditorSession(session, targetId, mode)) return
           this.saving = false
         })
       })
@@ -557,7 +654,7 @@ export default {
       return value === undefined || value === null || value === "" ? "-" : value
     },
     imageUrl(row) {
-      return row && row.imageUrl ? row.imageUrl : ""
+      return imageUrls(row)[0] || ""
     },
     statusLabel(status) {
       return status === "0" ? "正常" : "停用"
@@ -896,6 +993,22 @@ export default {
 
   .drawer-body {
     padding: 0 20px 20px;
+  }
+
+  .editor-status {
+    padding: 24px 8px 12px;
+    color: #64748b;
+    font-size: 13px;
+    line-height: 20px;
+  }
+
+  .editor-status[role="alert"] {
+    color: #d14b45;
+    font-weight: 600;
+  }
+
+  .editor-status .el-button {
+    margin-top: 10px;
   }
 
   .full-width {

@@ -8,6 +8,7 @@ import com.erp.inventory.domain.InvDeliveryNoticeDetail;
 public interface InvDeliveryNoticeDetailMapper
 {
     List<InvDeliveryNoticeDetail> selectInvDeliveryNoticeDetailByNoticeId(Long noticeId);
+    List<InvDeliveryNoticeDetail> selectInvDeliveryNoticeDetailByNoticeIdForUpdate(Long noticeId);
     int batchInsertInvDeliveryNoticeDetail(List<InvDeliveryNoticeDetail> details);
     int accumulateDelivery(@Param("detailId") Long detailId,
             @Param("expectedDeliveredQty") BigDecimal expectedDeliveredQty,

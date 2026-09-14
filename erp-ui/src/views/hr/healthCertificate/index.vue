@@ -15,24 +15,32 @@
       description="您仍可查看历史记录；人事仍可处理已有待审核记录和到期台账。"
     />
 
-    <section v-if="canManage" class="health-ops-grid">
-      <div class="health-ops-cell warning"><span>待审核</span><strong>{{ Number(opsSummary.pendingReviewCount || 0) }}</strong></div>
-      <div class="health-ops-cell success"><span>有效</span><strong>{{ Number(opsSummary.validCount || 0) }}</strong></div>
-      <div class="health-ops-cell warning"><span>30天内到期</span><strong>{{ Number(opsSummary.expiringCount || 0) }}</strong></div>
-      <div class="health-ops-cell danger"><span>已过期</span><strong>{{ Number(opsSummary.expiredCount || 0) }}</strong></div>
-      <div class="health-ops-cell danger"><span>本实例提醒失败</span><strong>{{ Number(opsSummary.reminderFailureCount || 0) }}</strong></div>
-      <div class="health-ops-cell"><span>最老待审核</span><strong class="age-value">{{ waitingHours(opsSummary.oldestPendingHours) }}</strong></div>
+    <el-alert v-if="canManage && opsError" :title="opsError" type="error" :closable="false" show-icon>
+      <el-button type="text" @click="loadOpsSummary">重试统计</el-button>
+    </el-alert>
+    <section v-if="canManage" class="health-ops-grid" v-loading="opsLoading">
+      <button type="button" class="health-ops-cell warning" @click="openQueue('PENDING_ALL')"><span>待审核合计</span><strong>{{ opsValue('pendingReviewCount') }}</strong></button>
+      <button type="button" class="health-ops-cell warning" @click="openQueue('PENDING_REVIEW')"><span>旧流程待审核</span><strong>{{ opsValue('legacyPendingCount') }}</strong></button>
+      <button type="button" class="health-ops-cell warning" @click="openQueue('APPROVAL_PENDING')"><span>统一审批中</span><strong>{{ opsValue('approvalPendingCount') }}</strong></button>
+      <button type="button" class="health-ops-cell warning" @click="openQueue('APPROVAL_SUBMITTING')"><span>待发起 / 发起恢复中</span><strong>{{ opsValue('approvalSubmittingCount') }}</strong></button>
+      <button type="button" class="health-ops-cell danger" @click="openQueue('APPROVAL_START_FAILED')"><span>其中：发起失败待恢复</span><strong>{{ opsValue('approvalStartFailedCount') }}</strong></button>
+      <button type="button" class="health-ops-cell success" @click="openQueue('', 'VALID')"><span>有效</span><strong>{{ opsValue('validCount') }}</strong></button>
+      <button type="button" class="health-ops-cell warning" @click="openQueue('', 'EXPIRING')"><span>30天内到期</span><strong>{{ opsValue('expiringCount') }}</strong></button>
+      <button type="button" class="health-ops-cell danger" @click="openQueue('', 'EXPIRED')"><span>已过期</span><strong>{{ opsValue('expiredCount') }}</strong></button>
+      <div class="health-ops-cell danger"><span>本实例提醒失败</span><strong>{{ opsValue('reminderFailureCount') }}</strong></div>
+      <div class="health-ops-cell"><span>最老待审核（自记录创建起）</span><strong class="age-value">{{ opsLoaded && !opsError ? waitingHours(opsSummary.oldestPendingHours) : '—' }}</strong></div>
     </section>
 
     <el-tabs v-model="activeTab" type="border-card">
       <el-tab-pane label="我的健康证" name="mine">
         <div class="tab-actions">
           <el-button v-hasPermi="['hr:healthCertificate:self:edit']" type="primary" size="mini" icon="el-icon-plus" :disabled="!intakeEnabled" @click="openMineForm()">新增证件</el-button>
-          <span>续证不会覆盖历史，审核通过后仅最新一条作为当前证件。</span>
+          <span>续证保留历史。未来生效的证件通过后显示待生效，当前有效证继续保留。</span>
         </div>
         <el-table ref="mineTable" v-loading="mineLoading" class="mine-health-table" :data="mineRows" size="small" empty-text="暂无健康证记录" highlight-current-row row-key="certificateId" :row-class-name="mineRowClass">
           <el-table-column label="证件编号" prop="certificateNo" min-width="150"/>
           <el-table-column label="办理日期" prop="issuedDate" width="120"/>
+          <el-table-column label="生效日期" prop="validFrom" width="120"><template slot-scope="s">{{ s.row.validFrom || s.row.issuedDate }}</template></el-table-column>
           <el-table-column label="到期日期" prop="expiresOn" width="120"/>
           <el-table-column label="状态" width="120"><template slot-scope="s"><el-tag :type="statusType(s.row.healthCertificateStatus)" size="mini">{{ statusLabel(s.row.healthCertificateStatus) }}</el-tag></template></el-table-column>
           <el-table-column label="附件" width="90"><template slot-scope="s">{{ s.row.attachmentPresent ? '已绑定' : '未绑定' }}</template></el-table-column>
@@ -52,6 +60,9 @@
       <el-tab-pane label="人事审核与到期台账" name="admin" v-if="canManage">
         <el-form :model="query" inline size="small" class="filter-bar">
           <el-form-item label="审核状态"><el-select v-model="query.reviewStatus" clearable>
+            <el-option label="发起失败待恢复" value="APPROVAL_START_FAILED"/>
+            <el-option label="待审核合计" value="PENDING_ALL"/>
+            <el-option label="待发起 / 发起恢复中" value="APPROVAL_SUBMITTING"/>
             <el-option label="旧流程待审核" value="PENDING_REVIEW"/>
             <el-option label="统一审批中" value="APPROVAL_PENDING"/>
             <el-option label="已通过" value="APPROVED"/>
@@ -60,17 +71,19 @@
             <el-option label="已撤回" value="WITHDRAWN"/>
             <el-option label="已终止" value="TERMINATED"/>
           </el-select></el-form-item>
-          <el-form-item label="证件状态"><el-select v-model="query.healthCertificateStatus" clearable><el-option label="临期或过期" value="EXPIRING_OR_EXPIRED"/><el-option label="即将到期" value="EXPIRING"/><el-option label="已过期" value="EXPIRED"/></el-select></el-form-item>
+          <el-form-item label="证件状态"><el-select v-model="query.healthCertificateStatus" clearable><el-option label="有效" value="VALID"/><el-option label="已通过、待生效" value="NOT_YET_EFFECTIVE"/><el-option label="临期或过期" value="EXPIRING_OR_EXPIRED"/><el-option label="即将到期" value="EXPIRING"/><el-option label="已过期" value="EXPIRED"/></el-select></el-form-item>
           <el-form-item><el-button type="primary" size="mini" @click="loadAdmin">查询</el-button><el-button size="mini" @click="resetAdmin">重置</el-button></el-form-item>
         </el-form>
+        <el-alert v-if="adminError" :title="adminError" type="error" :closable="false"><el-button type="text" @click="loadAdmin">重试台账</el-button></el-alert>
         <el-table v-loading="adminLoading" class="admin-health-table" :data="adminRows" size="small">
           <el-table-column label="员工" min-width="150"><template slot-scope="s"><strong>{{ s.row.employeeName }}</strong><div class="muted">{{ s.row.employeeNo }}</div></template></el-table-column>
           <el-table-column label="当前组织" prop="currentDeptName" min-width="150"/>
           <el-table-column label="证件编号" prop="certificateNo" min-width="140"/>
           <el-table-column label="办理日期" prop="issuedDate" width="115"/>
+          <el-table-column label="生效日期" prop="validFrom" width="120"><template slot-scope="s">{{ s.row.validFrom || s.row.issuedDate }}</template></el-table-column>
           <el-table-column label="到期日期" prop="expiresOn" width="115"/>
           <el-table-column label="状态" width="120"><template slot-scope="s"><el-tag :type="statusType(s.row.healthCertificateStatus)" size="mini">{{ statusLabel(s.row.healthCertificateStatus) }}</el-tag></template></el-table-column>
-          <el-table-column label="操作" width="230"><template slot-scope="s"><el-button v-if="s.row.attachmentPresent" type="text" size="mini" @click="previewAttachment(s.row)">预览附件</el-button><el-button v-if="s.row.approvalInstanceId" type="text" size="mini" @click="openApproval(s.row)">审批轨迹</el-button><el-button v-if="s.row.reviewStatus === 'PENDING_REVIEW'" v-hasPermi="['hr:healthCertificate:review']" type="text" size="mini" @click="openReview(s.row)">旧流程审核</el-button></template></el-table-column>
+          <el-table-column label="操作" width="230"><template slot-scope="s"><el-button v-if="s.row.attachmentPresent" type="text" size="mini" @click="previewAttachment(s.row)">预览附件</el-button><el-button v-if="s.row.approvalInstanceId" type="text" size="mini" @click="openApproval(s.row)">审批轨迹</el-button><el-button v-if="s.row.reviewStatus === 'APPROVAL_SUBMITTING'" v-hasPermi="['hr:healthCertificate:approvalStartOutbox:list']" type="text" size="mini" @click="openStartRecovery(s.row)">发起恢复</el-button><el-button v-if="s.row.reviewStatus === 'PENDING_REVIEW'" v-hasPermi="['hr:healthCertificate:review']" type="text" size="mini" @click="openReview(s.row)">旧流程审核</el-button></template></el-table-column>
         </el-table>
         <pagination v-show="adminTotal>0" :total="adminTotal" :page.sync="query.pageNum" :limit.sync="query.pageSize" @pagination="loadAdmin"/>
       </el-tab-pane>
@@ -95,6 +108,18 @@
     <el-dialog title="审核健康证" :visible.sync="reviewDialog" width="520px" custom-class="health-certificate-review-dialog" append-to-body>
       <el-form label-width="90px"><el-form-item label="审核结果"><el-radio-group v-model="reviewForm.decision"><el-radio label="APPROVED">通过</el-radio><el-radio label="REJECTED">驳回</el-radio></el-radio-group></el-form-item><el-form-item v-if="reviewForm.decision==='REJECTED'" label="驳回原因"><el-input v-model="reviewForm.rejectionReason" type="textarea" :rows="3" maxlength="300"/></el-form-item></el-form>
       <div slot="footer"><el-button @click="reviewDialog=false">取消</el-button><el-button type="primary" :loading="reviewing" @click="confirmReview">确认</el-button></div>
+    </el-dialog>
+
+    <el-dialog custom-class="health-certificate-start-recovery-dialog" title="恢复原健康证审批发起" :visible.sync="startRecoveryOpen" width="650px" append-to-body @close="closeStartRecovery" :close-on-click-modal="!startRecoveryBusy" :close-on-press-escape="!startRecoveryBusy" :show-close="!startRecoveryBusy">
+      <p>沿用原审批轮次和发起标识，不新建申请。已知失败才允许重放；结果不明确时先刷新核对。</p>
+      <el-alert v-if="startRecoveryError" :title="startRecoveryError" type="error" :closable="false"/>
+      <el-table v-loading="startRecoveryLoading" :data="startRecoveryRows">
+        <el-table-column label="轮次" prop="businessRound" width="65"/>
+        <el-table-column label="状态" prop="status" width="135"/>
+        <el-table-column label="最近错误" prop="lastErrorCode" min-width="170"/>
+        <el-table-column label="操作" width="135"><template slot-scope="s"><el-button v-if="s.row.status === 'FAILED'" v-hasPermi="['hr:healthCertificate:approvalStartOutbox:replay']" type="text" :disabled="startRecoveryBusy || startRecoveryNeedsCheck" @click="replayStart(s.row)">重放原发起</el-button></template></el-table-column>
+      </el-table>
+      <span slot="footer"><el-button :disabled="startRecoveryBusy" @click="startRecoveryOpen=false">关闭</el-button><el-button :disabled="startRecoveryBusy || startRecoveryLoading" @click="loadStartRecovery">刷新核对</el-button></span>
     </el-dialog>
 
     <el-dialog title="健康证与统一审批轨迹" :visible.sync="approvalDialog" width="920px" custom-class="health-approval-dialog" append-to-body>
@@ -135,8 +160,10 @@
 </template>
 
 <script>
+const { createUiOperationScope } = require('@/utils/uiOperationScope')
+import { getSelectedDeptId } from '@/utils/shopContext'
 import { listRecentDriveNodes } from '@/api/drive'
-import { getHealthCertificateCapability, getHealthCertificateAttachment, getHealthCertificateOpsSummary, getMyHealthCertificates, saveMyHealthCertificateDraft, submitMyHealthCertificate, withdrawMyHealthCertificate, listHealthCertificates, reviewHealthCertificate } from '@/api/hr/healthCertificate'
+import { listHealthCertificateApprovalStartOutboxes, replayHealthCertificateApprovalStart, getHealthCertificateCapability, getHealthCertificateAttachment, getHealthCertificateOpsSummary, getMyHealthCertificates, saveMyHealthCertificateDraft, submitMyHealthCertificate, withdrawMyHealthCertificate, listHealthCertificates, reviewHealthCertificate } from '@/api/hr/healthCertificate'
 import { getApprovalInstance } from '@/api/approval/monitor'
 import { approveApprovalTask, returnApprovalTask } from '@/api/approval/task'
 import { statusLabel as approvalStatusLabel, statusType as approvalStatusType } from '@/views/approval/manage/components/approvalUi'
@@ -149,12 +176,13 @@ export default {
       approvalDialog: false, approvalLoading: false, approvalActionLoading: false,
       withdrawLoadingId: undefined,
       capabilityLoaded: false, capability: { intakeEnabled: false, reason: '正在检查健康证受理能力' },
-      opsSummary: {},
+      startRecoveryNeedsCheck: false, startRecoveryOpen: false, startRecoveryBusy: false, startRecoveryLoading: false, startRecoveryError: '', startRecoveryCertificateId: '', startRecoveryRows: [],
+      opsSummary: {}, opsLoaded: false, opsLoading: false, opsError: '', adminError: '',
       focusCertificateId: '', approvalTaskId: '', approvalInstanceId: '', routeApprovalOpened: false,
       approvalRow: null, approvalDetail: null,
       mineRows: [], adminRows: [], adminTotal: 0, recentFiles: [], mineDialog: false, reviewDialog: false,
       mineForm: {}, reviewRow: null, reviewForm: { decision: 'APPROVED', rejectionReason: '' },
-      query: { pageNum: 1, pageSize: 10, certificateId: undefined, reviewStatus: 'PENDING_REVIEW', healthCertificateStatus: undefined },
+      query: { pageNum: 1, pageSize: 10, certificateId: undefined, reviewStatus: 'PENDING_ALL', healthCertificateStatus: undefined },
       mineRules: { issuedDate: [{ required: true, message: '请选择办理日期', trigger: 'change' }], expiresOn: [{ required: true, message: '请选择到期日期', trigger: 'change' }] }
     }
   },
@@ -173,11 +201,68 @@ export default {
     }
   },
   created() {
+    if (typeof window !== 'undefined') window.addEventListener('erp:dept-changed', this.healthDeptChanged)
     this.applyTodoRoute()
     this.refreshAll()
     this.loadCapability().then(() => { if (this.intakeEnabled && this.driveEnabled) this.loadRecentFiles() })
   },
+  beforeDestroy() { this.healthScope().deactivate(); if (typeof window !== 'undefined') window.removeEventListener('erp:dept-changed', this.healthDeptChanged) },
+  deactivated() { this.healthScope().deactivate() },
+  activated() { this.healthScope().activate() },
+  watch: {
+    '$store.state.user.sessionRevision'() { this.healthScope().invalidate(); this.opsLoaded = false; this.refreshAll() },
+    '$route.fullPath'() { this.healthScope().invalidate(); this.applyTodoRoute(); this.refreshAll() }
+  },
   methods: {
+    healthDeptChanged() { this.startRecoveryOpen = false; this.healthScope().invalidate(); this.opsLoaded = false; this.query.currentDeptId = undefined; this.refreshAll() },
+    healthScope() {
+      if (!this._healthScope) this._healthScope = createUiOperationScope(() => ({
+        actor: this.$store && this.$store.state && this.$store.state.user && this.$store.state.user.id,
+        session: this.$store && this.$store.state && this.$store.state.user && this.$store.state.user.sessionRevision,
+        dept: getSelectedDeptId(), filterDept: this.query.currentDeptId || '', route: this.$route && this.$route.fullPath
+      }))
+      return this._healthScope
+    },
+    opsValue(key) { return this.opsLoaded && !this.opsError ? Number(this.opsSummary[key] || 0) : '—' },
+    closeStartRecovery() { this.healthScope().invalidate('start-recovery'); this.healthScope().invalidate('start-replay'); this.startRecoveryBusy = false; this.startRecoveryLoading = false },
+    openStartRecovery(row) {
+      if (this.startRecoveryBusy) return
+      this.closeStartRecovery(); this.startRecoveryCertificateId = String(row.certificateId)
+      this.startRecoveryOpen = true; this.startRecoveryRows = []; return this.loadStartRecovery()
+    },
+    loadStartRecovery() {
+      if (!this.startRecoveryOpen || this.startRecoveryBusy) return Promise.resolve()
+      const scope = this.healthScope(), target = this.startRecoveryCertificateId, token = scope.begin('start-recovery', target)
+      this.startRecoveryLoading = true; this.startRecoveryError = ''
+      return listHealthCertificateApprovalStartOutboxes({ certificateId: target, pageNum: 1, pageSize: 50 }).then(response => {
+        if (!scope.isCurrent(token, this.startRecoveryCertificateId) || !this.startRecoveryOpen) return
+        if (!response || !Array.isArray(response.rows) || response.rows.some(row => String(row.certificateId) !== target)) throw new Error('发起恢复记录与当前证件不一致')
+        this.startRecoveryRows = response.rows; this.startRecoveryNeedsCheck = false
+      }).catch(error => { if (scope.isCurrent(token, this.startRecoveryCertificateId) && this.startRecoveryOpen) this.startRecoveryError = error.message || '发起记录读取失败，请重试核对' })
+        .finally(() => { if (scope.isCurrent(token, this.startRecoveryCertificateId)) this.startRecoveryLoading = false })
+    },
+    async replayStart(row) {
+      if (this.startRecoveryBusy || this.startRecoveryNeedsCheck || !this.startRecoveryOpen || row.status !== 'FAILED' || String(row.certificateId) !== this.startRecoveryCertificateId) return
+      const scope = this.healthScope(), target = this.startRecoveryCertificateId, token = scope.begin('start-replay', target)
+      const id = row.outboxId, version = row.version
+      this.startRecoveryBusy = true; this.startRecoveryError = ''
+      try {
+        await this.$modal.confirm('按原审批轮次重放这条已失败的发起记录？')
+        if (!scope.isCurrent(token, this.startRecoveryCertificateId) || !this.startRecoveryOpen) return
+        await replayHealthCertificateApprovalStart(id, version)
+        if (!scope.isCurrent(token, this.startRecoveryCertificateId) || !this.startRecoveryOpen) return
+        this.startRecoveryBusy = false; this.$modal.msgSuccess('已按原标识请求恢复，请核对最新发起状态')
+        await this.loadStartRecovery(); this.refreshAll()
+      } catch (error) {
+        if (scope.isCurrent(token, this.startRecoveryCertificateId) && this.startRecoveryOpen && error !== 'cancel' && error !== 'close') { this.startRecoveryNeedsCheck = true; this.startRecoveryError = '恢复结果尚未确认，请先刷新核对原记录，勿重复新建申请' }
+      } finally { if (scope.isCurrent(token, this.startRecoveryCertificateId)) this.startRecoveryBusy = false }
+    },
+    openQueue(reviewStatus, healthCertificateStatus) {
+      if (!this.canManage) return
+      this.activeTab = 'admin'
+      this.query = { ...this.query, pageNum: 1, certificateId: undefined, reviewStatus: reviewStatus || undefined, healthCertificateStatus: healthCertificateStatus || undefined }
+      return this.loadAdmin()
+    },
     approvalStatusLabel,
     approvalStatusType,
     loadCapability() {
@@ -210,10 +295,10 @@ export default {
       }
       if (view === 'admin' && this.canManage) this.activeTab = 'admin'
       if (view === 'mine') this.activeTab = 'mine'
-      if (['EXPIRING_OR_EXPIRED', 'EXPIRING', 'EXPIRED'].includes(healthStatus)) {
+      if (['EXPIRING_OR_EXPIRED', 'EXPIRING', 'EXPIRED', 'VALID', 'NOT_YET_EFFECTIVE'].includes(healthStatus)) {
         this.query.healthCertificateStatus = healthStatus
         this.query.reviewStatus = undefined
-      } else if (['PENDING_REVIEW', 'APPROVAL_SUBMITTING', 'APPROVAL_PENDING', 'APPROVED', 'RETURNED', 'REJECTED', 'WITHDRAWN', 'TERMINATED'].includes(reviewStatus)) {
+      } else if (['APPROVAL_START_FAILED', 'PENDING_ALL', 'PENDING_REVIEW', 'APPROVAL_SUBMITTING', 'APPROVAL_PENDING', 'APPROVED', 'RETURNED', 'REJECTED', 'WITHDRAWN', 'TERMINATED'].includes(reviewStatus)) {
         this.query.reviewStatus = reviewStatus
         this.query.healthCertificateStatus = undefined
       }
@@ -225,8 +310,28 @@ export default {
     },
     refreshAll() { this.loadMine(); if (this.canManage) { this.loadAdmin(); this.loadOpsSummary() } },
     loadMine() { this.mineLoading = true; return getMyHealthCertificates().then(r => { this.mineRows = r.data || []; const focused = this.mineRows.find(row => String(row.certificateId) === this.focusCertificateId); if (focused) { this.$nextTick(() => this.$refs.mineTable && this.$refs.mineTable.setCurrentRow(focused)); this.maybeOpenRouteApproval(focused) } }).finally(() => { this.mineLoading = false }) },
-    loadAdmin() { this.adminLoading = true; return listHealthCertificates(this.query).then(r => { this.adminRows = r.rows || []; this.adminTotal = r.total || 0; const focused = this.adminRows.find(row => String(row.certificateId) === this.focusCertificateId); if (focused) this.maybeOpenRouteApproval(focused) }).finally(() => { this.adminLoading = false }) },
-    loadOpsSummary() { return getHealthCertificateOpsSummary().then(r => { this.opsSummary = r.data || {} }).catch(() => { this.opsSummary = {} }) },
+    loadAdmin() {
+      const scope = this.healthScope(), payload = { ...this.query }, token = scope.begin('admin', payload)
+      this.adminLoading = true; this.adminError = ''
+      return listHealthCertificates(payload).then(r => {
+        if (!scope.isCurrent(token, this.query)) return
+        if (!r || !Array.isArray(r.rows)) throw new Error('健康证台账响应不完整')
+        this.adminRows = r.rows; this.adminTotal = r.total || 0
+        const focused = this.adminRows.find(row => String(row.certificateId) === this.focusCertificateId)
+        if (focused) this.maybeOpenRouteApproval(focused)
+      }).catch(error => { if (scope.isCurrent(token, this.query)) this.adminError = error.message || '台账加载失败，请重试' })
+        .finally(() => { if (scope.isCurrent(token, this.query)) this.adminLoading = false })
+    },
+    loadOpsSummary() {
+      const scope = this.healthScope(), token = scope.begin('summary')
+      this.opsLoading = true; this.opsError = ''
+      return getHealthCertificateOpsSummary({ currentDeptId: this.query.currentDeptId }).then(r => {
+        if (!scope.isCurrent(token)) return
+        if (!r || !r.data || typeof r.data.pendingReviewCount !== 'number') throw new Error('健康证统计响应不完整')
+        this.opsSummary = r.data; this.opsLoaded = true
+      }).catch(error => { if (scope.isCurrent(token)) this.opsError = error.message || '统计暂时不可用，请重试' })
+        .finally(() => { if (scope.isCurrent(token)) this.opsLoading = false })
+    },
     resetAdmin() { this.query = { pageNum: 1, pageSize: this.query.pageSize || 10, certificateId: undefined, reviewStatus: undefined, healthCertificateStatus: undefined, currentDeptId: undefined }; this.loadAdmin() },
     loadRecentFiles() {
       if (!this.driveEnabled) {
@@ -329,7 +434,7 @@ export default {
       return `健康证附件-${row.certificateNo || row.certificateId}.${extensions[blob.type] || 'bin'}`
     },
     waitingHours(value) { const hours = Math.max(0, Number(value || 0)); if (!hours) return '-'; if (hours < 24) return hours + ' 小时'; return Math.floor(hours / 24) + ' 天' },
-    statusLabel(v) { return { VALID: '有效', EXPIRING: '即将到期', EXPIRED: '已过期', NOT_SUBMITTED: '未提交', DRAFT: '草稿', PENDING_REVIEW: '旧流程待审核', APPROVAL_SUBMITTING: '提交中', APPROVAL_PENDING: '统一审批中', APPROVED: '已通过', RETURNED: '已退回', REJECTED: '已驳回', WITHDRAWN: '已撤回', TERMINATED: '已终止' }[v] || (v ? '未知健康证状态' : '-') },
+    statusLabel(v) { return { NOT_YET_EFFECTIVE: '已通过、待生效', INVALID_DATES: '日期待核对', VALID: '有效', EXPIRING: '即将到期', EXPIRED: '已过期', NOT_SUBMITTED: '未提交', DRAFT: '草稿', PENDING_REVIEW: '旧流程待审核', APPROVAL_SUBMITTING: '提交中', APPROVAL_PENDING: '统一审批中', APPROVED: '已通过', RETURNED: '已退回', REJECTED: '已驳回', WITHDRAWN: '已撤回', TERMINATED: '已终止' }[v] || (v ? '未知健康证状态' : '-') },
     statusType(v) { return { VALID: 'success', EXPIRING: 'warning', EXPIRED: 'danger', PENDING_REVIEW: 'warning', APPROVAL_SUBMITTING: 'warning', APPROVAL_PENDING: 'warning', RETURNED: 'warning', REJECTED: 'danger', TERMINATED: 'danger', DRAFT: 'info', WITHDRAWN: 'info' }[v] || 'info' }
   }
 }

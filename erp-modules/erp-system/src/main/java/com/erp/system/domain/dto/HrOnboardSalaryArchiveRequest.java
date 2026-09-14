@@ -1,17 +1,16 @@
 package com.erp.system.domain.dto;
 
+import java.time.LocalDate;
 import java.util.List;
-import jakarta.validation.Valid;
-import jakarta.validation.constraints.NotEmpty;
-import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Positive;
-import jakarta.validation.constraints.PositiveOrZero;
-import jakarta.validation.constraints.Size;
 
-public record HrOnboardSalaryArchiveRequest(
-        @NotNull @Positive Long batchId,
-        @NotEmpty @Size(max = 100) List<@Valid Row> rows)
+/** Only identities, concurrency tokens and HR confirmation; amounts remain server-owned. */
+public record HrOnboardSalaryArchiveRequest(Long batchId, List<Row> rows, String requestId,
+        LocalDate effectiveDate, String reason, Boolean confirmed)
 {
-    public record Row(@NotNull @Positive Long rowId,
-            @NotNull @PositiveOrZero Long version) { }
+    public HrOnboardSalaryArchiveRequest(Long batchId, List<Row> rows)
+    { this(batchId, rows, null, null, null, false); }
+    public record Row(Long rowId, Long version, String expectedSourceId, String expectedProfileHash)
+    {
+        public Row(Long rowId, Long version) { this(rowId, version, null, null); }
+    }
 }

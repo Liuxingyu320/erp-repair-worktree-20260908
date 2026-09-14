@@ -7,6 +7,9 @@ import com.erp.inventory.domain.dto.InvDeliverRequest;
 public interface IInvDeliveryNoticeService
 {
     InvDeliveryNotice createNotice(Long salesOrderId, Long selectedShopDeptId);
+    InvDeliveryNotice createNotice(Long salesOrderId, Long selectedShopDeptId, Long expectedVersion);
+    InvDeliveryNotice repairMissingWarehousesAndCreateNotice(Long salesOrderId,
+            com.erp.inventory.domain.dto.InvSalesWarehouseRepairRequest request, Long selectedShopDeptId);
     InvDeliveryNotice getNoticeDetail(Long noticeId, Long selectedShopDeptId);
     List<InvDeliveryNotice> selectNoticeList(InvDeliveryNotice notice, Long selectedShopDeptId);
     String deliverNotice(Long noticeId, InvDeliverRequest request, Long selectedShopDeptId);

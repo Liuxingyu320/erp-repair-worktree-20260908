@@ -7,6 +7,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.nio.charset.StandardCharsets;
+import org.springframework.data.redis.connection.ReturnType;
+import org.springframework.data.redis.core.RedisCallback;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.BoundSetOperations;
 import org.springframework.data.redis.core.Cursor;
@@ -123,6 +126,70 @@ public class RedisService
     {
         ValueOperations<String, T> operation = redisTemplate.opsForValue();
         return operation.get(key);
+    }
+
+    /** One GET, retaining the exact stored bytes before deserialization. Never return this in an API. */
+    public CacheSnapshot getCacheSnapshot(final String key)
+    {
+        byte[] rawKey = redisTemplate.getKeySerializer().serialize(key);
+        byte[] value = (byte[]) redisTemplate.execute((RedisCallback<byte[]>)
+                connection -> connection.stringCommands().get(rawKey));
+        return value == null ? null : new CacheSnapshot(value, deserializeCacheValue(value));
+    }
+
+    public Object deserializeCacheValue(byte[] bytes)
+    {
+        return redisTemplate.getValueSerializer().deserialize(bytes);
+    }
+
+    /** Single-key CAS; returns the bytes actually written, or null if revoked/changed. */
+    public byte[] compareAndSetCacheObject(String key, byte[] expected, Object value,
+            long timeout, TimeUnit unit)
+    {
+        if (expected == null || timeout <= 0)
+        {
+            throw new IllegalArgumentException("A cache snapshot and positive TTL are required");
+        }
+        byte[] rawKey = redisTemplate.getKeySerializer().serialize(key);
+        byte[] replacement = redisTemplate.getValueSerializer().serialize(value);
+        byte[] script = ("if redis.call('get', KEYS[1]) == ARGV[1] then "
+                + "redis.call('psetex', KEYS[1], ARGV[3], ARGV[2]); return 1 end; return 0")
+                .getBytes(StandardCharsets.UTF_8);
+        Long changed = (Long) redisTemplate.execute((RedisCallback<Long>) connection ->
+                connection.scriptingCommands().eval(script, ReturnType.INTEGER, 1, rawKey,
+                        expected, replacement, Long.toString(unit.toMillis(timeout)).getBytes(StandardCharsets.UTF_8)));
+        return Long.valueOf(1).equals(changed) ? replacement : null;
+    }
+
+    /** Release only the lock acquired by this owner; a later lease must survive. */
+    public boolean deleteCacheObjectIfValueMatches(String key, Object expectedValue)
+    {
+        if (expectedValue == null)
+        {
+            return false;
+        }
+        byte[] rawKey = redisTemplate.getKeySerializer().serialize(key);
+        byte[] expected = redisTemplate.getValueSerializer().serialize(expectedValue);
+        byte[] script = ("if redis.call('get', KEYS[1]) == ARGV[1] then "
+                + "return redis.call('del', KEYS[1]) end; return 0").getBytes(StandardCharsets.UTF_8);
+        Long removed = (Long) redisTemplate.execute((RedisCallback<Long>) connection ->
+                connection.scriptingCommands().eval(script, ReturnType.INTEGER, 1, rawKey, expected));
+        return Long.valueOf(1).equals(removed);
+    }
+
+    public static final class CacheSnapshot
+    {
+        private final byte[] bytes;
+        private final Object value;
+
+        public CacheSnapshot(byte[] bytes, Object value)
+        {
+            this.bytes = bytes.clone();
+            this.value = value;
+        }
+
+        public byte[] getBytes() { return bytes.clone(); }
+        public Object getValue() { return value; }
     }
 
     /**

@@ -526,7 +526,7 @@ class HrEmployeeTransferTransactionIT
         {
             HrLifecycleServiceImpl service = new HrLifecycleServiceImpl(configs, profiles,
                     actions, outboxes, renewalGuards, posts, departments, users, userPosts,
-                    shopService, objectMapper);
+                    shopService, objectMapper, org.mockito.Mockito.mock(com.erp.system.service.impl.HrSalarySourceService.class));
             ReflectionTestUtils.setField(service, "clock",
                     Clock.fixed(FIXED_NOW, ZoneId.of("UTC")));
             return service;

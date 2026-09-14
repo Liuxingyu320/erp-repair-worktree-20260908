@@ -148,6 +148,16 @@ public class AttendanceLeaveController extends OaBaseController
     }
 
     @RequiresPermissions(SELF)
+    @Log(title = "预览请假规则", businessType = BusinessType.OTHER, isSaveRequestData = false, isSaveResponseData = false)
+    @PostMapping("/{leaveRequestId}/policy-preview")
+    public AjaxResult previewPolicy(@PathVariable Long leaveRequestId,
+            @Valid @RequestBody SaveDraft body,HttpServletRequest request)
+    {
+        body.leaveRequestId=leaveRequestId;
+        return success(service.previewPolicy(leaveRequestId,body,resolveAttendanceShopDeptId(request)));
+    }
+
+    @RequiresPermissions(SELF)
     @IdempotentSubmit(timeout = 30)
     @Log(title = "提交请假申请", businessType = BusinessType.INSERT,
             isSaveRequestData = false, isSaveResponseData = false)

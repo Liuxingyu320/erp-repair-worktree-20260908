@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.oa.attendance.leave.balance.AttendanceLeaveQuotaMapper">
+<resultMap id="allocation" type="com.erp.oa.attendance.leave.balance.AttendanceLeaveQuotaModels$Allocation">
+<id property="allocationId" column="allocation_id"/><result property="leaveRequestId" column="leave_request_id"/><result property="businessRound" column="business_round"/>
+<result property="accountId" column="account_id"/><result property="bucketId" column="bucket_id"/><result property="userId" column="user_id"/><result property="leaveTypeId" column="leave_type_id"/>
+<result property="units" column="units"/><result property="status" column="status"/><result property="sourceExpiresOn" column="source_expires_on"/><result property="createTime" column="create_time"/><result property="updateTime" column="update_time"/>
+</resultMap>
+<resultMap id="event" type="com.erp.oa.attendance.leave.balance.AttendanceLeaveQuotaModels$Event">
+<id property="eventId" column="event_id"/><result property="leaveRequestId" column="leave_request_id"/><result property="businessRound" column="business_round"/><result property="eventKey" column="event_key"/><result property="action" column="action"/><result property="fingerprint" column="fingerprint"/><result property="units" column="units"/><result property="sourceJson" column="source_json"/><result property="createTime" column="create_time"/>
+</resultMap>
+<resultMap id="day" type="com.erp.oa.attendance.leave.balance.AttendanceLeaveQuotaModels$DayLock"><id property="dayResultId" column="day_result_id"/><result property="shopId" column="shop_id"/><result property="businessDate" column="business_date"/></resultMap>
+<select id="selectAllocations" resultMap="allocation">SELECT * FROM oa_attendance_leave_quota_allocation WHERE leave_request_id=#{requestId} AND business_round=#{round} ORDER BY bucket_id <if test="lock">FOR UPDATE</if></select>
+<select id="selectEvent" resultMap="event">SELECT * FROM oa_attendance_leave_quota_event WHERE leave_request_id=#{requestId} AND business_round=#{round} AND BINARY event_key=BINARY #{eventKey}</select>
+<insert id="insertAllocation" useGeneratedKeys="true" keyProperty="allocationId">INSERT INTO oa_attendance_leave_quota_allocation(leave_request_id,business_round,account_id,bucket_id,user_id,leave_type_id,units,status,source_expires_on) VALUES(#{leaveRequestId},#{businessRound},#{accountId},#{bucketId},#{userId},#{leaveTypeId},#{units},#{status},#{sourceExpiresOn})</insert>
+<update id="transitionAllocation">UPDATE oa_attendance_leave_quota_allocation SET status=#{status},update_time=NOW() WHERE allocation_id=#{id} AND status=#{expected}</update>
+<insert id="insertEvent" useGeneratedKeys="true" keyProperty="eventId">INSERT INTO oa_attendance_leave_quota_event(leave_request_id,business_round,event_key,action,fingerprint,units,source_json) VALUES(#{leaveRequestId},#{businessRound},#{eventKey},#{action},#{fingerprint},#{units},#{sourceJson})</insert>
+<update id="updateRequestQuotaStatus">UPDATE oa_attendance_leave_request SET quota_status=#{status} WHERE leave_request_id=#{requestId} AND business_round=#{round} AND quota_policy_json IS NOT NULL</update>
+<update id="returnFailedSubmission">UPDATE oa_attendance_leave_request SET status='RETURNED',quota_status=CASE WHEN quota_units IS NULL THEN 'NOT_REQUIRED' ELSE 'RELEASED' END,row_version=row_version+1,update_time=NOW() WHERE leave_request_id=#{requestId} AND business_round=#{round} AND status='SUBMITTING' AND approval_instance_id IS NULL</update>
+<select id="selectOvertimeSourceDays" resultMap="day">SELECT DISTINCT t.source_day_result_id day_result_id,t.shop_id,t.source_business_date business_date FROM oa_attendance_overtime_transfer t JOIN oa_attendance_leave_balance_bucket b ON b.bucket_id=t.bucket_id WHERE b.user_id=#{userId} AND b.leave_type_id=#{typeId} AND b.source_type='OVERTIME' AND b.expiry_state!='REVERSED' AND t.action='APPLY' ORDER BY t.source_day_result_id</select>
+<select id="selectAffectedDays" resultMap="day">
+SELECT d.day_result_id,s.shop_id,s.business_date
+FROM oa_attendance_schedule s LEFT JOIN oa_attendance_day_result d ON d.schedule_id=s.schedule_id
+WHERE s.user_id=#{userId} AND s.shop_id=#{shopId} AND s.status IN ('PUBLISHED','CHANGED')
+ AND TIMESTAMP(s.business_date,s.start_time_snapshot) &lt; #{end}
+ AND TIMESTAMP(CASE WHEN s.cross_day_snapshot=1 THEN DATE_ADD(s.business_date,INTERVAL 1 DAY) ELSE s.business_date END,s.end_time_snapshot) &gt; #{start}
+ORDER BY s.business_date,s.schedule_id
+</select>
+</mapper>

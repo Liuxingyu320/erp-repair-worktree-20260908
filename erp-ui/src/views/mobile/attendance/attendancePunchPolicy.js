@@ -29,6 +29,14 @@ const CORRECTION_ERROR_COPY = Object.freeze({
 })
 
 const PUNCH_ERROR_COPY = Object.freeze({
+  CLIENT_CAPTURE_TIME_INVALID: '拍照时间无效，本次未打卡，请重新开始并拍摄新照片。',
+  PUNCH_CORRECTION_EVIDENCE_INVALID: '补卡记录暂时无法核验，请联系管理者处理后重试。',
+  OUTSIDE_ATTENDANCE_GEOFENCE: '当前位置不在打卡范围内，本次未打卡。请到指定地点重新定位。',
+  LOCATION_ACCURACY_INSUFFICIENT: '定位精度不足，本次未打卡。请到信号较好的位置重新定位。',
+  LOCATION_INVALID: '定位信息无效，本次未打卡，请重新定位。',
+  ATTENDANCE_SHOP_SCOPE_MISMATCH: '当前门店与排班门店不一致，请切换到排班门店后重新开始。',
+  OUTSIDE_PUNCH_WINDOW: '当前不在允许打卡时间内，本次未打卡，请刷新考勤状态。',
+  PUNCH_SLOT_TYPE_MISMATCH: '本次打卡类型已变化，请刷新考勤状态后重新开始。',
   PUNCH_DAY_RESULT_ALREADY_SETTLED: '该考勤日已完成结算，本次未打卡；如需处理请联系管理者显式重算。'
 })
 

@@ -40,6 +40,7 @@ class InvStockCheckAdjustmentServiceTest
     {
         InvStockMapper stockMapper = mock(InvStockMapper.class);
         InvStockLogMapper logMapper = mock(InvStockLogMapper.class);
+        when(logMapper.insertInvStockLog(any())).thenReturn(1);
         InvStockCheckAdjustmentService service = new InvStockCheckAdjustmentService();
         ReflectionTestUtils.setField(service, "stockMapper", stockMapper);
         ReflectionTestUtils.setField(service, "stockLogMapper", logMapper);
@@ -47,7 +48,7 @@ class InvStockCheckAdjustmentServiceTest
         InvStockCheck check = check(1001L, 20L);
         InvStockCheckDetail detail = detail(501L, 101L, "测试茶", "10.00", "8.00");
         InvStock stock = stock(9001L, 101L, 20L, "9.00", "9.00");
-        when(stockMapper.selectInvStockByProductShopWarehouseForUpdate(101L, 20L, 20L))
+        when(stockMapper.selectInvStockByItemShopWarehouseForUpdate("product", 101L, 20L, 20L))
                 .thenReturn(stock);
 
         var result = service.evaluate(check, List.of(detail), true);
@@ -70,6 +71,7 @@ class InvStockCheckAdjustmentServiceTest
         SecurityContextHolder.setUserName("ops-director");
         InvStockMapper stockMapper = mock(InvStockMapper.class);
         InvStockLogMapper logMapper = mock(InvStockLogMapper.class);
+        when(logMapper.insertInvStockLog(any())).thenReturn(1);
         InvStockCheckAdjustmentService service = new InvStockCheckAdjustmentService();
         ReflectionTestUtils.setField(service, "stockMapper", stockMapper);
         ReflectionTestUtils.setField(service, "stockLogMapper", logMapper);
@@ -82,9 +84,9 @@ class InvStockCheckAdjustmentServiceTest
         InvStock profitAfter = stock(9001L, 101L, 20L, "12.00", "12.00");
         InvStock lossAfter = stock(9002L, 202L, 20L, "7.00", "7.00");
 
-        when(stockMapper.selectInvStockByProductShopWarehouseForUpdate(101L, 20L, 20L))
+        when(stockMapper.selectInvStockByItemShopWarehouseForUpdate("product", 101L, 20L, 20L))
                 .thenReturn(profitStock);
-        when(stockMapper.selectInvStockByProductShopWarehouseForUpdate(202L, 20L, 20L))
+        when(stockMapper.selectInvStockByItemShopWarehouseForUpdate("product", 202L, 20L, 20L))
                 .thenReturn(lossStock);
         when(stockMapper.addInvStockWithCost(9001L, 1L, new BigDecimal("2.00"),
                 new BigDecimal("2.00"), "ops-director")).thenReturn(1);
@@ -124,13 +126,14 @@ class InvStockCheckAdjustmentServiceTest
         SecurityContextHolder.setUserName("counter");
         InvStockMapper stockMapper = mock(InvStockMapper.class);
         InvStockLogMapper logMapper = mock(InvStockLogMapper.class);
+        when(logMapper.insertInvStockLog(any())).thenReturn(1);
         InvStockCheckAdjustmentService service = new InvStockCheckAdjustmentService();
         ReflectionTestUtils.setField(service, "stockMapper", stockMapper);
         ReflectionTestUtils.setField(service, "stockLogMapper", logMapper);
 
         InvStockCheck check = check(1001L, 20L);
         InvStockCheckDetail detail = detail(501L, 101L, "无差异茶", "10.00", "10.00");
-        when(stockMapper.selectInvStockByProductShopWarehouseForUpdate(101L, 20L, 20L))
+        when(stockMapper.selectInvStockByItemShopWarehouseForUpdate("product", 101L, 20L, 20L))
                 .thenReturn(stock(9001L, 101L, 20L, "10.00", "10.00"));
 
         var result = service.evaluate(check, List.of(detail), true);
@@ -139,6 +142,41 @@ class InvStockCheckAdjustmentServiceTest
         verify(stockMapper, never()).addInvStockWithCost(anyLong(), anyLong(), any(), any(), any());
         verify(stockMapper, never()).deductInvStockWithCost(anyLong(), anyLong(), any(), any(), any());
         verify(logMapper, never()).insertInvStockLog(any());
+    }
+
+    @Test
+    void shouldAdjustProductOeAndGiftWithSameNumericIdIndependently()
+    {
+        InvStockMapper stocks = mock(InvStockMapper.class);
+        InvStockLogMapper logs = mock(InvStockLogMapper.class);
+        when(logs.insertInvStockLog(any())).thenReturn(1);
+        InvStockCheckAdjustmentService service = new InvStockCheckAdjustmentService();
+        ReflectionTestUtils.setField(service, "stockMapper", stocks);
+        ReflectionTestUtils.setField(service, "stockLogMapper", logs);
+        java.util.ArrayList<InvStockCheckDetail> details = new java.util.ArrayList<>();
+        int index = 0;
+        for (String type : List.of("product", "oe", "gift"))
+        {
+            long stockId = 9000L + index++;
+            InvStockCheckDetail row = detail(stockId, "product".equals(type) ? 1L : null,
+                    type, "10.00", "11.00");
+            row.setItemType(type);
+            row.setItemId(1L);
+            details.add(row);
+            when(stocks.selectInvStockByItemShopWarehouseForUpdate(type, 1L, 20L, 20L))
+                    .thenReturn(stock(stockId, row.getProductId(), 20L, "10.00", "10.00"));
+            when(stocks.addInvStockWithCost(org.mockito.ArgumentMatchers.eq(stockId), anyLong(), any(), any(), any())).thenReturn(1);
+            when(stocks.selectInvStockById(stockId)).thenReturn(stock(stockId, row.getProductId(), 20L, "11.00", "11.00"));
+        }
+        var result = service.evaluate(check(1001L, 20L), details, true, "counter");
+        assertThat(result.hasSnapshotChanges()).isFalse();
+        assertThat(result.getAdjustments()).extracting(row -> row.getItemType() + ":" + row.getItemId())
+                .containsExactly("product:1", "oe:1", "gift:1");
+        ArgumentCaptor<InvStockLog> captured = ArgumentCaptor.forClass(InvStockLog.class);
+        verify(logs, times(3)).insertInvStockLog(captured.capture());
+        assertThat(captured.getAllValues()).extracting(InvStockLog::getItemType).containsExactly("product", "oe", "gift");
+        assertThat(captured.getAllValues().get(1).getProductId()).isNull();
+        assertThat(captured.getAllValues().get(2).getProductId()).isNull();
     }
 
     private static InvStockCheck check(Long checkId, Long deptId)
@@ -176,6 +214,7 @@ class InvStockCheckAdjustmentServiceTest
         stock.setCurrentQuantity(new BigDecimal(currentQty));
         stock.setAvailableQuantity(new BigDecimal(availableQty));
         stock.setCostPrice(BigDecimal.ONE);
+        stock.setTotalCost(new BigDecimal(currentQty));
         stock.setVersion(1L);
         return stock;
     }

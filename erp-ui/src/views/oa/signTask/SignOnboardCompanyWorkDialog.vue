@@ -207,8 +207,8 @@
 </template>
 
 <script>
+import { syncOnboardSalaryBeforeGenerate } from "@/utils/onboardSalarySync"
 import {
-  archiveOnboardSignSalary,
   executeOnboardSignCompanyWork,
   getOnboardSignCompanyWorkOptions,
   previewOnboardSignCompanyWork
@@ -243,7 +243,8 @@ export default {
       preflightPassed: false,
       executionDone: false,
       confirmed: false,
-      lastSummary: null
+      lastSummary: null,
+      salarySyncState: {}
     }
   },
   computed: {
@@ -487,6 +488,7 @@ export default {
     },
     markEdited() {
       this.requestId = ''
+      this.salarySyncState = {}
       this.preflightPassed = false
       this.confirmed = false
       this.lastSummary = null
@@ -542,15 +544,8 @@ export default {
     },
     execute() {
       this.executing = true
-      const batches = new Map()
-      this.rows.forEach(row => {
-        const batchId = this.normalizeId(row.batchId)
-        if (!batches.has(batchId)) batches.set(batchId, [])
-        batches.get(batchId).push({ rowId: this.normalizeId(row.rowId), version: row.version })
-      })
-      return Array.from(batches).reduce((previous, [batchId, rows]) =>
-        previous.then(() => archiveOnboardSignSalary(batchId, rows)), Promise.resolve())
-        .then(() => executeOnboardSignCompanyWork(this.payload())).then(response => {
+      const payload = this.payload()
+      return syncOnboardSalaryBeforeGenerate(this.rows, this.salarySyncState).then(() => executeOnboardSignCompanyWork(payload)).then(response => {
         const data = response.data || {}
         this.lastSummary = data
         this.applyResults(data.items || [])
@@ -638,6 +633,7 @@ export default {
       this.bulkLegalEntityId = ''
       this.bulkSealId = ''
       this.requestId = ''
+      this.salarySyncState = {}
       this.preflightPassed = false
       this.executionDone = false
       this.confirmed = false

@@ -80,6 +80,7 @@
     </section>
 
     <div class="profile-actions">
+      <span v-if="hasUnsavedChanges" class="unsaved-hint">还有未保存的修改</span>
       <el-button type="primary" :loading="saving" @click="submit">保存个人资料</el-button>
       <el-button @click="close">关闭</el-button>
     </div>
@@ -88,6 +89,7 @@
 
 <script>
 import { updateUserProfile } from "@/api/system/user"
+import { displayProfileDate } from "@/utils/profileDisplayDate"
 
 const EDITABLE_PROFILE_KEYS = [
   "currentAddress", "emergencyContact", "emergencyContactRelation", "emergencyContactPhone",
@@ -95,6 +97,7 @@ const EDITABLE_PROFILE_KEYS = [
   "firstGraduationDate", "firstGraduationSchool", "firstMajor", "highestEducation",
   "highestDegree", "highestGraduationDate", "highestGraduationSchool", "highestMajor", "bankName"
 ]
+const USER_TOP_KEYS = ["nickName", "phonenumber", "email", "sex", "currentAddress"]
 
 export default {
   props: { user: { type: Object, default: () => ({}) } },
@@ -103,6 +106,12 @@ export default {
       form: {},
       profile: {},
       saving: false,
+      validating: false,
+      saveSyncing: false,
+      syncedUser: null,
+      syncedSnapshot: null,
+      sourceGeneration: 0,
+      saveGeneration: 0,
       maritalOptions: ["未婚", "已婚", "离异", "丧偶"],
       identityItems: [
         { key: "birthDate", label: "出生日期" }, { key: "idType", label: "证件类型" },
@@ -154,51 +163,155 @@ export default {
       }
     }
   },
+  computed: {
+    hasUnsavedChanges() {
+      const snap = this.syncedSnapshot
+      if (!snap || !this.form) return false
+      if (this.form.bankAccount) return true
+      return Object.keys(snap.form).some(key => {
+        if (key === "bankAccount") return false
+        return this.sameValue(this.form[key], snap.form[key]) === false
+      })
+    }
+  },
   watch: {
     user: {
       immediate: true,
       deep: true,
       handler(user) {
-        const profile = Object.assign({}, (user && user.profile) || {})
-        this.profile = profile
-        const form = {
-          nickName: user.nickName || "",
-          phonenumber: user.phonenumber || "",
-          email: user.email || "",
-          sex: user.sex === undefined || user.sex === null ? "2" : String(user.sex),
-          bankAccount: ""
-        }
-        EDITABLE_PROFILE_KEYS.forEach(key => { form[key] = profile[key] || "" })
-        this.form = form
+        if (this.saveSyncing) return
+        if (this.matchesSyncedSnapshot(user)) return
+        this.applyAuthoritativeUser(user)
       }
     }
+  },
+  beforeDestroy() {
+    this.invalidatePendingWork()
   },
   methods: {
     display(value) {
       if (value === undefined || value === null || value === "") return "暂无"
-      return String(value).includes("T") ? String(value).slice(0, 10) : value
+      return displayProfileDate(value)
+    },
+    sameValue(left, right) {
+      if (left === undefined || left === null || left === "") return right === undefined || right === null || right === ""
+      if (right === undefined || right === null || right === "") return false
+      return String(left) === String(right)
+    },
+    publicProfileCopy(raw) {
+      const profile = Object.assign({}, raw || {})
+      delete profile.bankAccount
+      return profile
+    },
+    authoritativeSnapshot(user) {
+      const profile = this.publicProfileCopy((user && user.profile) || {})
+      const form = {
+        nickName: (user && user.nickName) || "",
+        phonenumber: (user && user.phonenumber) || "",
+        email: (user && user.email) || "",
+        sex: !user || user.sex === undefined || user.sex === null ? "2" : String(user.sex),
+        bankAccount: ""
+      }
+      EDITABLE_PROFILE_KEYS.forEach(key => { form[key] = profile[key] || "" })
+      return { form, profile }
+    },
+    matchesSyncedSnapshot(user) {
+      const previous = this.syncedSnapshot
+      if (!previous) return false
+      const incoming = this.authoritativeSnapshot(user)
+      const formChanged = Object.keys(incoming.form).some(key => this.sameValue(incoming.form[key], previous.form[key]) === false)
+      if (formChanged) return false
+      const profileKeys = {}
+      Object.keys(incoming.profile).forEach(key => { profileKeys[key] = true })
+      Object.keys(previous.profile).forEach(key => { profileKeys[key] = true })
+      return Object.keys(profileKeys).every(key => key === "bankAccount" || this.sameValue(incoming.profile[key], previous.profile[key]))
+    },
+    invalidatePendingWork() {
+      this.saveGeneration += 1
+      this.sourceGeneration += 1
+      this.saving = false
+      this.validating = false
+    },
+    isCurrentSave(saveGen, sourceGen) {
+      if (this._isDestroyed || this._isBeingDestroyed) return false
+      return saveGen === this.saveGeneration && sourceGen === this.sourceGeneration
+    },
+    applyAuthoritativeUser(user) {
+      const incoming = this.authoritativeSnapshot(user)
+      const previous = this.syncedSnapshot
+      const sameInstance = user === this.syncedUser
+      this.invalidatePendingWork()
+      this.profile = incoming.profile
+      if (!sameInstance || !previous) {
+        this.form = Object.assign({}, incoming.form)
+      } else {
+        Object.keys(incoming.form).forEach(key => {
+          if (key === "bankAccount") return
+          if (this.sameValue(incoming.form[key], previous.form[key]) === false) this.form[key] = incoming.form[key]
+        })
+      }
+      this.syncedUser = user
+      this.syncedSnapshot = incoming
+    },
+    savedProfilePatch(submitted) {
+      const patch = {}
+      EDITABLE_PROFILE_KEYS.forEach(key => {
+        if (Object.prototype.hasOwnProperty.call(submitted, key)) patch[key] = submitted[key]
+      })
+      return patch
+    },
+    applySavedPayload(submitted) {
+      this.saveSyncing = true
+      try {
+        const user = this.user
+        USER_TOP_KEYS.forEach(key => { this.$set(user, key, submitted[key]) })
+        if (!user.profile) this.$set(user, "profile", {})
+        const patch = this.savedProfilePatch(submitted)
+        Object.keys(patch).forEach(key => { this.$set(user.profile, key, patch[key]) })
+        if (user.profile.bankAccount) this.$delete(user.profile, "bankAccount")
+        this.profile = this.publicProfileCopy(Object.assign({}, this.profile, patch))
+        this.syncedUser = user
+        this.syncedSnapshot = this.authoritativeSnapshot(user)
+        const submittedBank = submitted.bankAccount || ""
+        if ((this.form.bankAccount || "") === submittedBank) this.form.bankAccount = ""
+      } finally {
+        this.saveSyncing = false
+      }
     },
     submit() {
-      this.$refs.form.validate(valid => {
+      if (this.saving || this.validating) return
+      const formRef = this.$refs.form
+      if (!formRef || typeof formRef.validate !== "function") return
+      this.validating = true
+      const saveGen = this.saveGeneration + 1
+      this.saveGeneration = saveGen
+      const sourceGen = this.sourceGeneration
+      formRef.validate(valid => {
+        if (!this.isCurrentSave(saveGen, sourceGen)) return
+        this.validating = false
         if (!valid) return
+        if (this.saving) return
         const payload = Object.assign({}, this.form)
         if (!payload.bankAccount) delete payload.bankAccount
+        const submitted = Object.assign({}, payload)
         this.saving = true
-        updateUserProfile(payload).then(() => {
+        updateUserProfile(payload, { silentError: true }).then(() => {
+          if (!this.isCurrentSave(saveGen, sourceGen)) return
           this.$modal.msgSuccess("个人资料已保存")
-          Object.assign(this.user, {
-            nickName: payload.nickName,
-            phonenumber: payload.phonenumber,
-            email: payload.email,
-            sex: payload.sex,
-            currentAddress: payload.currentAddress
-          })
-          Object.assign(this.profile, payload)
-          this.form.bankAccount = ""
-        }).finally(() => { this.saving = false })
+          this.applySavedPayload(submitted)
+        }).catch(error => {
+          if (!this.isCurrentSave(saveGen, sourceGen)) return
+          this.$modal.msgError((error && error.message) || "个人资料保存失败")
+        }).finally(() => {
+          if (!this.isCurrentSave(saveGen, sourceGen)) return
+          this.saving = false
+        })
       })
     },
-    close() { this.$tab.closePage() }
+    close() {
+      this.invalidatePendingWork()
+      this.$tab.closePage()
+    }
   }
 }
 </script>
@@ -216,6 +329,7 @@ export default {
   .readonly-item span { display: block; margin-bottom: 6px; color: #64748b; font-size: 12px; }
   .readonly-item strong { color: #1f2937; font-size: 14px; font-weight: 500; word-break: break-all; }
   .field-hint { color: #94a3b8; font-size: 12px; line-height: 22px; }
+  .unsaved-hint { margin-right: 12px; color: #b45309; font-size: 13px; }
   .profile-actions { position: sticky; bottom: 0; z-index: 2; margin: 0 -20px -20px; padding: 14px 20px; border-top: 1px solid #e5e7eb; background: rgba(255,255,255,.96); text-align: right; }
 }
 @media (max-width: 768px) {

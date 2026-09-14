@@ -5,19 +5,29 @@ const {
   getFixedAssetPrecheckFromError
 } = require("../src/views/mobile/feature/featureActionRuntime")
 
+const { createPurchaseReceiveRecovery } = require("../src/utils/purchaseReceiveRecovery")
+const { memoryStore } = require("./purchaseReceiveRecovery.test")
+
 function createStubRuntime(responses) {
   const calls = []
+  let purchaseReceiveRecovery
   const api = new Proxy({}, {
     get(target, name) {
+      if (name === "purchaseReceiveRecovery") return purchaseReceiveRecovery
       return function stubbedApi() {
         const args = Array.prototype.slice.call(arguments)
         calls.push({ name: String(name), args })
         const response = responses && responses[name]
+        if (name === "getPurchaseReceiveContext" && response && response.data) return { ...response, data: { orderId: args[0], ...response.data } }
+        if (name === "receivePurchase" && !response) return { data: { requestId: args[2], purchaseOrderId: args[0], warehouseId: args[1].warehouseId,
+          receiptBatchId: 101, batchNo: "RECEIPT-101", receivedQuantity: args[1].items.reduce((n, item) => n + item.receiveQuantity, 0) } }
         return typeof response === "function" ? response.apply(null, args) : (response || { ok: true })
       }
     }
   })
 
+  purchaseReceiveRecovery = createPurchaseReceiveRecovery({ storage: memoryStore(), context: () => ({ actor: "7", dept: "8" }),
+    createId: () => "receive:test-runtime", transport: (orderId, payload, requestId, scope) => api.receivePurchase(Number(orderId), payload, requestId, scope) })
   return {
     calls,
     runtime: createMobileActionRuntime(api)
@@ -299,7 +309,7 @@ function findCall(calls, name) {
 
   {
     const { runtime, calls } = createStubRuntime({
-      getPurchaseDetail: {
+      getPurchaseReceiveContext: {
         data: {
           warehouseId: 8,
           details: [
@@ -319,7 +329,7 @@ function findCall(calls, name) {
       "purchase",
       "receivePurchaseAll",
       { _raw: { orderId: 21, status: "arrived" } },
-      {
+      { receiveScope: { actor: "7", dept: "8" }, receiveObservedRequestId: null,
         actionPayload: {
           arrivedTime: "2026-07-29T10:30",
           supplierBatchNo: "SUP-20260729",
@@ -337,13 +347,13 @@ function findCall(calls, name) {
     assert.deepStrictEqual(
       findCall(calls, "receivePurchase").args,
       [21, {
-        warehouseId: 8,
+        warehouseId: "8",
         arrivedTime: "2026-07-29 10:30:00",
         items: [{ detailId: 1, receiveQuantity: 3 }],
         supplierBatchNo: "SUP-20260729",
         deliveryNoteNo: "DN-20260729",
         remark: "外箱完好"
-      }],
+      }, "receive:test-runtime", { actor: "7", dept: "8" }],
       "purchase receive should satisfy the backend DTO and preserve user-entered metadata and partial quantities"
     )
   }
@@ -389,7 +399,7 @@ function findCall(calls, name) {
 
   {
     const { runtime, calls } = createStubRuntime({
-      getPurchaseDetail: {
+      getPurchaseReceiveContext: {
         data: {
           warehouseId: 8,
           details: [
@@ -404,7 +414,7 @@ function findCall(calls, name) {
         "purchase",
         "receivePurchaseAll",
         { _raw: { orderId: 21, status: "arrived" } },
-        { actionPayload: {} }
+        { receiveScope: { actor: "7", dept: "8" }, receiveObservedRequestId: null, actionPayload: {} }
       )
     } catch (caught) {
       error = caught
@@ -419,7 +429,7 @@ function findCall(calls, name) {
 
   {
     const { runtime, calls } = createStubRuntime({
-      getPurchaseDetail: {
+      getPurchaseReceiveContext: {
         data: {
           warehouseId: 8,
           details: [
@@ -433,7 +443,7 @@ function findCall(calls, name) {
         "purchase",
         "receivePurchaseAll",
         { _raw: { orderId: 21, status: "arrived" } },
-        { actionPayload: { items: [{ detailId: 1, quantity: 2 }] } }
+        { receiveScope: { actor: "7", dept: "8" }, receiveObservedRequestId: null, actionPayload: { items: [{ detailId: 1, quantity: 2 }] } }
       ),
       /请选择实际到货时间/,
       "mobile purchase receive must reject a request that omits the backend-required arrivedTime"
@@ -447,7 +457,7 @@ function findCall(calls, name) {
 
   {
     const { runtime, calls } = createStubRuntime({
-      getPurchaseDetail: {
+      getPurchaseReceiveContext: {
         data: {
           warehouseId: 8,
           details: [
@@ -460,15 +470,15 @@ function findCall(calls, name) {
       "purchase",
       "receivePurchaseAll",
       { _raw: { orderId: 21, status: "arrived" } },
-      { actionPayload: { arrivedTime: "2026-07-29 11:20:30", allRemaining: true } }
+      { receiveScope: { actor: "7", dept: "8" }, receiveObservedRequestId: null, actionPayload: { arrivedTime: "2026-07-29 11:20:30", allRemaining: true } }
     )
     assert.deepStrictEqual(
       findCall(calls, "receivePurchase").args,
       [21, {
-        warehouseId: 8,
+        warehouseId: "8",
         arrivedTime: "2026-07-29 11:20:30",
         items: [{ detailId: 1, receiveQuantity: 4 }]
-      }],
+      }, "receive:test-runtime", { actor: "7", dept: "8" }],
       "purchase receive should still support an explicit all-remaining mobile confirmation"
     )
   }
@@ -911,7 +921,7 @@ function findCall(calls, name) {
     )
     assert.strictEqual(calls.length, 0, "a retired attendance action must not call any legacy API")
   }
-})().catch(error => {
+})().then(() => console.log("mobile feature action runtime regression passed")).catch(error => {
   console.error(error)
   process.exit(1)
 })

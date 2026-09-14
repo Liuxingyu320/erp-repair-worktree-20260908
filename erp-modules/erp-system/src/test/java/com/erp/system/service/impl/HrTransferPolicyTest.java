@@ -219,9 +219,39 @@ class HrTransferPolicyTest
                 .isEqualTo("mismatchFields=frozenPayload,deptId,salaryTotal,salaryVersion");
     }
 
+    @Test
+    void ordinaryTransferDoesNotRequireOrApplySalary()
+    {
+        HrEmployeeTransferRequest request = validRequest();
+        request.setAdjustSalary(false);
+        request.setBaseSalary(null); request.setPostSalary(null); request.setFieldAllowance(null);
+        request.setPerformanceSalary(null); request.setSalaryTotal(null); request.setSalaryVersion(null);
+        assertThatCode(() -> policy.normalizeAndValidate(9L, request)).doesNotThrowAnyException();
+        HrEmployeeSigningSnapshot after = beforeSnapshot();
+        policy.apply(after, request, validDept(), validPost(), validSupervisor());
+        assertThat(after.getSalaryTotal()).isEqualByComparingTo("10000.00");
+        assertThat(after.getSalaryVersion()).isEqualTo("V1");
+        assertThat(policy.matchesRequest(after, request)).isTrue();
+    }
+
+    @Test
+    void monetaryComparisonIgnoresVersionAndDecimalScale()
+    {
+        HrEmployeeSigningSnapshot before = beforeSnapshot();
+        HrEmployeeSigningSnapshot after = beforeSnapshot();
+        after.setBaseSalary(new BigDecimal("6000.0"));
+        after.setSalaryVersion("V99");
+        assertThat(policy.salaryChanged(before, after)).isFalse();
+        assertThat(policy.changed(before, after)).isFalse();
+        after.setBaseSalary(new BigDecimal("6100.00"));
+        after.setPostSalary(new BigDecimal("1900.00"));
+        assertThat(policy.salaryChanged(before, after)).isTrue();
+    }
+
     private HrEmployeeTransferRequest validRequest()
     {
         HrEmployeeTransferRequest request = new HrEmployeeTransferRequest();
+        request.setAdjustSalary(true);
         request.setRequestId("transfer-1");
         request.setEffectiveDate(EFFECTIVE_DATE);
         request.setTargetDeptId(30L);

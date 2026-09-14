@@ -253,6 +253,7 @@ class OaSignPackageControllerTest
     void publishPlanShouldUseConfigurationPermissionAndRedactHashes() throws Exception
     {
         Method method = OaSignPackageController.class.getMethod("publishPlan", Long.class,
+                com.erp.oa.domain.dto.OaSignPlanPublishRequest.class,
                 jakarta.servlet.http.HttpServletRequest.class);
         assertThat(method.getAnnotation(RequiresPermissions.class).value())
                 .containsExactly("oa:signPackage:template");
@@ -277,12 +278,45 @@ class OaSignPackageControllerTest
         ReflectionTestUtils.setField(controller, "signPlanVersionService", versionService);
         ReflectionTestUtils.setField(controller, "signHrAccessService", accessService);
 
-        String json = new ObjectMapper().writeValueAsString(controller.publishPlan(20L, request));
+        String json = new ObjectMapper().writeValueAsString(controller.publishPlan(20L, null, request));
 
         verify(accessService).requireCurrentHr();
         assertThat(json).contains("501", "PUBLISHED", "ENABLED")
                 .doesNotContain("version-hash-secret", "source-file-hash-secret", "versionHash",
                         "sourceFileHash");
+    }
+
+    @Test
+    void previewAndConfirmationRequireCurrentHrBeforeReadingOrMutatingVersions() throws Exception
+    {
+        Method preview = OaSignPackageController.class.getMethod("previewPublishPlan", Long.class);
+        assertThat(preview.getAnnotation(RequiresPermissions.class).value()).containsExactly("oa:signPackage:template");
+        OaSignPackageController controller = new OaSignPackageController();
+        IOaSignPlanVersionService service = mock(IOaSignPlanVersionService.class);
+        OaSignHrAccessService access = mock(OaSignHrAccessService.class);
+        ReflectionTestUtils.setField(controller, "signPlanVersionService", service);
+        ReflectionTestUtils.setField(controller, "signHrAccessService", access);
+        org.mockito.Mockito.doThrow(new com.erp.common.core.exception.ServiceException("当前唯一HR权限已变化"))
+                .when(access).requireCurrentHr();
+        assertThatThrownBy(() -> controller.previewPublishPlan(20L)).hasMessageContaining("权限已变化");
+        assertThatThrownBy(() -> controller.publishPlan(20L,
+                new com.erp.oa.domain.dto.OaSignPlanPublishRequest("00000000-0000-0000-0000-000000000001", 501L),
+                mock(HttpServletRequest.class))).hasMessageContaining("权限已变化");
+        org.mockito.Mockito.verifyNoInteractions(service);
+    }
+
+    @Test
+    void confirmationPassesExplicitPreviewContractWithoutFallingBackToLegacyPublish()
+    {
+        OaSignPackageController controller = new OaSignPackageController();
+        IOaSignPlanVersionService service = mock(IOaSignPlanVersionService.class);
+        OaSignHrAccessService access = mock(OaSignHrAccessService.class);
+        ReflectionTestUtils.setField(controller, "signPlanVersionService", service);
+        ReflectionTestUtils.setField(controller, "signHrAccessService", access);
+        var request = new com.erp.oa.domain.dto.OaSignPlanPublishRequest("00000000-0000-0000-0000-000000000001", 501L);
+        controller.publishPlan(20L, request, mock(HttpServletRequest.class));
+        verify(service).confirmPublish(20L, request, null);
+        verify(service, never()).publish(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
     }
 
     @Test

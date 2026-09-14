@@ -25,7 +25,7 @@
       class="onboard-import-alert"
     />
     <el-alert
-      title="工资以本Excel综合工资为应发基数，底薪及津贴分别存入员工档案；考勤增减另行计算。可单独确认工资入档，生成合同前也会自动入档。"
+      title="工资以本Excel综合工资为应发基数，底薪及津贴分别存入员工档案；考勤增减另行计算。生成合同时自动按Excel同步员工档案工资，无需另外确认。"
       type="info" :closable="false" show-icon class="onboard-import-alert"
     />
 
@@ -303,12 +303,6 @@
       <el-button :disabled="busy" @click="dialogVisible = false">关 闭</el-button>
       <el-button
         v-if="batchId"
-        :loading="archivingSalary"
-        :disabled="busy || !selectedRows.some(row => row.employeeId)"
-        @click="archiveSalaryRows(selectedRows)"
-      >确认选中工资入档</el-button>
-      <el-button
-        v-if="batchId"
         :loading="generating"
         :disabled="!canGenerateSelected"
         @click="generateRows(selectedReadyRows)"
@@ -503,10 +497,10 @@
 </template>
 
 <script>
+import { syncOnboardSalaryBeforeGenerate } from "@/utils/onboardSalarySync"
 import SignScopeSelector from "@/components/SignScopeSelector"
 import { getSelectedSignScopeDeptId } from "@/utils/signScopeContext"
 import {
-  archiveOnboardSignSalary,
   generateOnboardSignImport,
   getOnboardSignDataRequest,
   getOnboardSignImportBatch,
@@ -601,8 +595,10 @@ export default {
       batchWarnings: [],
       previewLoading: false,
       refreshLoading: false,
+      refreshSequence: 0,
       generating: false,
-      archivingSalary: false,
+      generationSequence: 0,
+      salarySyncState: {},
       sending: false,
       sendingRowId: "",
       operationError: "",
@@ -645,7 +641,7 @@ export default {
       return this.batch && (this.batch.batchNo || this.batch.importBatchNo)
     },
     busy() {
-      return this.archivingSalary || this.previewLoading || this.refreshLoading || this.generating || this.sending || this.updatingRow || this.reviewing
+      return this.previewLoading || this.refreshLoading || this.generating || this.sending || this.updatingRow || this.reviewing
     },
     canPreview() {
       return !this.busy && this.signScopeReady && !!this.selectedFile && this.employeeIds.length <= MAX_BATCH_SIZE
@@ -705,6 +701,12 @@ export default {
   watch: {
     visible(value) {
       if (value) this.prepare()
+      else {
+        this.generationSequence += 1
+        this.refreshSequence += 1
+        this.generating = false
+        this.refreshLoading = false
+      }
     },
     employees: {
       deep: true,
@@ -749,6 +751,10 @@ export default {
       return { servicePersonType: "", insuranceType: "", reason: "" }
     },
     prepare() {
+      this.generationSequence += 1
+      this.refreshSequence += 1
+      this.generating = false
+      this.refreshLoading = false
       this.activeStep = 0
       this.signScopeReady = !!getSelectedSignScopeDeptId()
       this.fileList = []
@@ -762,6 +768,7 @@ export default {
       this.sendResults = []
       this.signingSequence = "COMPANY_FIRST"
       this.generateRequestId = this.createRequestId("onboard-generate")
+      this.salarySyncState = {}
       this.sendRequestId = this.createRequestId("onboard-send")
       this.confirmation = {
         noExternalContractConfirmed: false,
@@ -811,6 +818,10 @@ export default {
       this.invalidatePreview("")
     },
     invalidatePreview(message) {
+      this.generationSequence += 1
+      this.refreshSequence += 1
+      this.generating = false
+      this.refreshLoading = false
       this.batch = null
       this.rows = []
       this.selectedRows = []
@@ -819,6 +830,7 @@ export default {
       this.activeStep = 0
       this.operationError = message || ""
       this.generateRequestId = this.createRequestId("onboard-generate")
+      this.salarySyncState = {}
       this.sendRequestId = this.createRequestId("onboard-send")
       this.confirmation.noExternalContractConfirmed = false
       this.confirmation.historicalSupplementConfirmed = false
@@ -838,17 +850,39 @@ export default {
         return null
       }).finally(() => { this.previewLoading = false })
     },
-    refreshBatch() {
+    refreshBatch(generationCurrent = () => true) {
       if (!this.batchId) return Promise.resolve(null)
+      const batchId = this.batchId
+      const sequence = ++this.refreshSequence
+      const current = () => sequence === this.refreshSequence && this.batchId === batchId &&
+        this.visible !== false && !this._isDestroyed && (typeof generationCurrent !== "function" || generationCurrent())
       this.refreshLoading = true
       this.operationError = ""
-      return getOnboardSignImportBatch(this.batchId).then(response => {
+      return getOnboardSignImportBatch(batchId).then(response => {
+        if (!current()) return null
+        const payload = response && response.data !== undefined ? response.data : response
+        const data = payload && payload.data !== undefined && !Array.isArray(payload.data) ? payload.data : payload
+        const batch = data && data.batch ? data.batch : data
+        const rows = data && Array.isArray(data.rows) ? data.rows : (batch && batch.rows)
+        const rowIds = new Set()
+        const validRows = Array.isArray(rows) && rows.every(row => {
+          const rowId = row && normalizePositiveDecimalId(row.rowId || row.id)
+          if (!rowId || rowIds.has(rowId)) return false
+          rowIds.add(rowId)
+          return true
+        })
+        if (!batch || Array.isArray(batch) || normalizePositiveDecimalId(batch.batchId || batch.id) !== batchId || !validRows) {
+          throw new Error("批次刷新结果暂未确认，请保留原请求号并刷新核对")
+        }
         this.applyBatchResponse(response)
         return this.rows
       }).catch(error => {
+        if (!current()) return null
         this.operationError = this.errorMessage(error, "批次刷新失败，请勿重复点击生成或发送")
         return null
-      }).finally(() => { this.refreshLoading = false })
+      }).finally(() => {
+        if (sequence === this.refreshSequence) this.refreshLoading = false
+      })
     },
     applyBatchResponse(response) {
       const payload = response && response.data !== undefined ? response.data : response
@@ -1242,20 +1276,8 @@ export default {
         return null
       }).finally(() => { this.reviewing = false })
     },
-    archiveSalaryRows(targetRows) {
-      const rows = (targetRows || []).filter(row => row.employeeId)
-      if (!rows.length || !this.batchId || this.busy) return Promise.resolve(null)
-      this.archivingSalary = true
-      this.operationError = ""
-      return archiveOnboardSignSalary(this.batchId, rows).then(response => {
-        this.$modal.msgSuccess("Excel综合工资和四项明细已存入员工档案")
-        return response
-      }).catch(error => {
-        this.operationError = this.errorMessage(error, "工资入档结果暂未确认，可用相同导入行重试")
-        return null
-      }).finally(() => { this.archivingSalary = false })
-    },
     generateRows(targetRows) {
+      if (this.generating || this.visible === false) return Promise.resolve(null)
       const rows = (targetRows || []).filter(row => this.isReadyToGenerate(row))
       const rowIds = Array.from(new Set(rows.map(row => row.rowId)))
       if (!rowIds.length || !this.batchId || !this.generationConfirmedFor(rows)) return Promise.resolve(null)
@@ -1263,27 +1285,77 @@ export default {
       const requiresWarningReason = this.targetRowsRequireWarningReason(rows)
       this.generating = true
       this.operationError = ""
+      const selectionKey = JSON.stringify(rows.map(row => [String(this.batchId), String(row.rowId), String(row.version)]).sort((a, b) => a.join(':').localeCompare(b.join(':'))))
+      if (this.salarySyncState.selectionKey !== selectionKey) this.generateRequestId = ''
+      this.salarySyncState.selectionKey = selectionKey
       if (!this.generateRequestId) this.generateRequestId = this.createRequestId("onboard-generate")
-      return archiveOnboardSignSalary(this.batchId, rows).then(() => generateOnboardSignImport(this.batchId, {
+      const batchId = this.batchId
+      const sequence = (this.generationSequence || 0) + 1
+      this.generationSequence = sequence
+      const current = () => sequence === this.generationSequence && this.batchId === batchId && this.visible !== false && !this._isDestroyed
+      const signingSequence = this.signingSequence
+      const generationRequest = {
         requestId: this.generateRequestId,
         batchVersion: this.batch && this.batch.version,
         rowIds,
         noExternalContractConfirmed: true,
         historicalReason: requiresHistoricalReason ? this.confirmation.historicalSupplementReason.trim() : "",
         warningReason: requiresWarningReason ? this.confirmation.warningReason.trim() : ""
-      })).then(response => {
-        this.generateRequestId = this.createRequestId("onboard-generate")
-        this.$modal.msgSuccess(this.signingSequence === "SIGNATURE_FIRST"
-          ? "最终合同已生成，本次不会自动发送；请先预览 PDF，再发送最终文件"
-          : "合同已生成，本次不会自动发送，请先预览 PDF")
-        return this.refreshBatch().then(() => {
-          this.activeStep = 2
+      }
+      return syncOnboardSalaryBeforeGenerate(rows.map(row => ({ ...row, batchId })), this.salarySyncState)
+        .then(() => current() && this.generateRequestId === generationRequest.requestId
+          ? generateOnboardSignImport(batchId, generationRequest) : null).then(response => {
+        if (!current() || this.generateRequestId !== generationRequest.requestId) return null
+        const result = response && response.data !== undefined ? response.data : response
+        const counts = { GENERATED: 0, REUSED: 0, BLOCKED: 0, FAILED: 0 }
+        const expectedIds = new Set(rowIds.map(String))
+        const returnedIds = new Set()
+        const items = result && result.items
+        const validItems = Array.isArray(items) && items.length === expectedIds.size && items.every(item => {
+          if (!item || !Object.prototype.hasOwnProperty.call(counts, item.result)) return false
+          const rowId = String(item.rowId)
+          if (!expectedIds.has(rowId) || returnedIds.has(rowId)) return false
+          returnedIds.add(rowId)
+          counts[item.result] += 1
+          return true
+        })
+        const validSummary = validItems && result.totalCount === expectedIds.size &&
+          result.generatedCount === counts.GENERATED && result.reusedCount === counts.REUSED &&
+          result.blockedCount === counts.BLOCKED && result.failedCount === counts.FAILED
+        if (!validSummary) {
+          throw new Error("合同生成结果暂未确认，请先刷新批次，使用原请求号重试")
+        }
+        const available = counts.GENERATED + counts.REUSED
+        const incomplete = counts.BLOCKED + counts.FAILED
+        const summary = `本次生成 ${counts.GENERATED} 份，复用 ${counts.REUSED} 份，需处理 ${counts.BLOCKED} 份，失败 ${counts.FAILED} 份。`
+        return this.refreshBatch(current).then(refreshed => {
+          if (!current()) return null
+          if (refreshed !== null) {
+            this.generateRequestId = this.createRequestId("onboard-generate")
+            this.salarySyncState = {}
+            this.activeStep = available > 0 ? 2 : 1
+          } else if (!available) this.activeStep = 1
+          if (!incomplete && refreshed !== null) {
+            this.$modal.msgSuccess(summary + (signingSequence === "SIGNATURE_FIRST"
+              ? "最终合同可预览，本次不会自动发送；请先预览 PDF，再发送最终文件"
+              : "合同可预览，本次不会自动发送，请先预览 PDF"))
+          } else {
+            const message = summary + (refreshed === null
+              ? "列表刷新失败，请刷新批次核对，重试将保留原请求号。"
+              : (available > 0 ? "已完成的合同可预览，其余请处理后重试。本次不会自动发送。"
+                : "本次没有可预览的合同，请处理失败或阻塞原因后重试。"))
+            this.operationError = message
+            this.$modal.msgWarning(message)
+          }
           return response
         })
       }).catch(error => {
+        if (!current()) return null
         this.operationError = this.errorMessage(error, "合同生成结果暂未确认，请先刷新批次，不要更换请求号重复点击")
         return null
-      }).finally(() => { this.generating = false })
+      }).finally(() => {
+        if (sequence === this.generationSequence) this.generating = false
+      })
     },
     sendRows(targetRows) {
       const taskIds = Array.from(new Set((targetRows || []).filter(row => this.isSendable(row)).map(row => normalizePositiveDecimalId(row.taskId)).filter(Boolean)))

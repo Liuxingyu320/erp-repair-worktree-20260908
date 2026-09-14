@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.oa.mapper.OaSignSalarySourceMapper">
+    <sql id="columns">
+        s.source_id sourceId, s.employee_id employeeId, s.previous_source_id previousSourceId,
+        s.source_type sourceType, s.business_id businessId, s.batch_id batchId, s.row_id rowId,
+        s.row_version rowVersion, s.file_sha256 fileSha256, s.command_id commandId,
+        s.request_hash requestHash, s.before_hash beforeHash, s.effective_date effectiveDate,
+        s.operator_user_id operatorUserId, s.operator_name operatorName, s.reason,
+        s.verified, s.confirmed_at confirmedAt, s.base_salary baseSalary, s.post_salary postSalary,
+        s.field_allowance fieldAllowance, s.performance_salary performanceSalary, s.salary_total salaryTotal
+    </sql>
+    <sql id="matchesProfile">
+        s.base_salary = p.base_salary and s.post_salary = p.post_salary
+        and s.field_allowance = p.field_allowance and s.performance_salary = p.performance_salary
+        and s.salary_total = p.salary_total and s.verified = 1
+    </sql>
+    <select id="current" resultType="com.erp.system.api.domain.EmployeeSalarySource">
+        select <include refid="columns"/> from sys_employee_salary_current c
+        join sys_employee_salary_source s on s.source_id = c.source_id and s.employee_id = c.employee_id
+        join sys_user_profile p on p.user_id = c.employee_id
+        where c.employee_id = #{employeeId} and <include refid="matchesProfile"/>
+    </select>
+    <select id="currentLocked" resultType="com.erp.system.api.domain.EmployeeSalarySource">
+        select <include refid="columns"/> from sys_employee_salary_current c
+        join sys_employee_salary_source s on s.source_id = c.source_id and s.employee_id = c.employee_id
+        join sys_user_profile p on p.user_id = c.employee_id
+        where c.employee_id = #{employeeId} and <include refid="matchesProfile"/>
+        for update
+    </select>
+    <select id="binding" resultType="com.erp.system.api.domain.EmployeeSalarySource">
+        select <include refid="columns"/> from oa_sign_package_salary_source b
+        join sys_employee_salary_source s on s.source_id = b.source_id and s.employee_id = b.employee_id
+        where b.package_id = #{packageId}
+    </select>
+    <select id="currentSourceIdLocked" resultType="String">
+        select source_id from sys_employee_salary_current where employee_id=#{employeeId} for update
+    </select>
+    <select id="lockPackageTask" resultType="Long">
+        select task_id from oa_sign_task
+        where task_id = (select task_id from oa_sign_package where package_id = #{packageId})
+        for update
+    </select>
+    <select id="lockProfile" resultType="Long">
+        select user_id from sys_user_profile where user_id=#{employeeId} for update
+    </select>
+    <select id="bindingLocked" resultType="com.erp.system.api.domain.EmployeeSalarySource">
+        select <include refid="columns"/> from oa_sign_package_salary_source b
+        join sys_employee_salary_source s on s.source_id=b.source_id and s.employee_id=b.employee_id
+        where b.package_id=#{packageId} for update
+    </select>
+    <select id="historicalForRow" resultType="com.erp.system.api.domain.EmployeeSalarySource">
+        select <include refid="columns"/> from sys_employee_salary_source s
+        where s.batch_id = #{batchId} and s.row_id = #{rowId}
+          and s.source_type = 'HISTORICAL_CONTRACT_EXCEL'
+        order by s.row_version desc, s.confirmed_at desc, s.source_id desc limit 1
+    </select>
+    <!-- A historical salary is eligible only through this exact, still-confirmed Excel contract. -->
+    <sql id="historicalPackageSource">
+        from sys_employee_salary_source s
+        join oa_sign_onboard_import_row r on r.row_id = s.row_id and r.batch_id = s.batch_id
+          and r.employee_id = s.employee_id and r.historical_supplement = 1
+          and trim(coalesce(r.historical_reason, '')) != ''
+          and s.row_version &lt;= r.version
+        join oa_sign_onboard_import_batch b on b.batch_id = r.batch_id and binary b.file_sha256 = binary s.file_sha256
+        join oa_sign_task t on t.employee_id = r.employee_id and upper(trim(t.scenario)) = 'ONBOARD'
+          and upper(trim(t.source_type)) = 'MANUAL_SIGN_EXCEL_IMPORT'
+          and binary trim(t.source_business_id) = binary cast(r.row_id as char)
+          and binary trim(t.source_event_version) = binary cast(r.source_event_version as char)
+        join oa_sign_package p on p.task_id = t.task_id and t.package_id = p.package_id
+          and p.employee_id = s.employee_id
+          and (r.task_id is null or r.task_id = t.task_id)
+          and (r.package_id is null or r.package_id = p.package_id)
+        where p.package_id = #{packageId} and s.employee_id = #{employeeId} and s.source_id = #{sourceId}
+          and s.source_type = 'HISTORICAL_CONTRACT_EXCEL' and s.verified = 1
+          and s.effective_date = cast(json_unquote(json_extract(r.snapshot_json, '$.contractStartDate')) as date)
+          and s.effective_date = cast(p.contract_start_date as date)
+          and s.base_salary = cast(json_unquote(json_extract(r.snapshot_json, '$.baseSalary')) as decimal(16,2))
+          and s.post_salary = cast(json_unquote(json_extract(r.snapshot_json, '$.postSalary')) as decimal(16,2))
+          and s.field_allowance = cast(json_unquote(json_extract(r.snapshot_json, '$.fieldAllowance')) as decimal(16,2))
+          and s.performance_salary = cast(json_unquote(json_extract(r.snapshot_json, '$.performanceSalary')) as decimal(16,2))
+          and s.salary_total = cast(json_unquote(json_extract(r.snapshot_json, '$.salaryTotal')) as decimal(16,2))
+          and s.base_salary = p.base_salary and s.post_salary = p.post_salary
+          and s.field_allowance = p.field_allowance and s.performance_salary = p.performance_salary
+          and s.salary_total = p.salary_total
+    </sql>
+    <select id="historicalForPackageLocked" resultType="com.erp.system.api.domain.EmployeeSalarySource">
+        select <include refid="columns"/> <include refid="historicalPackageSource"/> for update
+    </select>
+    <insert id="bindHistorical">
+        insert into oa_sign_package_salary_source(package_id, employee_id, source_id)
+        select p.package_id, s.employee_id, s.source_id <include refid="historicalPackageSource"/>
+        on duplicate key update package_id = values(package_id)
+    </insert>
+    <insert id="bind">
+        insert into oa_sign_package_salary_source(package_id, employee_id, source_id)
+        select #{packageId}, s.employee_id, s.source_id from sys_employee_salary_current c
+        join sys_employee_salary_source s on s.source_id = c.source_id and s.employee_id = c.employee_id
+        join sys_user_profile p on p.user_id = c.employee_id
+        where s.source_id = #{sourceId} and s.employee_id = #{employeeId} and <include refid="matchesProfile"/>
+        on duplicate key update package_id = values(package_id)
+    </insert>
+    <select id="isLegacyPreparedSignature" resultType="int">
+        select count(*) from oa_sign_package p
+        join sys_config c on c.config_key='feature.hr.salarySource.startedAt'
+        where p.package_id=#{packageId} and p.status='PENDING_COMPANY'
+          and p.signing_sequence='SIGNATURE_FIRST' and p.final_confirmation_status='PREPARED_NOT_SENT'
+          and p.initial_signed_time &lt; cast(c.config_value as datetime)
+          and p.final_generated_time &lt; cast(c.config_value as datetime)
+          and not exists (select 1 from sys_employee_salary_current s where s.employee_id=p.employee_id)
+          and not exists (select 1 from sys_config f where f.config_key='feature.hr.salarySource.strict.enabled' and f.config_value='true')
+    </select>
+    <select id="isExcelPackage" resultType="int">
+        select count(*) from oa_sign_package p join oa_sign_task t on t.task_id = p.task_id
+        where p.package_id = #{packageId} and t.source_type = 'MANUAL_SIGN_EXCEL_IMPORT'
+    </select>
+</mapper>

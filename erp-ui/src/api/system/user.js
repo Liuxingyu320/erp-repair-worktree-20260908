@@ -1,6 +1,10 @@
 import request from '@/utils/request'
 import { parseStrEmpty } from "@/utils/common"
 
+function userSilentError(config) {
+  return !!(config && config.silentError === true)
+}
+
 // 查询用户列表
 export function listUser(query, config) {
   return request({
@@ -21,47 +25,52 @@ export function getUserSetupSummary(query) {
 }
 
 // 查询用户详细
-export function getUser(userId) {
+export function getUser(userId, config) {
   return request({
     url: '/system/user/' + parseStrEmpty(userId),
-    method: 'get'
+    method: 'get',
+    silentError: userSilentError(config)
   })
 }
 
 // 受控读取用户个人敏感信息（固定原因码、独立权限和审计）
-export function getUserPii(userId, reasonCode) {
+export function getUserPii(userId, reasonCode, config) {
   return request({
     url: `/system/user/${userId}/pii`,
     method: 'get',
-    params: { reasonCode }
+    params: { reasonCode },
+    silentError: userSilentError(config)
   })
 }
 
 // 受控修改用户个人敏感信息；新建后的短窗口使用独立端点
-export function updateUserPii(userId, data, reasonCode, afterCreate = false) {
+export function updateUserPii(userId, data, reasonCode, afterCreate = false, config) {
   return request({
     url: `/system/user/${userId}/${afterCreate ? 'pii-after-create' : 'pii'}`,
     method: 'put',
     params: { reasonCode },
-    data
+    data,
+    silentError: userSilentError(config)
   })
 }
 
 // 新增用户
-export function addUser(data) {
+export function addUser(data, config) {
   return request({
     url: '/system/user',
     method: 'post',
-    data: data
+    data: data,
+    silentError: userSilentError(config)
   })
 }
 
 // 修改用户
-export function updateUser(data) {
+export function updateUser(data, config) {
   return request({
     url: '/system/user',
     method: 'put',
-    data: data
+    data: data,
+    silentError: userSilentError(config)
   })
 }
 
@@ -75,11 +84,12 @@ export function patchUser(userId, data) {
 }
 
 // 预览根据部门、岗位和日期实时派生的档案字段
-export function previewUserDerivedProfile(data) {
+export function previewUserDerivedProfile(data, config) {
   return request({
     url: "/system/user/derived-preview",
     method: "post",
-    data
+    data,
+    silentError: userSilentError(config)
   })
 }
 
@@ -124,19 +134,21 @@ export function changeUserStatus(userId, status) {
 }
 
 // 查询用户个人信息
-export function getUserProfile() {
+export function getUserProfile(options) {
   return request({
     url: '/system/user/profile',
-    method: 'get'
+    method: 'get',
+    silentError: userSilentError(options)
   })
 }
 
 // 修改用户个人信息
-export function updateUserProfile(data) {
+export function updateUserProfile(data, options) {
   return request({
     url: '/system/user/profile',
     method: 'put',
-    data: data
+    data: data,
+    silentError: userSilentError(options)
   })
 }
 
@@ -175,14 +187,15 @@ export function uploadAvatar(data) {
   return request({
     url: '/system/user/profile/avatar',
     method: 'post',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    headers: { 'Idempotency-Key': 'avatar-' + (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + '-' + Math.random().toString(36).slice(2)), repeatSubmit: false },
     data: data
   })
 }
 
 // 查询授权角色
-export function getAuthRole(userId) {
+export function getAuthRole(userId, options) {
   return request({
+    silentError: !!(options && options.silentError === true),
     url: '/system/user/authRole/' + userId,
     method: 'get'
   })

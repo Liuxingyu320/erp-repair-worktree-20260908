@@ -11,4 +11,5 @@ public interface InvDeliveryNoticeMapper
     int insertInvDeliveryNotice(InvDeliveryNotice notice);
     int updateInvDeliveryNotice(InvDeliveryNotice notice);
     List<InvDeliveryNotice> selectInvDeliveryNoticeBySalesOrderId(Long salesOrderId);
+    List<InvDeliveryNotice> selectInvDeliveryNoticeBySalesOrderIdForUpdate(Long salesOrderId);
 }

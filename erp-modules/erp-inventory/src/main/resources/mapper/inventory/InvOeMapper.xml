@@ -15,6 +15,7 @@
         <result property="supplierName" column="supplier_name"/>
         <result property="supplierPhone" column="supplier_phone"/>
         <result property="imageUrl" column="image_url"/>
+        <result property="imageUrlsText" column="image_urls"/>
         <result property="purchaseReferenceUrl" column="purchase_reference_url"/>
         <result property="purchaseReferenceNote" column="purchase_reference_note"/>
         <result property="purchaseReferenceUpdatedBy" column="purchase_reference_updated_by"/>
@@ -51,7 +52,7 @@
     <sql id="selectInvOeVo">
         select i.oe_item_id, i.oe_item_code, i.category_id, c.category_name,
                i.oe_type_name, i.oe_item_name, i.item_description, i.order_unit,
-               i.cost_price, i.supplier_name, i.supplier_phone, i.image_url,
+               i.cost_price, i.supplier_name, i.supplier_phone, i.image_url, i.image_urls,
                i.purchase_reference_url, i.purchase_reference_note,
                i.purchase_reference_updated_by, i.purchase_reference_updated_time,
                <include refid="purchaseReferenceStatusExpression"/> as purchase_reference_status,
@@ -87,6 +88,12 @@
     <select id="selectInvOeById" parameterType="Long" resultMap="InvOeResult">
         <include refid="selectInvOeVo"/>
         where i.oe_item_id = #{oeItemId} and i.del_flag = '0'
+    </select>
+
+    <select id="selectInvOeByIdForUpdate" parameterType="Long" resultMap="InvOeResult">
+        <include refid="selectInvOeVo"/>
+        where i.oe_item_id = #{oeItemId} and i.del_flag = '0'
+        for update
     </select>
 
     <select id="selectInvOeByCode" resultMap="InvOeResult">
@@ -129,13 +136,13 @@
     <insert id="insertInvOe" parameterType="InvOeItem" useGeneratedKeys="true" keyProperty="oeItemId">
         insert into inv_oe_item (
             oe_item_code, category_id, oe_type_name, oe_item_name, item_description,
-            order_unit, cost_price, supplier_name, supplier_phone, image_url,
+            order_unit, cost_price, supplier_name, supplier_phone, image_url, image_urls,
             purchase_reference_url, purchase_reference_note,
             purchase_reference_updated_by, purchase_reference_updated_time,
             status, del_flag, create_by, create_time, remark
         ) values (
             #{oeItemCode}, #{categoryId}, #{oeTypeName}, #{oeItemName}, #{itemDescription},
-            #{orderUnit}, #{costPrice}, #{supplierName}, #{supplierPhone}, #{imageUrl},
+            #{orderUnit}, #{costPrice}, #{supplierName}, #{supplierPhone}, #{imageUrl}, #{imageUrlsText},
             #{purchaseReferenceUrl}, #{purchaseReferenceNote},
             #{purchaseReferenceUpdatedBy}, #{purchaseReferenceUpdatedTime},
             #{status}, '0', #{createBy}, sysdate(), #{remark}
@@ -147,14 +154,14 @@
         <set>
             <if test="oeItemCode != null">oe_item_code = #{oeItemCode},</if>
             <if test="categoryId != null">category_id = #{categoryId},</if>
-            <if test="oeTypeName != null">oe_type_name = #{oeTypeName},</if>
+            <if test="oeTypeName != null or _parameter.wasJsonFieldProvided('oeTypeName')">oe_type_name = #{oeTypeName},</if>
             <if test="oeItemName != null">oe_item_name = #{oeItemName},</if>
-            <if test="itemDescription != null">item_description = #{itemDescription},</if>
-            <if test="orderUnit != null">order_unit = #{orderUnit},</if>
+            <if test="itemDescription != null or _parameter.wasJsonFieldProvided('itemDescription')">item_description = #{itemDescription},</if>
+            <if test="orderUnit != null or _parameter.wasJsonFieldProvided('orderUnit')">order_unit = #{orderUnit},</if>
             <if test="costPrice != null">cost_price = #{costPrice},</if>
-            <if test="supplierName != null">supplier_name = #{supplierName},</if>
-            <if test="supplierPhone != null">supplier_phone = #{supplierPhone},</if>
-            <if test="imageUrl != null">image_url = #{imageUrl},</if>
+            <if test="supplierName != null or _parameter.wasJsonFieldProvided('supplierName')">supplier_name = #{supplierName},</if>
+            <if test="supplierPhone != null or (_parameter.wasJsonFieldProvided('supplierName') and supplierName == null)">supplier_phone = #{supplierPhone},</if>
+            <if test="imageUrlsText != null">image_url = #{imageUrl}, image_urls = #{imageUrlsText},</if>
             <if test="purchaseReferenceTouched != null and purchaseReferenceTouched">
                 purchase_reference_url = #{purchaseReferenceUrl},
                 purchase_reference_note = #{purchaseReferenceNote},
@@ -162,7 +169,7 @@
                 purchase_reference_updated_time = #{purchaseReferenceUpdatedTime},
             </if>
             <if test="status != null">status = #{status},</if>
-            <if test="remark != null">remark = #{remark},</if>
+            <if test="remark != null or _parameter.wasJsonFieldProvided('remark')">remark = #{remark},</if>
             update_by = #{updateBy}, update_time = sysdate()
         </set>
         where oe_item_id = #{oeItemId}

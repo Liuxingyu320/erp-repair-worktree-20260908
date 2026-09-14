@@ -27,6 +27,7 @@
       show-icon
       class="mb12"
     />
+    <el-alert v-if="listError" :title="listError" type="error" :closable="false" show-icon class="mb12" />
     <el-card shadow="never" class="search-card oa-filter-card purchase-filter-card">
       <el-form :model="queryParams" inline size="small">
         <el-form-item label="标题">
@@ -111,7 +112,8 @@
       :close-on-click-modal="false"
       :before-close="handleDialogClose"
     >
-      <el-form ref="formRef" :model="form" :rules="rules" label-width="96px">
+      <el-alert v-if="formError" :title="formError" type="error" :closable="false" show-icon class="mb12" />
+      <el-form ref="formRef" v-loading="formLoading" :disabled="formLoading || submitLoading" :model="form" :rules="rules" label-width="96px">
         <el-form-item label="标题" prop="title">
           <el-input v-model="form.title" maxlength="120" show-word-limit/>
         </el-form-item>
@@ -124,12 +126,13 @@
       </el-form>
       <div slot="footer">
         <el-button :disabled="submitLoading" @click="requestCloseForm">取消</el-button>
-        <el-button type="primary" :loading="submitLoading" :disabled="submitLoading" @click="save(false)">保存草稿</el-button>
-        <el-button type="success" :loading="submitLoading" :disabled="submitLoading || !purchaseSubmissionAvailable" @click="save(true)">保存并提交</el-button>
+        <el-button type="primary" :loading="submitLoading" :disabled="submitLoading || formLoading || !formReady" @click="save(false)">保存草稿</el-button>
+        <el-button type="success" :loading="submitLoading" :disabled="submitLoading || formLoading || !formReady || !purchaseSubmissionAvailable" @click="save(true)">保存并提交</el-button>
       </div>
     </el-dialog>
 
     <el-dialog title="采购申请与审批轨迹" :visible.sync="detailVisible" width="960px" append-to-body>
+      <el-alert v-if="detailError" :title="detailError" type="error" :closable="false" show-icon class="mb12" />
       <div v-loading="detailLoading">
         <el-descriptions v-if="detail" :column="3" border size="small">
           <el-descriptions-item label="申请单号">{{ detail.purchaseId || '-' }}</el-descriptions-item>
@@ -163,35 +166,49 @@
         </template>
         <el-empty v-else-if="detail && !detail.approvalInstanceId" description="尚未发起审批" :image-size="72"/>
       </div>
+      <approval-command-recovery :message="approvalError" :reason="approvalReason" :unknown="approvalUnknown" :busy="actionLoading || checkingApproval" :checking="checkingApproval" :checked="approvalChecked" @check="checkApprovalCommand" @retry="retryApprovalCommand" />
       <div slot="footer">
         <el-button @click="detailVisible=false">关闭</el-button>
-        <el-button v-if="canHandleApproval" type="success" :loading="actionLoading" @click="handleApprovalAction('approve')">同意</el-button>
-        <el-button v-if="canHandleApproval" type="warning" :loading="actionLoading" @click="handleApprovalAction('return')">退回修改</el-button>
-        <el-button v-if="canHandleApproval" type="danger" :loading="actionLoading" @click="handleApprovalAction('reject')">拒绝</el-button>
+        <el-button v-if="canHandleApproval" type="success" :loading="actionLoading" :disabled="approvalUnknown || checkingApproval" @click="handleApprovalAction('approve')">同意</el-button>
+        <el-button v-if="canHandleApproval" type="warning" :loading="actionLoading" :disabled="approvalUnknown || checkingApproval" @click="handleApprovalAction('return')">退回修改</el-button>
+        <el-button v-if="canHandleApproval" type="danger" :loading="actionLoading" :disabled="approvalUnknown || checkingApproval" @click="handleApprovalAction('reject')">拒绝</el-button>
       </div>
     </el-dialog>
   </div>
 </template>
 
 <script>
+import { createApprovalCommandRecovery } from "@/mixins/approvalCommandRecovery"
+import ApprovalCommandRecovery from "@/components/ApprovalCommandRecovery"
 import { closePurchase, getPurchaseAvailability, getPurchaseDetail, listMyPurchases, savePurchase, submitPurchase, withdrawPurchase } from "@/api/oa/purchase"
 import { getApprovalInstance } from "@/api/approval/monitor"
 import { approveApprovalTask, rejectApprovalTask, returnApprovalTask } from "@/api/approval/task"
 import { statusLabel as approvalStatusLabel, statusType as approvalStatusType } from "@/views/approval/manage/components/approvalUi"
 import { getBusinessEmptyText } from "@/utils/businessEmptyState"
+import { getSelectedDeptId } from "@/utils/shopContext"
+const { createUiOperationScope } = require("@/utils/uiOperationScope")
+const { purchaseRouteTarget, resolvePurchaseInstanceId, validatePurchaseApproval, canActOnPurchase } = require("@/utils/oaPurchaseContext")
+const { getTodoFocus } = require("@/utils/todoBusinessFocus")
 const { createTodoBusinessFocusMixin } = require("@/mixins/todoBusinessFocus")
 
 export default {
+  components: { ApprovalCommandRecovery },
   name: "OaPurchase",
-  mixins: [createTodoBusinessFocusMixin({
+  mixins: [createApprovalCommandRecovery({
+    target: vm => vm.detailTarget && ({ businessCode: 'OA_PURCHASE', businessId: vm.detailTarget.purchaseId, taskId: vm.detailTarget.taskId, instanceId: vm.detailTarget.instanceId }),
+    visible: vm => vm.detailVisible, canAct: vm => vm.canHandleApproval, loading: 'actionLoading',
+    success: (vm, command) => { vm.refreshTodo(); return vm.showDetail(command.businessId) }
+  }), createTodoBusinessFocusMixin({
     featureKey: "oaPurchase",
-    loadFocusedRow(purchaseId) { return getPurchaseDetail(purchaseId) },
+    loadFocusedRow(purchaseId) { return getPurchaseDetail(purchaseId, { silentError: true }) },
     actions: {
-      editOaPurchase(row) {
+      editOaPurchase(row, focus) {
+        if (!this.isPurchaseFocusCurrent(focus)) return
         if (!this.editable(row)) return this.showTodoBusinessHandled()
         return this.openForm(row)
       },
-      viewOaPurchaseApproval(row) {
+      viewOaPurchaseApproval(row, focus) {
+        if (!this.isPurchaseFocusCurrent(focus)) return
         if (!row || !row.purchaseId) return this.showTodoBusinessHandled()
         if (this.editable(row)) return this.openForm(row)
         return this.showDetail(row.purchaseId)
@@ -214,6 +231,12 @@ export default {
       approvalDetail: null,
       approvalTaskId: "",
       formSnapshot: "",
+      formLoading: false,
+      formReady: false,
+      formError: "",
+      listError: "",
+      detailError: "",
+      detailTarget: null,
       queryParams: {
         pageNum: 1,
         pageSize: 10,
@@ -240,10 +263,16 @@ export default {
     }
   },
   created() {
+    if (typeof window !== "undefined") window.addEventListener("erp:dept-changed", this.handlePurchaseContextChanged)
     this.loadPurchaseAvailability()
     this.getList()
   },
   computed: {
+    routeTargetKey() { return JSON.stringify(purchaseRouteTarget(this.$route && this.$route.query || {})) },
+    actorContextKey() {
+      const store = this.$store || {}, user = store.state && store.state.user || {}
+      return JSON.stringify([store.getters && store.getters.id, user.sessionRevision])
+    },
     approvalInstance() {
       return this.approvalDetail && this.approvalDetail.instance || {}
     },
@@ -256,10 +285,8 @@ export default {
       return Array.isArray(value) ? value : []
     },
     canHandleApproval() {
-      if (!this.approvalTaskId || !this.approvalDetail) return false
-      const task = this.approvalTasks.find(item => String(item.taskId || item.id) === String(this.approvalTaskId))
-      return !!task && String(task.taskStatus || task.status).toUpperCase() === "PENDING" &&
-        String(this.approvalInstance.status || "").toUpperCase() === "RUNNING"
+      return this.detailVisible && !this.detailLoading && this.purchaseScope().isCurrent(this._purchaseDetailToken, this.detailTarget) &&
+        canActOnPurchase(this.detail, this.approvalDetail, this.detailTarget)
     },
     currentUserId() {
       return this.$store && this.$store.getters ? this.$store.getters.id : undefined
@@ -267,6 +294,45 @@ export default {
     oaPurchaseEmptyText() {
       return getBusinessEmptyText("oaPurchase", "missingBaseline")
     }
+  },
+  watch: {
+    open(value) { if (!value) this.invalidatePurchaseForm() },
+    detailVisible(value) {
+      if (!value) { this.purchaseScope().invalidate("detail"); this.purchaseScope().invalidate("action"); this.actionLoading = false }
+    },
+    actorContextKey() { this.handlePurchaseContextChanged() },
+    routeTargetKey() {
+      this.handlePurchaseContextChanged(false)
+      this.todoBusinessFocus = getTodoFocus("oaPurchase", this.$route && this.$route.query || {})
+      if (this.todoBusinessFocus) this.getList()
+      else {
+        const target = purchaseRouteTarget(this.$route && this.$route.query || {})
+        if (target.purchaseId) this.showDetail(target.purchaseId)
+      }
+    }
+  },
+  activated() {
+    this.purchaseScope().activate()
+    if (this._needsPurchaseRefresh) { this._needsPurchaseRefresh = false; this.loadPurchaseAvailability(); this.getList() }
+  },
+  deactivated() {
+    this.purchaseScope().deactivate()
+    this.invalidatePurchaseForm()
+    this.detailLoading = false
+    this.actionLoading = false
+    this.loading = false
+    this.open = false
+    this.detailVisible = false
+    this.formSnapshot = ""
+    this._needsPurchaseRefresh = true
+  },
+  beforeDestroy() {
+    if (typeof window !== "undefined") window.removeEventListener("erp:dept-changed", this.handlePurchaseContextChanged)
+    this.purchaseScope().deactivate()
+  },
+  beforeRouteUpdate(to, from, next) {
+    if (JSON.stringify(purchaseRouteTarget(to.query)) === JSON.stringify(purchaseRouteTarget(from.query))) { next(); return }
+    this.confirmDiscardIfDirty().then(() => next()).catch(() => next(false))
   },
   beforeRouteLeave(to, from, next) {
     if (!this.isFormDirty()) {
@@ -282,6 +348,34 @@ export default {
   methods: {
     approvalStatusLabel,
     approvalStatusType,
+    purchaseScope() {
+      if (!this._purchaseScope) this._purchaseScope = createUiOperationScope(() => ({ actor: this.actorContextKey,
+        deptId: getSelectedDeptId(), path: this.$route && this.$route.path }))
+      return this._purchaseScope
+    },
+    isPurchaseFocusCurrent(focus) {
+      return Boolean(focus) && this.purchaseScope().isCurrent(focus.operationToken)
+    },
+    invalidatePurchaseForm() {
+      ;["form", "form-open", "save", "submit"].forEach(lane => this.purchaseScope().invalidate(lane))
+      this.formReady = false
+      this.formLoading = false
+      this.submitLoading = false
+    },
+    handlePurchaseContextChanged(refresh = true) {
+      this.purchaseScope().invalidate()
+      this.invalidatePurchaseForm()
+      this.open = false
+      this.detailVisible = false
+      this.detailTarget = null
+      this.detail = null
+      this.approvalDetail = null
+      this.list = []
+      this.total = 0
+      this.loading = false
+      this.actionLoading = false
+      if (refresh !== false && this.currentUserId) { this.loadPurchaseAvailability(); this.getList() }
+    },
     statusLabel(status) {
       return { draft: "草稿", submitting: "提交中", pending: "审批中", approved: "已通过", returned: "已退回", rejected: "已拒绝", withdrawn: "已撤回", terminated: "已终止", cancelled: "已关闭" }[status] || (status ? "未知状态" : "-")
     },
@@ -289,56 +383,88 @@ export default {
       return !!row && ["draft", "returned", "withdrawn"].includes(row.status)
     },
     loadPurchaseAvailability() {
+      const scope = this.purchaseScope(), token = scope.begin("availability")
       this.purchaseSubmissionAvailable = false
       this.purchaseAvailabilityResolved = false
       return getPurchaseAvailability().then(res => {
+        if (!scope.isCurrent(token)) return
         this.purchaseSubmissionAvailable = !!(res.data && res.data.enabled === true)
       }).catch(() => {
-        this.purchaseSubmissionAvailable = false
+        if (scope.isCurrent(token)) this.purchaseSubmissionAvailable = false
       }).finally(() => {
-        this.purchaseAvailabilityResolved = true
+        if (scope.isCurrent(token)) this.purchaseAvailabilityResolved = true
       })
     },
     getList() {
+      const scope = this.purchaseScope(), token = scope.begin("list")
       this.loading = true
-      return this.loadTodoBusinessList(() => listMyPurchases(this.queryParams)).then(res => {
+      this.listError = ""
+      return this.loadTodoBusinessList(() => listMyPurchases({ ...this.queryParams }, { silentError: true })).then(res => {
+        if (!scope.isCurrent(token)) return
         this.list = res.rows || []
         this.total = res.total || 0
+        if (this.todoBusinessFocus) this.todoBusinessFocus.operationToken = token
         return this.handleTodoFocusRows(this.list)
+      }).catch(error => {
+        if (scope.isCurrent(token)) this.listError = error && error.message || "采购申请加载失败，请重试"
       }).finally(() => {
-        this.loading = false
+        if (scope.isCurrent(token)) this.loading = false
       })
     },
     openForm(row) {
+      const scope = this.purchaseScope()
+      const intent = scope.begin("form-open")
       const eventLike = row && typeof row === "object" &&
         (typeof row.preventDefault === "function" || typeof row.stopPropagation === "function" ||
           (row.type && row.target))
       const rawPurchaseId = !eventLike && row && typeof row === "object" ? row.purchaseId : null
       const purchaseId = rawPurchaseId === undefined || rawPurchaseId === null
         ? "" : String(rawPurchaseId).trim()
-      if (!/^[1-9]\d{0,18}$/.test(purchaseId)) {
-        this.form = { purchaseId: undefined, title: "", amount: undefined, reason: "" }
+      const load = () => {
+        if (!scope.isCurrent(intent)) return
+        this.invalidatePurchaseForm()
+        const token = scope.begin("form")
+        this._purchaseFormToken = token
+        this.formError = ""
         this.open = true
-        this.$nextTick(this.markFormClean)
-        return
+        if (!/^[1-9]\d{0,18}$/.test(purchaseId)) {
+          this.form = { purchaseId: undefined, title: "", amount: undefined, reason: "" }
+          this.formReady = true
+          this.$nextTick(() => { if (scope.isCurrent(token)) this.markFormClean() })
+          return Promise.resolve()
+        }
+        this.formLoading = true
+        return getPurchaseDetail(purchaseId, { silentError: true }).then(res => {
+          if (!scope.isCurrent(token) || !this.open) return
+          if (!res.data || String(res.data.purchaseId) !== purchaseId) throw new Error("采购申请已变化，请重新打开")
+          this.form = Object.assign({}, res.data, { purchaseId })
+          this.formReady = true
+          this.$nextTick(() => { if (scope.isCurrent(token)) this.markFormClean() })
+        }).catch(error => {
+          if (scope.isCurrent(token) && this.open) this.formError = error && error.message || "采购申请加载失败，请重新打开"
+        }).finally(() => { if (scope.isCurrent(token)) this.formLoading = false })
       }
-      getPurchaseDetail(purchaseId).then(res => {
-        this.form = Object.assign({}, res.data || {}, { purchaseId })
-        this.open = true
-        this.$nextTick(this.markFormClean)
-      })
+      if (this.isFormDirty()) return this.confirmDiscardIfDirty().then(load).catch(() => {})
+      return load()
     },
     save(submitAfterSave) {
-      if (this.submitLoading) return
+      const scope = this.purchaseScope()
+      if (this.submitLoading || this.formLoading || !this.formReady || !this.open || !scope.isCurrent(this._purchaseFormToken)) return
       if (submitAfterSave && !this.purchaseSubmissionAvailable) {
         this.$modal.msgWarning("审批规则尚未发布或采购提交尚未开放")
         return
       }
+      const token = scope.begin("save"), formToken = this._purchaseFormToken
+      const payload = { ...this.form }
+      const current = () => scope.isCurrent(token) && scope.isCurrent(formToken) && this.open
+      this.submitLoading = true
       this.$refs.formRef.validate(valid => {
-        if (!valid) return
-        this.submitLoading = true
-        savePurchase(this.form).then(res => {
-          this.form = res.data
+        if (!current()) return
+        if (!valid) { this.submitLoading = false; return }
+        savePurchase(payload).then(res => {
+          if (!current()) return
+          if (!res.data || (payload.purchaseId && String(res.data.purchaseId) !== String(payload.purchaseId))) throw new Error("保存结果与采购申请不一致，请重新核对")
+          this.form = { ...res.data }
           this.markFormClean()
           if (!submitAfterSave) {
             this.$modal.msgSuccess("已保存草稿")
@@ -346,9 +472,11 @@ export default {
             this.getList()
             return
           }
-          return this.submitSavedPurchase(res.data)
+          return this.submitSavedPurchase({ ...res.data }, current)
+        }).catch(error => {
+          if (current() && !(error && error.notified)) this.formError = error && error.message || "保存结果待核对，请保留填写内容后重试"
         }).finally(() => {
-          this.submitLoading = false
+          if (scope.isCurrent(token)) this.submitLoading = false
         })
       })
     },
@@ -358,14 +486,20 @@ export default {
         this.$modal.msgWarning("审批规则尚未发布或采购提交尚未开放")
         return
       }
+      const scope = this.purchaseScope(), token = scope.begin("submit")
+      const payload = { ...row }
       this.submitLoading = true
-      this.submitSavedPurchase(row).finally(() => {
-        this.submitLoading = false
+      return this.submitSavedPurchase(payload, () => scope.isCurrent(token)).catch(error => {
+        if (scope.isCurrent(token) && !(error && error.notified)) this.$modal.msgError(error && error.message || "提交结果待核对，请刷新查看")
+      }).finally(() => {
+        if (scope.isCurrent(token)) this.submitLoading = false
       })
     },
-    submitSavedPurchase(row) {
+    submitSavedPurchase(row, current = () => true) {
       if (!this.purchaseSubmissionAvailable) return Promise.reject(new Error("审批规则尚未发布或采购提交尚未开放"))
-      return submitPurchase(row).then(() => {
+      if (!current()) return Promise.resolve()
+      return submitPurchase({ ...row }).then(() => {
+        if (!current()) return
         this.$modal.msgSuccess("提交成功")
         this.closeForm(true)
         this.getList()
@@ -413,6 +547,7 @@ export default {
       }
       this.open = false
       this.formSnapshot = ""
+      this.invalidatePurchaseForm()
     },
     markFormClean() {
       this.formSnapshot = this.snapshotForm()
@@ -434,41 +569,38 @@ export default {
       return this.$modal.confirm("当前采购申请有未保存内容，确定放弃修改吗？", "未保存提醒")
     },
     showDetail(purchaseId) {
-      const query = (this.$route && this.$route.query) || {}
-      this.approvalTaskId = String(query.approvalTaskId || "")
+      const target = purchaseRouteTarget(this.$route && this.$route.query || {}, purchaseId)
+      const scope = this.purchaseScope()
+      scope.invalidate("action")
+      const token = scope.begin("detail", target)
+      this._purchaseDetailToken = token
+      this.detailTarget = target
+      this.approvalTaskId = target.taskId
+      this.actionLoading = false
       this.detailVisible = true
       this.detailLoading = true
+      this.detailError = ""
       this.detail = null
       this.approvalDetail = null
-      return getPurchaseDetail(purchaseId).then(res => {
-        this.detail = res.data || {}
-        const instanceId = query.approvalInstanceId || this.detail.approvalInstanceId
+      const current = () => scope.isCurrent(token, this.detailTarget) && this.detailVisible
+      let purchase
+      return getPurchaseDetail(target.purchaseId, { silentError: true }).then(res => {
+        if (!current()) return
+        purchase = res.data || {}
+        const instanceId = resolvePurchaseInstanceId(purchase, target)
         if (!instanceId) return null
-        return getApprovalInstance(instanceId).then(response => {
-          this.approvalDetail = response.data && response.data.data !== undefined ? response.data.data : (response.data || {})
-        })
-      }).finally(() => { this.detailLoading = false })
+        return getApprovalInstance(instanceId, { silentError: true })
+      }).then(response => {
+        if (!current() || !purchase) return
+        const approval = response && (response.data && response.data.data !== undefined ? response.data.data : response.data || {})
+        validatePurchaseApproval(purchase, approval, target)
+        this.detail = purchase
+        this.approvalDetail = approval
+      }).catch(error => {
+        if (current()) this.detailError = error && error.message || "采购审批加载失败，请重试"
+      }).finally(() => { if (current()) this.detailLoading = false })
     },
-    handleApprovalAction(action) {
-      if (!this.canHandleApproval || this.actionLoading) return
-      const execute = reason => {
-        const data = { requestId: `OA_PURCHASE:${this.approvalTaskId}:${action}:${Date.now()}`, reason }
-        if (action === "approve") return approveApprovalTask(this.approvalTaskId, data)
-        if (action === "return") return returnApprovalTask(this.approvalTaskId, data)
-        return rejectApprovalTask(this.approvalTaskId, data)
-      }
-      const input = action === "approve"
-        ? this.$modal.confirm("确认同意这条采购申请？", "审批确认").then(() => "")
-        : this.$prompt(action === "return" ? "请输入退回原因" : "请输入拒绝原因", action === "return" ? "退回修改" : "拒绝申请", { inputValidator: value => String(value || "").trim() ? true : "原因不能为空" }).then(({ value }) => String(value).trim())
-      return input.then(reason => {
-        this.actionLoading = true
-        return execute(reason)
-      }).then(() => {
-        this.$modal.msgSuccess("审批动作已提交")
-        this.refreshTodo()
-        return this.showDetail(this.detail.purchaseId)
-      }).finally(() => { this.actionLoading = false }).catch(() => {})
-    },
+    handleApprovalAction(action) { return this.runApprovalCommand(action) },
     refreshTodo() {
       return this.$store.dispatch("todo/invalidateAfterMutation").catch(() => {})
     },

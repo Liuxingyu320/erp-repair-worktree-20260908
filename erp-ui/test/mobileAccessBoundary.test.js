@@ -262,6 +262,7 @@ const expectedPermissionsByFeature = {
   ],
   salary: [],
   notice: [],
+  messages: [],
   profile: [],
   systemUser: ["system:user:list"],
   systemRole: ["system:role:list"],
@@ -282,7 +283,7 @@ const expectedPermissionsByFeature = {
   mine: []
 }
 
-const authenticatedSelfServiceFeatures = new Set(["salary", "notice", "profile", "mine"])
+const authenticatedSelfServiceFeatures = new Set(["salary", "notice", "messages", "profile", "mine"])
 const definedMobileFeatures = mobileRouteDefinitions
   .map(definition => definition.meta && definition.meta.mobileFeature && definition.meta.mobileFeature.featureKey)
   .filter(Boolean)
@@ -606,6 +607,7 @@ assert.deepStrictEqual(
   "/mobile/mine",
   "/mobile/profile",
   "/mobile/notice",
+  "/mobile/messages",
   "/mobile/attendance",
   "/mobile/salary",
   "/mobile/contract",

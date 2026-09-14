@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.oa.mapper.OaFixedAssetConfigCommandMapper">
+    <resultMap id="Command" type="com.erp.oa.domain.OaFixedAssetConfigCommand">
+        <result property="payloadHash" column="payload_hash"/>
+        <result property="resultJson" column="result_json"/>
+    </resultMap>
+    <resultMap id="ConfigRow" type="com.erp.oa.domain.OaFixedAssetConfig">
+        <id property="configId" column="config_id"/>
+        <result property="shopDeptId" column="shop_dept_id"/>
+        <result property="oeItemId" column="oe_item_id"/>
+        <result property="assetQuantity" column="asset_quantity"/>
+        <result property="assetUnitPrice" column="asset_unit_price"/>
+        <result property="assetAmount" column="asset_amount"/>
+        <result property="status" column="status"/>
+        <result property="remark" column="remark"/>
+    </resultMap>
+    <select id="lockConfigRows" resultMap="ConfigRow">select * from oa_fixed_asset_config where shop_dept_id=#{shopId} order by config_id for update</select>
+    <select id="lockCommand" resultMap="Command">select payload_hash,result_json from oa_fixed_asset_config_command where shop_dept_id=#{shopId} and actor_id=#{actorId} and request_id=#{requestId} for update</select>
+    <insert id="ensureScope">insert into oa_fixed_asset_config_scope(shop_dept_id,scope_version) values(#{shopId},0) on duplicate key update shop_dept_id=shop_dept_id</insert>
+    <select id="selectVersion" resultType="java.lang.Long">select scope_version from oa_fixed_asset_config_scope where shop_dept_id=#{shopId}</select>
+    <select id="lockScope" resultType="java.lang.Long">select scope_version from oa_fixed_asset_config_scope where shop_dept_id=#{shopId} for update</select>
+    <update id="advanceVersion">update oa_fixed_asset_config_scope set scope_version=scope_version+1 where shop_dept_id=#{shopId} and scope_version=#{version}</update>
+    <insert id="claimCommand">insert into oa_fixed_asset_config_command(shop_dept_id,actor_id,request_id,payload_hash,create_time) values(#{shopId},#{actorId},#{requestId},#{hash},now()) on duplicate key update request_id=request_id</insert>
+    <select id="selectCommand" resultMap="Command">select payload_hash,result_json from oa_fixed_asset_config_command where shop_dept_id=#{shopId} and actor_id=#{actorId} and request_id=#{requestId}</select>
+    <update id="completeCommand">update oa_fixed_asset_config_command set result_json=#{result},complete_time=now() where shop_dept_id=#{shopId} and actor_id=#{actorId} and request_id=#{requestId} and payload_hash=#{hash} and result_json is null</update>
+</mapper>

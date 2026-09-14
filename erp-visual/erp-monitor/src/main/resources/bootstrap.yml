@@ -24,3 +24,19 @@ spring:
     import:
       - optional:nacos:application-${spring.profiles.active}.${spring.config.file-extension}
       - optional:nacos:${spring.application.name}-${spring.profiles.active}.${spring.config.file-extension}
+
+# Required before enabling this optional service; never commit credentials.
+erp:
+  monitor:
+    accounts:
+      admin-username: ${ERP_MONITOR_ADMIN_USERNAME:}
+      admin-password: ${ERP_MONITOR_ADMIN_PASSWORD:}
+      registration-enabled: ${ERP_MONITOR_REGISTRATION_ENABLED:false}
+      registrar-username: ${ERP_MONITOR_REGISTRAR_USERNAME:}
+      registrar-password: ${ERP_MONITOR_REGISTRAR_PASSWORD:}
+management:
+  endpoint:
+    health:
+      show-details: when-authorized
+      show-components: when-authorized
+      roles: MONITOR_ADMIN

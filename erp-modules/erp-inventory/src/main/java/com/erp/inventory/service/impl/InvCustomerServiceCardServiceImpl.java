@@ -1,5 +1,8 @@
 package com.erp.inventory.service.impl;
 
+import com.erp.inventory.domain.vo.InvCustomerServiceRecordQuery;
+import com.erp.inventory.domain.vo.InvCustomerServiceRecordPage;
+
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Date;
@@ -135,6 +138,59 @@ public class InvCustomerServiceCardServiceImpl extends InvBaseService
         InvCustomerServiceCardVo card = assertScopedCard(customerId, shopDeptId);
         card.setServiceRecords(mapper.selectRecords(customerId));
         return card;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public InvCustomerServiceRecordPage selectRecords(Long customerId, InvCustomerServiceRecordQuery requested, Long selectedShopDeptId)
+    {
+        PageHelper.clearPage();
+        Long shopDeptId = requireStoreContext(selectedShopDeptId, "请先选择门店");
+        assertScopedCard(customerId, shopDeptId);
+        InvCustomerServiceRecordQuery query = requested == null ? new InvCustomerServiceRecordQuery() : requested;
+        query.setCustomerId(customerId); query.setShopDeptId(shopDeptId);
+        int pageSize = query.getPageSize() == null ? 20 : query.getPageSize();
+        if (pageSize < 1 || pageSize > 50) throw new ServiceException("每页记录数必须在1至50之间");
+        query.setKeyword(trimToNull(query.getKeyword()));
+        if (query.getKeyword() != null && query.getKeyword().length() > 100) throw new ServiceException("搜索关键词不能超过100字");
+        query.setDateFrom(normalizeHistoryDate(query.getDateFrom())); query.setDateTo(normalizeHistoryDate(query.getDateTo()));
+        if (query.getDateFrom() != null && query.getDateTo() != null && query.getDateFrom().compareTo(query.getDateTo()) > 0)
+            throw new ServiceException("开始日期不能晚于结束日期");
+        boolean hasCursor = query.getBeforeRecordId() != null || query.getBeforeServiceDate() != null;
+        if (hasCursor)
+        {
+            if (query.getBeforeRecordId() == null || query.getBeforeRecordId() <= 0 || query.getSnapshotMaxRecordId() == null || query.getBeforeServiceDate() == null)
+                throw new ServiceException("历史分页游标不完整，请刷新记录");
+            try { java.time.LocalDateTime.parse(query.getBeforeServiceDate(), java.time.format.DateTimeFormatter.ofPattern("uuuu-MM-dd HH:mm:ss").withResolverStyle(java.time.format.ResolverStyle.STRICT)); }
+            catch (java.time.DateTimeException error) { throw new ServiceException("历史分页日期无效，请刷新记录"); }
+        }
+        Long maximum = mapper.selectRecordSnapshotMaxId(query);
+        maximum = maximum == null ? 0L : maximum;
+        if (query.getSnapshotMaxRecordId() == null) query.setSnapshotMaxRecordId(maximum);
+        else if (query.getSnapshotMaxRecordId() < 0 || query.getSnapshotMaxRecordId() > maximum)
+            throw new ServiceException("历史记录快照已变化，请刷新记录");
+        long total = mapper.countRecordHistory(query);
+        query.setPageSize(pageSize + 1);
+        List<InvCustomerServiceRecord> rows = mapper.selectRecordHistoryPage(query);
+        boolean hasMore = rows.size() > pageSize;
+        rows = new ArrayList<>(rows.subList(0, Math.min(rows.size(), pageSize)));
+        InvCustomerServiceRecordPage page = new InvCustomerServiceRecordPage();
+        page.setRecords(rows); page.setTotal(total); page.setHasMore(hasMore); page.setSnapshotMaxRecordId(query.getSnapshotMaxRecordId());
+        if (!rows.isEmpty())
+        {
+            InvCustomerServiceRecord last = rows.get(rows.size()-1);
+            page.setNextRecordId(last.getRecordId());
+            page.setNextServiceDate(new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(last.getServiceDate()));
+        }
+        return page;
+    }
+
+    private String normalizeHistoryDate(String date)
+    {
+        String value = trimToNull(date);
+        if (value == null) return null;
+        try { java.time.LocalDate.parse(value); return value; }
+        catch (java.time.DateTimeException error) { throw new ServiceException("服务记录日期无效"); }
     }
 
     @Override

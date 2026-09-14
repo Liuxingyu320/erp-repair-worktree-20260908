@@ -61,6 +61,13 @@ function settleBestEffort(task) {
 }
 
 function clearLocalSession(commit, options = {}) {
+  // This boundary runs after confirmed Cookie logout, or local credential invalidation.
+  // Never unlock while an unconfirmed Cookie logout is still pending/failed.
+  try {
+    void Promise.resolve(store.dispatch('lock/unlockScreen')).catch(() => {})
+  } catch (e) {
+    // Optional persistence failures must not prevent credential cleanup.
+  }
   clearSessionContextsBestEffort()
   commit('SET_TOKEN', '')
   commit('SET_EXPIRES_IN', '')
@@ -124,7 +131,7 @@ function runRequiredWithTimeout(task, timeoutMs = 12000) {
       handler(value)
     }
     const timeoutId = setTimeout(() => {
-      const error = new Error('退出请求超时，会话仍保持登录，请检查网络后重试。')
+      const error = new Error('退出请求超时，暂时无法确认退出结果，请检查网络后重试。')
       error.code = 'COOKIE_LOGOUT_TIMEOUT'
       finish(reject, error)
     }, timeoutMs)
@@ -139,15 +146,33 @@ function runRequiredWithTimeout(task, timeoutMs = 12000) {
   })
 }
 
-function notifyCookieLogoutFailure(error) {
-  const message = error && error.code === 'COOKIE_LOGOUT_TIMEOUT'
+function cookieLogoutFailureMessage(error) {
+  return error && error.code === 'COOKIE_LOGOUT_TIMEOUT'
     ? error.message
-    : '退出未完成，服务器会话仍保持登录。请检查网络后重试，或关闭页面后联系管理员。'
+    : '暂时无法确认服务器已完成退出，当前登录状态已保留。请检查网络后重试，或关闭页面后联系管理员。'
+}
+
+function notifyCookieLogoutFailure(error) {
+  const message = cookieLogoutFailureMessage(error)
   if (MessageBox && typeof MessageBox.alert === 'function') {
     void Promise.resolve(MessageBox.alert(message, '退出失败', {
       confirmButtonText: '我知道了',
       type: 'error'
     })).catch(() => {})
+  }
+}
+
+function logoutSessionSnapshot(state) {
+  return { sessionRevision: state.sessionRevision || 0, userId: String(state.id || ''), token: state.token || '' }
+}
+
+function requireLogoutSession(state, expected) {
+  const current = logoutSessionSnapshot(state)
+  if (current.sessionRevision !== expected.sessionRevision || current.userId !== expected.userId || current.token !== expected.token) {
+    const error = new Error('登录会话已变化，已忽略之前的退出结果')
+    error.code = 'LOGOUT_SESSION_CHANGED'
+    error.notified = true
+    throw error
   }
 }
 
@@ -189,6 +214,9 @@ const user = {
   },
 
   mutations: {
+    BEGIN_LOGIN: state => {
+      state.sessionRevision = (state.sessionRevision || 0) + 1
+    },
     SET_TOKEN: (state, token) => {
       state.token = token
     },
@@ -250,6 +278,9 @@ const user = {
   actions: {
     // 登录
     Login({ commit }, userInfo) {
+      // Cookie login has no script token and may not have a user ID until GetInfo.
+      // Starting it still supersedes completion permits from a preceding logout.
+      commit('BEGIN_LOGIN')
       clearLocalSession(commit, { updateWebStatus: !isCookiePreferredSession() })
       if (isCookiePreferredSession()) {
         setWebSessionStatus('unknown', false)
@@ -387,27 +418,45 @@ const user = {
     },
     
     // 退出系统
-    LogOut({ commit, state }) {
+    LogOut({ commit, state }, options = {}) {
+      const originalSession = logoutSessionSnapshot(state)
+      const completedResult = () => {
+        // clearLocalSession changes the revision itself. Return that exact completion identity,
+        // and reject if another login took over while optional cleanup was still finishing.
+        const completedSession = logoutSessionSnapshot(state)
+        return () => {
+          requireLogoutSession(state, completedSession)
+          return { completed: true, ...completedSession }
+        }
+      }
       if (isCookiePreferredSession()) {
         const finishLocalLogout = () => {
+          requireLogoutSession(state, originalSession)
           clearMobileHrQueueStateCache()
           const cleanup = [
             settleBestEffort(() => store.dispatch('todo/stop')),
             settleBestEffort(() => pushRegistration.disable())
           ]
           clearLocalSession(commit)
-          return Promise.all(cleanup).then(() => undefined)
+          return Promise.all(cleanup).then(completedResult())
         }
         return runRequiredWithTimeout(() => logout())
           .then(finishLocalLogout)
           .catch(error => {
+            requireLogoutSession(state, originalSession)
             // 401 表示服务端会话已失效，网关同时清除了 Cookie，可安全完成本地退出。
             if (isUnauthorizedError(error)) {
               return finishLocalLogout()
             }
-            notifyCookieLogoutFailure(error)
             const logoutError = error instanceof Error ? error : new Error('退出未完成')
             if (!logoutError.code) logoutError.code = 'COOKIE_LOGOUT_FAILED'
+            if (options && options.failureFeedback === 'inline') {
+              // The lock screen covers global dialogs. Let that caller render its visible alert.
+              logoutError.inlineMessage = cookieLogoutFailureMessage(logoutError)
+            } else if (!logoutError.notified) {
+              notifyCookieLogoutFailure(logoutError)
+              logoutError.notified = true
+            }
             return Promise.reject(logoutError)
           })
       }
@@ -422,7 +471,7 @@ const user = {
         void settleBestEffort(() => logout(token))
       })
       clearLocalSession(commit)
-      return Promise.all(cleanup).then(() => undefined)
+      return Promise.all(cleanup).then(completedResult())
     },
 
     // 前端 登出

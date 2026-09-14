@@ -2,8 +2,8 @@ import request from '@/utils/request'
 
 const BASE_URL = '/oa/attendance-v2'
 
-export function listAttendanceShifts(params) {
-  return request({ url: `${BASE_URL}/shifts`, method: 'get', params })
+export function listAttendanceShifts(params, options) {
+  return request({ url: `${BASE_URL}/shifts`, method: 'get', params, silentError: options && options.silentError === true })
 }
 
 export function createAttendanceShift(data) {
@@ -46,8 +46,8 @@ export function deleteAttendanceSite(siteId, rowVersion) {
   return request({ url: `${BASE_URL}/sites/${siteId}`, method: 'delete', params: { rowVersion }, silentError: true })
 }
 
-export function listAttendanceSchedules(params) {
-  return request({ url: `${BASE_URL}/schedules`, method: 'get', params })
+export function listAttendanceSchedules(params, options) {
+  return request({ url: `${BASE_URL}/schedules`, method: 'get', params, silentError: options && options.silentError === true })
 }
 
 export function listAttendanceEmployeeOptions(params) {
@@ -102,7 +102,7 @@ export function submitAttendancePunch(payload, onUploadProgress) {
     method: 'post',
     headers: { 'Content-Type': 'multipart/form-data' },
     data,
-    timeout: 0,
+    timeout: 60000,
     silentError: true,
     onUploadProgress
   })
@@ -122,7 +122,7 @@ export function getPunchEvidenceContent(evidenceId) {
     url: `${BASE_URL}/evidence/${evidenceId}/content`,
     method: 'get',
     responseType: 'blob',
-    timeout: 0,
+    timeout: 20000,
     silentError: true
   })
 }
@@ -266,6 +266,10 @@ export function updateAttendanceLeaveDraft(leaveRequestId, data) {
   return request({ url: `${BASE_URL}/leave/${leaveRequestId}/draft`, method: 'put', data, silentError: true })
 }
 
+export function previewAttendanceLeavePolicy(leaveRequestId, data) {
+  return request({ url: `${BASE_URL}/leave/${leaveRequestId}/policy-preview`, method: 'post', data, silentError: true })
+}
+
 export function submitAttendanceLeave(leaveRequestId, rowVersion) {
   return request({
     url: `${BASE_URL}/leave/${leaveRequestId}/submit`,
@@ -331,6 +335,10 @@ export function listShopAttendanceCorrections(params) {
 
 export function getAttendanceCorrection(correctionRequestId) {
   return request({ url: `${BASE_URL}/corrections/${correctionRequestId}`, method: 'get', silentError: true })
+}
+
+export function getAttendanceCorrectionByClientRequest(clientRequestId) {
+  return request({ url: `${BASE_URL}/corrections/by-client-request/${encodeURIComponent(clientRequestId)}`, method: 'get', silentError: true })
 }
 
 export function createAttendanceCorrectionDraft(data) {

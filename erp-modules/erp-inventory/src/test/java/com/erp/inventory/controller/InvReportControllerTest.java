@@ -100,6 +100,10 @@ class InvReportControllerTest
         controller.productOptions("龙井", 20, request, optionResponse);
         assertNoStore(optionResponse);
 
+        MockHttpServletResponse itemResponse = new MockHttpServletResponse();
+        controller.itemOptions("oe", "壶", 20, request, itemResponse);
+        assertNoStore(itemResponse);
+
         MockHttpServletResponse exportResponse = new MockHttpServletResponse();
         controller.exportStockWarning(exportResponse, new InvStock(), request);
         assertNoStore(exportResponse);

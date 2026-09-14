@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 1,
+  "releaseId": "repair-20260912",
+  "migrationList": "scripts/repair-migrations-20260912.list",
+  "migrationCount": 7,
+  "sourceDirectory": "sql",
+  "deployDirectory": "docker/mysql/releases/repair-20260912",
+  "featureFlags": [],
+  "migrations": [
+    {
+      "file": "erp_hr_employee_salary_edit_permission_20260912.sql",
+      "sha256": "9edbe3a7fda0b2467d381f6881f5aa9746a7bacb677c29d26eb3b58d5e08e4da"
+    },
+    {
+      "file": "erp_inventory_purchase_return_lock_indexes_20260912.sql",
+      "sha256": "56bfb4e77a0ff7303afdeb4bc4aaf77f04dd5e0b50a08d90b9326e0c0e395c45"
+    },
+    {
+      "file": "erp_system_user_notification_page_index_20260912.sql",
+      "sha256": "0d8a26d12d17b7d7bc2cd419f51da5a558e73b6d9a09521a9416aa4963774a17"
+    },
+    {
+      "file": "erp_inventory_stock_check_restart_20260912.sql",
+      "sha256": "353417e3d15d68a79a74a9b4483bc28e1fcfbe58c27ce2b6c769265d2b926da4"
+    },
+    {
+      "file": "erp_oa_attendance_leave_balance_20260912.sql",
+      "sha256": "43c9aba9223bfbb50ab385cc4865888429c6949cf865f0d7dad76b3e8f66040c"
+    },
+    {
+      "file": "erp_oa_attendance_overtime_transfer_20260912.sql",
+      "sha256": "69c4a281b44987bf6d01a3a62db22d913846649f87da34ac95b062c7486183cf"
+    },
+    {
+      "file": "erp_oa_attendance_leave_quota_20260912.sql",
+      "sha256": "e918fff0bd63f98566fb9c986fa005c314bd78e64c8618332832bff2541bdfd0"
+    }
+  ],
+  "artifactSha256Required": true,
+  "releaseAcceptance": "B08-C SQL frozen by its author and hash verified; business final acceptance pending. Package preparation is not deployment authorization.",
+  "operatorNotes": [
+    "Requires verified existing baseline and prior attendance/HR/inventory schemas; do not use as fresh base schema.",
+    "No automatic role grants; balance accrual property remains default false; legacy attendance cutover is outside this upgrade list.",
+    "Retain historical salary/signing/inventory/restart/balance facts; no universal destructive rollback script."
+  ]
+}

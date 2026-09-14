@@ -15,8 +15,10 @@ public interface HrHealthCertificateMapper
 
     List<HrHealthCertificateVo> selectByUserId(Long userId);
 
+    List<HrHealthCertificateVo> selectByUserIdForUpdate(Long userId);
+
     List<HrHealthCertificateVo> selectCurrentByUserIds(
-            @Param("userIds") List<Long> userIds);
+            @Param("userIds") List<Long> userIds, @Param("asOfDate") LocalDate asOfDate);
 
     List<HrHealthCertificateVo> selectScopedList(
             HrHealthCertificateVo query);
@@ -25,6 +27,7 @@ public interface HrHealthCertificateMapper
             HrHealthCertificateVo query);
 
     List<HrHealthCertificateVo> selectReminderCandidates(
+            @Param("asOfDate") LocalDate asOfDate,
             @Param("expiresThrough") LocalDate expiresThrough,
             @Param("afterCertificateId") Long afterCertificateId,
             @Param("limit") int limit);
@@ -52,6 +55,10 @@ public interface HrHealthCertificateMapper
 
     int clearCurrentByUserId(@Param("userId") Long userId,
             @Param("updateBy") String updateBy);
+
+    int setCurrentCertificate(@Param("userId") Long userId,
+            @Param("certificateId") Long certificateId,
+            @Param("asOfDate") LocalDate asOfDate, @Param("updateBy") String updateBy);
 
     int reviewCertificate(@Param("certificateId") Long certificateId,
             @Param("version") Long version,

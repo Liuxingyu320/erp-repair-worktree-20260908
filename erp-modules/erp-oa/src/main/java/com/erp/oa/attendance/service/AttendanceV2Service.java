@@ -71,6 +71,7 @@ import com.erp.oa.attendance.support.AttendanceGeoFence;
 import com.erp.oa.attendance.support.AttendanceLocationAuditPolicy;
 import com.erp.oa.attendance.support.AttendanceLeaveCoveragePolicy;
 import com.erp.oa.attendance.support.AttendanceLeaveCoveragePolicy.Coverage;
+import com.erp.oa.attendance.support.AttendanceLeaveCoveragePolicy.TimeInterval;
 import com.erp.oa.attendance.support.AttendanceRuleEngine;
 import com.erp.oa.attendance.support.AttendanceRuleEngine.PunchWindow;
 import com.erp.oa.service.BusinessFeatureGate;
@@ -332,6 +333,30 @@ public class AttendanceV2Service
         return mapper.selectActiveEmployeeOptions(target, query);
     }
 
+    public Map<String, Object> employeeOptionsPage(Long shopId, String keyword,
+            Integer pageNum, Integer pageSize, Long selectedShopId)
+    {
+        Long target = requireSameScopedShop(shopId, selectedShopId);
+        String query = blankToNull(keyword);
+        if (query != null && query.length() > 50)
+            throw new ServiceException("EMPLOYEE_OPTION_KEYWORD_TOO_LONG");
+        int page = pageNum == null ? 1 : pageNum;
+        int size = pageSize == null ? 100 : pageSize;
+        if (page < 1 || size < 1 || size > 100)
+            throw new ServiceException("EMPLOYEE_OPTION_PAGE_INVALID");
+        long offset = ((long) page - 1) * size;
+        long total = mapper.countActiveEmployeeOptions(target, query);
+        List<EmployeeOption> rows = offset >= total ? List.of()
+                : mapper.selectActiveEmployeeOptionsPage(target, query,
+                        offset, size);
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("rows", rows == null ? List.of() : rows);
+        result.put("total", total);
+        result.put("pageNum", page);
+        result.put("pageSize", size);
+        return result;
+    }
+
     @Transactional
     public List<Schedule> saveScheduleBatch(ScheduleBatch request,
             Long selectedShopId)
@@ -423,10 +448,32 @@ public class AttendanceV2Service
                 || request.scheduleIds.size() > MAX_BATCH)
             throw new ServiceException("SCHEDULE_PUBLISH_SIZE_INVALID");
         Long shopId = requireSameScopedShop(request.shopId, selectedShopId);
+        Map<Long, Schedule> frozen = new LinkedHashMap<>();
+        if (request.scheduleVersions != null)
+        {
+            Set<Long> ids = new java.util.HashSet<>(request.scheduleIds);
+            if (ids.size() != request.scheduleIds.size() || ids.contains(null)
+                    || !ids.equals(request.scheduleVersions.keySet())
+                    || request.scheduleVersions.values().stream()
+                            .anyMatch(version -> version == null || version < 0))
+                throw new ServiceException("SCHEDULE_PUBLISH_SNAPSHOT_INVALID");
+            // Lock and validate the whole batch before any row is published.
+            // The surrounding transaction keeps these locks until all writes finish.
+            for (Long id : request.scheduleIds)
+            {
+                Schedule current = mapper.selectScheduleByIdForUpdate(id);
+                if (current == null || !shopId.equals(current.shopId))
+                    throw new ServiceException("SCHEDULE_NOT_FOUND_IN_SHOP");
+                if (!request.scheduleVersions.get(id).equals(current.rowVersion))
+                    throw new ServiceException("SCHEDULE_VERSION_CONFLICT");
+                frozen.put(id, current);
+            }
+        }
         List<Schedule> published = new ArrayList<>();
         for (Long id : request.scheduleIds)
         {
-            Schedule current = mapper.selectScheduleByIdForUpdate(id);
+            Schedule current = request.scheduleVersions == null
+                    ? mapper.selectScheduleByIdForUpdate(id) : frozen.get(id);
             if (current == null || !shopId.equals(current.shopId))
                 throw new ServiceException("SCHEDULE_NOT_FOUND_IN_SHOP");
             if (mapper.countActiveEmployeeInShop(current.userId, shopId) <= 0)
@@ -454,19 +501,25 @@ public class AttendanceV2Service
         return published;
     }
 
-    public TodayContext today()
+    public TodayContext today(Long selectedShopId)
     {
         requireEnabled();
+        Long shopId = shopScopeService.resolveRequiredShopDept(selectedShopId);
         LocalDateTime now = authoritativeNow();
         Long userId = SecurityUtils.getUserId();
         List<Schedule> candidates = mapper
                 .selectPublishedScheduleCandidatesForUser(userId,
-                        now.toLocalDate(), now.toLocalDate().minusDays(1));
+                        now.toLocalDate().minusDays(2), now.toLocalDate().plusDays(1));
         TodayContext context = new TodayContext();
         context.serverTime = now;
         if (candidates == null || candidates.isEmpty())
             return locked(context, "LOCKED_NO_SCHEDULE", "今日没有已发布排班");
-        Schedule schedule = chooseCandidate(candidates, now);
+        List<Schedule> scoped = candidates.stream()
+                .filter(value -> Objects.equals(shopId, value.shopId)).toList();
+        if (scoped.isEmpty())
+            return locked(context, "LOCKED_WRONG_STORE",
+                    "当前门店与本人排班不一致，请切换到排班门店");
+        Schedule schedule = chooseCandidate(scoped, now);
         hydratePublishedSegments(schedule, false);
         context.schedule = schedule;
         context.punchModeSnapshot = rules.normalizePunchMode(
@@ -481,16 +534,17 @@ public class AttendanceV2Service
         context.dayResult = mapper.selectDayResultByScheduleId(schedule.scheduleId);
         if (isPerWorkSegment(schedule))
             return populateSegmentToday(context, schedule, now);
-        BoundaryPunchState boundary = boundaryPunchState(schedule, false);
+        BoundaryPunchState boundary = boundaryPunchState(schedule, now, false);
         if (boundary.fullyCovered())
             return locked(context, "ON_LEAVE",
                     "当前班次已由批准请假全额覆盖，无需打卡");
         if (boundary.nextType() == null
-                && boundary.requiresRemainingWorkConfirmation())
-            return locked(context, "REMAINING_WORK_CONFIRMATION_REQUIRED",
-                    "部分请假之间仍有工作时间，等待管理者核验");
+                && boundary.remainingWorkStatus() != null)
+            return remainingWorkToday(context, boundary.remainingWorkStatus());
         if (boundary.nextType() == null)
-            return locked(context, "COMPLETED", "今日打卡已完成");
+            return boundary.hasMissingSlots()
+                    ? locked(context, "CLOSED_WITH_MISSING", "存在待处理的缺卡记录，请申请补卡")
+                    : locked(context, "COMPLETED", "今日打卡已完成");
         context.allowedPunchType = boundary.nextType();
         PunchWindow window = rules.window(schedule, context.allowedPunchType);
         if (now.isBefore(window.opensAt()) || now.isAfter(window.closesAt()))
@@ -501,15 +555,17 @@ public class AttendanceV2Service
     }
 
     @Transactional
-    public ChallengeView issueChallenge(ChallengeCreate request)
+    public ChallengeView issueChallenge(ChallengeCreate request, Long selectedShopId)
     {
         requireEnabled();
         if (request == null || request.scheduleId == null)
             throw new ServiceException("CHALLENGE_REQUEST_INVALID");
         String type = rules.normalizeType(request.punchType);
-        LocalDateTime now = authoritativeNow();
+        var clockSample = authoritativeClock();
+        LocalDateTime now = clockSample.localTime.withNano(0);
         Schedule schedule = mapper.selectScheduleById(request.scheduleId);
         requireSelfPublishedSchedule(schedule);
+        requireSelectedPunchShop(schedule, selectedShopId);
         SegmentPunchBinding segmentBinding = null;
         if (isPerWorkSegment(schedule))
             segmentBinding = requireNextSegmentSlot(schedule,
@@ -517,7 +573,7 @@ public class AttendanceV2Service
         else
         {
             requireBoundarySlotAbsent(request.punchSlotKey);
-            requireExpectedBoundaryPunch(schedule, type, false);
+            requireExpectedBoundaryPunch(schedule, type, now, false);
             rules.requireWithinWindow(schedule, type, now);
         }
         Challenge challenge = new Challenge();
@@ -539,29 +595,55 @@ public class AttendanceV2Service
                 runtimePolicy.challengeTtlSeconds());
         if (mapper.insertChallenge(challenge) != 1)
             throw new ServiceException("CHALLENGE_CREATE_FAILED");
-        return new ChallengeView(challenge.challengeToken,
+        ChallengeView view = new ChallengeView(challenge.challengeToken,
                 challenge.expiresAt, challenge.scheduleId, type,
                 challenge.punchSlotKey);
+        view.expiresAtUtc = java.time.Instant.ofEpochMilli(clockSample.epochMillis)
+                .plus(Duration.between(clockSample.localTime, challenge.expiresAt)).toString();
+        return view;
     }
 
     @Transactional
-    public PunchResult punch(PunchCommand command, MultipartFile photo)
+    public PunchResult punch(PunchCommand command, MultipartFile photo,
+            Long selectedShopId)
     {
         requireEnabled();
         if (command == null || command.challengeToken == null
                 || command.challengeToken.isBlank())
             throw new ServiceException("PUNCH_CHALLENGE_REQUIRED");
-        LocalDateTime now = authoritativeNow();
         String type = rules.normalizeType(command.punchType);
         Challenge challenge = mapper.selectChallengeByTokenForUpdate(
                 command.challengeToken);
+        // A terminal status query may have held this row until the challenge
+        // expired. Never accept using a timestamp captured before that wait.
+        ServiceException captureParseError = null;
+        if (command.clientCaptureTimestamp != null)
+        {
+            try { parseCaptureTime(command, command.clientCaptureTimestamp); }
+            catch (ServiceException invalid) { captureParseError = invalid; }
+        }
+        var clockSample = command.clientCaptureInstant == null ? null : authoritativeClock();
+        LocalDateTime now = clockSample == null ? authoritativeNow() : clockSample.localTime.withNano(0);
         challengePolicy.requireUsable(challenge, SecurityUtils.getUserId(),
                 type, now);
+        // A malformed retry must not report rejection if this challenge already
+        // committed a punch; validate the one-time credential before this error.
+        if (captureParseError != null) throw captureParseError;
+        if (clockSample != null)
+        {
+            Duration delta = Duration.between(java.time.Instant.ofEpochMilli(clockSample.epochMillis), command.clientCaptureInstant);
+            if (delta.abs().compareTo(Duration.ofMinutes(6)) > 0)
+                throw new ServiceException("CLIENT_CAPTURE_TIME_STALE");
+            // Map the absolute instant onto the database's local business clock.
+            // This avoids assuming either the phone or JVM has the DB timezone.
+            command.clientCaptureTime = clockSample.localTime.plusNanos(delta.toNanos());
+        }
         requireFreshCaptureTime(command.clientCaptureTime,
                 challenge.issuedAt, now);
         Schedule schedule = mapper.selectScheduleByIdForUpdate(
                 challenge.scheduleId);
         requireSelfPublishedSchedule(schedule);
+        requireSelectedPunchShop(schedule, selectedShopId);
         if (!schedule.shopId.equals(challenge.shopId)
                 || !schedule.businessDate.equals(challenge.businessDate))
             throw new ServiceException("PUNCH_CHALLENGE_SCOPE_CHANGED");
@@ -588,7 +670,7 @@ public class AttendanceV2Service
             if (challenge.punchSlotKey != null
                     || challenge.scheduleSegmentSnapshotId != null)
                 throw new ServiceException("PUNCH_BOUNDARY_CHALLENGE_INVALID");
-            requireExpectedBoundaryPunch(schedule, type, true);
+            requireExpectedBoundaryPunch(schedule, type, now, true);
             rules.requireWithinWindow(schedule, type, now);
         }
         String coordinateSystem = requireAuditLocation(command);
@@ -891,13 +973,13 @@ public class AttendanceV2Service
             if (state.allWorkSegmentsExempt())
                 return locked(context, "ON_LEAVE",
                         "当前班次的所有工作段均已由批准请假覆盖，无需打卡");
-            if (state.hasRemainingWorkPending())
-                return locked(context,
-                        "REMAINING_WORK_CONFIRMATION_REQUIRED",
-                        "部分请假之间仍有工作时间，等待管理者核验");
+            if (remainingWorkPending(state.remainingWorkStatus()))
+                return remainingWorkToday(context, state.remainingWorkStatus());
             if (state.hasMissingSlots())
                 return locked(context, "CLOSED_WITH_MISSING",
                         "当日工作段已结束，存在缺卡记录，请申请补卡");
+            if (state.remainingWorkStatus() != null)
+                return remainingWorkToday(context, state.remainingWorkStatus());
             return locked(context, "COMPLETED", "今日各工作段打卡已完成");
         }
         PunchSlotView next = state.nextSlot();
@@ -933,7 +1015,7 @@ public class AttendanceV2Service
         {
             if (state.allWorkSegmentsExempt())
                 throw new ServiceException("PUNCH_BLOCKED_BY_APPROVED_LEAVE");
-            if (state.hasRemainingWorkPending())
+            if (remainingWorkPending(state.remainingWorkStatus()))
                 throw new ServiceException(
                         "PUNCH_REMAINING_WORK_CONFIRMATION_REQUIRED");
             if (state.hasMissingSlots())
@@ -983,7 +1065,9 @@ public class AttendanceV2Service
         Map<Long, ScheduleSegmentSnapshot> segmentById =
                 new LinkedHashMap<>();
         Set<Long> exemptSegmentIds = new java.util.HashSet<>();
-        boolean hasRemainingWorkPending = false;
+        Map<Long, String> remainingStatusBySegment = new LinkedHashMap<>();
+        List<RemainingWorkConfirmationSource> confirmations = null;
+        String remainingStatus = null;
         for (int index = 0; index < workSegments.size(); index++)
         {
             ScheduleSegmentSnapshot segment = workSegments.get(index);
@@ -1000,7 +1084,20 @@ public class AttendanceV2Service
                     segment.scheduleSegmentSnapshotId);
             boolean confirmationRequired = coverage
                     .requiresRemainingWorkConfirmation();
-            hasRemainingWorkPending |= confirmationRequired;
+            if (confirmationRequired)
+            {
+                if (confirmations == null)
+                {
+                    confirmations = mapper.selectRemainingWorkConfirmationSources(
+                            schedule.scheduleId, lockRows);
+                    if (confirmations == null) confirmations = List.of();
+                }
+                String status = remainingWorkStatus(schedule,
+                        coverage.remainingIntervals(), confirmations);
+                remainingStatusBySegment.put(segment.scheduleSegmentSnapshotId,
+                        status);
+                remainingStatus = mergeRemainingWorkStatus(remainingStatus, status);
+            }
             String label = workSegmentLabel(index, workSegments.size());
             addSegmentSlot(schedule, segment, "IN", label, startAt, endAt,
                     coverage.fullyCovered() || coverage.startCovered(),
@@ -1010,6 +1107,10 @@ public class AttendanceV2Service
                     confirmationRequired, workSegments, slots, slotByKey);
         }
 
+        Set<String> leaveExemptSlotKeys = slots.stream()
+                .filter(slot -> "EXEMPT_LEAVE".equals(slot.status))
+                .map(slot -> slot.punchSlotKey)
+                .collect(java.util.stream.Collectors.toSet());
         List<PunchEvent> accepted = mapper.selectAcceptedPunches(
                 schedule.scheduleId);
         if (accepted == null) accepted = List.of();
@@ -1038,8 +1139,48 @@ public class AttendanceV2Service
 
         PunchSlotView next = null;
         boolean hasMissing = false;
+        var correctedCoverage = approvedPunchCoverage(schedule, lockRows);
+        if (correctedCoverage != null)
+            for (PunchSlotView slot : slots)
+            {
+                var source = correctedCoverage.sources().get(slot.punchSlotKey);
+                if (source != null && source.correctionRequestId() != null)
+                {
+                    slot.completed = true;
+                    slot.status = "CORRECTED";
+                    slot.correctionRequestId = source.correctionRequestId();
+                }
+                else if (source == null && slot.punchEventId != null)
+                {
+                    // WRONG_TYPE retires the effective source, but its immutable
+                    // event still occupies the DB unique slot. Preserve leave
+                    // coverage; otherwise require correction or manual review.
+                    slot.completed = leaveExemptSlotKeys.contains(
+                            slot.punchSlotKey);
+                    slot.status = slot.completed ? "EXEMPT_LEAVE"
+                            : slot.requiresRemainingWorkConfirmation
+                                    ? "REMAINING_WORK_PENDING"
+                                    : "CORRECTION_REQUIRED";
+                }
+            }
         for (PunchSlotView slot : slots)
         {
+            String manualStatus = remainingStatusBySegment.get(
+                    slot.scheduleSegmentSnapshotId);
+            if (manualStatus != null)
+            {
+                // The original slots remain exempt after review. A physical
+                // punch or correction cannot substitute for the work-island review.
+                slot.status = manualStatus;
+                slot.completed = !remainingWorkPending(manualStatus);
+                slot.requiresRemainingWorkConfirmation = !slot.completed;
+                continue;
+            }
+            if ("CORRECTION_REQUIRED".equals(slot.status))
+            {
+                hasMissing = true;
+                continue;
+            }
             if (slot.completed) continue;
             if (slot.requiresRemainingWorkConfirmation)
             {
@@ -1064,7 +1205,7 @@ public class AttendanceV2Service
         boolean allExempt = exemptSegmentIds.size() == workSegments.size();
         return new SegmentPunchState(List.copyOf(workSegments),
                 List.copyOf(slots), next, Map.copyOf(segmentById), allExempt,
-                hasMissing, hasRemainingWorkPending);
+                hasMissing, remainingStatus);
     }
 
     private void addSegmentSlot(Schedule schedule,
@@ -1180,19 +1321,18 @@ public class AttendanceV2Service
     private Schedule chooseCandidate(List<Schedule> values,
             LocalDateTime now)
     {
-        for (Schedule value : values)
-        {
-            if (value.businessDate.equals(now.toLocalDate().minusDays(1))
-                    && Boolean.TRUE.equals(value.crossDaySnapshot)
-                    && isInsideNextPunchWindow(value, now))
-                return value;
-        }
-        for (Schedule value : values)
-            if (value.businessDate.equals(now.toLocalDate())
-                    && isInsideNextPunchWindow(value, now)) return value;
-        for (Schedule value : values)
+        // Oldest still-open window wins, including delayed non-cross-day OUT
+        // and the second morning after a late-starting cross-day shift.
+        List<Schedule> ordered = values.stream()
+                .sorted(Comparator.comparing(value -> value.businessDate))
+                .toList();
+        for (Schedule value : ordered)
+            if (isInsideNextPunchWindow(value, now)) return value;
+        for (Schedule value : ordered)
             if (value.businessDate.equals(now.toLocalDate())) return value;
-        return values.get(0);
+        for (Schedule value : ordered)
+            if (value.businessDate.isAfter(now.toLocalDate())) return value;
+        return ordered.get(ordered.size() - 1);
     }
 
     private boolean isInsideNextPunchWindow(Schedule schedule,
@@ -1203,7 +1343,7 @@ public class AttendanceV2Service
             SegmentPunchState state = segmentPunchState(schedule, now, false);
             return insideWindow(state.nextSlot(), now);
         }
-        BoundaryPunchState state = boundaryPunchState(schedule, false);
+        BoundaryPunchState state = boundaryPunchState(schedule, now, false);
         String type = state.nextType();
         if (type == null) return false;
         PunchWindow window = rules.window(schedule, type);
@@ -1226,13 +1366,13 @@ public class AttendanceV2Service
     }
 
     private void requireExpectedBoundaryPunch(Schedule schedule, String type,
-            boolean lockRows)
+            LocalDateTime now, boolean lockRows)
     {
-        BoundaryPunchState state = boundaryPunchState(schedule, lockRows);
+        BoundaryPunchState state = boundaryPunchState(schedule, now, lockRows);
         if (state.fullyCovered())
             throw new ServiceException("PUNCH_BLOCKED_BY_APPROVED_LEAVE");
         if (state.nextType() == null
-                && state.requiresRemainingWorkConfirmation())
+                && remainingWorkPending(state.remainingWorkStatus()))
             throw new ServiceException(
                     "PUNCH_REMAINING_WORK_CONFIRMATION_REQUIRED");
         if (state.nextType() == null)
@@ -1242,7 +1382,7 @@ public class AttendanceV2Service
     }
 
     private BoundaryPunchState boundaryPunchState(Schedule schedule,
-            boolean lockRows)
+            LocalDateTime now, boolean lockRows)
     {
         hydratePublishedSegments(schedule, lockRows);
         List<ScheduleSegmentSnapshot> work = schedule.segmentSnapshots.stream()
@@ -1275,11 +1415,87 @@ public class AttendanceV2Service
                 "IN");
         PunchEvent out = mapper.selectLastAcceptedPunch(schedule.scheduleId,
                 "OUT");
-        boolean inSatisfied = in != null || outer.startCovered();
-        boolean outSatisfied = out != null || outer.endCovered();
-        String next = !inSatisfied ? "IN" : !outSatisfied ? "OUT" : null;
-        return new BoundaryPunchState(next, allCovered,
-                outer.startCovered() && outer.endCovered() && !allCovered);
+        var correctedCoverage = approvedPunchCoverage(schedule, lockRows);
+        boolean inCovered = correctedCoverage == null ? in != null : correctedCoverage.sources().containsKey("IN");
+        boolean outCovered = correctedCoverage == null ? out != null : correctedCoverage.sources().containsKey("OUT");
+        boolean inSatisfied = inCovered || outer.startCovered();
+        boolean outSatisfied = outCovered || outer.endCovered();
+        boolean inMissed = !inSatisfied && (in != null || now.isAfter(rules.window(schedule, "IN").closesAt()));
+        boolean outMissed = !outSatisfied && (out != null || now.isAfter(rules.window(schedule, "OUT").closesAt()));
+        String next = !inSatisfied && !inMissed ? "IN"
+                : !outSatisfied && !outMissed ? "OUT" : null;
+        String remainingStatus = null;
+        if (outer.startCovered() && outer.endCovered() && !allCovered)
+        {
+            List<TimeInterval> remaining = new ArrayList<>();
+            for (ScheduleSegmentSnapshot segment : work)
+                remaining.addAll(AttendanceLeaveCoveragePolicy.analyze(
+                        rules.segmentStart(schedule, segment),
+                        rules.segmentEnd(schedule, segment), leaves)
+                        .remainingIntervals());
+            remainingStatus = remainingWorkStatus(schedule, remaining,
+                    mapper.selectRemainingWorkConfirmationSources(
+                            schedule.scheduleId, lockRows));
+        }
+        return new BoundaryPunchState(next, allCovered, remainingStatus,
+                inMissed || outMissed);
+    }
+
+    private String remainingWorkStatus(Schedule schedule,
+            List<TimeInterval> intervals,
+            List<RemainingWorkConfirmationSource> confirmations)
+    {
+        List<String> issues = settlementCalculator.remainingWorkIssueCodes(
+                schedule, intervals, confirmations);
+        if (issues.contains("INVALID_REMAINING_WORK_CONFIRMATION"))
+            return "REMAINING_WORK_INVALID";
+        if (issues.contains("REMAINING_WORK_EVIDENCE_REQUIRED"))
+            return "REMAINING_WORK_EVIDENCE_REQUIRED";
+        if (!issues.isEmpty()) return "REMAINING_WORK_PENDING";
+        return "REMAINING_WORK_CONFIRMED";
+    }
+
+    private boolean remainingWorkPending(String status)
+    { return status != null && !"REMAINING_WORK_CONFIRMED".equals(status); }
+
+    private String mergeRemainingWorkStatus(String current, String next)
+    {
+        for (String state : List.of("REMAINING_WORK_INVALID",
+                "REMAINING_WORK_EVIDENCE_REQUIRED", "REMAINING_WORK_PENDING",
+                "REMAINING_WORK_CONFIRMED"))
+            if (state.equals(current) || state.equals(next)) return state;
+        return null;
+    }
+
+    private TodayContext remainingWorkToday(TodayContext context, String status)
+    {
+        return switch (status)
+        {
+            case "REMAINING_WORK_CONFIRMED" -> locked(context,
+                    "REMAINING_WORK_CONFIRMED",
+                    "剩余工作已核验，无需补打原卡；出勤与缺勤明细请查看我的记录");
+            case "REMAINING_WORK_EVIDENCE_REQUIRED" -> locked(context,
+                    "REMAINING_WORK_EVIDENCE_REQUIRED",
+                    "剩余工作核验已退回补证，请联系管理者处理");
+            case "REMAINING_WORK_INVALID" -> locked(context,
+                    "REMAINING_WORK_CONFIRMATION_INVALID",
+                    "剩余工作核验记录异常，请联系管理者重新核验");
+            default -> locked(context, "REMAINING_WORK_CONFIRMATION_REQUIRED",
+                    "部分请假之间仍有工作时间，等待管理者核验");
+        };
+    }
+
+    private AttendanceDaySettlementCalculator.PunchCoverage approvedPunchCoverage(Schedule schedule, boolean lockRows)
+    {
+        List<CorrectionSource> corrections = mapper.selectSettlementCorrectionSources(schedule.scheduleId, lockRows);
+        if (corrections == null || corrections.stream().noneMatch(value -> value != null && "APPROVED".equals(value.status)))
+            return null;
+        List<PunchEvent> punches = mapper.selectAcceptedPunches(schedule.scheduleId);
+        var coverage = settlementCalculator.punchCoverage(schedule,
+                punches == null ? List.of() : punches, corrections, schedule.segmentSnapshots);
+        if (!coverage.issueCodes().isEmpty())
+            throw new ServiceException("PUNCH_CORRECTION_EVIDENCE_INVALID");
+        return coverage;
     }
 
     private DayResult recalculate(Schedule schedule, LocalDateTime now)
@@ -1379,6 +1595,13 @@ public class AttendanceV2Service
                         }
                     }
                 });
+    }
+
+    private void requireSelectedPunchShop(Schedule schedule, Long selectedShopId)
+    {
+        Long shopId = shopScopeService.resolveRequiredShopDept(selectedShopId);
+        if (!Objects.equals(shopId, schedule.shopId))
+            throw new ServiceException("ATTENDANCE_SHOP_SCOPE_MISMATCH");
     }
 
     private void requireSelfPublishedSchedule(Schedule schedule)
@@ -1695,12 +1918,40 @@ public class AttendanceV2Service
     private LocalDateTime now()
     { return LocalDateTime.now(clock).withNano(0); }
 
+    private void parseCaptureTime(PunchCommand command, String value)
+    {
+        try
+        {
+            try
+            {
+                command.clientCaptureInstant = java.time.OffsetDateTime.parse(value).toInstant();
+            }
+            catch (java.time.format.DateTimeParseException legacy)
+            {
+                // Existing clients send a local business timestamp without an offset.
+                command.clientCaptureTime = LocalDateTime.parse(value);
+            }
+        }
+        catch (java.time.DateTimeException | NullPointerException invalid)
+        {
+            throw new ServiceException("CLIENT_CAPTURE_TIME_INVALID");
+        }
+    }
+
     private LocalDateTime authoritativeNow()
     {
         LocalDateTime value = mapper.selectDatabaseNow();
         if (value == null)
             throw new ServiceException("ATTENDANCE_SERVER_TIME_UNAVAILABLE");
         return value.withNano(0);
+    }
+
+    private com.erp.oa.attendance.domain.AttendanceModels.DatabaseClock authoritativeClock()
+    {
+        var value = mapper.selectDatabaseClock();
+        if (value == null || value.localTime == null || value.epochMillis == null || value.epochMillis <= 0)
+            throw new ServiceException("ATTENDANCE_SERVER_TIME_UNAVAILABLE");
+        return value;
     }
 
     private String nextNo(String prefix)
@@ -1798,13 +2049,13 @@ public class AttendanceV2Service
             Map<Long, ScheduleSegmentSnapshot> segmentById,
             boolean allWorkSegmentsExempt,
             boolean hasMissingSlots,
-            boolean hasRemainingWorkPending) { }
+            String remainingWorkStatus) { }
 
     private record SegmentPunchBinding(ScheduleSegmentSnapshot segment,
             PunchSlotView slot) { }
 
     private record BoundaryPunchState(String nextType, boolean fullyCovered,
-            boolean requiresRemainingWorkConfirmation) { }
+            String remainingWorkStatus, boolean hasMissingSlots) { }
 
     public record EvidenceContent(Path path, String fileName, long size) { }
 }

@@ -17,12 +17,14 @@
         </el-card>
 
         <el-card shadow="never" class="oa-table-card table-card">
-          <el-table v-loading="requestLoading" :data="requests" size="small" empty-text="暂无请假申请">
+          <el-alert v-if="readError" :title="readError" type="error" :closable="false" />
+      <el-table v-loading="requestLoading" :data="requests" size="small" empty-text="暂无请假申请">
             <el-table-column label="申请人" prop="userName" width="120" />
             <el-table-column label="请假类型" prop="leaveTypeName" width="120" />
             <el-table-column label="请假时间" min-width="260">
               <template slot-scope="scope">{{ dateTime(scope.row.startTime) }} 至 {{ dateTime(scope.row.endTime) }}</template>
             </el-table-column>
+            <el-table-column label="申请天数" width="100"><template slot-scope="scope">{{ scope.row.requestedDays == null ? '按时段' : scope.row.requestedDays + ' 天' }}</template></el-table-column>
             <el-table-column label="时长" width="100"><template slot-scope="scope">{{ minutesText(scope.row.totalMinutes) }}</template></el-table-column>
             <el-table-column label="原因" prop="reason" min-width="180" show-overflow-tooltip />
             <el-table-column label="状态" width="100">
@@ -59,6 +61,7 @@
     </el-tabs>
 
     <el-dialog title="请假详情" :visible.sync="detailOpen" width="720px" append-to-body>
+      <el-alert v-if="detailError" :title="detailError" type="error" :closable="false" />
       <template v-if="detail">
         <el-descriptions :column="2" border size="small">
           <el-descriptions-item label="申请单号">{{ detail.leaveRequestNo }}</el-descriptions-item>
@@ -67,6 +70,7 @@
           <el-descriptions-item label="类型">{{ detail.leaveTypeName }}</el-descriptions-item>
           <el-descriptions-item label="开始">{{ dateTime(detail.startTime) }}</el-descriptions-item>
           <el-descriptions-item label="结束">{{ dateTime(detail.endTime) }}</el-descriptions-item>
+          <el-descriptions-item label="申请天数">{{ detail.requestedDays == null ? '按时段' : detail.requestedDays + ' 天' }}</el-descriptions-item>
           <el-descriptions-item label="总时长">{{ minutesText(detail.totalMinutes) }}</el-descriptions-item>
           <el-descriptions-item label="附件数">{{ (detail.attachments || []).length }}</el-descriptions-item>
           <el-descriptions-item label="原因" :span="2">{{ detail.reason }}</el-descriptions-item>
@@ -82,18 +86,20 @@
     <el-dialog :title="typeForm.leaveTypeId ? '编辑请假类型' : '新建请假类型'" :visible.sync="typeDialog" width="700px" append-to-body>
       <el-form ref="typeForm" :model="typeForm" :rules="typeRules" label-width="125px" size="small">
         <el-row :gutter="16">
-          <el-col :span="12"><el-form-item label="类型编码" prop="typeCode"><el-input v-model.trim="typeForm.typeCode" :disabled="Boolean(typeForm.leaveTypeId)" maxlength="32" /></el-form-item></el-col>
+          <el-col :span="12"><el-form-item label="类型编码" prop="typeCode"><el-input v-model.trim="typeForm.typeCode" @input="enforceTypePolicy" :disabled="Boolean(typeForm.leaveTypeId)" maxlength="32" /></el-form-item></el-col>
           <el-col :span="12"><el-form-item label="类型名称" prop="typeName"><el-input v-model.trim="typeForm.typeName" maxlength="64" /></el-form-item></el-col>
           <el-col :span="12"><el-form-item label="计量方式"><el-select v-model="typeForm.unitMode"><el-option label="按分钟" value="MINUTE" /><el-option label="半天" value="HALF_DAY" /><el-option label="按天" value="DAY" /><el-option label="混合" value="MIXED" /></el-select></el-form-item></el-col>
           <el-col :span="12"><el-form-item label="薪资规则"><el-select v-model="typeForm.payPolicy"><el-option label="带薪" value="PAID" /><el-option label="无薪" value="UNPAID" /><el-option label="按比例" value="POLICY" /></el-select></el-form-item></el-col>
           <el-col v-if="typeForm.payPolicy === 'POLICY'" :span="12"><el-form-item label="带薪比例"><el-input-number v-model="typeForm.paidRatio" :min="0" :max="1" :step="0.1" /></el-form-item></el-col>
+          <el-col :span="12"><el-form-item label="每日换算分钟"><el-input-number v-model="typeForm.minutesPerDay" :min="1" :max="1440" :controls="false" placeholder="按天申请时须配置" /></el-form-item></el-col>
           <el-col :span="12"><el-form-item label="最少分钟"><el-input-number v-model="typeForm.minMinutes" :min="1" :max="525600" /></el-form-item></el-col>
           <el-col :span="12"><el-form-item label="递增步长"><el-input-number v-model="typeForm.stepMinutes" :min="1" :max="1440" /></el-form-item></el-col>
           <el-col :span="12"><el-form-item label="单次上限"><el-input-number v-model="typeForm.maxMinutesPerRequest" :min="typeForm.minMinutes || 1" :max="525600" /></el-form-item></el-col>
           <el-col :span="12"><el-form-item label="附件阈值"><el-input-number v-model="typeForm.attachmentThresholdMinutes" :min="1" :max="525600" placeholder="留空不按时长要求" /></el-form-item></el-col>
           <el-col :span="8"><el-form-item label="允许跨天"><el-switch v-model="typeForm.allowCrossDay" /></el-form-item></el-col>
           <el-col :span="8"><el-form-item label="始终需附件"><el-switch v-model="typeForm.attachmentRequired" /></el-form-item></el-col>
-          <el-col :span="8"><el-form-item label="需要审批"><el-switch v-model="typeForm.approvalRequired" /></el-form-item></el-col>
+          <el-col :span="8"><el-form-item label="额度校验"><el-switch v-model="typeForm.balanceRequired" :disabled="requiresBalance(typeForm)" @change="enforceTypePolicy" /></el-form-item></el-col>
+          <el-col :span="8"><el-form-item label="需要HR审批"><el-switch v-model="typeForm.approvalRequired" :disabled="requiresHrApproval(typeForm)" /></el-form-item></el-col>
         </el-row>
       </el-form>
       <span slot="footer"><el-button size="small" @click="typeDialog = false">取消</el-button><el-button type="primary" size="small" :loading="typeSaving" @click="saveType">保存</el-button></span>
@@ -112,11 +118,12 @@ import {
   updateAttendanceLeaveType
 } from '@/api/oa/attendanceV2'
 
+const { createUiOperationScope } = require('@/utils/uiOperationScope')
 const { dataOf } = require('@/views/mobile/attendance/attendancePunchPolicy')
 
 const emptyType = () => ({
   leaveTypeId: null, typeCode: '', typeName: '', unitMode: 'MINUTE', payPolicy: 'UNPAID', paidRatio: 0,
-  balanceRequired: false, attachmentRequired: false, attachmentThresholdMinutes: null,
+  minutesPerDay: null, balanceRequired: false, attachmentRequired: false, attachmentThresholdMinutes: null,
   minMinutes: 30, stepMinutes: 30, maxMinutesPerRequest: 43200,
   allowCrossDay: true, approvalRequired: true, sortNo: 0, status: 'DISABLED', rowVersion: null
 })
@@ -129,6 +136,7 @@ export default {
   },
   data() {
     return {
+      readError: '', detailError: '',
       innerTab: 'requests', requestLoading: false, requests: [],
       query: { status: '', dates: [] }, detail: null, detailOpen: false,
       typeLoading: false, typeSaving: false, types: [], typeDialog: false, typeForm: emptyType(),
@@ -139,9 +147,18 @@ export default {
       ]
     }
   },
+  computed: {
+    actorContextKey() {
+      const store = this.$store || {}
+      return String((store.getters || {}).id || '') + ':' + String(((store.state || {}).user || {}).sessionRevision || 0)
+    }
+  },
   watch: {
-    'shopContext.deptId'() { this.loadRequests() },
-    businessId(value) { if (value) this.openDetail(value) }
+    actorContextKey() { this.resetReadContext() },
+    query: { deep: true, handler() { this.loadRequests() } },
+    detailOpen(value) { if (!value) { this.attendanceScope().invalidate('detail'); this.detail = null } },
+    'shopContext.deptId'() { this.resetReadContext() },
+    businessId(value) { this.attendanceScope().invalidate('detail'); this.detail = null; this.detailOpen = false; if (value) this.openDetail(value) }
   },
   created() {
     if (this.can('oa:attendance:leave:list')) this.loadRequests()
@@ -149,22 +166,64 @@ export default {
     if (this.businessId) this.openDetail(this.businessId)
     if (!this.can('oa:attendance:leave:list') && this.can('oa:attendance:leave:type:list')) this.innerTab = 'types'
   },
+  activated() {
+    this.attendanceScope().activate()
+    if (this._refreshAttendanceOnActivate) { this._refreshAttendanceOnActivate = false; this.loadRequests() }
+  },
+  deactivated() {
+    this.attendanceScope().deactivate()
+    this.requestLoading = false
+    this.detailOpen = false
+    this.detail = null
+    this._refreshAttendanceOnActivate = true
+  },
+  beforeDestroy() { this.attendanceScope().deactivate() },
   methods: {
+    attendanceScope() {
+      if (!this._attendanceScope) this._attendanceScope = createUiOperationScope(() => ({ actor: this.actorContextKey, shop: String(this.shopContext.deptId || ''), route: this.$route && this.$route.path }))
+      return this._attendanceScope
+    },
+    resetReadContext() {
+      this.attendanceScope().invalidate()
+      this.requests = []
+      this.detail = null
+      this.detailOpen = false
+      this.requestLoading = false
+      return this.loadRequests()
+    },
     can(permission) { return !this.$auth || typeof this.$auth.hasPermi !== 'function' ? false : this.$auth.hasPermi(permission) },
     rows(response) { const payload = dataOf(response); return Array.isArray(payload) ? payload : [] },
     loadRequests() {
-      if (!this.shopContext.isStore || !this.shopContext.deptId || !this.can('oa:attendance:leave:list')) { this.requests = []; return Promise.resolve() }
+      const scope = this.attendanceScope(), token = scope.begin('list')
+      this.requests = []
+      this.requestLoading = false
+      this.readError = ''
+      if (!this.shopContext.isStore || !this.shopContext.deptId || !this.can('oa:attendance:leave:list')) return Promise.resolve()
       const params = { shopId: this.shopContext.deptId, status: this.query.status || undefined }
-      if (this.query.dates && this.query.dates.length === 2) [params.dateFrom, params.dateTo] = this.query.dates
+      if (this.query.dates && this.query.dates.length === 2) [params.dateFrom, params.dateTo] = [...this.query.dates]
       this.requestLoading = true
-      return listShopAttendanceLeaves(params).then(response => { this.requests = this.rows(response) })
-        .catch(error => { this.requests = []; this.$modal.msgError(error.message || '请假申请加载失败') })
-        .finally(() => { this.requestLoading = false })
+      return listShopAttendanceLeaves(params).then(response => {
+        if (!scope.isCurrent(token)) return
+        const payload = dataOf(response)
+        this.requests = Array.isArray(payload) ? payload : []
+      }).catch(error => {
+        if (scope.isCurrent(token)) this.readError = error && error.message || '请假申请加载失败，请重试查询'
+      }).finally(() => { if (scope.isCurrent(token)) this.requestLoading = false })
     },
     openDetail(id) {
-      if (!id) return
-      return getAttendanceLeave(id).then(response => { this.detail = dataOf(response); this.detailOpen = true })
-        .catch(error => { this.$modal.msgError(error.message || '请假详情加载失败') })
+      const scope = this.attendanceScope(), target = String(id || ''), token = scope.begin('detail', target)
+      this.detail = null
+      this.detailError = ''
+      this.detailOpen = Boolean(target)
+      if (!target) return Promise.resolve()
+      return getAttendanceLeave(target).then(response => {
+        if (!this.detailOpen || !scope.isCurrent(token)) return
+        const detail = dataOf(response)
+        if (!detail || String(detail.leaveRequestId) !== target) throw new Error('请假详情已变化，请重新选择')
+        this.detail = detail
+      }).catch(error => {
+        if (this.detailOpen && scope.isCurrent(token)) this.detailError = error && error.message || '请假详情加载失败'
+      })
     },
     loadTypes() {
       this.typeLoading = true
@@ -173,12 +232,17 @@ export default {
         .finally(() => { this.typeLoading = false })
     },
     openTypeCreate() { this.typeForm = emptyType(); this.typeDialog = true },
-    openTypeEdit(row) { this.typeForm = Object.assign(emptyType(), row); this.typeDialog = true },
+    openTypeEdit(row) { this.typeForm = Object.assign(emptyType(), row); this.enforceTypePolicy(); this.typeDialog = true },
+    requiresBalance(type) { return ['ANNUAL','COMPENSATORY'].includes(String(type && type.typeCode || '').toUpperCase()) },
+    requiresHrApproval(type) { return !!(type && type.balanceRequired) || ['PERSONAL','SICK','ANNUAL','COMPENSATORY','MARRIAGE','BEREAVEMENT','MATERNITY','PATERNITY','CHILDCARE'].includes(String(type && type.typeCode || '').toUpperCase()) },
+    enforceTypePolicy() { if (this.requiresBalance(this.typeForm)) this.typeForm.balanceRequired = true; if (this.requiresHrApproval(this.typeForm)) this.typeForm.approvalRequired = true },
     saveType() {
       this.$refs.typeForm.validate(valid => {
         if (!valid || this.typeSaving) return
         this.typeSaving = true
-        const request = this.typeForm.leaveTypeId ? updateAttendanceLeaveType(this.typeForm.leaveTypeId, this.typeForm) : createAttendanceLeaveType(this.typeForm)
+        this.enforceTypePolicy()
+        const payload = JSON.parse(JSON.stringify(this.typeForm))
+        const request = payload.leaveTypeId ? updateAttendanceLeaveType(payload.leaveTypeId, payload) : createAttendanceLeaveType(payload)
         request.then(() => { this.$modal.msgSuccess('请假类型已保存'); this.typeDialog = false; return this.loadTypes() })
           .catch(error => { this.$modal.msgError(error.message || '请假类型保存失败') })
           .finally(() => { this.typeSaving = false })

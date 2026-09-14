@@ -196,7 +196,13 @@ function loadSfc(source, filename, globals) {
   const transformed = script[1]
     .replace(/import\s+[\s\S]*?\s+from\s+["'][^"']+["']\s*/g, "")
     .replace("export default", "module.exports =")
-  const sandbox = { module: { exports: {} }, exports: {}, ...globals }
+  const sandbox = { module: { exports: {} }, exports: {},
+    getSelectedDeptId: () => "10",
+    require(id) {
+      if (id === "@/utils/positiveDecimalId") return require("../src/utils/positiveDecimalId")
+      if (id === "@/utils/uiOperationScope") return require("../src/utils/uiOperationScope")
+      throw new Error("Unexpected import " + id)
+    }, ...globals }
   sandbox.exports = sandbox.module.exports
   vm.runInNewContext(transformed, sandbox, { filename })
   return sandbox.module.exports
@@ -301,7 +307,7 @@ async function testPermissionsAndFinalQueryPayloads() {
   pane.handleSelect({ onboardingId: 8 })
   assert.deepStrictEqual(plain(pane.emitted.pop()), { name: "select", value: { onboardingId: 8 } })
 
-  indexTarget.selectedOnboardingId = 8
+  indexTarget.selectedOnboardingId = "8"
   indexTarget.detail = { onboardingId: 8 }
   pane.activeStatus = "READY"
   pane.handleStatusChange()
@@ -353,7 +359,7 @@ async function testStaleListRejectionAndCurrentListFailure() {
   assert.strictEqual(target.rows[0].onboardingId, 2)
   assert.strictEqual(target.listLoading, false)
 
-  target.selectedOnboardingId = 2
+  target.selectedOnboardingId = "2"
   target.detail = { onboardingId: 2, allowedActions: ["EDIT"] }
   target.loadList()
   currentFailure.reject(new Error("current list failure"))
@@ -419,27 +425,31 @@ async function testActionPayloadsAndCreateSelection() {
     $message: { success() {}, error() {} },
     $prompt: () => Promise.resolve({ value: "个人原因" })
   })
-  target.selectedOnboardingId = 41
+  target.selectedOnboardingId = "41"
+  target.selectedOnboardingId = "41"
   target.detail = { onboardingId: 41, version: 8, allowedActions: ["MARK_READY", "RETURN_TO_DRAFT", "CANCEL", "RESTORE"] }
   await target.handleAction({ key: "MARK_READY" })
+  target.selectedOnboardingId = "41"
   target.detail = { onboardingId: 41, version: 8, allowedActions: ["RETURN_TO_DRAFT"] }
   await target.handleAction({ key: "RETURN_TO_DRAFT" })
+  target.selectedOnboardingId = "41"
   target.detail = { onboardingId: 41, version: 8, allowedActions: ["CANCEL"] }
   await target.handleAction({ key: "CANCEL" })
+  target.selectedOnboardingId = "41"
   target.detail = { onboardingId: 41, version: 8, allowedActions: ["RESTORE"] }
   await target.handleAction({ key: "RESTORE" })
   assert.deepStrictEqual(calls, [
-    ["ready", 41, { version: 8 }],
-    ["return", 41, { version: 8 }],
-    ["cancel", 41, { version: 8, reason: "个人原因" }],
-    ["restore", 41, { version: 8 }]
+    ["ready", "41", { version: 8 }],
+    ["return", "41", { version: 8 }],
+    ["cancel", "41", { version: 8, reason: "个人原因" }],
+    ["restore", "41", { version: 8 }]
   ], "all state actions must carry the currently displayed version and cancel reason")
 
   target.createVisible = true
   await target.handleCreated({ onboardingId: 72 })
   assert.strictEqual(target.createVisible, false)
-  assert.strictEqual(target.selectedOnboardingId, 72)
-  assert.strictEqual(target.detail.onboardingId, 72)
+  assert.strictEqual(target.selectedOnboardingId, "72")
+  assert.strictEqual(target.detail.onboardingId, "72")
 }
 
 async function testStateActionVersionConflictRefreshesVersion() {
@@ -458,7 +468,8 @@ async function testStateActionVersionConflictRefreshesVersion() {
     checkPermi: () => true
   })
   const target = bind(component, { $message: { warning() {}, error() {}, success() {} } })
-  target.selectedOnboardingId = 41
+  target.selectedOnboardingId = "41"
+  target.selectedOnboardingId = "41"
   target.detail = { onboardingId: 41, version: 4, allowedActions: ["MARK_READY"] }
   await target.handleAction("MARK_READY")
   assert.strictEqual(target.detail.version, 5, "version conflict must refresh selected detail")
@@ -804,7 +815,7 @@ async function testConfirmedResultDefersParentRefreshUntilDialogCloses() {
   })
   const parent = bind(component)
   parent.confirmVisible = true
-  parent.selectedOnboardingId = 4
+  parent.selectedOnboardingId = "4"
   parent.detail = { onboardingId: 4, version: 1, status: "READY" }
   parent.rows = [{ onboardingId: 4, version: 1, status: "READY" }]
 
@@ -873,10 +884,10 @@ async function testOnboardingDeepLinkOverridesDefaultStatusAndOpensScopedDetail(
   target.applyRouteDeepLink()
   await target.loadList()
 
-  assert.strictEqual(listCalls[0].onboardingId, 9)
+  assert.strictEqual(listCalls[0].onboardingId, "9")
   assert.strictEqual(listCalls[0].status, undefined, "deep link must not retain the default DRAFT tab")
-  assert.strictEqual(target.selectedOnboardingId, 9)
-  assert.strictEqual(target.detail.onboardingId, 9)
+  assert.strictEqual(target.selectedOnboardingId, "9")
+  assert.strictEqual(target.detail.onboardingId, "9")
   assert.strictEqual(detailCalls, 1)
 }
 
@@ -892,7 +903,7 @@ async function testOnboardingQueueRouteFiltersReachTheFirstServerRequest() {
   await target.loadList()
 
   assert.strictEqual(listCalls[0].status, "READY")
-  assert.strictEqual(listCalls[0].targetDeptId, 11)
+  assert.strictEqual(listCalls[0].targetDeptId, "11")
 }
 
 async function testLinkedEmployeeLoadsFormalCoverageWithoutBlockingOnboardingDetail() {
@@ -904,7 +915,7 @@ async function testLinkedEmployeeLoadsFormalCoverageWithoutBlockingOnboardingDet
     getHrOnboardingFormOptions: () => Promise.resolve({ data: {} }), checkPermi: () => true
   })
   const target = bind(component, { $route: { query: {} } })
-  target.selectedOnboardingId = 9
+  target.selectedOnboardingId = "9"
 
   await target.loadDetail(9)
 
@@ -929,9 +940,9 @@ async function testFirstVisibleRecordBecomesTheDefaultDetail() {
 
   await target.loadList()
 
-  assert.strictEqual(target.selectedOnboardingId, 41)
-  assert.strictEqual(target.detail.onboardingId, 41)
-  assert.deepStrictEqual(detailCalls, [41])
+  assert.strictEqual(target.selectedOnboardingId, "41")
+  assert.strictEqual(target.detail.onboardingId, "41")
+  assert.deepStrictEqual(detailCalls, ["41"])
 }
 
 async function testNormalQueueActionClearsHiddenDeepLinkWithoutDuplicateRequest() {

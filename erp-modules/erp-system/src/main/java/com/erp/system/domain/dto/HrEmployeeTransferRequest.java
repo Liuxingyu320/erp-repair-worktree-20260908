@@ -33,12 +33,13 @@ public class HrEmployeeTransferRequest
     @NotBlank @Size(max = 64) private String legalEntityCode;
     @NotBlank @Size(max = 100) private String legalEntityName;
 
-    @NotNull @DecimalMin("0.00") @Digits(integer = 14, fraction = 2) private BigDecimal baseSalary;
-    @NotNull @DecimalMin("0.00") @Digits(integer = 14, fraction = 2) private BigDecimal postSalary;
-    @NotNull @DecimalMin("0.00") @Digits(integer = 14, fraction = 2) private BigDecimal fieldAllowance;
-    @NotNull @DecimalMin("0.00") @Digits(integer = 14, fraction = 2) private BigDecimal performanceSalary;
-    @NotNull @DecimalMin("0.01") @Digits(integer = 14, fraction = 2) private BigDecimal salaryTotal;
-    @NotBlank @Size(max = 32) private String salaryVersion;
+    private boolean adjustSalary;
+    @DecimalMin("0.00") @Digits(integer = 14, fraction = 2) private BigDecimal baseSalary;
+    @DecimalMin("0.00") @Digits(integer = 14, fraction = 2) private BigDecimal postSalary;
+    @DecimalMin("0.00") @Digits(integer = 14, fraction = 2) private BigDecimal fieldAllowance;
+    @DecimalMin("0.00") @Digits(integer = 14, fraction = 2) private BigDecimal performanceSalary;
+    @DecimalMin("0.01") @Digits(integer = 14, fraction = 2) private BigDecimal salaryTotal;
+    @Size(max = 32) private String salaryVersion;
 
     @Valid private HrTransferRiskConfirmation riskConfirmation;
 
@@ -74,6 +75,8 @@ public class HrEmployeeTransferRequest
     public void setLegalEntityCode(String legalEntityCode) { this.legalEntityCode = legalEntityCode; }
     public String getLegalEntityName() { return legalEntityName; }
     public void setLegalEntityName(String legalEntityName) { this.legalEntityName = legalEntityName; }
+    public boolean isAdjustSalary() { return adjustSalary; }
+    public void setAdjustSalary(boolean adjustSalary) { this.adjustSalary = adjustSalary; }
     public BigDecimal getBaseSalary() { return baseSalary; }
     public void setBaseSalary(BigDecimal baseSalary) { this.baseSalary = baseSalary; }
     public BigDecimal getPostSalary() { return postSalary; }

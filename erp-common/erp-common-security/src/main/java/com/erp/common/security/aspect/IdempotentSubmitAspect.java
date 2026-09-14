@@ -41,7 +41,8 @@ public class IdempotentSubmitAspect
     public Object around(ProceedingJoinPoint point, IdempotentSubmit idempotentSubmit) throws Throwable
     {
         String key = buildKey(point);
-        if (!idempotentSubmitService.tryAcquire(key, idempotentSubmit.timeout()))
+        String owner = idempotentSubmitService.tryAcquire(key, idempotentSubmit.timeout());
+        if (owner == null)
         {
             throw new ServiceException(idempotentSubmit.message());
         }
@@ -50,7 +51,7 @@ public class IdempotentSubmitAspect
             Object result = point.proceed();
             if (idempotentSubmit.releaseOnSuccess())
             {
-                releaseQuietly(key);
+                releaseQuietly(key, owner);
             }
             return result;
         }
@@ -58,17 +59,17 @@ public class IdempotentSubmitAspect
         {
             if (idempotentSubmit.releaseOnFailure())
             {
-                releaseQuietly(key);
+                releaseQuietly(key, owner);
             }
             throw e;
         }
     }
 
-    private void releaseQuietly(String key)
+    private void releaseQuietly(String key, String owner)
     {
         try
         {
-            idempotentSubmitService.release(key);
+            idempotentSubmitService.release(key, owner);
         }
         catch (RuntimeException ex)
         {

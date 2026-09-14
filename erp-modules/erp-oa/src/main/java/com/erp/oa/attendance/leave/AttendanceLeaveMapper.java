@@ -15,6 +15,7 @@ public interface AttendanceLeaveMapper
 {
     List<LeaveType> selectLeaveTypes(@Param("status") String status);
     LeaveType selectLeaveTypeById(@Param("leaveTypeId") Long leaveTypeId);
+    LeaveType selectLeaveTypeForUpdate(@Param("leaveTypeId") Long leaveTypeId);
     int insertLeaveType(LeaveType value);
     int updateLeaveType(LeaveType value);
     int updateLeaveTypeStatus(@Param("leaveTypeId") Long leaveTypeId,

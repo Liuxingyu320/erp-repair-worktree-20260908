@@ -31,6 +31,14 @@
           <span>当前仍可新建、编辑和保存采购草稿，提交与重新提交暂不可用。</span>
         </section>
 
+        <section v-if="featureKey === 'purchase' && hasAnyPermission(['inv:purchase:receive'])" class="glass-panel mobile-redirect-banner mobile-system-panel">
+          <strong>收货结果核对</strong>
+          <p v-if="purchaseReceiveError" role="alert">{{ purchaseReceiveError }}</p>
+          <p v-else-if="purchaseReceiveRecords.length" role="status">上一笔结果未确认时，请先核对；采购单已收完也可恢复。</p>
+          <button type="button" @click="refreshPurchaseReceiveRecords">刷新待核对收货</button>
+          <button v-for="record in purchaseReceiveRecords" :key="record.requestId" type="button" :disabled="purchaseReceiveBusy || !!actionLoadingKey" @click="recoverMobilePurchaseReceive(record)">核对采购单 {{ record.orderId }} 的上一笔收货</button>
+        </section>
+
         <p v-if="feature.subtitle" class="feature-subtitle mobile-system-muted">{{ feature.subtitle }}</p>
 
         <section class="section-title scope-title mobile-section-title">
@@ -168,6 +176,12 @@
               type="button"
               @click="openItem(item)"
             >
+              <div v-if="item.imageUrls" class="mobile-list-images">
+                <el-image v-if="item.imageUrls.length" :src="item.imageUrls[0]" fit="cover" style="width:64px;height:64px;border-radius:8px">
+                  <span slot="error">图片不可用</span>
+                </el-image>
+                <small>{{ item.imageUrls.length ? item.imageUrls.length + '张图片' : '暂无图片' }}</small>
+              </div>
               <div>
                 <h3 class="mobile-list-row__title">{{ item.title }}</h3>
                 <p class="mobile-list-row__meta">{{ item.code }}</p>
@@ -252,6 +266,7 @@
           v-if="mobileFormConfig"
           :value="formSheet.data"
           :open="formSheet.open"
+          :context-key="formUploadEpoch"
           :feature="feature"
           :config="mobileFormConfig"
           :title="mobileFormTitle"
@@ -270,10 +285,10 @@
         <mobile-action-dialog
           :open="actionDialog.open"
           :action="actionDialog.action || {}"
-          :item="selectedItem"
+          :item="actionDialog.receiveScope ? actionDialog.item : selectedItem"
           :review-fields="selectedReviewFields"
           :icon-paths="iconPaths"
-          :selected-dept-id="selectedDeptId"
+          :selected-dept-id="actionDialog.receiveScope ? actionDialog.receiveScope.dept : selectedDeptId"
           @close="closeActionDialog"
           @confirm="confirmActionDialog"
         />
@@ -325,6 +340,8 @@ import MobileActionDialog from "./components/MobileActionDialog.vue"
 import MobileCustomerRecordDialog from "./components/MobileCustomerRecordDialog.vue"
 import MobileConfirmDialog from "./components/MobileConfirmDialog.vue"
 
+const { getPurchaseReceiveRecovery, purchaseReceiveResultMessage } = require("@/utils/purchaseReceiveRecovery")
+
 const {
   getMobileRouteBottomNav,
   getMobileRouteAccessDecision,
@@ -366,6 +383,7 @@ const { refreshMobileTransferAvailability } = require("./mobileTransferAvailabil
 const { releaseAllMobileOverlays } = require("./components/mobileOverlayStack")
 const { startMobileViewportSync, stopMobileViewportSync } = require("../mobileViewport")
 const { mobileErrorMessage } = require("../mobileErrorMessage")
+const { getFixedAssetPrecheckFromError } = require("./featureActionRuntime")
 const {
   consumeTodoFocusQuery,
   findTodoFocusShipment,
@@ -415,6 +433,8 @@ export default {
       selectedDeptName: this.formatDeptLabel(selectedContext),
       selectedDeptId: selectedContext.deptId,
       selectedDeptType: selectedContext.deptType,
+      purchaseReceiveActive: true, purchaseReceiveEpoch: 0, purchaseReceiveListEpoch: 0, purchaseReceiveBusy: false,
+      purchaseReceiveRecords: [], purchaseReceiveError: "",
       stockScopeMode: "current",
       managedStoreId: 0,
       managedStoreOptions: [],
@@ -448,12 +468,14 @@ export default {
       oaPurchaseSubmissionAvailable: false,
       oaPurchaseAvailabilityResolved: false,
       oaPurchaseAvailabilityToken: 0,
+      formUploadEpoch: 0,
       formSheet: {
         open: false,
         mode: "create",
         saving: false,
         error: "",
         validationError: null,
+        fixedAssetPrecheck: null,
         config: null,
         data: {},
         initialData: {}
@@ -809,6 +831,7 @@ export default {
     }
   },
   watch: {
+    "$store.getters.id"() { this.invalidatePurchaseReceive(); this.refreshPurchaseReceiveRecords() },
     "$route.fullPath"() {
       if (this.skipNextRouteApply) {
         this.skipNextRouteApply = false
@@ -819,9 +842,15 @@ export default {
   },
   created() {
     startMobileViewportSync()
+    if (typeof window !== "undefined") window.addEventListener("erp:dept-changed", this.handlePurchaseReceiveContextChange)
     this.applyRouteFeature()
   },
+  activated() { this.purchaseReceiveActive = true; this.refreshPurchaseReceiveRecords() },
+  deactivated() { this.purchaseReceiveActive = false; this.invalidatePurchaseReceive() },
   beforeDestroy() {
+    this.purchaseReceiveActive = false
+    this.invalidatePurchaseReceive()
+    if (typeof window !== "undefined") window.removeEventListener("erp:dept-changed", this.handlePurchaseReceiveContextChange)
     stopMobileViewportSync()
     this.routeLoadGuard.invalidate()
     releaseAllMobileOverlays()
@@ -838,6 +867,8 @@ export default {
       this.refreshedAt = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`
     },
     applyRouteFeature() {
+      this.invalidatePurchaseReceive()
+      this.refreshPurchaseReceiveRecords()
       this.routeLoadGuard.invalidate()
       releaseAllMobileOverlays()
       this.applySelectedContext()
@@ -1468,14 +1499,14 @@ export default {
       this.detailLoading = true
       this.detailLoadFailed = false
       this.setActionMessage("", "status")
-      return withMobileRetry(() => fetchMobileFeatureDetail(this.featureKey, item, this.approvalRouteContext)).then(detail => {
+      return withMobileRetry(() => fetchMobileFeatureDetail(this.featureKey, item, Object.assign({}, this.approvalRouteContext, { inventoryPermissions: this.userPermissions || [] }))).then(detail => {
         if (requestToken !== this.detailRequestToken || !this.selectedItem) return
         const detailRow = Object.assign({}, item._raw || {}, detail || {})
         this.selectedItemEditSource = cloneMobileEditFormSource(detailRow)
         const mappedDetail = mapMobileFeatureRows(this.featureKey, [detailRow], this.mobileMapperContext())[0]
         this.selectedItem = mappedDetail || item
         this.detailLoadFailed = false
-        this.setActionMessage("", "status")
+        this.setActionMessage(detailRow._specialistSummaryOnly ? "当前岗位可处理单据；完整明细需要查询权限" : "", "status")
       }).catch(() => {
         if (requestToken !== this.detailRequestToken || !this.selectedItem) return
         this.detailLoadFailed = true
@@ -1594,7 +1625,102 @@ export default {
         "receiveTransferShipment"
       ].indexOf(action.id) > -1
     },
+    invalidatePurchaseReceive() {
+      this.purchaseReceiveEpoch += 1
+      this.purchaseReceiveListEpoch += 1
+      this.purchaseReceiveBusy = false
+      if (this.actionDialog && this.actionDialog.action && this.actionDialog.action.id === "receivePurchaseAll") this.closeActionDialog()
+      if (this.actionLoadingKey === "receivePurchaseAll") this.actionLoadingKey = ""
+    },
+    handlePurchaseReceiveContextChange() {
+      this.invalidatePurchaseReceive()
+      this.applySelectedContext()
+      this.refreshPurchaseReceiveRecords()
+    },
+    isCurrentPurchaseReceive(operation, detail = true) {
+      if (!this.purchaseReceiveActive || this.featureKey !== "purchase" || operation.epoch !== this.purchaseReceiveEpoch) return false
+      if (detail && operation.detailToken !== this.detailRequestToken) return false
+      try { getPurchaseReceiveRecovery().assertCurrent(operation.receiveScope); return true } catch (_) { return false }
+    },
+    async refreshPurchaseReceiveRecords() {
+      const epoch = ++this.purchaseReceiveListEpoch
+      if (this.featureKey !== "purchase" || !this.hasAnyPermission(["inv:purchase:receive"])) {
+        this.purchaseReceiveRecords = []; this.purchaseReceiveError = ""; return
+      }
+      try {
+        const records = await getPurchaseReceiveRecovery().list()
+        if (this.purchaseReceiveActive && epoch === this.purchaseReceiveListEpoch) { this.purchaseReceiveRecords = records; this.purchaseReceiveError = "" }
+      } catch (error) {
+        if (this.purchaseReceiveActive && epoch === this.purchaseReceiveListEpoch) { this.purchaseReceiveRecords = []; this.purchaseReceiveError = error.message }
+      }
+    },
+    async recoverMobilePurchaseReceive(record) {
+      if (this.purchaseReceiveBusy || this.actionLoadingKey) return
+      const recovery = getPurchaseReceiveRecovery()
+      let operation
+      this.purchaseReceiveBusy = true
+      try {
+        operation = { receiveScope: recovery.capture(), epoch: this.purchaseReceiveEpoch }
+        await this.requestMobileConfirm({ title: "核对上一笔收货", message: "核对采购单 " + record.orderId + " 的原收货结果；本次新输入不会提交。" })
+        if (!this.isCurrentPurchaseReceive(operation, false)) return
+        const result = await runMobileFeatureAction("purchase", "receivePurchaseAll", { orderId: record.orderId }, {
+          receiveScope: operation.receiveScope, receiveRecoveryOnly: true, receiveRequestId: record.requestId,
+          isCurrent: () => this.isCurrentPurchaseReceive(operation, false)
+        })
+        if (!this.isCurrentPurchaseReceive(operation, false)) return
+        this.showActionSuccess({ successText: purchaseReceiveResultMessage(result) }, { msg: purchaseReceiveResultMessage(result) })
+        await recovery.acknowledge(result)
+        this.refresh()
+      } catch (error) {
+        if ((!operation || this.isCurrentPurchaseReceive(operation, false)) && error.message !== "cancelled") this.showActionError(error)
+      } finally {
+        if (!operation || operation.epoch === this.purchaseReceiveEpoch) this.purchaseReceiveBusy = false
+        this.refreshPurchaseReceiveRecords()
+      }
+    },
+    async openPurchaseReceiveDialog(action) {
+      if (!this.selectedItem || this.actionLoadingKey || this.detailLoading || this.detailLoadFailed) return
+      const recovery = getPurchaseReceiveRecovery()
+      let operation
+      this.actionLoadingKey = "receivePurchaseAll"
+      try {
+        operation = { epoch: this.purchaseReceiveEpoch, detailToken: this.detailRequestToken,
+          receiveScope: recovery.capture(), item: JSON.parse(JSON.stringify(this.selectedItem)) }
+        const row = operation.item._raw || operation.item.raw || operation.item
+        const head = await recovery.inspect(row.orderId, operation.receiveScope)
+        if (!this.isCurrentPurchaseReceive(operation)) return
+        if (head.pending) {
+          await this.refreshPurchaseReceiveRecords()
+          this.showActionError(new Error("上一笔收货结果待核对，请先使用页面上方的核对入口，新到货暂未提交。"))
+          return
+        }
+        this.actionDialog = Object.assign(operation, { open: true, action, payload: {}, receiveObservedRequestId: head.observedRequestId })
+      } catch (error) { if (!operation || this.isCurrentPurchaseReceive(operation)) this.showActionError(error) }
+      finally { if (!operation || this.isCurrentPurchaseReceive(operation)) this.actionLoadingKey = "" }
+    },
+    async runPurchaseReceiveAction(action, actionPayload, operation) {
+      if (this.actionLoadingKey || !operation.receiveScope || !this.isCurrentPurchaseReceive(operation)) return
+      const payload = JSON.parse(JSON.stringify(actionPayload))
+      this.actionLoadingKey = "receivePurchaseAll"
+      try {
+        const result = await runMobileFeatureAction("purchase", "receivePurchaseAll", operation.item, {
+          actionPayload: payload, receiveScope: operation.receiveScope, receiveObservedRequestId: operation.receiveObservedRequestId,
+          isCurrent: () => this.isCurrentPurchaseReceive(operation)
+        })
+        if (!this.isCurrentPurchaseReceive(operation)) return
+        this.showActionSuccess(action, { msg: purchaseReceiveResultMessage(result) })
+        await getPurchaseReceiveRecovery().acknowledge(result)
+        if (!this.isCurrentPurchaseReceive(operation)) return
+        this.closeItem()
+        this.refresh()
+      } catch (error) { if (this.isCurrentPurchaseReceive(operation)) this.showActionError(error) }
+      finally {
+        if (this.isCurrentPurchaseReceive(operation)) this.actionLoadingKey = ""
+        this.refreshPurchaseReceiveRecords()
+      }
+    },
     openActionDialog(action) {
+      if (action && action.id === "receivePurchaseAll") return this.openPurchaseReceiveDialog(action)
       this.actionDialog = {
         open: true,
         action,
@@ -1687,11 +1813,14 @@ export default {
       if (reject) reject(new Error("cancelled"))
     },
     confirmActionDialog(actionPayload) {
-      const action = this.actionDialog.action
+      const dialog = this.actionDialog
+      const action = dialog.action
       this.closeActionDialog()
-      this.runDetailAction(action, actionPayload || {}, true)
+      if (action && action.id === "receivePurchaseAll") return this.runPurchaseReceiveAction(action, actionPayload || {}, dialog)
+      return this.runDetailAction(action, actionPayload || {}, true)
     },
     runDetailAction(action, actionPayload = {}, confirmed = false) {
+      if (action && action.id === "receivePurchaseAll") return this.openPurchaseReceiveDialog(action)
       if (!action || this.actionLoadingKey || this.detailLoading) {
         if (this.detailLoading) this.setActionMessage("完整详情加载中，请稍后再处理", "status")
         return
@@ -1815,6 +1944,7 @@ export default {
       const data = preparedData && typeof preparedData === "object"
         ? preparedData
         : this.buildMobileFormData(config, item)
+      this.formUploadEpoch += 1
       this.formSheet = {
         open: true,
         mode: item ? "edit" : "create",
@@ -1846,6 +1976,7 @@ export default {
         saving: false,
         error: "",
         validationError: null,
+        fixedAssetPrecheck: null,
         config: null,
         data: {},
         initialData: {}
@@ -1907,6 +2038,7 @@ export default {
       return getMobileTransferFormConfig(transferType)
     },
     handleMobileFormInput(data) {
+      if (this.formSheet.saving) return
       this.formSheet.data = data || {}
       if (this.formSheet.validationError || this.formSheet.error) {
         this.formSheet.validationError = null
@@ -1942,7 +2074,14 @@ export default {
       this.formSheet.error = ""
       this.formSheet.validationError = null
 
-      saveMobileFeatureForm(this.featureKey, this.normalizeMobileFormPayload(config, submitAction)).then(res => {
+      const submittedSheet = this.formSheet
+      const submittedFeature = this.featureKey
+      const submittedData = this.snapshotMobileFormData(this.formSheet.data)
+      const isCurrent = () => this.formSheet === submittedSheet && this.formSheet.open &&
+        this.featureKey === submittedFeature
+      const isPrecheckCurrent = () => isCurrent() && this.snapshotMobileFormData(this.formSheet.data) === submittedData
+      saveMobileFeatureForm(submittedFeature, this.normalizeMobileFormPayload(config, submitAction), { isCurrent: isPrecheckCurrent }).then(res => {
+        if (!isCurrent()) return
         const successText = submitAction === "submit"
           ? "保存并提交成功"
           : (this.formSheet.mode === "edit" ? "保存成功" : "新增成功")
@@ -1953,13 +2092,15 @@ export default {
         this.loadData()
         acknowledgeTransferCommand(res)
       }).catch(error => {
-        const fixedAssetPrecheck = this.featureKey === "fixedAssetRepair"
+        if (!isCurrent()) return
+        const fixedAssetPrecheck = submittedFeature === "fixedAssetRepair"
           ? getFixedAssetPrecheckFromError(error) : null
+        this.$set(this.formSheet, "fixedAssetPrecheck", fixedAssetPrecheck)
         this.formSheet.validationError = null
         this.formSheet.error = mobileErrorMessage(error, "保存失败，请稍后重试")
         this.showToastError(this.formSheet.error)
       }).finally(() => {
-        if (this.formSheet.open) {
+        if (this.formSheet === submittedSheet && this.formSheet.open) {
           this.formSheet.saving = false
         }
       })

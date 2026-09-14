@@ -6,6 +6,8 @@ import com.erp.oa.domain.OaSignPlanVersion;
 /** Business-facing publication receipt. Integrity hashes remain internal. */
 public class OaSignPlanVersionPublishResult
 {
+    private String action;
+    private java.util.List<Long> previousActiveVersionIds;
     private Long versionId;
     private Long planId;
     private Integer versionNo;
@@ -31,6 +33,11 @@ public class OaSignPlanVersionPublishResult
         }
         return result;
     }
+
+    public String getAction() { return action; }
+    public void setAction(String action) { this.action = action; }
+    public java.util.List<Long> getPreviousActiveVersionIds() { return previousActiveVersionIds; }
+    public void setPreviousActiveVersionIds(java.util.List<Long> values) { this.previousActiveVersionIds = values; }
 
     public Long getVersionId() { return versionId; }
     public void setVersionId(Long versionId) { this.versionId = versionId; }

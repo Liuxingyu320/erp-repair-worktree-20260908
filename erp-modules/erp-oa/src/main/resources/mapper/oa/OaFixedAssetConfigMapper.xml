@@ -12,6 +12,7 @@
         <result property="itemDescription" column="item_description"/>
         <result property="orderUnit" column="order_unit"/>
         <result property="imageUrl" column="image_url"/>
+        <result property="imageUrlsText" column="image_urls"/>
         <result property="purchaseReferenceUrl" column="purchase_reference_url"/>
         <result property="purchaseReferenceNote" column="purchase_reference_note"/>
         <result property="assetQuantity" column="asset_quantity"/>
@@ -28,7 +29,7 @@
     <sql id="baseColumns">
         c.config_id, c.shop_dept_id, sd.dept_name as shop_dept_name,
         c.oe_item_id, i.oe_item_code, i.oe_item_name, i.item_description,
-        i.order_unit, i.image_url, i.purchase_reference_url,
+        i.order_unit, i.image_url, i.image_urls, i.purchase_reference_url,
         i.purchase_reference_note,
         c.asset_quantity, c.asset_unit_price, c.asset_amount, c.status,
         c.create_by, c.create_time, c.update_by, c.update_time, c.remark
@@ -78,7 +79,7 @@
                i.oe_item_name,
                i.item_description,
                i.order_unit,
-               i.image_url,
+               i.image_url, i.image_urls,
                i.purchase_reference_url,
                i.purchase_reference_note,
                null as asset_quantity,
@@ -94,6 +95,34 @@
         where i.oe_item_id = #{oeItemId}
           and i.del_flag = '0'
           and i.status = '0'
+    </select>
+
+    <select id="selectOeItemSnapshotForUpdate" resultMap="OaFixedAssetConfigResult">
+        select null as config_id,
+               null as shop_dept_id,
+               null as shop_dept_name,
+               i.oe_item_id,
+               i.oe_item_code,
+               i.oe_item_name,
+               i.item_description,
+               i.order_unit,
+               i.image_url, i.image_urls,
+               i.purchase_reference_url,
+               i.purchase_reference_note,
+               null as asset_quantity,
+               i.cost_price as asset_unit_price,
+               null as asset_amount,
+               i.status,
+               i.create_by,
+               i.create_time,
+               i.update_by,
+               i.update_time,
+               i.remark
+        from inv_oe_item i
+        where i.oe_item_id = #{oeItemId}
+          and i.del_flag = '0'
+          and i.status = '0'
+        for update
     </select>
 
     <select id="selectActiveConfigByShopAndOeItem" resultMap="OaFixedAssetConfigResult">

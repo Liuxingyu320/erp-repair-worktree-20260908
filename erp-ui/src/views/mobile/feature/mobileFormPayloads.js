@@ -1,3 +1,5 @@
+const { isReturnSelected } = require("../../../utils/returnSelection")
+
 function cloneMobileEditFormSource(item) {
   const source = item && (item._raw || item.raw || item)
   if (!source || typeof source !== "object") return {}
@@ -59,7 +61,7 @@ function createMobileFormData(config, item, options) {
   })
 
   ;(source.fields || []).forEach(field => {
-    const value = resolveFormFieldValue(field, row, options)
+    const value = resolveFormFieldValue(field, row, options, source)
     if (field.type === "line-items") {
       if (field.payloadMode === "stock-check-products") {
         data[field.key] = normalizeStockCheckProductItems(value || row.details || [], { includeDisplayMeta: true })
@@ -108,7 +110,8 @@ function buildMobileFormPayload(config, data, options) {
         if (rows.length) payload[field.key] = rows
         return
       }
-      const rows = normalizeLineItems(value, getLineItemNormalizeOptions(config, field, "payload"))
+      const selectedValue = field.selectionScoped ? (Array.isArray(value) ? value.filter(isReturnSelected) : []) : value
+      const rows = normalizeLineItems(selectedValue, getLineItemNormalizeOptions(config, field, "payload"))
       if (rows.length) payload[field.key] = rows
       return
     }
@@ -152,6 +155,8 @@ function normalizeLineItems(value, options) {
     copyLineItemMaterialMeta(item, row, settings)
     copyReturnDetailMeta(item, row, settings)
     copyTransferDetailMeta(item, row, settings)
+    if (settings.preserveSalesWarehouse && hasValue(row.warehouseId)) item.warehouseId = normalizeIdValue(row.warehouseId)
+    if (settings.preserveSalesWarehouse && settings.includeDisplayMeta && hasValue(row.warehouseName)) item.warehouseName = row.warehouseName
     if (settings.addSortOrder) {
       item.sortOrder = hasValue(row.sortOrder) ? normalizeIdValue(row.sortOrder) : index
     }
@@ -169,12 +174,14 @@ function normalizeStockCheckProductItems(value, options) {
   const settings = options || {}
   const seen = {}
   return parseLineItemRows(value).reduce((items, row) => {
+    const itemType = row.itemType || "product"
     const productId = normalizeIdValue(row.productId)
-    if (!hasValue(productId)) return items
-    const key = String(productId)
+    const itemId = normalizeIdValue(row.itemId == null ? productId : row.itemId)
+    if (!["product", "oe", "gift"].includes(itemType) || !hasValue(itemId)) return items
+    const key = itemType + ":" + itemId
     if (seen[key]) return items
     seen[key] = true
-    const item = { productId }
+    const item = itemType === "product" ? { productId: itemId } : { itemType, itemId }
     if (settings.includeDisplayMeta) {
       ;[
         "productName",
@@ -246,9 +253,11 @@ function getLineItemNormalizeOptions(config, field, mode) {
     includeDisplayMeta: mode === "form",
     addSortOrder: isTransferConfig(config),
     preserveReturnDetailMeta: returnForm,
+    preserveLegacyReturnAlias: isSalesReturnConfig(config),
     preserveTransferDetailMeta: isTransferConfig(config),
+    preserveSalesWarehouse: isSalesConfig(config),
     outputUnitPrice: mode === "payload" && (isSalesConfig(config) || isPurchaseConfig(config) || returnForm),
-    legacyProductPayload: isSalesReturnConfig(config),
+    legacyProductPayload: false,
     allowedItemTypes: Array.isArray(field && field.allowedItemTypes) ? field.allowedItemTypes : null
   }
 }
@@ -264,6 +273,10 @@ function copyLineItemMaterialMeta(item, row, settings) {
     if (hasValue(itemName)) item.itemName = String(itemName).trim()
   }
 
+  if (settings.preserveLegacyReturnAlias) {
+    if (hasValue(itemName)) item.productName = String(itemName).trim()
+    if (hasValue(row.productId) && normalizeLineItemType(row) === "product") item.productId = normalizeIdValue(row.productId)
+  }
   if (settings.preserveProductMeta) {
     ;["unit", "spec", "grade"].forEach(key => {
       if (hasValue(row[key])) item[key] = String(row[key]).trim()
@@ -334,13 +347,17 @@ function normalizeNumber(value) {
   return Number.isFinite(numberValue) ? Number(numberValue.toFixed(2)) : undefined
 }
 
-function resolveFormFieldValue(field, row, options) {
+function resolveFormFieldValue(field, row, options, config) {
   if (!field) return undefined
   const directValue = row && row[field.key]
   if (hasValue(directValue)) return directValue
   if (field.key !== "warehouseId") return directValue
 
   const details = row && Array.isArray(row.details) ? row.details : []
+  if (isSalesConfig(config)) {
+    const ids = Array.from(new Set(details.filter(item => hasValue(item.warehouseId)).map(item => String(item.warehouseId))))
+    return ids.length === 1 ? normalizeIdValue(ids[0]) : undefined
+  }
   const detailWarehouseId = firstValue(details[0], ["warehouseId"])
   if (hasValue(detailWarehouseId)) return detailWarehouseId
 
@@ -512,7 +529,9 @@ function applyPayloadDefaults(config, payload, source, options) {
 }
 
 function applySalesPayloadDefaults(payload) {
-  applyOrderWarehouseDefaults(payload)
+  if (!payload || !hasValue(payload.warehouseId) || !Array.isArray(payload.details)) return
+  const warehouseId = normalizeIdValue(payload.warehouseId)
+  payload.details = payload.details.map(item => Object.assign({}, item, hasValue(item.warehouseId) ? {} : { warehouseId }))
 }
 
 function applyOrderWarehouseDefaults(payload) {

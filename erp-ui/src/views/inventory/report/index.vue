@@ -11,14 +11,8 @@
     />
     <el-card shadow="never" class="search-card mb12">
       <el-form :model="queryParams" inline size="small" class="query-form">
-        <el-form-item label="商品">
-          <product-select
-            v-model="queryParams.productId"
-            placeholder="搜索商品名称/编码"
-            width="220px"
-            @change="handleProductChange"
-          />
-        </el-form-item>
+        <el-form-item label="物料类型"><el-select v-model="queryParams.itemType" clearable placeholder="全部类型" style="width:130px" @change="handleItemTypeChange"><el-option label="商品" value="product"/><el-option label="OE" value="oe"/><el-option label="礼盒" value="gift"/></el-select></el-form-item>
+        <el-form-item label="物料"><report-item-select v-model="itemChoiceKey" :item-type="queryParams.itemType" @change="handleItemChange"/></el-form-item>
         <el-form-item label="库存组织">
           <el-tag size="small">{{ currentDeptLabel }}</el-tag>
         </el-form-item>
@@ -66,7 +60,7 @@
       <div v-if="canViewCostMetrics" class="metric-card">
         <div class="metric-value">{{ formatMoney(summary.purchaseAmount) }}</div>
         <div class="metric-label">已入库采购净额</div>
-        <div class="metric-extra">实际收货并扣除已确认采购退货 · {{ displayValue(summary.purchaseOrderCount) }} 单</div>
+        <div class="metric-extra">按实际合格/让步入库与退货发生日期统计 · {{ displayValue(summary.purchaseOrderCount) }} 单</div>
       </div>
       <div class="metric-card">
         <div class="metric-value">{{ formatMoney(summary.salesAmount) }}</div>
@@ -101,17 +95,18 @@
         <el-button v-hasPermi="['inv:report:list']" type="text" size="mini" icon="el-icon-refresh" @click="getWarningList">刷新</el-button>
       </div>
       <el-table v-loading="warningLoading" :data="warningList" size="small">
-        <el-table-column label="商品编码" min-width="130" show-overflow-tooltip>
-          <template slot-scope="scope">{{ displayValue(scope.row.productCode) }}</template>
+        <el-table-column label="物料类型" width="90"><template slot-scope="scope">{{ itemTypeLabel(scope.row.itemType) }}</template></el-table-column>
+        <el-table-column label="物料编码" min-width="130" show-overflow-tooltip>
+          <template slot-scope="scope">{{ displayValue(scope.row.itemCode || scope.row.productCode) }}</template>
         </el-table-column>
-        <el-table-column label="商品名称" min-width="180" show-overflow-tooltip>
-          <template slot-scope="scope">{{ displayValue(scope.row.productName) }}</template>
+        <el-table-column label="物料名称" min-width="180" show-overflow-tooltip>
+          <template slot-scope="scope">{{ displayValue(scope.row.itemName || scope.row.productName) }}</template>
         </el-table-column>
-        <el-table-column label="商品分类" min-width="160" show-overflow-tooltip>
-          <template slot-scope="scope">{{ displayValue(scope.row.categoryFullPath || scope.row.categoryName) }}</template>
+        <el-table-column label="物料分类" min-width="160" show-overflow-tooltip>
+          <template slot-scope="scope">{{ displayValue(scope.row.itemCategoryFullPath || scope.row.itemCategoryName || scope.row.categoryFullPath || scope.row.categoryName) }}</template>
         </el-table-column>
         <el-table-column label="规格" min-width="120" show-overflow-tooltip>
-          <template slot-scope="scope">{{ displayValue(scope.row.spec) }}</template>
+          <template slot-scope="scope">{{ displayValue(scope.row.itemSpec || scope.row.spec) }}</template>
         </el-table-column>
         <el-table-column label="库存组织" min-width="140" show-overflow-tooltip>
           <template slot-scope="scope">{{ displayValue(scope.row.warehouseName || scope.row.shopDeptName) }}</template>
@@ -147,37 +142,40 @@
 
 <script>
 import { getReportSummary, listStockWarning } from "@/api/inventory/report"
-import ProductSelect from "@/views/inventory/components/ProductSelect"
+import ReportItemSelect from "@/views/inventory/components/ReportItemSelect"
 import { getSelectedDeptContext, getSelectedDeptId, getSelectedDeptName } from "@/utils/shopContext"
 
 export default {
   name: "InvReport",
-  components: { ProductSelect },
+  components: { ReportItemSelect },
   data() {
     return {
+      summaryReadSeq: 0, warningReadSeq: 0, summaryReadContext: "", warningReadContext: "",
+      pageInactive: false, deptListenerBound: false,
+      selectedDeptId: getSelectedDeptId(), selectedDeptContext: getSelectedDeptContext(), selectedDeptName: getSelectedDeptName(),
       summaryLoading: false,
       warningLoading: false,
-      dateRange: [],
+      dateRange: [], itemChoiceKey: undefined,
       summary: {},
       warningList: [],
       warningTotal: 0,
       queryParams: {
         pageNum: 1,
         pageSize: 10,
-        productId: undefined,
+        productId: undefined, itemType: undefined, itemId: undefined,
         stockStatus: undefined
       }
     }
   },
   computed: {
     currentDeptId() {
-      return getSelectedDeptId()
+      return this.selectedDeptId
     },
     currentDeptContext() {
-      return getSelectedDeptContext()
+      return this.selectedDeptContext
     },
     currentDeptLabel() {
-      const deptName = getSelectedDeptName() || "当前组织"
+      const deptName = this.selectedDeptName || "当前组织"
       const deptType = this.currentDeptContext.isWarehouse ? "仓库" : this.currentDeptContext.isStore ? "门店" : "组织"
       return deptName + "（" + deptType + "）"
     },
@@ -188,31 +186,111 @@ export default {
       return Number(this.summary.salesCost || 0) < 0
     }
   },
-  created() {
+  created() { this.bindDeptListener(); this.loadData() },
+  activated() {
+    if (!this.pageInactive) return
+    this.pageInactive = false
+    this.bindDeptListener()
     this.loadData()
   },
+  deactivated() { this.pageInactive = true; this.invalidateReportReads() },
+  beforeDestroy() {
+    this.pageInactive = true
+    this.invalidateReportReads()
+    if (this.deptListenerBound && typeof window !== "undefined") window.removeEventListener("erp:dept-changed", this.handleDeptChanged)
+    this.deptListenerBound = false
+  },
+  watch: {
+    dateRange: { deep: true, handler() { this.handleReportContextChange() } },
+    queryParams: { deep: true, handler() { this.handleReportContextChange() } },
+    "$store.getters.id"() { this.handleActorChanged() },
+    "$store.getters.token"() { this.handleActorChanged() },
+    "$route.fullPath"() { this.invalidateReportReads() }
+  },
   methods: {
+    bindDeptListener() {
+      if (!this.deptListenerBound && typeof window !== "undefined") {
+        window.addEventListener("erp:dept-changed", this.handleDeptChanged)
+        this.deptListenerBound = true
+      }
+    },
+    handleDeptChanged() {
+      this.itemChoiceKey=undefined; this.queryParams.itemId=undefined;
+      this.selectedDeptId = getSelectedDeptId()
+      this.selectedDeptContext = getSelectedDeptContext()
+      this.selectedDeptName = getSelectedDeptName()
+      this.invalidateReportReads()
+      if (!this.pageInactive) this.loadData()
+    },
+    handleActorChanged() { this.invalidateReportReads(); this.itemChoiceKey=undefined; this.queryParams.itemId=undefined; if(!this.pageInactive)this.loadData() },
+    itemTypeLabel(type) { return {product:'商品',oe:'OE',gift:'礼盒'}[type] || '商品' },
+    handleItemTypeChange() { this.itemChoiceKey=undefined; this.queryParams.itemId=undefined; this.queryParams.productId=undefined; this.queryParams.pageNum=1 },
+    handleItemChange(item) { this.queryParams.itemId=item ? item.itemId : undefined; this.queryParams.productId=undefined; if(item)this.queryParams.itemType=item.itemType; this.queryParams.pageNum=1 },
+    reportContextKey(withPage) {
+      return JSON.stringify({ actorId:this.$store && this.$store.getters.id, session:this.$store && this.$store.getters.token, deptId: getSelectedDeptId(), query: this.buildQuery(withPage) })
+    },
+    invalidateReportRead(withPage) {
+      if (withPage) {
+        this.warningReadSeq += 1
+        this.warningReadContext = ""
+        this.warningLoading = false
+        this.warningList = []
+        this.warningTotal = 0
+      } else {
+        this.summaryReadSeq += 1
+        this.summaryReadContext = ""
+        this.summaryLoading = false
+        this.summary = {}
+      }
+    },
+    invalidateReportReads() { this.invalidateReportRead(false); this.invalidateReportRead(true) },
+    handleReportContextChange() {
+      if (this.summaryReadContext && this.summaryReadContext !== this.reportContextKey(false)) this.invalidateReportRead(false)
+      if (this.warningReadContext && this.warningReadContext !== this.reportContextKey(true)) this.invalidateReportRead(true)
+    },
+    isCurrentReportRead(withPage, seq, context) {
+      return !this.pageInactive && seq === (withPage ? this.warningReadSeq : this.summaryReadSeq) && context === this.reportContextKey(withPage)
+    },
     loadData() {
-      if (!this.ensureEntryContext()) return
-      this.getSummary()
-      this.getWarningList()
+      if (this.pageInactive) return Promise.resolve()
+      if (!this.ensureEntryContext()) { this.invalidateReportReads(); return Promise.resolve() }
+      return Promise.all([this.getSummary(), this.getWarningList()])
     },
     getSummary() {
+      if (this.pageInactive) return Promise.resolve()
+      if (!this.ensureEntryContext()) { this.invalidateReportReads(); return Promise.resolve() }
+      const query = this.buildQuery(false)
+      const context = this.reportContextKey(false)
+      const seq = ++this.summaryReadSeq
+      this.summaryReadContext = context
+      this.summary = {}
       this.summaryLoading = true
-      getReportSummary(this.buildQuery(false)).then(res => {
-        this.summary = res.data || {}
+      return getReportSummary(query, { silentError: true }).then(res => {
+        if (this.isCurrentReportRead(false, seq, context)) this.summary = res.data || {}
+      }).catch(() => {
+        if (this.isCurrentReportRead(false, seq, context)) this.$modal.msgError("报表汇总加载失败，请重试")
       }).finally(() => {
-        this.summaryLoading = false
+        if (this.isCurrentReportRead(false, seq, context)) this.summaryLoading = false
       })
     },
     getWarningList() {
-      if (!this.ensureEntryContext()) return
+      if (this.pageInactive) return Promise.resolve()
+      if (!this.ensureEntryContext()) { this.invalidateReportReads(); return Promise.resolve() }
+      const query = this.buildQuery(true)
+      const context = this.reportContextKey(true)
+      const seq = ++this.warningReadSeq
+      this.warningReadContext = context
+      this.warningList = []
+      this.warningTotal = 0
       this.warningLoading = true
-      listStockWarning(this.buildQuery(true)).then(res => {
+      return listStockWarning(query, { silentError: true }).then(res => {
+        if (!this.isCurrentReportRead(true, seq, context)) return
         this.warningList = res.rows || []
         this.warningTotal = res.total || 0
+      }).catch(() => {
+        if (this.isCurrentReportRead(true, seq, context)) this.$modal.msgError("库存预警加载失败，请重试")
       }).finally(() => {
-        this.warningLoading = false
+        if (this.isCurrentReportRead(true, seq, context)) this.warningLoading = false
       })
     },
     handleQuery() {
@@ -220,11 +298,11 @@ export default {
       this.loadData()
     },
     resetQuery() {
-      this.dateRange = []
+      this.dateRange = []; this.itemChoiceKey=undefined
       this.queryParams = {
         pageNum: 1,
         pageSize: 10,
-        productId: undefined,
+        productId: undefined, itemType: undefined, itemId: undefined,
         stockStatus: undefined
       }
       this.loadData()
@@ -241,7 +319,7 @@ export default {
       return this.addDateRange(query, this.dateRange)
     },
     ensureEntryContext() {
-      if (!this.currentDeptId) {
+      if (!getSelectedDeptId()) {
         this.$message.warning("请先选择店铺或仓库")
         return false
       }

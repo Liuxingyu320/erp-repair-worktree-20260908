@@ -2306,6 +2306,55 @@ class InvTransferServiceImplTest
     }
 
     @Test
+    @DisplayName("删除只依据加锁后的当前状态，等待锁期间已提交则拒绝")
+    void deletionUsesLockedStateInsteadOfOldDraftSnapshot()
+    {
+        SecurityContextHolder.setUserId("1");
+        FakeTransferOrderMapper orders = new FakeTransferOrderMapper();
+        FakeTransferDetailMapper details = new FakeTransferDetailMapper();
+        orders.stored = persistedTransfer(InvStatusConstants.DRAFT);
+        orders.lockedReadOverride = persistedTransfer(InvStatusConstants.SUBMITTED);
+        details.details.add(persistedDetail());
+        assertThatThrownBy(() -> transferService(orders, details).deleteTransfer(900L, 202L))
+                .hasMessageContaining("当前状态不允许删除");
+        assertThat(orders.deleteCalls).isZero();
+        assertThat(details.details).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("已取消但存在历史预留的单据不能被删除")
+    void deletionRetainsCancelledTransferWithReservationHistory()
+    {
+        SecurityContextHolder.setUserId("1");
+        FakeTransferOrderMapper orders = new FakeTransferOrderMapper();
+        FakeTransferDetailMapper details = new FakeTransferDetailMapper();
+        orders.stored = persistedTransfer(InvStatusConstants.CANCELLED);
+        orders.deletionReservationIds = List.of(71L);
+        details.details.add(persistedDetail());
+        assertThatThrownBy(() -> transferService(orders, details).deleteTransfer(900L, 202L))
+                .hasMessageContaining("已有预留");
+        assertThat(orders.deleteCalls).isZero();
+        assertThat(details.details).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("无业务事实的草稿按加锁状态和版本删除")
+    void unusedDraftDeletionCarriesLockedVersion()
+    {
+        SecurityContextHolder.setUserId("1");
+        FakeTransferOrderMapper orders = new FakeTransferOrderMapper();
+        FakeTransferDetailMapper details = new FakeTransferDetailMapper();
+        orders.stored = persistedTransfer(InvStatusConstants.DRAFT);
+        orders.stored.setVersion(7L);
+        details.details.add(persistedDetail());
+        transferService(orders, details).deleteTransfer(900L, 202L);
+        assertThat(orders.lastDeleteExpectedVersion).isEqualTo(7L);
+        assertThat(orders.deleteCalls).isEqualTo(1);
+        assertThat(orders.stored).isNull();
+        assertThat(details.details).isEmpty();
+    }
+
+    @Test
     @DisplayName("已提交调拨单不能物理删除")
     void shouldRejectDeletingSubmittedTransfer()
     {
@@ -2588,6 +2637,8 @@ class InvTransferServiceImplTest
     {
         return new InventoryItemResolver()
         {
+            // This fixture supplies catalog snapshots; real master locking is exercised by the MySQL suite.
+            @Override public void lockReferences(java.util.Collection<InventoryItemResolver.ReferenceKey> keys) {}
             private int invocation;
 
             @Override
@@ -2644,6 +2695,9 @@ class InvTransferServiceImplTest
         private CyclicBarrier draftCasBarrier;
         private Long lastDraftExpectedVersion;
         private int deleteCalls;
+        private InvTransferOrder lockedReadOverride;
+        private List<Long> deletionReservationIds = List.of();
+        private Long lastDeleteExpectedVersion;
         private InvTransferOrder concurrentSalesDelivery;
         private int sourceForUpdateQueries;
 
@@ -2656,7 +2710,7 @@ class InvTransferServiceImplTest
         @Override
         public InvTransferOrder selectInvTransferOrderByIdForUpdate(Long transferId)
         {
-            return stored;
+            return lockedReadOverride == null ? stored : lockedReadOverride;
         }
 
         @Override
@@ -2803,6 +2857,22 @@ class InvTransferServiceImplTest
             stored.setVersion(currentVersion + 1);
             stored.setUpdateBy(updateBy);
             return 1;
+        }
+
+        @Override
+        public List<Long> selectShipmentIdsForDeletionForUpdate(Long transferId) { return List.of(); }
+        @Override
+        public List<Long> selectDiscrepancyIdsForDeletionForUpdate(Long transferId) { return List.of(); }
+        @Override
+        public List<Long> selectReservationIdsForDeletionForUpdate(Long transferId) { return deletionReservationIds; }
+
+        @Override
+        public int deleteDraftIfVersionMatches(Long transferId, String expectedStatus, Long expectedVersion)
+        {
+            lastDeleteExpectedVersion = expectedVersion;
+            if (stored == null || !java.util.Objects.equals(stored.getStatus(), expectedStatus)
+                    || !java.util.Objects.equals(stored.getVersion() == null ? 0L : stored.getVersion(), expectedVersion)) return 0;
+            return deleteInvTransferOrderById(transferId);
         }
 
         @Override

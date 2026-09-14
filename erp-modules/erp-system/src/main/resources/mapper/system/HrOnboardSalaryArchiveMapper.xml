@@ -4,7 +4,7 @@
     <select id="lockSource" resultType="com.erp.system.domain.HrOnboardSalarySource">
         select r.row_id rowId, r.batch_id batchId, r.employee_id employeeId,
                r.version, r.status, r.match_type matchType, r.task_id taskId,
-               r.source_event_version sourceEventVersion,
+               r.source_event_version sourceEventVersion, r.historical_supplement historicalSupplement,
                r.snapshot_json snapshotJson, b.shop_dept_id shopDeptId,
                b.file_sha256 fileSha256,
                b.created_by_user_id ownerUserId
@@ -21,9 +21,33 @@
         where task_id = #{taskId}
            or (employee_id = #{employeeId} and upper(trim(scenario)) = 'ONBOARD'
                and upper(trim(source_type)) = 'MANUAL_SIGN_EXCEL_IMPORT'
-               and trim(source_business_id) = cast(#{rowId} as char)
-               and trim(source_event_version) = cast(#{sourceEventVersion} as char))
+               and binary trim(source_business_id) = binary cast(#{rowId} as char)
+               and binary trim(source_event_version) = binary cast(#{sourceEventVersion} as char))
         order by task_id for update
+    </select>
+    <select id="readSource" resultType="com.erp.system.domain.HrOnboardSalarySource">
+        select r.row_id rowId, r.batch_id batchId, r.employee_id employeeId,
+               r.version, r.status, r.match_type matchType, r.task_id taskId,
+               r.source_event_version sourceEventVersion, r.historical_supplement historicalSupplement,
+               r.snapshot_json snapshotJson, b.shop_dept_id shopDeptId,
+               b.file_sha256 fileSha256,
+               b.created_by_user_id ownerUserId
+        from oa_sign_onboard_import_row r
+        join oa_sign_onboard_import_batch b on b.batch_id = r.batch_id
+        where r.batch_id = #{batchId} and r.row_id = #{rowId}
+
+    </select>
+    <select id="readTasks" resultType="com.erp.system.domain.HrOnboardSalaryTaskOwner">
+        select task_id taskId, employee_id employeeId, assigned_hr_user_id assignedHrUserId,
+               scenario, source_type sourceType, source_business_id sourceBusinessId,
+               source_event_version sourceEventVersion
+        from oa_sign_task
+        where task_id = #{taskId}
+           or (employee_id = #{employeeId} and upper(trim(scenario)) = 'ONBOARD'
+               and upper(trim(source_type)) = 'MANUAL_SIGN_EXCEL_IMPORT'
+               and binary trim(source_business_id) = binary cast(#{rowId} as char)
+               and binary trim(source_event_version) = binary cast(#{sourceEventVersion} as char))
+        order by task_id
     </select>
     <select id="latest" resultType="com.erp.system.domain.HrEmployeeSalaryImportAudit">
         select employee_id employeeId, source_row_id sourceRowId,
@@ -31,6 +55,10 @@
         from sys_employee_salary_import_audit
         where employee_id = #{employeeId}
         order by audit_id desc limit 1
+    </select>
+    <select id="auditForRow" resultType="com.erp.system.domain.HrEmployeeSalaryImportAudit">
+        select employee_id employeeId, source_row_id sourceRowId, source_version sourceVersion, salary_json salaryJson
+        from sys_employee_salary_import_audit where source_row_id = #{rowId} and source_version = #{version}
     </select>
     <update id="updateSalary">
         update sys_user_profile

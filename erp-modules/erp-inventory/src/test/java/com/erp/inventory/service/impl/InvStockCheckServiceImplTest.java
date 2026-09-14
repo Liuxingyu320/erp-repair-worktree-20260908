@@ -117,6 +117,7 @@ class InvStockCheckServiceImplTest
         when(checkMapper.selectInvStockCheckById(1001L)).thenReturn(check);
         when(checkMapper.selectInvStockCheckByIdForUpdate(1001L)).thenReturn(check);
         when(detailMapper.selectInvStockCheckDetailByCheckId(1001L)).thenReturn(List.of(dbDetail));
+        when(detailMapper.selectInvStockCheckDetailByCheckIdForUpdate(1001L)).thenReturn(List.of(dbDetail));
         service.deptScopeMapper = deptScopeMapper(Map.of(20L, "WAREHOUSE"));
         ReflectionTestUtils.setField(service, "checkMapper", checkMapper);
         ReflectionTestUtils.setField(service, "checkDetailMapper", detailMapper);
@@ -131,6 +132,74 @@ class InvStockCheckServiceImplTest
         assertThat(captor.getValue().getCounterName()).isNull();
         assertThat(captor.getValue().getDeadline()).isNull();
         verify(approvalService, never()).createPendingApproval(any(), any());
+    }
+
+    @Test
+    void shouldPreserveRecountAndAuditWhenActualUnchangedAndRecountOmitted() throws Exception
+    {
+        InvStockCheckDetail saved = saveRecountInput("{\"detailId\":501,\"actualQty\":8.00}");
+        assertThat(saved.getRecountQty()).isEqualByComparingTo("7");
+        assertThat(saved.getRecountBy()).isEqualTo("original-counter");
+        assertThat(saved.getRecountTime()).isEqualTo(new Date(123L));
+        assertThat(saved.getDiffQty()).isEqualByComparingTo("-3");
+        assertThat(new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(saved))
+                .doesNotContain("recountQtySpecified");
+    }
+
+    @Test
+    void shouldClearRecountAndAuditWhenExplicitNullIsProvided() throws Exception
+    {
+        InvStockCheckDetail saved = saveRecountInput("{\"detailId\":501,\"actualQty\":8,\"recountQty\":null}");
+        assertThat(saved.getRecountQty()).isNull();
+        assertThat(saved.getRecountBy()).isNull();
+        assertThat(saved.getRecountTime()).isNull();
+        assertThat(saved.getDiffQty()).isEqualByComparingTo("-2");
+    }
+
+    @Test
+    void shouldDiscardOldRecountWhenActualChangedWithoutNewRecount() throws Exception
+    {
+        InvStockCheckDetail saved = saveRecountInput("{\"detailId\":501,\"actualQty\":6}");
+        assertThat(saved.getRecountQty()).isNull();
+        assertThat(saved.getRecountBy()).isNull();
+        assertThat(saved.getRecountTime()).isNull();
+        assertThat(saved.getDiffQty()).isEqualByComparingTo("-4");
+    }
+
+    @Test
+    void shouldRecordNewRecountIncludingZeroWithCurrentOperator() throws Exception
+    {
+        InvStockCheckDetail saved = saveRecountInput("{\"detailId\":501,\"actualQty\":6,\"recountQty\":0}");
+        assertThat(saved.getRecountQty()).isZero();
+        assertThat(saved.getRecountBy()).isEqualTo("current-counter");
+        assertThat(saved.getRecountTime()).isAfter(new Date(123L));
+        assertThat(saved.getDiffQty()).isEqualByComparingTo("-10");
+    }
+
+    private InvStockCheckDetail saveRecountInput(String json) throws Exception
+    {
+        SecurityContextHolder.setUserId("7");
+        SecurityContextHolder.setUserName("current-counter");
+        InvStockCheckServiceImpl service = new InvStockCheckServiceImpl();
+        InvStockCheckMapper checks = mock(InvStockCheckMapper.class);
+        InvStockCheckDetailMapper details = mock(InvStockCheckDetailMapper.class);
+        InvStockCheck check = stockCheck(1001L, 20L, InvStatusConstants.DRAFT);
+        check.setRecountThreshold(BigDecimal.ONE);
+        InvStockCheckDetail persisted = stockCheckDetail(501L, 1001L, 101L, "测试商品", "10", "8", "-3");
+        persisted.setRecountRequired("1"); persisted.setRecountQty(new BigDecimal("7"));
+        persisted.setRecountBy("original-counter"); persisted.setRecountTime(new Date(123L));
+        when(checks.selectInvStockCheckById(1001L)).thenReturn(check);
+        when(checks.selectInvStockCheckByIdForUpdate(1001L)).thenReturn(check);
+        when(details.selectInvStockCheckDetailByCheckId(1001L)).thenReturn(List.of(persisted));
+        when(details.selectInvStockCheckDetailByCheckIdForUpdate(1001L)).thenReturn(List.of(persisted));
+        service.deptScopeMapper = deptScopeMapper(Map.of(20L, "WAREHOUSE"));
+        ReflectionTestUtils.setField(service, "checkMapper", checks);
+        ReflectionTestUtils.setField(service, "checkDetailMapper", details);
+        InvStockCheck input = new InvStockCheck();
+        input.setDetails(List.of(new com.fasterxml.jackson.databind.ObjectMapper().readValue(json, InvStockCheckDetail.class)));
+        service.inputActualQty(1001L, input, 20L);
+        verify(details).updateInvStockCheckDetail(persisted);
+        return persisted;
     }
 
     @Test
@@ -170,6 +239,8 @@ class InvStockCheckServiceImplTest
         when(checkMapper.selectInvStockCheckByIdForUpdate(1001L)).thenReturn(check);
         when(detailMapper.selectInvStockCheckDetailByCheckId(1001L))
                 .thenReturn(Collections.emptyList());
+        when(detailMapper.selectInvStockCheckDetailByCheckIdForUpdate(1001L))
+                .thenReturn(Collections.emptyList());
         service.deptScopeMapper = deptScopeMapper(Map.of(20L, "WAREHOUSE"));
         ReflectionTestUtils.setField(service, "checkMapper", checkMapper);
         ReflectionTestUtils.setField(service, "checkDetailMapper", detailMapper);
@@ -197,6 +268,8 @@ class InvStockCheckServiceImplTest
         when(checkMapper.selectInvStockCheckByIdForUpdate(1001L)).thenReturn(check);
         when(checkMapper.selectCounterCandidate(20L, 8L)).thenReturn(candidate);
         when(detailMapper.selectInvStockCheckDetailByCheckId(1001L))
+                .thenReturn(Collections.emptyList());
+        when(detailMapper.selectInvStockCheckDetailByCheckIdForUpdate(1001L))
                 .thenReturn(Collections.emptyList());
         service.deptScopeMapper = deptScopeMapper(Map.of(20L, "WAREHOUSE"));
         ReflectionTestUtils.setField(service, "checkMapper", checkMapper);
@@ -441,12 +514,15 @@ class InvStockCheckServiceImplTest
         InvStockCheck check = stockCheck(1001L, 20L, InvStatusConstants.INVALIDATED);
         InvStockCheckDetail detail = stockCheckDetail(501L, 1001L, 101L,
                 "测试商品", "10", "8", "-2");
+        detail.setItemType("gift");
+        detail.setItemId(101L);
+        detail.setProductId(null);
         InvStock current = stock(9001L, 101L, 20L, "9", "9");
         when(checkMapper.selectInvStockCheckById(1001L)).thenReturn(check);
         when(checkMapper.selectInvStockCheckByIdForUpdate(1001L)).thenReturn(check);
         when(detailMapper.selectInvStockCheckDetailByCheckIdForUpdate(1001L))
                 .thenReturn(List.of(detail));
-        when(stockMapper.selectInvStockByProductShopWarehouseForUpdate(101L, 20L, 20L))
+        when(stockMapper.selectInvStockByItemShopWarehouseForUpdate("gift", 101L, 20L, 20L))
                 .thenReturn(current);
         service.deptScopeMapper = deptScopeMapper(Map.of(20L, "WAREHOUSE"));
         ReflectionTestUtils.setField(service, "checkMapper", checkMapper);
@@ -679,6 +755,7 @@ class InvStockCheckServiceImplTest
         when(checkMapper.selectCounterCandidate(20L, 7L))
                 .thenReturn(counterCandidate(7L, "counter", "真实盘点人"));
         when(detailMapper.selectInvStockCheckDetailByCheckId(1001L)).thenReturn(Collections.emptyList());
+        when(detailMapper.selectInvStockCheckDetailByCheckIdForUpdate(1001L)).thenReturn(Collections.emptyList());
         when(detailMapper.selectStockForCheck(20L, 20L)).thenReturn(List.of(
                 stockSnapshotRow(101L, "明前龙井", "8.00"),
                 stockSnapshotRow(202L, "清香铁观音", "12.00")));
@@ -691,6 +768,66 @@ class InvStockCheckServiceImplTest
         List<InvStockCheckDetail> createdDetails = detailCaptor.getValue();
 
         assertThat(createdDetails).hasSize(1);
+        assertThat(createdDetails.get(0).getProductId()).isEqualTo(101L);
+        assertThat(createdDetails.get(0).getProductName()).isEqualTo("明前龙井");
+        assertThat(createdDetails.get(0).getBookQty()).isEqualByComparingTo("8.00");
+        assertThat(check.getCounterName()).isEqualTo("真实盘点人");
+    }
+
+    @Test
+    @DisplayName("创建指定商品盘点时只生成所选商品快照")
+    void shouldKeepAllThreeMaterialIdentitiesInFullStockCheck()
+    {
+        SecurityContextHolder.setUserId("1");
+        SecurityContextHolder.setUserName("admin");
+        InvStockCheckServiceImpl service = new InvStockCheckServiceImpl();
+        InvStockCheckMapper checkMapper = mock(InvStockCheckMapper.class);
+        InvStockCheckDetailMapper detailMapper = mock(InvStockCheckDetailMapper.class);
+        InvNumberSequenceMapper numberSequenceMapper = mock(InvNumberSequenceMapper.class);
+        InvStockCheck check = new InvStockCheck();
+        check.setWarehouseId(20L);
+        check.setCounterUserId(7L);
+        check.setCounterName("客户端伪造姓名");
+        check.setDeadline(futureDeadline());
+        check.setCheckScope("all");
+
+        service.deptScopeMapper = deptScopeMapper(Map.of(20L, "WAREHOUSE"));
+        ReflectionTestUtils.setField(service, "checkMapper", checkMapper);
+        ReflectionTestUtils.setField(service, "checkDetailMapper", detailMapper);
+        ReflectionTestUtils.setField(service, "numberSequenceMapper", numberSequenceMapper);
+
+        doAnswer(invocation -> {
+            InvStockCheck inserted = invocation.getArgument(0);
+            inserted.setCheckId(1001L);
+            return 1;
+        }).when(checkMapper).insertInvStockCheck(any(InvStockCheck.class));
+        when(numberSequenceMapper.insertOrUpdateSequence(any(), any(), eq(0), any())).thenReturn(1);
+        when(numberSequenceMapper.incrementAndGetSequence(any(), any())).thenReturn(1);
+        when(numberSequenceMapper.selectLastInsertId()).thenReturn(1L);
+        when(checkMapper.selectInvStockCheckById(1001L)).thenReturn(check);
+        when(checkMapper.selectCounterCandidate(20L, 7L))
+                .thenReturn(counterCandidate(7L, "counter", "真实盘点人"));
+        when(detailMapper.selectInvStockCheckDetailByCheckId(1001L)).thenReturn(Collections.emptyList());
+        when(detailMapper.selectInvStockCheckDetailByCheckIdForUpdate(1001L)).thenReturn(Collections.emptyList());
+        Map<String, Object> oe = stockSnapshotRow(101L, "OE物料", "12.00");
+        oe.remove("productId"); oe.put("itemType", "oe"); oe.put("itemId", 101L);
+        Map<String, Object> gift = stockSnapshotRow(101L, "礼盒", "15.00");
+        gift.remove("productId"); gift.put("itemType", "gift"); gift.put("itemId", 101L);
+        when(detailMapper.selectStockForCheck(20L, 20L)).thenReturn(List.of(
+                stockSnapshotRow(101L, "明前龙井", "8.00"), oe, gift));
+
+        service.createCheck(check, 20L);
+
+        @SuppressWarnings({ "unchecked", "rawtypes" })
+        ArgumentCaptor<List<InvStockCheckDetail>> detailCaptor = ArgumentCaptor.forClass((Class) List.class);
+        verify(detailMapper).batchInsertInvStockCheckDetail(detailCaptor.capture());
+        List<InvStockCheckDetail> createdDetails = detailCaptor.getValue();
+
+        assertThat(createdDetails).hasSize(3);
+        assertThat(createdDetails).extracting(row -> row.getItemType() + ":" + row.getItemId())
+                .containsExactly("product:101", "oe:101", "gift:101");
+        assertThat(createdDetails.get(1).getProductId()).isNull();
+        assertThat(createdDetails.get(2).getProductId()).isNull();
         assertThat(createdDetails.get(0).getProductId()).isEqualTo(101L);
         assertThat(createdDetails.get(0).getProductName()).isEqualTo("明前龙井");
         assertThat(createdDetails.get(0).getBookQty()).isEqualByComparingTo("8.00");

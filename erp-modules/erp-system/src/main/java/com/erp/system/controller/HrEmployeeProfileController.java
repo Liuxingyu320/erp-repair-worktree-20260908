@@ -104,6 +104,16 @@ public class HrEmployeeProfileController extends BaseController
     public AjaxResult editLegacyRoot(@RequestBody Map<String,Object> input)
     {return success(employeeService.updateLegacy(input,SecurityUtils.getUsername()));}
 
+    @RequiresPermissions("hr:employee:regularize")
+    @GetMapping("/{userId}/regularize/context")
+    public AjaxResult regularizationContext(@PathVariable Long userId)
+    { return success(hrLifecycleService.lifecycleContext(userId, "REGULARIZE", SecurityUtils.getUserId())); }
+
+    @RequiresPermissions("hr:employee:renewal")
+    @GetMapping("/{userId}/renewal/context")
+    public AjaxResult renewalContext(@PathVariable Long userId)
+    { return success(hrLifecycleService.lifecycleContext(userId, "RENEWAL", SecurityUtils.getUserId())); }
+
     @Log(title = "员工合同续签决定", businessType = BusinessType.UPDATE,
             isSaveRequestData = false, isSaveResponseData = false)
     @RequiresPermissions("hr:employee:renewal")
@@ -116,7 +126,7 @@ public class HrEmployeeProfileController extends BaseController
         Long actionId = hrLifecycleService.confirmRenewal(userId, request,
                 SecurityUtils.getUserId(), SecurityUtils.getUsername(), SecurityUtils.isAdmin(),
                 IpUtils.getIpAddr(servletRequest), userAgent);
-        return success(Map.of("actionId", actionId));
+        return success(Map.of("actionId", String.valueOf(actionId)));
     }
 
     @Log(title = "员工转正确认", businessType = BusinessType.UPDATE,
@@ -131,7 +141,7 @@ public class HrEmployeeProfileController extends BaseController
         Long actionId = hrLifecycleService.confirmRegularization(userId, request,
                 SecurityUtils.getUserId(), SecurityUtils.getUsername(), SecurityUtils.isAdmin(),
                 IpUtils.getIpAddr(servletRequest), userAgent);
-        return success(Map.of("actionId", actionId));
+        return success(Map.of("actionId", String.valueOf(actionId)));
     }
 
     @RequiresPermissions("hr:employee:transfer")

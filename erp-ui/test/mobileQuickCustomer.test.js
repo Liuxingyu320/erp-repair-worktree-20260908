@@ -306,9 +306,12 @@ assert.ok(
     hasAnyPermission: pickerComponent.methods.hasAnyPermission,
     loadCustomerServiceCardCapabilities: pickerComponent.methods.loadCustomerServiceCardCapabilities,
     hydrateKeywordFromOptions: pickerComponent.methods.hydrateKeywordFromOptions,
+    entityQueryKey: pickerComponent.methods.entityQueryKey,
+    invalidateEntityOptions: pickerComponent.methods.invalidateEntityOptions,
     searchOptions: pickerComponent.methods.searchOptions,
     openQuickCustomerForm: pickerComponent.methods.openQuickCustomerForm
   }
+  Object.defineProperty(picker, "entityDependencyKey", { get() { return pickerComponent.computed.entityDependencyKey.call(picker) } })
   Object.defineProperty(picker, "customerCapabilityContextKey", {
     configurable: true,
     get() { return pickerComponent.computed.customerCapabilityContextKey.call(picker) }
@@ -357,8 +360,13 @@ assert.ok(
   await new Promise(resolve => setTimeout(resolve, 0))
   assert.strictEqual(optionSearches, 1,
     "capability context switching must not block or duplicate options search")
+  assert.strictEqual(picker.options.length, 0,
+    "customer options from the previous organization must be discarded")
+  await picker.searchOptions()
+  assert.strictEqual(optionSearches, 2)
   assert.strictEqual(picker.options.length, 1,
-    "customer options must remain available independently of capability probes")
+    "fresh customer options remain available independently of capability probes")
+  assert.strictEqual(picker.canQuickCreateCustomer, true)
 })().then(() => {
   console.log("mobileQuickCustomer tests passed")
 }).catch(error => {

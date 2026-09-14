@@ -9,6 +9,12 @@ import com.erp.oa.domain.OaReimbursementItem;
 
 public interface OaReimbursementMapper
 {
+    int claimExportCommand(@Param("actorId") Long actorId, @Param("requestId") String requestId, @Param("payloadHash") String payloadHash);
+    com.erp.oa.domain.OaReimbursementExportCommand lockExportCommand(@Param("actorId") Long actorId, @Param("requestId") String requestId);
+    int completeExportCommand(@Param("actorId") Long actorId, @Param("requestId") String requestId, @Param("payloadHash") String payloadHash, @Param("batchId") Long batchId);
+    OaReimbursementExportBatch selectExportByCommand(@Param("actorId") Long actorId, @Param("requestId") String requestId);
+    List<OaReimbursementExportBatch> selectExportHistory(@Param("actorId") Long actorId);
+
     int insertReimbursement(OaReimbursement value);
 
     int updateReimbursement(OaReimbursement value);

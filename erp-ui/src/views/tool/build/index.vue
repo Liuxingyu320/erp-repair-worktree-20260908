@@ -77,6 +77,16 @@
     </div>
 
     <div class="center-board">
+      <div class="design-draft-bar">
+        <span role="status" :class="{ 'draft-error': draftError }">{{ draftError || draftStatus }}</span>
+        <div>
+          <el-button size="mini" @click="persistDesignDraft">保存草稿</el-button>
+          <el-button size="mini" @click="openDraftRecovery">恢复草稿</el-button>
+          <el-button size="mini" @click="exportDesignDraft">导出草稿</el-button>
+          <el-button size="mini" @click="$refs.designDraftFile.click()">导入草稿</el-button>
+          <input ref="designDraftFile" type="file" accept=".json,application/json" hidden @change="importDesignDraft">
+        </div>
+      </div>
       <div class="action-bar">
         <el-button icon="el-icon-download" type="text" @click="download">
           导出vue文件
@@ -131,6 +141,13 @@
       :show-file-name="showFileName"
       @confirm="generate"
     />
+    <el-dialog title="恢复表单设计草稿" :visible.sync="draftRecoveryOpen" width="560px" append-to-body>
+      <p>选择要恢复的草稿；当前未保存内容将被替换。</p>
+      <el-select v-model="selectedDraftKey" placeholder="选择保存时间" style="width: 100%">
+        <el-option v-for="record in savedDrafts" :key="record.key" :value="record.key" :label="draftRecordLabel(record)" />
+      </el-select>
+      <div slot="footer"><el-button @click="draftRecoveryOpen = false">取消</el-button><el-button type="primary" :disabled="!selectedDraftKey" @click="restoreSelectedDraft">恢复</el-button></div>
+    </el-dialog>
     <input id="copyNode" type="hidden">
   </div>
 </template>
@@ -146,7 +163,9 @@ import { beautifierConf, titleCase } from '@/utils/index'
 import { makeUpHtml, vueTemplate, vueScript, cssStyle } from '@/utils/generator/html'
 import { makeUpJs } from '@/utils/generator/js'
 import { makeUpCss } from '@/utils/generator/css'
-import { drawingDefaultValue, initDrawingDefaultValue, cleanDrawingDefaultValue } from '@/utils/generator/drawingDefault'
+import { drawingDefaultValue, initDrawingDefaultValue } from '@/utils/generator/drawingDefault'
+import { MAX_DRAFT_BYTES, parseDesignDraft, designDraftPrefix, readDesignDrafts, findDesignField } from '@/utils/generator/draft'
+import { getSelectedDeptId } from '@/utils/shopContext'
 import logo from '@/assets/logo/logo.png'
 import CodeTypeDialog from './CodeTypeDialog'
 import DraggableItem from './DraggableItem'
@@ -167,12 +186,12 @@ export default {
     return {
       logo,
       idGlobal: 100,
-      formConf,
+      formConf: JSON.parse(JSON.stringify(formConf)),
       inputComponents,
       selectComponents,
       layoutComponents,
       labelWidth: 100,
-      drawingList: drawingDefaultValue,
+      drawingList: JSON.parse(JSON.stringify(drawingDefaultValue)),
       drawingData: {},
       activeId: drawingDefaultValue[0].formId,
       drawerVisible: false,
@@ -180,21 +199,32 @@ export default {
       dialogVisible: false,
       generateConf: null,
       showFileName: false,
-      activeData: drawingDefaultValue[0]
+      activeData: {},
+      draftScope: '', draftKey: '', draftReady: false, draftApplying: false,
+      draftDirty: false, draftRevision: 0, draftTimer: null, draftContentBaseline: '', retiredDesignDrafts: {}, draftPendingRecoveryError: false,
+      draftError: '', draftStatus: '设计修改会自动保存到本机',
+      savedDrafts: [], draftRecoveryOpen: false, selectedDraftKey: ''
     }
   },
   beforeCreate() {
     initDrawingDefaultValue()
   },
   created() {
+    this.initializeDesignDraft()
     // 防止 firefox 下 拖拽 会新打卡一个选项卡
     document.body.ondrop = event => {
       event.preventDefault()
       event.stopPropagation()
     }
   },
+  activated() { if (this.currentDraftScope() !== this.draftScope) this.initializeDesignDraft() },
+  deactivated() { this.persistDesignDraft() },
   watch: {
+    '$store.getters.id'() { this.initializeDesignDraft() },
+    drawingList: { deep: true, handler() { this.scheduleDesignDraft() } },
+    formConf: { deep: true, handler() { this.scheduleDesignDraft() } },
     'activeData.label': function (val, oldVal) {
+      if (this.draftApplying) return
       if (
         this.activeData.placeholder === undefined
         || !this.activeData.tag
@@ -212,6 +242,7 @@ export default {
     }
   },
   mounted() {
+    window.addEventListener('beforeunload', this.beforeDraftUnload)
     clipboard = new ClipboardJS('#copyNode', {
       text: trigger => {
         const codeStr = this.generateCode()
@@ -228,9 +259,165 @@ export default {
     })
   },
   beforeDestroy() {
-    clipboard.destroy()
+    this.flushPreviousDesignDraft()
+    this.persistDesignDraft()
+    clearTimeout(this.draftTimer)
+    window.removeEventListener('beforeunload', this.beforeDraftUnload)
+    if (clipboard) clipboard.destroy()
   },
   methods: {
+    currentDraftScope() {
+      try { return designDraftPrefix(this.$store && this.$store.getters.id, getSelectedDeptId()) } catch (error) { return '' }
+    },
+    designTags() { return [...this.inputComponents, ...this.selectComponents, ...this.layoutComponents].map(item => item.tag).filter(Boolean) },
+    designContentSignature() { return JSON.stringify([this.drawingList, this.formConf, this.activeId]) },
+    flushPreviousDesignDraft() {
+      if (!this.draftReady || !this.draftKey || !this.draftScope || this.draftApplying) return
+      if (!this.draftDirty && this.designContentSignature() === this.draftContentBaseline) return
+      const text = this.designDraftText()
+      try {
+        parseDesignDraft(text, this.designTags())
+        window.localStorage.setItem(this.draftKey, text)
+        this.$delete(this.retiredDesignDrafts, this.draftScope)
+        this.draftDirty = false
+        this.draftContentBaseline = this.designContentSignature()
+      } catch (error) { this.$set(this.retiredDesignDrafts, this.draftScope, text) }
+    },
+    initializeDesignDraft() {
+      this.flushPreviousDesignDraft()
+      clearTimeout(this.draftTimer)
+      this.draftReady = false
+      this.draftScope = this.currentDraftScope()
+      this.draftKey = ''
+      this.draftRevision += 1
+      this.draftDirty = false
+      this.draftError = ''
+      this.draftPendingRecoveryError = false
+      this.savedDrafts = []
+      this.draftRecoveryOpen = false
+      this.selectedDraftKey = ''
+      initDrawingDefaultValue()
+      this.applyDesignDraft({ fields: JSON.parse(JSON.stringify(drawingDefaultValue)), formConf: JSON.parse(JSON.stringify(formConf)), idGlobal: 100 })
+      try {
+        if (!this.draftScope) throw new Error('账号尚未就绪，暂不能保存草稿')
+        const id = new Uint32Array(4)
+        window.crypto.getRandomValues(id)
+        this.draftKey = this.draftScope + Array.from(id, value => value.toString(16).padStart(8, '0')).join('')
+        const { records, invalid } = readDesignDrafts(window.localStorage, this.draftScope, this.designTags())
+        this.savedDrafts = records
+        const pending = this.retiredDesignDrafts[this.draftScope]
+        if (pending || records.length) {
+          this.applyDesignDraft(pending ? parseDesignDraft(pending, this.designTags()) : records[0].draft)
+          this.draftStatus = '已恢复最近草稿；修改会自动保存到本机'
+        } else this.draftStatus = '设计修改会自动保存到本机'
+        if (invalid.length) this.draftError = '部分旧草稿格式损坏，已保留原记录；当前设计仍可另存或导出'
+      } catch (error) { this.draftError = '本机草稿不可用，请导出保留设计：' + error.message }
+      if (this.retiredDesignDrafts[this.draftScope]) {
+        try { this.applyDesignDraft(parseDesignDraft(this.retiredDesignDrafts[this.draftScope], this.designTags())) }
+        catch (error) { this.draftPendingRecoveryError = true; this.draftError = '上次未保存的设计暂不能恢复，请先导出草稿保留原内容：' + error.message }
+      }
+      this.draftContentBaseline = this.designContentSignature()
+      this.$nextTick(() => {
+        this.draftReady = true
+        if (this.retiredDesignDrafts[this.draftScope] && !this.draftPendingRecoveryError) { this.draftDirty = true; this.persistDesignDraft() }
+      })
+    },
+    applyDesignDraft(draft) {
+      this.draftApplying = true
+      this.drawingList = JSON.parse(JSON.stringify(draft.fields))
+      this.formConf = JSON.parse(JSON.stringify(draft.formConf))
+      this.idGlobal = draft.idGlobal || 100
+      this.activeData = findDesignField(this.drawingList, draft.activeId) || this.drawingList[0] || {}
+      this.activeId = this.activeData.formId || null
+      this.$nextTick(() => { this.draftApplying = false })
+    },
+    designDraftText() {
+      return JSON.stringify({ format: 'erp-form-design', version: 1, savedAt: new Date().toISOString(), fields: this.drawingList, formConf: this.formConf, activeId: this.activeId })
+    },
+    scheduleDesignDraft() {
+      if (!this.draftReady || this.draftApplying) return
+      this.draftRevision += 1
+      this.draftDirty = true
+      this.draftStatus = '正在保存草稿…'
+      clearTimeout(this.draftTimer)
+      this.draftTimer = setTimeout(() => this.persistDesignDraft(), 200)
+    },
+    persistDesignDraft() {
+      clearTimeout(this.draftTimer)
+      if (!this.draftReady || this.draftApplying || this.draftPendingRecoveryError) return false
+      if (!this.draftScope || this.draftScope !== this.currentDraftScope() || !this.draftKey) {
+        this.draftError = '账号或组织已变化，请重新进入表单设计'
+        return false
+      }
+      try {
+        const text = this.designDraftText()
+        parseDesignDraft(text, this.designTags())
+        window.localStorage.setItem(this.draftKey, text)
+        this.draftDirty = false
+        this.draftContentBaseline = this.designContentSignature()
+        this.$delete(this.retiredDesignDrafts, this.draftScope)
+        this.draftError = ''
+        this.draftStatus = '草稿已保存到本机'
+        return true
+      } catch (error) {
+        this.draftDirty = true
+        this.draftError = '草稿未保存，请导出保留设计：' + error.message
+        return false
+      }
+    },
+    beforeDraftUnload(event) {
+      if (!this.draftDirty && this.designContentSignature() === this.draftContentBaseline && !Object.keys(this.retiredDesignDrafts).length) return
+      this.draftDirty = true
+      if (this.currentDraftScope() === this.draftScope) this.persistDesignDraft()
+      else this.flushPreviousDesignDraft()
+      if (this.draftDirty || Object.keys(this.retiredDesignDrafts).length) { event.preventDefault(); event.returnValue = '' }
+    },
+    draftRecordLabel(record) {
+      return (record.draft.savedAt || '未知时间').replace('T', ' ').replace('Z', ' UTC') + ' · ' + record.draft.componentCount + ' 个组件'
+    },
+    openDraftRecovery() {
+      if (this.currentDraftScope() !== this.draftScope) return
+      try {
+        this.savedDrafts = readDesignDrafts(window.localStorage, this.draftScope, this.designTags()).records
+        this.selectedDraftKey = this.savedDrafts.length ? this.savedDrafts[0].key : ''
+        this.draftRecoveryOpen = true
+      } catch (error) { this.draftError = '读取草稿失败：' + error.message }
+    },
+    async restoreSelectedDraft() {
+      const record = this.savedDrafts.find(item => item.key === this.selectedDraftKey)
+      if (!record || this.currentDraftScope() !== this.draftScope) return
+      this.draftPendingRecoveryError = false
+      this.applyDesignDraft(record.draft)
+      this.draftRecoveryOpen = false
+      await this.$nextTick()
+      this.draftDirty = true
+      this.persistDesignDraft()
+    },
+    exportDesignDraft() {
+      if (!this.draftScope || this.currentDraftScope() !== this.draftScope) return
+      try {
+        const text = this.retiredDesignDrafts[this.draftScope] || this.designDraftText()
+        this.$download.saveAs(new Blob([text], { type: 'application/json;charset=utf-8' }), '表单设计草稿.json')
+      } catch (error) { this.draftError = '草稿导出失败：' + error.message }
+    },
+    async importDesignDraft(event) {
+      const file = event.target.files && event.target.files[0]
+      event.target.value = ''
+      if (!file) return
+      const scope = this.draftScope, revision = this.draftRevision, signature = this.designContentSignature()
+      try {
+        if (file.size > MAX_DRAFT_BYTES) throw new Error('草稿文件过大，最多支持 1 MB')
+        const draft = parseDesignDraft(await file.text(), this.designTags())
+        if (this.currentDraftScope() !== scope || scope !== this.draftScope || revision !== this.draftRevision || signature !== this.designContentSignature()) throw new Error('读取文件期间设计或账号已变化，请重新导入')
+        await this.$confirm('导入草稿会替换当前设计，是否继续？', '导入草稿', { type: 'warning' })
+        if (this.currentDraftScope() !== scope || scope !== this.draftScope || revision !== this.draftRevision || signature !== this.designContentSignature()) throw new Error('确认期间设计或账号已变化，请重新导入')
+        this.draftPendingRecoveryError = false
+        this.applyDesignDraft(draft)
+        await this.$nextTick()
+        this.draftDirty = true
+        this.persistDesignDraft()
+      } catch (error) { if (error !== 'cancel' && error !== 'close') this.draftError = '草稿导入未完成：' + error.message }
+    },
     activeFormItem(element) {
       this.activeData = element
       this.activeId = element.formId
@@ -249,7 +436,7 @@ export default {
     cloneComponent(origin) {
       const clone = JSON.parse(JSON.stringify(origin))
       clone.formId = ++this.idGlobal
-      clone.span = formConf.span
+      clone.span = this.formConf.span
       clone.renderKey = +new Date() // 改变renderKey后可以实现强制更新组件
       if (!clone.layout) clone.layout = 'colFormItem'
       if (clone.layout === 'colFormItem') {
@@ -291,7 +478,8 @@ export default {
       this.$confirm('确定要清空所有组件吗？', '提示', { type: 'warning' }).then(
         () => {
           this.drawingList = []
-          cleanDrawingDefaultValue()
+          this.activeData = {}
+          this.activeId = null
         }
       )
     },
@@ -378,6 +566,12 @@ export default {
 </script>
 
 <style lang='scss'>
+.design-draft-bar { padding: 8px 12px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; border-bottom: 1px solid #e4e7ed; font-size: 12px; }
+.design-draft-bar .draft-error { color: #b42318; }
+.container .center-board { display: flex; flex-direction: column; }
+.container .center-scrollbar { flex: 1; min-height: 0; height: 0; }
+.container .center-board > .action-bar { flex-shrink: 0; }
+
 .editor-tabs{
   background: #121315;
   .el-tabs__header{

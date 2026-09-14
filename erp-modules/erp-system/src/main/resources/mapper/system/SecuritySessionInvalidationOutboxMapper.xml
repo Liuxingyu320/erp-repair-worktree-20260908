@@ -7,6 +7,7 @@
         <result property="eventType" column="event_type" />
         <result property="userId" column="user_id" />
         <result property="reasonCode" column="reason_code" />
+        <result property="retainedSessionDigest" column="retained_session_digest" />
         <result property="status" column="status" />
         <result property="attempts" column="attempts" />
         <result property="availableAt" column="available_at" />
@@ -21,9 +22,9 @@
     <insert id="insert" parameterType="com.erp.system.domain.SecuritySessionInvalidationOutbox"
             useGeneratedKeys="true" keyProperty="outboxId">
         insert into sys_security_session_outbox
-            (event_id, event_type, user_id, reason_code, status, attempts, available_at, created_at)
+            (event_id, event_type, user_id, reason_code, retained_session_digest, status, attempts, available_at, created_at)
         values
-            (#{eventId}, 'INVALIDATE_USER_SESSIONS', #{userId}, #{reasonCode}, 'PENDING', 0, now(), now())
+            (#{eventId}, 'INVALIDATE_USER_SESSIONS', #{userId}, #{reasonCode}, #{retainedSessionDigest}, 'PENDING', 0, now(), now())
     </insert>
 
     <update id="markDone">
@@ -60,7 +61,7 @@
     </update>
 
     <select id="selectClaimed" resultMap="OutboxResult">
-        select outbox_id, event_id, event_type, user_id, reason_code, status, attempts,
+        select outbox_id, event_id, event_type, user_id, reason_code, retained_session_digest, status, attempts,
                available_at, next_attempt_at, lock_owner, locked_at, last_error_code,
                created_at, processed_at
         from sys_security_session_outbox

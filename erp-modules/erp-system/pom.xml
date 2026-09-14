@@ -227,6 +227,7 @@
                             <reuseForks>true</reuseForks>
                             <includes>
                                 <include>**/TokenServiceRedisIT.java</include>
+                                <include>**/TokenSessionCasRedisIT.java</include>
                                 <include>**/SysUserOnlineControllerRedisIT.java</include>
                             </includes>
                         </configuration>

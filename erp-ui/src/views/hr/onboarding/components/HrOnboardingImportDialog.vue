@@ -205,7 +205,7 @@ const CATEGORY_LABELS = {
 
 const IMPORT_ISSUE_LABELS = {
   FORMULA_NOT_ALLOWED: "不允许使用公式单元格",
-  TEXT_CELL_REQUIRED: "该字段必须使用文本格式",
+  TEXT_CELL_REQUIRED: "请将该列设为文本后重新录入原值；已丢失的长号码不能自动恢复",
   ALIAS_CONFLICT: "表头别名存在冲突",
   FIELD_LENGTH_EXCEEDED: "字段内容超过长度限制",
   SAME_FILE_DUPLICATE: "文件内存在重复数据",

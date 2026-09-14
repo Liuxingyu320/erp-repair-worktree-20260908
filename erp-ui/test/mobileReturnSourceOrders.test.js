@@ -41,6 +41,7 @@ assert.deepStrictEqual(
     returnTitle: "销售退货-SO202607050001",
     details: [{
       salesDetailId: 51,
+      itemType: "product", itemId: 5, itemCode: "SKU-5", itemName: "龙井茶",
       productId: 5,
       productName: "龙井茶",
       sku: "SKU-5",
@@ -77,6 +78,7 @@ assert.deepStrictEqual(
   }).details,
   [{
     salesDetailId: 53,
+    itemType: "product", itemId: 7, itemName: "红茶",
     productId: 7,
     productName: "红茶",
     quantity: 0,
@@ -128,7 +130,7 @@ assert.deepStrictEqual(
       itemCode: "OE-805",
       itemName: "茶叶展架",
       productId: 5,
-      productName: "龙井茶",
+      productName: "茶叶展架",
       sku: "SKU-5",
       spec: "500g",
       unit: "斤",

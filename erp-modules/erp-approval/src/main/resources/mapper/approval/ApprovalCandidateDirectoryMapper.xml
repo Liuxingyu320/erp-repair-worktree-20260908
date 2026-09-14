@@ -5,6 +5,7 @@
     <resultMap id="DirectoryUserResult" type="ApprovalDirectoryUser">
         <id property="userId" column="user_id"/>
         <result property="userName" column="user_name"/>
+        <result property="accountName" column="account_name"/>
         <result property="deptId" column="dept_id"/>
         <result property="deptName" column="dept_name"/>
         <result property="postSort" column="post_sort"/>
@@ -160,6 +161,30 @@
         where u.user_id = #{userId}
           and <include refid="activeEmployee"/>
           <include refid="permissionExists"/>
+    </select>
+
+    <select id="selectReassignOptions" resultMap="DirectoryUserResult">
+        select u.user_id,
+               coalesce(nullif(trim(u.nick_name), ''), nullif(trim(u.user_name), ''), '姓名未配置') user_name,
+               u.user_name account_name, u.dept_id, d.dept_name, null post_sort
+        from sys_user u
+        left join sys_dept d on d.dept_id = u.dept_id
+        left join sys_user_profile profile on profile.user_id = u.user_id
+        where <include refid="activeEmployee"/>
+          and #{permission} is not null and #{permission} &lt;&gt; ''
+          <include refid="permissionExists"/>
+          and not exists (
+              select 1 from approval_task_candidate existing_candidate
+              where existing_candidate.task_id = #{taskId}
+                and existing_candidate.user_id = u.user_id
+          )
+          <if test="keyword != null and keyword != ''">
+              and (u.nick_name like concat('%', #{keyword}, '%')
+                   or u.user_name like concat('%', #{keyword}, '%')
+                   or d.dept_name like concat('%', #{keyword}, '%'))
+          </if>
+        order by u.user_id
+        limit #{limit} offset #{offset}
     </select>
 
     <select id="selectActiveAnchors" resultMap="DirectoryDeptResult">

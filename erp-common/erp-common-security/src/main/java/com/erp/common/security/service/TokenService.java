@@ -2,16 +2,20 @@ package com.erp.common.security.service;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.Objects;
+import java.util.WeakHashMap;
 import java.util.concurrent.TimeUnit;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
+import org.springframework.beans.BeanUtils;
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONObject;
 import com.erp.common.core.constant.CacheConstants;
@@ -23,6 +27,9 @@ import com.erp.common.core.utils.ip.IpUtils;
 import com.erp.common.core.utils.uuid.IdUtils;
 import com.erp.common.redis.service.RedisService;
 import com.erp.common.redis.service.RedisService.KeyScanResult;
+import com.erp.common.redis.service.RedisService.CacheSnapshot;
+import com.erp.common.core.exception.ServiceException;
+import com.erp.common.core.exception.auth.NotLoginException;
 import com.erp.common.security.utils.SecurityUtils;
 import com.erp.system.api.model.LoginUser;
 
@@ -57,6 +64,12 @@ public class TokenService
 
     private static final int SESSION_READ_BATCH_SIZE = 500;
 
+    // Weak identity keys: no snapshot is added to LoginUser, JWT, logs or API JSON.
+    // Values must never retain the LoginUser key, otherwise a weak map would leak sessions.
+    private final Map<LoginUser, SessionRead> sessionReads = Collections.synchronizedMap(new WeakHashMap<>());
+
+    private record SessionRead(String key, byte[] bytes) { }
+
     /**
      * 创建令牌
      */
@@ -69,7 +82,7 @@ public class TokenService
         loginUser.setUserid(userId);
         loginUser.setUsername(userName);
         loginUser.setIpaddr(IpUtils.getIpAddr());
-        refreshToken(loginUser);
+        createSession(loginUser);
 
         // Jwt存储信息
         Map<String, Object> claimsMap = new HashMap<String, Object>();
@@ -158,8 +171,53 @@ public class TokenService
         {
             return null;
         }
-        Object cacheUser = redisService.getCacheObject(cacheKey);
-        return parseCachedLoginUser(cacheUser);
+        CacheSnapshot snapshot = redisService.getCacheSnapshot(cacheKey);
+        if (snapshot == null)
+        {
+            return null;
+        }
+        LoginUser user = parseCachedLoginUser(snapshot.getValue());
+        if (user != null)
+        {
+            sessionReads.put(user, new SessionRead(cacheKey, snapshot.getBytes()));
+        }
+        return user;
+    }
+
+    /**
+     * Bounded read-only batches for display. These objects deliberately have no CAS write snapshot:
+     * listing sessions must neither renew them nor retain thousands of raw login payloads.
+     * Missing/invalid entries retain their position; Redis errors and incomplete reads fail visibly.
+     */
+    public List<LoginUser> getLoginUsersForDisplay(List<String> cacheKeys)
+    {
+        if (cacheKeys == null || cacheKeys.isEmpty())
+        {
+            return Collections.emptyList();
+        }
+        for (String key : cacheKeys)
+        {
+            if (StringUtils.isEmpty(key) || !key.startsWith(ACCESS_TOKEN))
+            {
+                throw new IllegalArgumentException("只允许读取登录会话缓存");
+            }
+        }
+        List<LoginUser> users = new ArrayList<>(cacheKeys.size());
+        for (int start = 0; start < cacheKeys.size(); start += SESSION_READ_BATCH_SIZE)
+        {
+            List<String> batch = cacheKeys.subList(start,
+                    Math.min(start + SESSION_READ_BATCH_SIZE, cacheKeys.size()));
+            List<Object> values = redisService.getMultiCacheObject(batch);
+            if (values == null || values.size() != batch.size())
+            {
+                throw new IllegalStateException("批量读取在线会话结果不完整");
+            }
+            for (Object value : values)
+            {
+                users.add(parseCachedLoginUser(value));
+            }
+        }
+        return users;
     }
 
     /**
@@ -180,6 +238,16 @@ public class TokenService
      * @return 删除的会话数量
      */
     public int deleteLoginUsersByUserId(Long userId)
+    {
+        return deleteLoginUsersByUserId(userId, null);
+    }
+
+    private int deleteLoginUsersByUserId(Long userId, String retainedToken)
+    {
+        return deleteLoginUsersByUserId(userId, retainedToken, null);
+    }
+
+    private int deleteLoginUsersByUserId(Long userId, String retainedToken, String retainedDigest)
     {
         if (userId == null)
         {
@@ -218,7 +286,10 @@ public class TokenService
             {
                 cachedUserId = loginUser.getSysUser().getUserId();
             }
-            if (userId.equals(cachedUserId))
+            if (userId.equals(cachedUserId)
+                    && (retainedToken == null || !keyList.get(i).equals(getTokenKey(retainedToken)))
+                    && (retainedDigest == null || !SessionRetentionDigest.matches(userId,
+                            keyList.get(i).substring(ACCESS_TOKEN.length()), retainedDigest)))
             {
                 matchedKeys.add(keyList.get(i));
             }
@@ -282,7 +353,7 @@ public class TokenService
     }
 
     /**
-     * Invalidates all cached sessions for one user without scanning the Redis keyspace.
+     * Invalidates sessions using a bounded authoritative scan, including missing index members.
      */
     public void invalidateUserSessions(Long userId)
     {
@@ -299,6 +370,8 @@ public class TokenService
             return;
         }
         String indexKey = getUserTokenIndexKey(String.valueOf(userId));
+        // Finish the complete read/validation before deleting anything. The index is auxiliary.
+        deleteLoginUsersByUserId(userId, retainedToken);
         Set<String> tokens = redisService.getCacheSet(indexKey);
         if (tokens == null || tokens.isEmpty())
         {
@@ -311,7 +384,6 @@ public class TokenService
             {
                 continue;
             }
-            redisService.deleteObject(getTokenKey(token));
             redisService.removeCacheSetValue(indexKey, token);
         }
         if (StringUtils.isEmpty(retainedToken))
@@ -322,6 +394,43 @@ public class TokenService
         {
             redisService.expire(indexKey, TOKEN_EXPIRE_TIME, TimeUnit.MINUTES);
         }
+    }
+
+    /**
+     * Outbox replay keeps only an existing, owner-matched session with the supplied digest.
+     * This never creates or renews a session, and never trusts the auxiliary index for completeness.
+     */
+    public void invalidateUserSessionsExceptDigest(Long userId, String retainedDigest)
+    {
+        SessionRetentionDigest.validate(retainedDigest);
+        if (retainedDigest == null)
+        {
+            invalidateUserSessions(userId);
+            return;
+        }
+        if (userId == null) return;
+        deleteLoginUsersByUserId(userId, null, retainedDigest);
+        String indexKey = getUserTokenIndexKey(String.valueOf(userId));
+        Set<String> indexedTokens = redisService.getCacheSet(indexKey);
+        if (indexedTokens == null || indexedTokens.isEmpty())
+        {
+            redisService.deleteObject(indexKey);
+            return;
+        }
+        for (String userKey : indexedTokens)
+        {
+            boolean retained = false;
+            if (SessionRetentionDigest.matches(userId, userKey, retainedDigest))
+            {
+                LoginUser existing = parseCachedLoginUser(redisService.getCacheObject(getTokenKey(userKey)));
+                Long owner = existing == null ? null : existing.getUserid();
+                if (owner == null && existing != null && existing.getSysUser() != null)
+                    owner = existing.getSysUser().getUserId();
+                retained = userId.equals(owner);
+            }
+            if (!retained) redisService.removeCacheSetValue(indexKey, userKey);
+        }
+        // Do not extend even the index TTL during compensation. Missing members remain missing.
     }
 
     /**
@@ -345,6 +454,65 @@ public class TokenService
      * @param loginUser 登录信息
      */
     public void refreshToken(LoginUser loginUser)
+    {
+        SessionRead read = loginUser == null ? null : sessionReads.get(loginUser);
+        if (read == null || !read.key().equals(getTokenKey(loginUser.getToken())))
+        {
+            throw new NotLoginException("登录状态已变化，请重新登录");
+        }
+        LoginUser original = parseCachedLoginUser(redisService.deserializeCacheValue(read.bytes()));
+        if (original == null || !Objects.equals(original.getUserid(), loginUser.getUserid()))
+        {
+            throw new NotLoginException("登录状态已变化，请重新登录");
+        }
+        boolean renewalOnly = sameSessionContent(original, loginUser);
+        for (int attempt = 0; attempt < 3; attempt++)
+        {
+            loginUser.setLoginTime(System.currentTimeMillis());
+            loginUser.setExpireTime(loginUser.getLoginTime() + TOKEN_EXPIRE_TIME * MILLIS_MINUTE);
+            byte[] written = redisService.compareAndSetCacheObject(read.key(), read.bytes(), loginUser,
+                    TOKEN_EXPIRE_TIME, TimeUnit.MINUTES);
+            if (written != null)
+            {
+                sessionReads.put(loginUser, new SessionRead(read.key(), written));
+                return;
+            }
+            LoginUser current = getLoginUserByCacheKey(read.key());
+            if (current == null)
+            {
+                sessionReads.remove(loginUser);
+                throw new NotLoginException("登录已过期或被撤销，请重新登录");
+            }
+            if (renewalOnly)
+            {
+                // Another request renewed or refreshed permissions. Use its authoritative state.
+                BeanUtils.copyProperties(current, loginUser);
+                sessionReads.put(loginUser, sessionReads.get(current));
+                return;
+            }
+            if (!sameSessionContent(original, current))
+            {
+                throw new ServiceException("登录资料已被更新，请刷新后核对", 409);
+            }
+            // Only timestamps changed: retry the intended update against the newly read raw bytes.
+            read = sessionReads.get(current);
+        }
+        throw new ServiceException("登录资料正在更新，请刷新后核对", 409);
+    }
+
+    private boolean sameSessionContent(LoginUser first, LoginUser second)
+    {
+        JSONObject left = JSON.parseObject(JSON.toJSONString(first));
+        JSONObject right = JSON.parseObject(JSON.toJSONString(second));
+        left.remove("loginTime");
+        left.remove("expireTime");
+        right.remove("loginTime");
+        right.remove("expireTime");
+        return left.equals(right);
+    }
+
+    /** Only successful authentication can create a new UUID session. Existing sessions never use SET. */
+    private void createSession(LoginUser loginUser)
     {
         loginUser.setLoginTime(System.currentTimeMillis());
         loginUser.setExpireTime(loginUser.getLoginTime() + TOKEN_EXPIRE_TIME * MILLIS_MINUTE);

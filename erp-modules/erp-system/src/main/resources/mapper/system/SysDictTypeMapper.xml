@@ -20,6 +20,12 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 		from sys_dict_type
     </sql>
 
+    <select id="lockDictTypeById" parameterType="Long" resultMap="SysDictTypeResult">
+        <include refid="selectDictTypeVo"/> where dict_id = #{dictId} for update
+    </select>
+    <select id="lockDictTypeByType" parameterType="String" resultMap="SysDictTypeResult">
+        <include refid="selectDictTypeVo"/> where dict_type = #{dictType} for update
+    </select>
 	<select id="selectDictTypeList" parameterType="SysDictType" resultMap="SysDictTypeResult">
 	    <include refid="selectDictTypeVo"/>
 		<where>

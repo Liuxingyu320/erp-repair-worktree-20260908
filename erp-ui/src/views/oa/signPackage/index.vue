@@ -787,10 +787,18 @@
       </div>
     </el-dialog>
 
-    <el-dialog title="发布方案版本前检查" :visible.sync="publishOpen" width="760px" append-to-body>
+    <el-dialog title="发布方案版本前检查" :visible.sync="publishOpen" width="760px" append-to-body
+      :show-close="!publishing" :close-on-click-modal="!publishing" :close-on-press-escape="!publishing">
+      <el-alert v-if="publishError" :title="publishError" type="error" show-icon :closable="false" class="detail-block" />
+      <div v-if="publishPreviewLoading" class="form-tip">正在核对方案内容与当前启用版本…</div>
+      <el-alert v-if="publishPreview" :title="publishPreview.message" :type="publishPreview.action === 'RESTORED' ? 'warning' : 'info'"
+        show-icon :closable="false" class="detail-block" />
+      <div v-if="publishPreview && publishPreview.activeVersions.length" class="form-tip">
+        当前启用：{{ publishPreview.activeVersions.map(version => 'V' + version.versionNo).join('、') }}
+      </div>
       <template v-if="publishDetail">
         <el-alert
-          title="发布只会生成不可变版本，自动发送仍保持关闭；发布后如需调整，请修改源方案再发布新版本。"
+          title="新发布或恢复版本仅用于后续新任务，已有签包保持原版本；本次不会自动发送。"
           type="info"
           show-icon
           :closable="false"
@@ -836,8 +844,11 @@
         <div class="form-tip">点击发布后，服务端还会校验模板场景、文件哈希、必填占位符、签名定位和企业章定位。</div>
       </template>
       <div slot="footer">
-        <el-button @click="publishOpen = false">取 消</el-button>
-        <el-button type="primary" :loading="publishing" :disabled="publishBlockingReasons.length > 0" @click="confirmPublishPlan">确认发布</el-button>
+        <el-button :disabled="publishing" @click="publishOpen = false">取 消</el-button>
+        <el-button v-if="publishError" :loading="publishPreviewLoading" :disabled="publishing" @click="handlePublishPlan({ planId: publishTargetId })">刷新预览并核对</el-button>
+        <el-button type="primary" :loading="publishing" :disabled="!publishPreview || publishPreviewLoading || publishBlockingReasons.length > 0" @click="confirmPublishPlan">
+          {{ publishPreview && publishPreview.action === 'RESTORED' ? '确认恢复该版本' : '确认发布' }}
+        </el-button>
       </div>
     </el-dialog>
 
@@ -1140,6 +1151,7 @@ import {
   listSignTemplates,
   matchSignTemplates,
   publishSignPlan,
+  previewPublishSignPlan,
   previewSignPackageBatch,
   previewSignTemplateFile,
   saveSignPlan,
@@ -1166,6 +1178,7 @@ import {
   signPackageStatusLabel
 } from "@/utils/signDictionary"
 import { signPlaceholderToken } from "@/utils/signPlaceholder"
+const { createUiOperationScope } = require("@/utils/uiOperationScope")
 const { signVersionLabel } = require("@/utils/signDisplayText")
 const { formatSignDateTimeWithSeconds } = require("@/utils/signDateTime")
 const {
@@ -1257,6 +1270,10 @@ export default {
       templateTitle: "新增模板",
       planTitle: "新增方案",
       publishDetail: null,
+      publishPreview: null,
+      publishTargetId: "",
+      publishPreviewLoading: false,
+      publishError: "",
       publishing: false,
       detail: null,
       verificationLoading: false,
@@ -1482,7 +1499,28 @@ export default {
   created() {
     return this.bootstrapSignPackagePage()
   },
+  beforeDestroy() {
+    if (this._publishOperationScope) this._publishOperationScope.deactivate()
+  },
+  deactivated() {
+    if (this._publishOperationScope) this._publishOperationScope.deactivate()
+    this.publishOpen = false
+  },
+  activated() {
+    if (this._publishOperationScope) this._publishOperationScope.activate()
+  },
   watch: {
+    publishOpen(value) {
+      if (!value && this._publishOperationScope) this._publishOperationScope.invalidate()
+    },
+    "$store.state.user.sessionRevision"() {
+      if (this._publishOperationScope) this._publishOperationScope.invalidate()
+      this.publishOpen = false
+    },
+    "$route.fullPath"() {
+      if (this._publishOperationScope) this._publishOperationScope.invalidate()
+      this.publishOpen = false
+    },
     activeTab(newValue) {
       if (newValue === "template") {
         this.getTemplates()
@@ -1837,25 +1875,76 @@ export default {
         this.$modal.msgWarning("已清除与当前场景不兼容的模板")
       }
     },
+    publishOperationScope() {
+      if (!this._publishOperationScope) {
+        this._publishOperationScope = createUiOperationScope(() => {
+          const user = (this.$store && this.$store.state && this.$store.state.user) || {}
+          return { actorId: String(user.id || ""), sessionRevision: user.sessionRevision || 0,
+            deptId: String(getSelectedSignScopeDeptId() || "") }
+        })
+      }
+      return this._publishOperationScope
+    },
     handlePublishPlan(row) {
+      const planId = String((row && row.planId) || "")
+      if (!/^[1-9]\d*$/.test(planId)) return Promise.resolve(null)
+      const scope = this.publishOperationScope()
+      scope.invalidate()
+      this.publishTargetId = planId
       this.publishDetail = null
+      this.publishPreview = null
+      this.publishError = ""
+      this.publishing = false
+      this.publishPreviewLoading = true
       this.publishOpen = true
-      getSignPlan(row.planId).then(response => {
-        this.publishDetail = response.data || row
-      }).catch(() => {
-        this.publishOpen = false
+      const operation = scope.begin("publish-preview", planId)
+      const current = () => this.publishOpen && scope.isCurrent(operation, this.publishTargetId)
+      return Promise.all([getSignPlan(planId), previewPublishSignPlan(planId)]).then(([detailResponse, previewResponse]) => {
+        if (!current()) return null
+        const detail = detailResponse && detailResponse.data
+        const preview = previewResponse && previewResponse.data
+        if (!detail || String(detail.planId) !== planId || !preview || String(preview.planId) !== planId ||
+            !preview.previewToken || !Array.isArray(preview.activeVersions)) {
+          throw new Error("发布预览结果暂未确认，请刷新预览核对")
+        }
+        this.publishDetail = detail
+        this.publishPreview = preview
+        return preview
+      }).catch(error => {
+        if (current()) this.publishError = (error && error.message) || "发布预览失败，请保留当前方案后重试"
+        return null
+      }).finally(() => {
+        if (current()) this.publishPreviewLoading = false
       })
     },
     confirmPublishPlan() {
-      if (!this.publishDetail || this.publishBlockingReasons.length) return
+      if (this.publishing || !this.publishDetail || !this.publishPreview || this.publishBlockingReasons.length) return Promise.resolve(null)
+      const planId = this.publishTargetId
+      const preview = this.publishPreview
+      const scope = this.publishOperationScope()
+      const operation = scope.begin("publish-write", planId)
+      const current = () => this.publishOpen && scope.isCurrent(operation, this.publishTargetId)
       this.publishing = true
-      publishSignPlan(this.publishDetail.planId).then(response => {
-        const receipt = response.data || {}
-        this.$modal.msgSuccess(`发布成功：版本 V${receipt.versionNo || '-'}`)
+      this.publishError = ""
+      return publishSignPlan(planId, { previewToken: preview.previewToken, restoreVersionId: preview.restoreVersionId }).then(response => {
+        if (!current()) return null
+        const receipt = (response && response.data) || {}
+        if (String(receipt.planId) !== planId || receipt.matchingStatus !== "ENABLED" ||
+            !["PUBLISHED", "UNCHANGED", "RESTORED"].includes(receipt.action) ||
+            (preview.targetVersionId != null && String(receipt.versionId) !== String(preview.targetVersionId))) {
+          throw new Error("发布结果暂未确认，请刷新预览核对当前启用版本")
+        }
+        const labels = { PUBLISHED: "发布成功", UNCHANGED: "版本内容未变化，保持启用", RESTORED: "已恢复历史版本" }
+        this.$modal.msgSuccess(`${labels[receipt.action]}：V${receipt.versionNo}`)
+        this.publishing = false
         this.publishOpen = false
         this.getPlans()
+        return receipt
+      }).catch(error => {
+        if (current()) this.publishError = (error && error.message) || "发布结果暂未确认，请刷新预览核对，已有输入仍保留"
+        return null
       }).finally(() => {
-        this.publishing = false
+        if (current()) this.publishing = false
       })
     },
     prunePlanTemplateSelection() {

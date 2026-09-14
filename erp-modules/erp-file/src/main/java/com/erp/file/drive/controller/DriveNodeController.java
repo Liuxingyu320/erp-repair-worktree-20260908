@@ -98,15 +98,28 @@ public class DriveNodeController extends BaseController
     @PostMapping(value = "/files", consumes = "multipart/form-data")
     public AjaxResult upload(@RequestPart("file") @NotNull MultipartFile file,
             @RequestParam @NotNull @Positive Long spaceId,
-            @RequestParam(defaultValue = "0") @NotNull @Min(0) Long parentId)
+            @RequestParam(defaultValue = "0") @NotNull @Min(0) Long parentId,
+            @RequestParam String operationId)
     {
         featureGuard.requireEnabled();
         DriveActor actor = actorResolver.resolve();
-        if (file.isEmpty())
-        {
-            throw new DriveException(DriveErrorCodes.DRIVE_FILE_TYPE_REJECTED, "文件不能为空");
-        }
-        return AjaxResult.success(uploadService.upload(file, spaceId, parentId, actor));
+        return AjaxResult.success(uploadService.uploadWithReceipt(file, spaceId, parentId, actor, operationId));
+    }
+
+    /** Compatibility for in-process callers; new clients always provide a durable operation ID. */
+    public AjaxResult upload(MultipartFile file, Long spaceId, Long parentId)
+    {
+        featureGuard.requireEnabled();
+        if (file.isEmpty()) throw new DriveException(DriveErrorCodes.DRIVE_FILE_TYPE_REJECTED, "文件不能为空");
+        return AjaxResult.success(uploadService.upload(file, spaceId, parentId, actorResolver.resolve()));
+    }
+
+    @RequiresPermissions(DriveConstants.PERMISSION_ACCESS)
+    @GetMapping("/uploads/{operationId}")
+    public AjaxResult uploadReceipt(@PathVariable String operationId)
+    {
+        featureGuard.requireEnabled();
+        return AjaxResult.success(uploadService.uploadReceipt(operationId, actorResolver.resolve()));
     }
 
     @RequiresPermissions(DriveConstants.PERMISSION_ACCESS)

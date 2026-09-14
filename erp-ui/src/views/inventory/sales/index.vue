@@ -77,6 +77,9 @@
             <el-button v-if="scope.row.status === 'draft'" v-hasPermi="['inv:sales:add']" type="text" size="mini" :disabled="!isStoreContext" @click="openForm(scope.row, $event)">编辑</el-button>
             <el-button v-if="scope.row.status === 'draft'" v-hasPermi="['inv:sales:submit']" type="text" size="mini" :disabled="!isStoreContext" @click="doSubmit(scope.row)">提交</el-button>
             <el-button v-if="scope.row.status === 'submitted'" v-hasPermi="['inv:deliveryNotice:add']" type="text" size="mini" style="color:var(--erp-primary, #0b6b53)" :disabled="!isStoreContext" @click="doCreateDeliveryNotice(scope.row)">生成发货通知</el-button>
+            <span v-if="scope.row.status === 'submitted'" v-hasPermi="['inv:sales:add']">
+              <el-button v-hasPermi="['inv:deliveryNotice:add']" type="text" size="mini" :disabled="!isStoreContext" @click="openWarehouseRepair(scope.row)">补全缺仓</el-button>
+            </span>
             <el-button v-if="scope.row.status === 'draft' || scope.row.status === 'submitted'" v-hasPermi="['inv:sales:remove']" type="text" size="mini" style="color:#F56C6C" :disabled="!isStoreContext" @click="doCancel(scope.row)">取消</el-button>
           </template>
         </el-table-column>
@@ -104,6 +107,9 @@
               <div class="product-meta">{{ scope.row.itemCode || scope.row.productCode || "-" }}</div>
             </template>
           </el-table-column>
+          <el-table-column label="出库仓库" min-width="120">
+            <template slot-scope="scope">{{ scope.row.warehouseName || (scope.row.warehouseId ? '仓库 ' + scope.row.warehouseId : '未选择') }}</template>
+          </el-table-column>
           <el-table-column label="规格" width="120">
             <template slot-scope="scope">{{ scope.row.spec || "-" }}</template>
           </el-table-column>
@@ -126,10 +132,34 @@
       </div>
     </el-dialog>
 
+    <el-dialog title="受控补全仓库并生成通知" :visible.sync="repairOpen" width="760px" append-to-body
+      :close-on-click-modal="false" :close-on-press-escape="!repairSubmitting" :show-close="!repairSubmitting">
+      <el-alert title="只处理已核对清单中的历史缺仓单。不能更改已有仓库、数量、价格或客户。"
+        type="warning" :closable="false" class="mb12"/>
+      <p>销售单：{{ repairForm.orderNo }}；客户：{{ repairForm.customerName }}</p>
+      <warehouse-select v-if="repairOpen" :key="repairRevision" v-model="repairDefaultWarehouseId" purpose="deliverySource"
+        :scope-dept-id="selectedDeptContext.deptId" autoload @loaded="onRepairWarehousesLoaded" @change="applyRepairDefault" :disabled="repairSubmitting || repairUncertain"/>
+      <el-table :data="repairForm.details" size="small">
+        <el-table-column label="缺仓明细" prop="productName" min-width="140"/>
+        <el-table-column label="原数量" prop="quantity" width="100"/>
+        <el-table-column label="原单价" prop="unitPrice" width="100"/>
+        <el-table-column label="补入仓库" min-width="180"><template slot-scope="scope">
+          <el-select v-model="scope.row.warehouseId" :disabled="repairSubmitting || repairUncertain" placeholder="请选择经核对的仓库">
+            <el-option v-for="warehouse in repairWarehouseOptions" :key="warehouse.deptId" :label="warehouse.deptName" :value="warehouse.deptId"/>
+          </el-select>
+        </template></el-table-column>
+      </el-table>
+      <p v-if="repairUncertain" role="alert">结果待核实，不能重复补仓。<el-button type="text" @click="refreshWarehouseRepair">刷新核对原单</el-button></p>
+      <div slot="footer">
+        <el-button :disabled="repairSubmitting" @click="repairOpen = false">关闭</el-button>
+        <el-button type="primary" :loading="repairSubmitting" :disabled="repairSubmitting || repairUncertain || !repairWarehouseOptions.length" @click="submitWarehouseRepair">确认映射并生成通知</el-button>
+      </div>
+    </el-dialog>
+
     <el-dialog
       :title="form.orderId ? '编辑销售单' : '新建销售单'"
       :visible.sync="open"
-      width="720px"
+      width="940px"
       append-to-body
       :close-on-click-modal="false"
       :close-on-press-escape="!formSubmitting"
@@ -138,7 +168,7 @@
       @opened="focusSalesTitle"
       @closed="restoreSalesDialogFocus"
     >
-      <el-form ref="formRef" :model="form" :rules="rules" label-width="96px">
+      <el-form ref="formRef" :model="form" :rules="rules" :disabled="formSubmitting" label-width="96px">
         <el-form-item label="标题" prop="orderTitle">
           <el-input ref="salesTitleInput" v-model="form.orderTitle" aria-label="销售单标题" maxlength="120"/>
         </el-form-item>
@@ -165,6 +195,12 @@
         </el-form-item>
         <el-form-item label="销售日期" prop="orderDate">
           <el-date-picker v-model="form.orderDate" type="date" placeholder="选择日期" value-format="yyyy-MM-dd" style="width:100%"/>
+        </el-form-item>
+        <el-form-item label="默认出库仓库">
+          <warehouse-select v-if="open" :key="editorRevision" v-model="defaultWarehouseId"
+            purpose="deliverySource" :scope-dept-id="selectedDeptContext.deptId" autoload
+            @loaded="onWarehousesLoaded" @change="applyDefaultWarehouse" @load-error="onWarehouseLoadError"/>
+          <div class="detail-product-meta">仅带入空仓行；每行可单独调整。请核对仓库后提交，多仓明细保留在同一销售单中。</div>
         </el-form-item>
         <el-form-item label="备注">
           <el-input v-model="form.remark" type="textarea" :rows="2" maxlength="500"/>
@@ -201,6 +237,14 @@
           <el-col :span="2">
             <el-button type="text" size="mini" style="color:#F56C6C" @click="removeDetail(idx)">删除</el-button>
           </el-col>
+          <el-col :span="24" class="mb8">
+            <span>出库仓库：</span>
+            <el-select v-model="item.warehouseId" size="small" filterable clearable placeholder="草稿可暂不选，提交前必填">
+              <el-option v-for="warehouse in warehouseOptions" :key="warehouse.deptId" :label="warehouse.deptName" :value="warehouse.deptId"/>
+              <el-option v-if="item.warehouseId && !warehouseOptions.some(w => String(w.deptId) === String(item.warehouseId))"
+                :value="item.warehouseId" :label="item.warehouseName || ('仓库 ' + item.warehouseId + '（需核对授权）')" disabled/>
+            </el-select>
+          </el-col>
         </el-row>
         <el-button type="primary" size="mini" icon="el-icon-plus" plain @click="addDetail">添加明细</el-button>
       </el-form>
@@ -215,21 +259,27 @@
 
 <script>
 import { listSales, getSalesDetail, saveSales, submitSales, cancelSales } from "@/api/inventory/sales"
-import { createDeliveryNotice as createDeliveryNoticeApi } from "@/api/inventory/deliveryNotice"
+import { createDeliveryNotice as createDeliveryNoticeApi, repairSalesWarehouses } from "@/api/inventory/deliveryNotice"
 import { listCustomerOptions } from "@/api/inventory/customer"
 import { getSelectedDeptContext, isSelectedStore } from "@/utils/shopContext"
 import { getBusinessEmptyText } from "@/utils/businessEmptyState"
 import { parseTime } from "@/utils/common"
 import InventoryItemSelect from "@/views/inventory/components/InventoryItemSelect"
+import WarehouseSelect from "@/views/inventory/components/WarehouseSelect"
+const { createUiOperationScope } = require("@/utils/uiOperationScope")
+const { defaultSalesWarehouse, fillEmptySalesWarehouses } = require("@/utils/salesWarehouse")
 export default {
   name: "InvSales",
-  components: { InventoryItemSelect },
+  components: { InventoryItemSelect, WarehouseSelect },
   data() {
     return {
       loading: false, total: 0, list: [], listError: "", listRequestSequence: 0, activeListQuerySnapshot: "",
       open: false, formSubmitting: false, detailOpen: false, detailLoading: false,
       customerLoading: false, customerOptions: [], dateRange: [],
       lastSalesDialogTrigger: null,
+      repairOpen: false, repairSubmitting: false, repairUncertain: false, repairRevision: 0,
+      repairForm: { details: [] }, repairWarehouseOptions: [], repairDefaultWarehouseId: undefined,
+      editorRevision: 0, contextRevision: 0, defaultWarehouseId: undefined, warehouseOptions: [], warehousesLoaded: false,
       allowedItemTypes: ["product", "gift"],
       queryParams: { pageNum: 1, pageSize: 10, orderNo: undefined, orderTitle: undefined, customerName: undefined, status: undefined },
       form: { orderId: undefined, orderTitle: "", customerId: undefined, customerName: "", orderDate: null, remark: "", totalAmount: 0, details: [] },
@@ -243,9 +293,11 @@ export default {
   },
   computed: {
     selectedDeptContext() {
+      void this.contextRevision
       return getSelectedDeptContext()
     },
     isStoreContext() {
+      void this.contextRevision
       return isSelectedStore()
     },
     currentDeptLabel() {
@@ -263,8 +315,144 @@ export default {
       return getBusinessEmptyText("sales", this.isStoreContext ? "missingBaseline" : "missingContext")
     }
   },
-  created() { this.getList() },
+  created() {
+    this._deptChanged = () => this.handleContextChanged()
+    window.addEventListener("erp:dept-changed", this._deptChanged)
+    this.getList()
+  },
+  beforeDestroy() {
+    window.removeEventListener("erp:dept-changed", this._deptChanged)
+    this.operationScope().deactivate()
+  },
+  watch: {
+    "$store.getters.id"() { this.handleContextChanged() },
+    "$store.getters.token"() { this.handleContextChanged() },
+    open(value) { if (!value) this.invalidateEditor() },
+    detailOpen(value) { if (!value) this.operationScope().invalidate("detail") },
+    repairOpen(value) { if (!value) { this.repairRevision += 1; this.operationScope().invalidate("repair"); this.repairSubmitting = false } }
+  },
   methods: {
+    openWarehouseRepair(row) {
+      if (!this.ensureStoreContext()) return
+      this.repairRevision += 1
+      const operation = this.operationScope().begin("repair", this.repairRevision)
+      this.repairWarehouseOptions = []
+      this.repairDefaultWarehouseId = undefined
+      this.repairUncertain = false
+      return getSalesDetail(row.orderId, { silentError: true }).then(res => {
+        if (!this.operationScope().isCurrent(operation, this.repairRevision)) return { discarded: true }
+        const data = res.data || {}
+        const missing = (data.details || []).filter(detail => !detail.warehouseId)
+        if (data.status !== "submitted" || !missing.length) {
+          this.$modal.msgWarning("原单已无待补空仓明细，或状态已变化，请核对原单和现有发货通知")
+          return { unavailable: true }
+        }
+        this.repairForm = { ...data, details: missing.map(detail => ({ ...detail, warehouseId: undefined })) }
+        this.repairOpen = true
+      }).catch(error => {
+        if (this.operationScope().isCurrent(operation, this.repairRevision)) this.$modal.msgError("读取原单失败，请重试")
+        return { failed: true, error }
+      })
+    },
+    onRepairWarehousesLoaded(options) {
+      if (!this.repairOpen) return
+      this.repairWarehouseOptions = options || []
+      // Historical assignments require an explicit reviewed mapping; no automatic default.
+    },
+    applyRepairDefault() {
+      this.repairForm.details = fillEmptySalesWarehouses(this.repairForm.details, this.repairDefaultWarehouseId)
+    },
+    refreshWarehouseRepair() {
+      const operation = this.operationScope().begin("repair", this.repairRevision)
+      const orderId = this.repairForm.orderId
+      return getSalesDetail(orderId, { silentError: true }).then(res => {
+        if (!this.operationScope().isCurrent(operation, this.repairRevision)) return
+        const data = res.data || {}
+        if (data.status !== "submitted" || !(data.details || []).some(detail => !detail.warehouseId)) {
+          this.$modal.msgWarning("原单状态或仓库已变化，请核对现有发货通知；本窗口不再补仓")
+          this.repairOpen = false
+          this.getList()
+          return
+        }
+        const previous = new Map((this.repairForm.details || []).map(detail => [String(detail.detailId), detail.warehouseId]))
+        const missing = (data.details || []).filter(detail => !detail.warehouseId)
+        this.repairForm = { ...data, details: missing.map(detail => ({ ...detail, warehouseId: previous.get(String(detail.detailId)) })) }
+        this.repairUncertain = false
+      }).catch(error => {
+        if (this.operationScope().isCurrent(operation, this.repairRevision)) this.$modal.msgError("核对原单失败，结果仍待确认，请稍后重试")
+        return { failed: true, error }
+      })
+    },
+    submitWarehouseRepair() {
+      if (this.repairSubmitting || this.repairUncertain) return Promise.resolve({ busy: true })
+      const details = this.repairForm.details || []
+      if (!details.length || details.some(detail => !this.repairWarehouseOptions.some(warehouse => String(warehouse.deptId) === String(detail.warehouseId)))) {
+        this.$modal.msgError("请为全部空仓明细选择经核对的授权仓库")
+        return Promise.resolve({ invalid: true })
+      }
+      const orderId = this.repairForm.orderId
+      const payload = { version: this.repairForm.version, assignments: details.map(detail => ({ detailId: detail.detailId, warehouseId: detail.warehouseId })) }
+      const operation = this.operationScope().begin("repair", this.repairRevision)
+      const summary = details.map(detail => (detail.itemName || detail.productName) + " → " + this.repairWarehouseOptions.find(w => String(w.deptId) === String(detail.warehouseId)).deptName).join("；")
+      this.repairSubmitting = true
+      let sent = false
+      return this.$modal.confirm("确认按已核对清单补全销售单 [" + this.repairForm.orderNo + "] 并生成通知？" + summary).then(() => {
+        if (!this.operationScope().isCurrent(operation, this.repairRevision)) return { discarded: true }
+        sent = true
+        return repairSalesWarehouses(orderId, payload, { silentError: true }).then(() => {
+          if (!this.operationScope().isCurrent(operation, this.repairRevision)) return { discarded: true }
+          this.$modal.msgSuccess("仓库已补全并生成发货通知")
+          this.repairOpen = false
+          return this.getList()
+        })
+      }).catch(error => {
+        if (sent && this.operationScope().isCurrent(operation, this.repairRevision)) {
+          this.repairUncertain = true
+          this.$modal.msgError("补仓结果待核实，请先刷新核对原单后再决定是否重试")
+        }
+        return { failed: true, error }
+      }).finally(() => {
+        if (this.operationScope().isCurrent(operation, this.repairRevision)) this.repairSubmitting = false
+      })
+    },
+    operationScope() {
+      if (!this._salesScope) this._salesScope = createUiOperationScope(() => ({
+        actorId: String((this.$store && this.$store.getters.id) || ""),
+        deptId: String(getSelectedDeptContext().deptId || ""), revision: this.contextRevision
+      }))
+      return this._salesScope
+    },
+    handleContextChanged() {
+      this.contextRevision += 1
+      this.operationScope().invalidate()
+      this.invalidateEditor()
+      this.open = false
+      this.detailOpen = false
+      this.repairOpen = false
+      this.getList()
+    },
+    invalidateEditor() {
+      this.editorRevision += 1
+      ;["editor", "save", "customers"].forEach(lane => this.operationScope().invalidate(lane))
+      this.formSubmitting = false
+      this.customerLoading = false
+      this.warehouseOptions = []
+      this.warehousesLoaded = false
+    },
+    onWarehousesLoaded(warehouses) {
+      if (!this.open) return
+      this.warehouseOptions = warehouses || []
+      this.warehousesLoaded = true
+      this.defaultWarehouseId = defaultSalesWarehouse(this.warehouseOptions, getSelectedDeptContext().deptId, this.defaultWarehouseId)
+      this.applyDefaultWarehouse()
+    },
+    onWarehouseLoadError() {
+      if (this.open) this.$modal.msgWarning("仓库选项加载失败，请点击仓库选择框重试；已录明细已保留")
+    },
+    applyDefaultWarehouse() {
+      this.form.details = fillEmptySalesWarehouses(this.form.details, this.defaultWarehouseId)
+    },
+
     statusType(s) { const m = { draft: 'info', submitted: 'warning', noticed: 'primary', delivered: 'success', cancelled: 'danger' }; return m[s] || 'info' },
     statusLabel(s) { const m = { draft: '草稿', submitted: '已提交', noticed: '已通知', delivered: '已出库', cancelled: '已取消' }; return m[s] || '未知销售状态' },
     toNumber(value) {
@@ -284,6 +472,7 @@ export default {
       return this.formatAmount(this.toNumber(item.quantity) * this.toNumber(item.unitPrice))
     },
     getList() {
+      const operation = this.operationScope().begin("list")
       const query = this.buildQuery()
       const querySnapshot = JSON.stringify(query)
       const requestSequence = ++this.listRequestSequence
@@ -293,18 +482,18 @@ export default {
       this.list = []
       this.total = 0
       return listSales(query).then(res => {
-        if (!this.isCurrentListRequest(requestSequence, querySnapshot)) return { discarded: true }
+        if (!this.operationScope().isCurrent(operation) || !this.isCurrentListRequest(requestSequence, querySnapshot)) return { discarded: true }
         this.list = res.rows || []
         this.total = res.total || 0
         return res
       }).catch(error => {
-        if (!this.isCurrentListRequest(requestSequence, querySnapshot)) return { discarded: true, error }
+        if (!this.operationScope().isCurrent(operation) || !this.isCurrentListRequest(requestSequence, querySnapshot)) return { discarded: true, error }
         this.list = []
         this.total = 0
         this.listError = "销售单列表加载失败，请重试。"
         return { failed: true, error }
       }).finally(() => {
-        if (this.isCurrentListRequest(requestSequence, querySnapshot)) this.loading = false
+        if (this.operationScope().isCurrent(operation) && this.isCurrentListRequest(requestSequence, querySnapshot)) this.loading = false
       })
     },
     isCurrentListRequest(requestSequence, querySnapshot) {
@@ -332,6 +521,7 @@ export default {
     resetForm() {
       this.form = { orderId: undefined, orderTitle: "", customerId: undefined, customerName: "", orderDate: this.defaultOrderDate(), remark: "", totalAmount: 0, details: [] }
       this.customerOptions = []
+      this.defaultWarehouseId = undefined
     },
     defaultOrderDate() {
       return parseTime(new Date(), "{y}-{m}-{d}")
@@ -345,8 +535,10 @@ export default {
         this.customerOptions = []
         return Promise.resolve([])
       }
+      const operation = this.operationScope().begin("customers", this.editorRevision)
       this.customerLoading = true
       return listCustomerOptions(keyword ? String(keyword).trim() : undefined).then(res => {
+        if (!this.operationScope().isCurrent(operation, this.editorRevision)) return []
         const selected = this.customerOptions.find(item => String(item.customerId) === String(this.form.customerId))
         this.customerOptions = res.data || []
         if (selected && !this.customerOptions.some(item => String(item.customerId) === String(selected.customerId))) {
@@ -354,9 +546,10 @@ export default {
         }
         return this.customerOptions
       }).catch(() => {
+        if (!this.operationScope().isCurrent(operation, this.editorRevision)) return []
         this.$modal.msgWarning("客户选项加载失败，请检查客户档案权限或稍后重试")
         return this.customerOptions
-      }).finally(() => { this.customerLoading = false })
+      }).finally(() => { if (this.operationScope().isCurrent(operation, this.editorRevision)) this.customerLoading = false })
     },
     onCustomerChange(customerId) {
       const customer = this.customerOptions.find(item => String(item.customerId) === String(customerId))
@@ -433,14 +626,17 @@ export default {
     },
     openForm(row, event) {
       if (!this.ensureStoreContext()) return
+      this.invalidateEditor()
       this.captureSalesDialogTrigger(event)
+      const operation = this.operationScope().begin("editor", this.editorRevision)
       if (!row) {
         this.resetForm()
         this.open = true
         this.loadCustomers()
         return
       }
-      getSalesDetail(row.orderId).then(res => {
+      return getSalesDetail(row.orderId).then(res => {
+        if (!this.operationScope().isCurrent(operation, this.editorRevision)) return { discarded: true }
         const data = res.data || {}
         this.form = Object.assign({}, data, {
           orderDate: data.orderDate || this.defaultOrderDate(),
@@ -460,7 +656,7 @@ export default {
         itemName: detail.itemName || detail.productName || ""
       })
     },
-    addDetail() { this.form.details.push({ itemType: null, itemId: null, itemCode: "", itemName: "", productId: null, productName: "", productCode: "", sku: "", spec: "", unit: "", quantity: 1, unitPrice: 0, amount: 0 }) },
+    addDetail() { this.form.details.push({ warehouseId: this.defaultWarehouseId, itemType: null, itemId: null, itemCode: "", itemName: "", productId: null, productName: "", productCode: "", sku: "", spec: "", unit: "", quantity: 1, unitPrice: 0, amount: 0 }) },
     removeDetail(idx) { this.form.details.splice(idx, 1) },
     handleFormBeforeClose(done) {
       if (this.formSubmitting) return
@@ -483,15 +679,17 @@ export default {
     doSave(submitAfter) {
       if (this.formSubmitting) return Promise.resolve({ busy: true })
       if (!this.ensureStoreContext()) return Promise.resolve({ invalidContext: true })
+      const operation = this.operationScope().begin("save", this.editorRevision)
       this.formSubmitting = true
       return this.validateEditorForm().then(valid => {
+        if (!this.operationScope().isCurrent(operation, this.editorRevision)) return { discarded: true }
         if (!valid) return { invalid: true }
-        return this.submitValidatedForm(submitAfter)
+        return this.submitValidatedForm(submitAfter, operation)
       }).catch(error => ({ failed: true, error })).finally(() => {
-        this.formSubmitting = false
+        if (this.operationScope().isCurrent(operation, this.editorRevision)) this.formSubmitting = false
       })
     },
-    submitValidatedForm(submitAfter) {
+    submitValidatedForm(submitAfter, operation) {
       if (!this.form.details || this.form.details.length === 0) {
         this.$modal.msgError("请添加至少一条明细")
         return { invalid: true }
@@ -499,6 +697,11 @@ export default {
       const validDetails = this.form.details.filter(d => d.itemType && (d.itemId || d.productId))
       if (validDetails.length !== this.form.details.length) {
         this.$modal.msgError("请为所有明细行选择物料")
+        return { invalid: true }
+      }
+      if (submitAfter && (!this.warehousesLoaded || this.form.details.some(row => !row.warehouseId ||
+        !this.warehouseOptions.some(warehouse => String(warehouse.deptId) === String(row.warehouseId))))) {
+        this.$modal.msgError("请为每条明细选择已授权的出库仓库，核对后提交")
         return { invalid: true }
       }
       const zeroPriceItem = this.form.details.find(d => this.toNumber(d.unitPrice) <= 0)
@@ -517,6 +720,7 @@ export default {
       })
       const api = submitAfter ? submitSales : saveSales
       return api(payload).then(() => {
+        if (operation && !this.operationScope().isCurrent(operation, this.editorRevision)) return { discarded: true }
         this.$modal.msgSuccess(submitAfter ? "提交成功" : "已保存草稿")
         this.open = false
         this.getList()
@@ -524,37 +728,46 @@ export default {
       })
     },
     doSubmit(row) {
-      if (!this.ensureStoreContext()) return
-      getSalesDetail(row.orderId).then(res => {
-        submitSales(res.data).then(() => { this.$modal.msgSuccess("提交成功"); this.getList() })
-      })
+      // Open the editor so warehouse defaults and the operator's confirmation are visible.
+      return this.openForm(row)
     },
     doCreateDeliveryNotice(row) {
       if (!this.ensureStoreContext()) return
-      this.$modal.confirm("确认对销售单 [" + row.orderNo + "] 生成发货通知?").then(() => {
-        createDeliveryNoticeApi(row.orderId).then(res => {
+      const target = { orderId: row.orderId, version: row.version, orderNo: row.orderNo }
+      const operation = this.operationScope().begin("createNotice")
+      return this.$modal.confirm("确认对销售单 [" + target.orderNo + "] 生成发货通知?").then(() => {
+        if (!this.operationScope().isCurrent(operation)) return { discarded: true }
+        return createDeliveryNoticeApi(target.orderId, target.version).then(res => {
+          if (!this.operationScope().isCurrent(operation)) return { discarded: true }
           this.$modal.msgSuccess(res.msg || "生成发货通知成功")
-          this.getList()
+          return this.getList()
         })
-      })
+      }).catch(error => ({ failed: true, error }))
     },
     doCancel(row) {
       if (!this.ensureStoreContext()) return
-      this.$modal.confirm("确认取消销售单 [" + row.orderNo + "]?").then(() => {
-        cancelSales(row.orderId).then(() => { this.$modal.msgSuccess("已取消"); this.getList() })
-      })
+      const target = { orderId: row.orderId, version: row.version, orderNo: row.orderNo }
+      const operation = this.operationScope().begin("cancel")
+      return this.$modal.confirm("确认取消销售单 [" + target.orderNo + "]?").then(() => {
+        if (!this.operationScope().isCurrent(operation)) return { discarded: true }
+        return cancelSales(target.orderId, target.version).then(() => {
+          if (!this.operationScope().isCurrent(operation)) return { discarded: true }
+          this.$modal.msgSuccess("已取消")
+          return this.getList()
+        })
+      }).catch(error => ({ failed: true, error }))
     },
     showDetail(orderId) {
+      const operation = this.operationScope().begin("detail")
       this.detailOpen = true
       this.detailLoading = true
       this.detailOrder = { details: [] }
-      getSalesDetail(orderId).then(res => {
+      return getSalesDetail(orderId).then(res => {
+        if (!this.operationScope().isCurrent(operation)) return { discarded: true }
         const data = res.data || {}
-        this.detailOrder = Object.assign({}, data, {
-          details: data.details || []
-        })
+        this.detailOrder = Object.assign({}, data, { details: data.details || [] })
       }).finally(() => {
-        this.detailLoading = false
+        if (this.operationScope().isCurrent(operation)) this.detailLoading = false
       })
     },
     handleExport() {

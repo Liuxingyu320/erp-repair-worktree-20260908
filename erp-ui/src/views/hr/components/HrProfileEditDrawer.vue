@@ -557,6 +557,7 @@ export default {
       this.validationMessage = body.msg || body.message || "保存失败，服务端未接受本次修改。"
     },
     submitForm() {
+      if (this.saving || !this.visible) return
       if (!this.validateRequiredFields()) return
       const patch = this.buildEmployeeUpdatePayload()
       if (!patch) {

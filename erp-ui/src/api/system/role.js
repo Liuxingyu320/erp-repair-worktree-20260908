@@ -66,8 +66,9 @@ export function delRole(roleId) {
 }
 
 // 查询角色已授权用户列表
-export function allocatedUserList(query) {
+export function allocatedUserList(query, options) {
   return request({
+    silentError: !!(options && options.silentError === true),
     url: '/system/role/authUser/allocatedList',
     method: 'get',
     params: query
@@ -75,8 +76,9 @@ export function allocatedUserList(query) {
 }
 
 // 查询角色未授权用户列表
-export function unallocatedUserList(query) {
+export function unallocatedUserList(query, options) {
   return request({
+    silentError: !!(options && options.silentError === true),
     url: '/system/role/authUser/unallocatedList',
     method: 'get',
     params: query

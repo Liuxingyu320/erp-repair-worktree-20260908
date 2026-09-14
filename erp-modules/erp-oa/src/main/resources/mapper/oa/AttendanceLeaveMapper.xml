@@ -11,6 +11,7 @@
         <result property="unitMode" column="unit_mode"/>
         <result property="payPolicy" column="pay_policy"/>
         <result property="paidRatio" column="paid_ratio"/>
+        <result property="minutesPerDay" column="minutes_per_day"/>
         <result property="balanceRequired" column="balance_required"/>
         <result property="attachmentRequired" column="attachment_required"/>
         <result property="attachmentThresholdMinutes" column="attachment_threshold_minutes"/>
@@ -30,7 +31,7 @@
     </resultMap>
 
     <sql id="leaveTypeColumns">
-        leave_type_id, type_code, type_name, unit_mode, pay_policy, paid_ratio,
+        leave_type_id, type_code, type_name, unit_mode, pay_policy, paid_ratio, minutes_per_day,
         balance_required, attachment_required, attachment_threshold_minutes,
         min_minutes, step_minutes, max_minutes_per_request, allow_cross_day,
         approval_required, sort_no, status, row_version, create_by, create_time,
@@ -52,17 +53,21 @@
         where leave_type_id = #{leaveTypeId}
     </select>
 
+    <select id="selectLeaveTypeForUpdate" resultMap="leaveTypeResult">
+        select <include refid="leaveTypeColumns"/> from oa_attendance_leave_type where leave_type_id=#{leaveTypeId} for update
+    </select>
+
     <insert id="insertLeaveType"
             parameterType="com.erp.oa.attendance.leave.AttendanceLeaveModels$LeaveType"
             useGeneratedKeys="true" keyProperty="leaveTypeId">
         insert into oa_attendance_leave_type (
-            type_code, type_name, unit_mode, pay_policy, paid_ratio,
+            type_code, type_name, unit_mode, pay_policy, paid_ratio, minutes_per_day,
             balance_required, attachment_required, attachment_threshold_minutes,
             min_minutes, step_minutes, max_minutes_per_request, allow_cross_day,
             approval_required, sort_no, status, row_version, create_by,
             create_time, remark
         ) values (
-            #{typeCode}, #{typeName}, #{unitMode}, #{payPolicy}, #{paidRatio},
+            #{typeCode}, #{typeName}, #{unitMode}, #{payPolicy}, #{paidRatio}, #{minutesPerDay},
             #{balanceRequired}, #{attachmentRequired},
             #{attachmentThresholdMinutes}, #{minMinutes}, #{stepMinutes},
             #{maxMinutesPerRequest}, #{allowCrossDay}, #{approvalRequired},
@@ -74,7 +79,7 @@
             parameterType="com.erp.oa.attendance.leave.AttendanceLeaveModels$LeaveType">
         update oa_attendance_leave_type
         set type_name = #{typeName}, unit_mode = #{unitMode},
-            pay_policy = #{payPolicy}, paid_ratio = #{paidRatio},
+            pay_policy = #{payPolicy}, paid_ratio = #{paidRatio}, minutes_per_day=#{minutesPerDay},
             balance_required = #{balanceRequired},
             attachment_required = #{attachmentRequired},
             attachment_threshold_minutes = #{attachmentThresholdMinutes},
@@ -140,6 +145,10 @@
         <result property="startTime" column="start_time"/>
         <result property="endTime" column="end_time"/>
         <result property="totalMinutes" column="total_minutes"/>
+        <result property="requestedDays" column="requested_days"/>
+        <result property="quotaPolicyJson" column="quota_policy_json"/>
+        <result property="quotaUnits" column="quota_units"/>
+        <result property="quotaStatus" column="quota_status"/>
         <result property="reason" column="reason"/>
         <result property="status" column="status"/>
         <result property="businessRound" column="business_round"/>
@@ -163,7 +172,7 @@
                r.client_request_fingerprint, r.user_id, r.user_name,
                r.shop_id, r.leave_type_id, t.type_code leave_type_code,
                t.type_name leave_type_name, r.start_time, r.end_time,
-               r.total_minutes, r.reason, r.status, r.business_round,
+               r.total_minutes,r.requested_days,r.quota_policy_json,r.quota_units,r.quota_status, r.reason, r.status, r.business_round,
                r.approval_instance_id, r.row_version,
                r.last_approval_event_key, r.submitted_at, r.approved_at,
                r.rejected_at, r.cancelled_at, r.create_by, r.create_time,
@@ -181,13 +190,13 @@
         insert into oa_attendance_leave_request (
             leave_request_no, client_request_id, client_request_fingerprint,
             user_id, user_name, shop_id, leave_type_id,
-            start_time, end_time, total_minutes, reason, status,
+            start_time, end_time, total_minutes, requested_days, quota_policy_json, quota_units, quota_status, reason, status,
             business_round, approval_instance_id, row_version,
             last_approval_event_key, create_by, create_time, remark
         ) values (
             #{leaveRequestNo}, #{clientRequestId},
             #{clientRequestFingerprint}, #{userId}, #{userName}, #{shopId},
-            #{leaveTypeId}, #{startTime}, #{endTime}, #{totalMinutes},
+            #{leaveTypeId}, #{startTime}, #{endTime}, #{totalMinutes}, #{requestedDays}, #{quotaPolicyJson}, #{quotaUnits}, #{quotaStatus},
             #{reason}, #{status}, 0, null, 0, null, #{createBy}, now(),
             #{remark}
         )
@@ -197,7 +206,7 @@
             parameterType="com.erp.oa.attendance.leave.AttendanceLeaveModels$LeaveRequest">
         update oa_attendance_leave_request
         set leave_type_id = #{leaveTypeId}, start_time = #{startTime},
-            end_time = #{endTime}, total_minutes = #{totalMinutes},
+            end_time = #{endTime}, total_minutes = #{totalMinutes}, requested_days=#{requestedDays}, quota_policy_json=#{quotaPolicyJson}, quota_units=#{quotaUnits}, quota_status=#{quotaStatus},
             reason = #{reason}, row_version = row_version + 1,
             update_by = #{updateBy}, update_time = now()
         where leave_request_id = #{leaveRequestId}
@@ -413,7 +422,7 @@
 
     <update id="markLeaveSubmitting">
         update oa_attendance_leave_request
-        set status = 'SUBMITTING', business_round = #{businessRound},
+        set status = 'SUBMITTING', quota_status=CASE WHEN quota_policy_json IS NULL THEN quota_status WHEN quota_units IS NULL THEN 'NOT_REQUIRED' ELSE 'RESERVED' END, business_round = #{businessRound},
             approval_instance_id = null, last_approval_event_key = null,
             submitted_at = now(), row_version = row_version + 1,
             update_by = #{updateBy}, update_time = now()

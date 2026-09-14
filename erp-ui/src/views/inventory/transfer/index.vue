@@ -771,7 +771,7 @@
         <el-table-column v-if="transferDiscrepancyEnabled" label="拒收" width="135"><template slot-scope="scope"><el-input-number v-model="scope.row.rejectedQuantity" :min="0" :max="scope.row.remainingQuantity" :precision="2" size="small" style="width:100%"/></template></el-table-column>
         <el-table-column v-if="transferDiscrepancyEnabled" label="残损" width="135"><template slot-scope="scope"><el-input-number v-model="scope.row.damagedQuantity" :min="0" :max="scope.row.remainingQuantity" :precision="2" size="small" style="width:100%"/></template></el-table-column>
         <el-table-column v-if="transferDiscrepancyEnabled" label="自动短少" width="95" align="right"><template slot-scope="scope"><span :class="{'text-danger':receiptShortage(scope.row)>0}">{{ formatQuantity(receiptShortage(scope.row)) }}</span></template></el-table-column>
-        <el-table-column v-if="transferDiscrepancyEnabled" label="差异说明 / 凭证" min-width="220"><template slot-scope="scope"><el-input v-model="scope.row.discrepancyNote" size="small" placeholder="有差异时必填说明"/><el-input v-model="scope.row.attachmentRefs" size="small" placeholder="受控附件节点编号，可选" class="mt4"/></template></el-table-column>
+        <el-table-column v-if="transferDiscrepancyEnabled" label="差异说明 / 凭证" min-width="220"><template slot-scope="scope"><el-input v-model="scope.row.discrepancyNote" size="small" placeholder="有差异时必填说明"/><transfer-evidence-picker v-if="receiptOpen" v-model="scope.row.attachmentRefs" :context-key="transferContextToken() + ':receipt:' + receiptDetail.transferId + ':' + receiptForm.shipmentId + ':' + scope.row.detailId" :disabled="actionLoading" @upload-state="$set(scope.row, 'evidenceState', $event)"/></template></el-table-column>
       </el-table>
       <div slot="footer">
         <el-button @click="receiptOpen = false">取消</el-button>
@@ -802,7 +802,7 @@
         </el-table-column>
         <el-table-column label="附件要求 / 引用" min-width="210">
           <template slot-scope="scope">
-            <el-input v-model="scope.row.attachmentRefs" size="small" :placeholder="scope.row.attachmentRequired ? '残损终结处置必填附件节点' : '受控附件节点编号，可选'"/>
+            <transfer-evidence-picker v-if="discrepancyOpen" v-model="scope.row.attachmentRefs" :context-key="transferContextToken() + ':discrepancy:' + selectedDiscrepancy.discrepancyId + ':' + discrepancyForm.requestId + ':' + scope.row.detailId + ':' + scope.row.category" :required="scope.row.attachmentRequired && ['RETURN_SOURCE', 'WRITE_OFF'].includes(scope.row.decision)" :disabled="actionLoading" @upload-state="$set(scope.row, 'evidenceState', $event)"/>
             <span v-if="scope.row.attachmentRequired" class="text-danger discrepancy-attachment-hint">残损直接退回/核销需附件和说明</span>
           </template>
         </el-table-column>
@@ -854,7 +854,7 @@ import {
 import InventoryItemSelect from "@/views/inventory/components/InventoryItemSelect"
 import WarehouseSelect from "@/views/inventory/components/WarehouseSelect"
 const { createTodoBusinessFocusMixin } = require("@/mixins/todoBusinessFocus")
-const { buildTransferApprovalPayload } = require("@/views/mobile/feature/mobileActionPayloads")
+const { buildTransferApprovalPayload } = require("@/utils/transferApprovalPayload")
 const { findTodoFocusShipment } = require("@/utils/todoBusinessFocus")
 const { returnAfterTodoAction } = require("@/utils/todoActionReturn")
 const {
@@ -909,6 +909,7 @@ export default {
   })],
   name: "InvTransfer",
   components: {
+    TransferEvidencePicker: () => import("@/components/TransferEvidencePicker.vue"),
     InventoryItemSelect,
     WarehouseSelect,
     TransferApprovalProgress,
@@ -2698,6 +2699,8 @@ export default {
     },
     submitReceipt() {
       if (!this.ensureCanReceive(this.receiptDetail)) return
+      if (this.receiptForm.items.some(row => row.evidenceState && !row.evidenceState.valid))
+        return this.$modal.msgError("凭证尚未上传完成或不可用，请先处理附件后再收货")
       const actionToken = this.captureTransferAction()
       if (!this.transferDiscrepancyEnabled) {
         const difference = this.receiptForm.items.find(item =>
@@ -2893,15 +2896,17 @@ export default {
       })
     },
     submitDiscrepancy() {
+      if ((this.discrepancyForm.items || []).some(row => row.evidenceState && !row.evidenceState.valid))
+        return this.$modal.msgError("凭证尚未上传完成、不可用或未选择，请先处理附件")
       if (!String(this.discrepancyForm.requestId || "").trim()) return this.$modal.msgError("差异处置 requestId 缺失，请重新打开")
       if (!this.discrepancyForm.items || !this.discrepancyForm.items.length) return this.$modal.msgError("没有可处置的差异类别，请刷新台账")
       if (!String(this.discrepancyForm.note || "").trim()) return this.$modal.msgError("请填写差异处理说明")
       const invalid = this.discrepancyForm.items.find(row => {
         const selected = (row.decisionOptions || []).some(option => option.value === row.decision)
         const requiresAttachment = row.category === "DAMAGED" && row.attachmentRequired && ["RETURN_SOURCE", "WRITE_OFF"].includes(row.decision)
-        return !selected || (requiresAttachment && !String(row.attachmentRefs || "").trim())
+        return !selected || (requiresAttachment && !require("@/utils/transferEvidence").hasEvidence(row.attachmentRefs))
       })
-      if (invalid) return this.$modal.msgError(invalid.attachmentRequired ? `物料「${invalid.itemName}」残损终结处置需上传附件节点` : `物料「${invalid.itemName}」请选择合法处置决定`)
+      if (invalid) return this.$modal.msgError(invalid.attachmentRequired ? `物料「${invalid.itemName}」残损终结处置需上传或选择凭证附件` : `物料「${invalid.itemName}」请选择合法处置决定`)
       const actionToken = this.captureTransferAction()
       const discrepancyId = this.selectedDiscrepancy && this.selectedDiscrepancy.discrepancyId
       const payload = this.snapshotTransferValue({

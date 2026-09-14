@@ -6,6 +6,9 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.never;
+import static org.mockito.ArgumentMatchers.eq;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -27,6 +30,7 @@ import com.erp.inventory.domain.InvStock;
 import com.erp.inventory.domain.InvStockLog;
 import com.erp.inventory.mapper.InvDeptScopeMapper;
 import com.erp.inventory.mapper.InvNumberSequenceMapper;
+import com.erp.inventory.mapper.InvOutboundRecordMapper;
 import com.erp.inventory.mapper.InvSalesDetailMapper;
 import com.erp.inventory.mapper.InvSalesOrderMapper;
 import com.erp.inventory.mapper.InvSalesReturnDetailMapper;
@@ -55,7 +59,7 @@ class InvSalesReturnServiceImplTest
         assertThatThrownBy(() -> service.submitReturn(salesReturn(), List.of(
                 salesReturnDetail(101L, "3.00"), salesReturnDetail(101L, "3.00")), 10L))
                 .isInstanceOf(ServiceException.class)
-                .hasMessageContaining("超过原销售已出库数量");
+                .hasMessageContaining("超过原销售明细已出库数量");
     }
 
     @Test
@@ -155,9 +159,22 @@ class InvSalesReturnServiceImplTest
     @DisplayName("销售退货优先按原销售出库成本冲回，不使用当前库存均价")
     void shouldUseOriginalOutboundCostWhenConfirmingSalesReturn() throws Exception
     {
+        assertOriginalCostForMaterial("product");
+    }
+
+    @Test
+    void shouldReturnGiftStockAndCostWithoutUsingProductIdentity() throws Exception
+    {
+        assertOriginalCostForMaterial("gift");
+    }
+
+    private void assertOriginalCostForMaterial(String type) throws Exception
+    {
         loginAsAdmin();
+        Long productId = "product".equals(type) ? 101L : null;
         InvSalesReturnServiceImpl service = new InvSalesReturnServiceImpl();
         InvSalesReturnMapper returnMapper = mock(InvSalesReturnMapper.class);
+        when(returnMapper.updateInvSalesReturn(any())).thenReturn(1);
         InvSalesReturnDetailMapper detailMapper = mock(InvSalesReturnDetailMapper.class);
         InvSalesDetailMapper salesDetailMapper = mock(InvSalesDetailMapper.class);
         FakeStockMapper stockMapper = new FakeStockMapper();
@@ -168,15 +185,22 @@ class InvSalesReturnServiceImplTest
         salesReturn.setShopDeptId(10L);
         salesReturn.setStatus("submitted");
         salesReturn.setReturnNo("SR001");
-        InvSalesReturnDetail detail = salesReturnDetail(101L, "2.00");
+        InvSalesReturnDetail detail = salesReturnDetail(productId, "2.00");
         detail.setDetailId(9001L);
+        detail.setItemType(type);
+        detail.setItemId(101L);
         detail.setReturnId(1L);
         detail.setReturnedQuantity(BigDecimal.ZERO);
         detail.setUnitPrice(new BigDecimal("20.00"));
         InvSalesDetail original = originalSalesDetail(601L, "原销售商品", "20.00", "2.00");
+        original.setItemType(type);
+        original.setItemId(101L);
+        original.setProductId(productId);
         InvStock stock = new InvStock();
         stock.setStockId(7001L);
-        stock.setProductId(101L);
+        stock.setProductId(productId);
+        stock.setItemType(type);
+        stock.setItemId(101L);
         stock.setShopDeptId(10L);
         stock.setWarehouseId(10L);
         stock.setCurrentQuantity(new BigDecimal("3.00"));
@@ -187,7 +211,9 @@ class InvSalesReturnServiceImplTest
         InvStockLog outboundLog = new InvStockLog();
         outboundLog.setBusinessType("sales");
         outboundLog.setBusinessId(10L);
-        outboundLog.setProductId(101L);
+        outboundLog.setProductId(productId);
+        outboundLog.setItemType(type);
+        outboundLog.setItemId(101L);
         outboundLog.setMovementType("sales_out");
         outboundLog.setChangeQuantity(new BigDecimal("-2.00"));
         outboundLog.setCostPrice(new BigDecimal("6.00"));
@@ -198,6 +224,7 @@ class InvSalesReturnServiceImplTest
         when(salesDetailMapper.selectInvSalesDetailByOrderId(10L)).thenReturn(List.of(original));
         when(detailMapper.selectInvSalesReturnDetailByReturnId(1L)).thenReturn(List.of(detail));
         when(detailMapper.selectInvSalesReturnDetailByReturnIdForUpdate(1L)).thenReturn(List.of(detail));
+        when(detailMapper.updateInvSalesReturnDetail(any())).thenReturn(1);
         when(detailMapper.sumHistoricalReturnQuantity(10L, 101L, 1L)).thenReturn(BigDecimal.ZERO);
         when(detailMapper.sumHistoricalReturnQuantityBySalesDetailId(10L, 601L, 1L)).thenReturn(BigDecimal.ZERO);
 
@@ -207,21 +234,133 @@ class InvSalesReturnServiceImplTest
         ReflectionTestUtils.setField(service, "salesOrderMapper", sourceSalesOrderMapper());
         ReflectionTestUtils.setField(service, "stockMapper", stockMapper);
         ReflectionTestUtils.setField(service, "stockLogMapper", stockLogMapper);
+        ReflectionTestUtils.setField(service, "outboundRecordMapper", mock(InvOutboundRecordMapper.class));
         ReflectionTestUtils.setField(service, "deptScopeMapper", new FakeDeptScopeMapper());
 
         service.confirmReturn(1L, 10L);
 
         assertThat(stockMapper.addedCost).isEqualByComparingTo("12.00");
         assertThat(stockLogMapper.inserted.getCostPrice()).isEqualByComparingTo("6.00");
+        assertThat(stockLogMapper.inserted.getCostAmount()).isEqualByComparingTo("12.00");
+        assertThat(detail.getReturnedCostAmount()).isEqualByComparingTo("12.00");
+        assertThat(detail.getSalesDetailId()).isEqualTo(601L);
         assertThat(stockLogMapper.lastQuery.getBusinessId()).isEqualTo(10L);
-        assertThat(stockLogMapper.lastQuery.getProductId()).isEqualTo(101L);
+        assertThat(stockLogMapper.lastQuery.getProductId()).isEqualTo(productId);
+        assertThat(stockLogMapper.lastQuery.getItemType()).isEqualTo(type);
+        assertThat(stockLogMapper.lastQuery.getItemId()).isEqualTo(101L);
+        assertThat(stockLogMapper.inserted.getItemType()).isEqualTo(type);
+        assertThat(stockLogMapper.inserted.getProductId()).isEqualTo(productId);
+        assertThat(stock.getCurrentQuantity()).isEqualByComparingTo("5");
         assertThat(stockLogMapper.lastQuery.getMovementType()).isEqualTo("sales_out");
+    }
+
+    @Test
+    void shouldKeepProductAndGiftWithSameNumericIdOnSeparateSourceLines() throws Exception
+    {
+        loginAsAdmin();
+        InvSalesDetail product = originalSalesDetail(601L, "商品", "12.50", "5");
+        InvSalesDetail gift = originalSalesDetail(602L, "礼盒", "80.00", "2");
+        gift.setProductId(null);
+        gift.setItemType("gift");
+        gift.setItemId(101L);
+        gift.setItemName("礼盒");
+        SalesReturnFixture fixture = salesReturnServiceWithOriginalSalesDetail(product, gift);
+        InvSalesReturnDetail giftInput = new InvSalesReturnDetail();
+        giftInput.setSalesDetailId(602L);
+        giftInput.setItemType("gift");
+        giftInput.setItemId(101L);
+        giftInput.setQuantity(new BigDecimal("2"));
+        fixture.service.submitReturn(salesReturn(), List.of(salesReturnDetail(101L, "3"), giftInput), 10L);
+        assertThat(fixture.detailsRef.get()).hasSize(2);
+        assertThat(giftInput.getProductId()).isNull();
+        assertThat(giftInput.getItemType()).isEqualTo("gift");
+        assertThat(giftInput.getItemId()).isEqualTo(101L);
+        assertThat(giftInput.getAmount()).isEqualByComparingTo("160");
+        assertThat(fixture.returnRef.get().getTotalAmount()).isEqualByComparingTo("197.50");
+    }
+
+    @Test
+    void shouldRejectReturnBeyondHistoricalSourceAllowance() throws Exception
+    {
+        loginAsAdmin();
+        SalesReturnFixture fixture = salesReturnServiceWithOriginalSalesDetail(originalSalesDetail());
+        InvSalesReturnDetailMapper mapper = (InvSalesReturnDetailMapper) ReflectionTestUtils.getField(fixture.service, "salesReturnDetailMapper");
+        when(mapper.sumHistoricalReturnQuantityBySalesDetailId(10L, 601L, 1L)).thenReturn(new BigDecimal("4"));
+        assertThatThrownBy(() -> fixture.service.submitReturn(salesReturn(), List.of(salesReturnDetail(101L, "2")), 10L))
+                .isInstanceOf(ServiceException.class).hasMessageContaining("超过原销售明细已出库数量");
+    }
+
+    @Test
+    void shouldRejectGiftSpoofingProductSourceIdentity() throws Exception
+    {
+        loginAsAdmin();
+        SalesReturnFixture fixture = salesReturnServiceWithOriginalSalesDetail(originalSalesDetail());
+        InvSalesReturnDetail input = salesReturnDetail(101L, "1");
+        input.setSalesDetailId(601L);
+        input.setItemType("gift");
+        input.setItemId(101L);
+        assertThatThrownBy(() -> fixture.service.saveDraft(salesReturn(), List.of(input), 10L))
+                .isInstanceOf(ServiceException.class).hasMessageContaining("不一致");
+    }
+
+    @Test
+    void shouldRejectCancelAfterConfirmationWonTheRowLock()
+    {
+        loginAsAdmin();
+        InvSalesReturnServiceImpl service = new InvSalesReturnServiceImpl();
+        InvSalesReturnMapper mapper = mock(InvSalesReturnMapper.class);
+        InvSalesReturn locked = salesReturn();
+        locked.setShopDeptId(10L);
+        locked.setStatus("returned");
+        when(mapper.selectInvSalesReturnById(1L)).thenReturn(locked);
+        when(mapper.selectInvSalesReturnByIdForUpdate(1L)).thenReturn(locked);
+        ReflectionTestUtils.setField(service, "salesOrderMapper", sourceSalesOrderMapper());
+        ReflectionTestUtils.setField(service, "salesReturnMapper", mapper);
+        ReflectionTestUtils.setField(service, "deptScopeMapper", new FakeDeptScopeMapper());
+        assertThatThrownBy(() -> service.cancelReturn(1L, 10L)).isInstanceOf(ServiceException.class);
+        verify(mapper, never()).updateInvSalesReturn(any());
+        verify(mapper).selectInvSalesReturnByIdForUpdate(1L);
+    }
+
+    @Test
+    void shouldRejectStateCompareAndSetFailureInsteadOfReportingCancelled()
+    {
+        loginAsAdmin();
+        InvSalesReturnServiceImpl service = new InvSalesReturnServiceImpl();
+        InvSalesReturnMapper mapper = mock(InvSalesReturnMapper.class);
+        InvSalesReturn locked = salesReturn();
+        locked.setShopDeptId(10L);
+        locked.setStatus("submitted");
+        when(mapper.selectInvSalesReturnById(1L)).thenReturn(locked);
+        when(mapper.selectInvSalesReturnByIdForUpdate(1L)).thenReturn(locked);
+        ReflectionTestUtils.setField(service, "salesOrderMapper", sourceSalesOrderMapper());
+        ReflectionTestUtils.setField(service, "salesReturnMapper", mapper);
+        ReflectionTestUtils.setField(service, "deptScopeMapper", new FakeDeptScopeMapper());
+        assertThatThrownBy(() -> service.cancelReturn(1L, 10L))
+                .isInstanceOf(ServiceException.class).hasMessageContaining("状态已变化");
+        org.mockito.ArgumentCaptor<InvSalesReturn> update = org.mockito.ArgumentCaptor.forClass(InvSalesReturn.class);
+        verify(mapper).updateInvSalesReturn(update.capture());
+        assertThat(update.getValue().getParams().get("expectedStatus")).isEqualTo("submitted");
+    }
+
+    @Test
+    void shouldExcludeCurrentReturnWhenShowingItsEditableAllowance() throws Exception
+    {
+        loginAsAdmin();
+        SalesReturnFixture fixture = salesReturnServiceWithOriginalSalesDetail(originalSalesDetail());
+        fixture.service.saveDraft(salesReturn(), List.of(salesReturnDetail(101L, "2")), 10L);
+        InvSalesReturnDetailMapper mapper = (InvSalesReturnDetailMapper) ReflectionTestUtils.getField(fixture.service, "salesReturnDetailMapper");
+        when(mapper.sumHistoricalReturnQuantityBySalesDetailId(10L, 601L, 1L)).thenReturn(new BigDecimal("3"));
+        InvSalesReturn result = fixture.service.getReturnDetail(1L, 10L);
+        assertThat(result.getDetails().get(0).getReturnableQuantity()).isEqualByComparingTo("2");
+        verify(mapper).sumHistoricalReturnQuantityBySalesDetailId(10L, 601L, 1L);
     }
 
     private static InvSalesReturnServiceImpl salesReturnServiceWithQuantityFixtures() throws Exception
     {
         InvSalesReturnServiceImpl service = new InvSalesReturnServiceImpl();
         InvSalesReturnMapper returnMapper = mock(InvSalesReturnMapper.class);
+        when(returnMapper.updateInvSalesReturn(any())).thenReturn(1);
         InvSalesReturnDetailMapper detailMapper = mock(InvSalesReturnDetailMapper.class);
         InvSalesDetailMapper salesDetailMapper = mock(InvSalesDetailMapper.class);
         InvNumberSequenceMapper numberSequenceMapper = mock(InvNumberSequenceMapper.class);
@@ -243,6 +382,7 @@ class InvSalesReturnServiceImplTest
         when(detailMapper.selectInvSalesReturnDetailByReturnId(1L)).thenAnswer(invocation -> detailsRef.get());
         when(numberSequenceMapper.selectLastInsertId()).thenReturn(1L);
         InvSalesDetail salesDetail = new InvSalesDetail();
+        salesDetail.setDetailId(601L);
         salesDetail.setProductId(101L);
         salesDetail.setProductName("测试商品");
         salesDetail.setDeliveredQuantity(new BigDecimal("5.00"));
@@ -268,6 +408,7 @@ class InvSalesReturnServiceImplTest
     {
         InvSalesReturnServiceImpl service = new InvSalesReturnServiceImpl();
         InvSalesReturnMapper returnMapper = mock(InvSalesReturnMapper.class);
+        when(returnMapper.updateInvSalesReturn(any())).thenReturn(1);
         InvSalesReturnDetailMapper detailMapper = mock(InvSalesReturnDetailMapper.class);
         InvSalesDetailMapper salesDetailMapper = mock(InvSalesDetailMapper.class);
         InvNumberSequenceMapper numberSequenceMapper = mock(InvNumberSequenceMapper.class);
@@ -349,6 +490,7 @@ class InvSalesReturnServiceImplTest
         source.setCustomerName("来源客户");
         source.setShopDeptId(10L);
         when(mapper.selectInvSalesOrderById(10L)).thenReturn(source);
+        when(mapper.selectInvSalesOrderByIdForUpdate(10L)).thenReturn(source);
         return mapper;
     }
 

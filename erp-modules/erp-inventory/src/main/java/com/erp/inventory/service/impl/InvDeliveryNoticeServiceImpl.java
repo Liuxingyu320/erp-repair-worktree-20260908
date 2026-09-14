@@ -70,26 +70,37 @@ public class InvDeliveryNoticeServiceImpl extends InvBaseService implements IInv
     @Autowired
     private IInvTransferService transferService;
 
+    @Autowired
+    private com.erp.inventory.mapper.InvSalesWarehouseRepairMapper warehouseRepairMapper;
+
     @Override
     @Transactional(rollbackFor = Exception.class)
     public InvDeliveryNotice createNotice(Long salesOrderId, Long selectedShopDeptId)
     {
-        // 行级锁防并发：先锁销售单再校验状态，避免与deliverSales并发覆盖
+        return createNotice(salesOrderId, selectedShopDeptId, null);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public InvDeliveryNotice createNotice(Long salesOrderId, Long selectedShopDeptId, Long expectedVersion)
+    {
+        // Original order first; internal callers may already hold it in the same transaction.
         InvSalesOrder salesOrder = salesOrderMapper.selectInvSalesOrderByIdForUpdate(salesOrderId);
         if (salesOrder == null)
         {
             throw new ServiceException("销售单不存在");
         }
         assertShopVisible(salesOrder.getShopDeptId(), selectedShopDeptId, "无权访问该店铺销售单");
+        if (expectedVersion != null) InvSalesMutationGuard.requireVersion(expectedVersion, salesOrder);
         InvStateGuard.requireDeliveryNoticeCreatable(salesOrder.getStatus());
 
-        List<InvDeliveryNotice> existingNotices = noticeMapper.selectInvDeliveryNoticeBySalesOrderId(salesOrderId);
+        List<InvDeliveryNotice> existingNotices = noticeMapper.selectInvDeliveryNoticeBySalesOrderIdForUpdate(salesOrderId);
         if (hasActiveNotice(existingNotices))
         {
             throw new ServiceException("该销售单已有未完成发货通知，请先处理现有通知");
         }
 
-        List<InvSalesDetail> salesDetails = salesDetailMapper.selectInvSalesDetailByOrderId(salesOrderId);
+        List<InvSalesDetail> salesDetails = salesDetailMapper.selectInvSalesDetailByOrderIdForUpdate(salesOrderId);
         if (salesDetails.isEmpty())
         {
             throw new ServiceException("销售单无明细");
@@ -153,9 +164,64 @@ public class InvDeliveryNoticeServiceImpl extends InvBaseService implements IInv
         updateSo.setOrderId(salesOrderId);
         updateSo.setStatus(InvStatusConstants.NOTICED);
         updateSo.setUpdateBy(SecurityUtils.getUsername());
-        salesOrderMapper.updateInvSalesOrder(updateSo);
+        InvSalesMutationGuard.update(salesOrderMapper, updateSo, salesOrder);
 
         return noticeMapper.selectInvDeliveryNoticeById(notice.getNoticeId());
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public InvDeliveryNotice repairMissingWarehousesAndCreateNotice(Long salesOrderId,
+            com.erp.inventory.domain.dto.InvSalesWarehouseRepairRequest request, Long selectedShopDeptId)
+    {
+        Long shopDeptId = requireStoreContext(selectedShopDeptId, "请选择销售门店");
+        InvSalesOrder order = salesOrderMapper.selectInvSalesOrderByIdForUpdate(salesOrderId);
+        if (order == null) throw new ServiceException("销售单不存在");
+        assertShopVisible(order.getShopDeptId(), shopDeptId, "无权访问该店铺销售单");
+        if (request == null) throw new ServiceException("请提供经核对的空仓明细映射");
+        InvSalesMutationGuard.requireVersion(request.getVersion(), order);
+        if (!InvStatusConstants.SUBMITTED.equals(order.getStatus()))
+            throw new ServiceException("仅已提交且未生成活动通知的缺仓销售单可补全仓库");
+        if (hasActiveNotice(noticeMapper.selectInvDeliveryNoticeBySalesOrderIdForUpdate(salesOrderId)))
+            throw new ServiceException("已有活动发货通知，请先核对，不能补仓");
+        List<InvSalesDetail> details = salesDetailMapper.selectInvSalesDetailByOrderIdForUpdate(salesOrderId);
+        if (!warehouseRepairMapper.selectOutboundIdsForUpdate(salesOrderId).isEmpty()
+                || details.stream().anyMatch(detail -> detail.getDeliveredQuantity() != null
+                        && detail.getDeliveredQuantity().compareTo(BigDecimal.ZERO) != 0))
+            throw new ServiceException("销售单已有出库事实，不能补仓");
+        java.util.Map<Long, Long> assignments = new java.util.TreeMap<>();
+        if (request.getAssignments() == null) throw new ServiceException("请提供空仓明细映射");
+        for (com.erp.inventory.domain.dto.InvSalesWarehouseRepairRequest.Assignment entry : request.getAssignments())
+        {
+            if (entry == null || entry.getDetailId() == null || entry.getWarehouseId() == null
+                    || entry.getDetailId() <= 0 || entry.getWarehouseId() <= 0
+                    || assignments.putIfAbsent(entry.getDetailId(), entry.getWarehouseId()) != null)
+                throw new ServiceException("补仓映射包含无效或重复明细");
+        }
+        java.util.Set<Long> missing = details.stream()
+                .filter(detail -> detail.getWarehouseId() == null || detail.getWarehouseId() == 0)
+                .map(InvSalesDetail::getDetailId).collect(java.util.stream.Collectors.toSet());
+        if (missing.isEmpty() || !missing.equals(assignments.keySet()))
+            throw new ServiceException("请仅提交原单全部空仓明细，已填仓、其他单明细及价格数量均不可修改");
+        for (Long warehouseId : new java.util.TreeSet<>(assignments.values()))
+        {
+            assertDeptType(warehouseId, DEPT_TYPE_WAREHOUSE, "出库仓库不合法");
+            assertShopVisible(warehouseId, shopDeptId, "无权使用所选出库仓库");
+        }
+        for (java.util.Map.Entry<Long, Long> entry : assignments.entrySet())
+        {
+            if (warehouseRepairMapper.fillMissingWarehouse(salesOrderId, entry.getKey(), entry.getValue()) != 1)
+                throw new ServiceException("销售明细已变化，补仓未保存，请重新核对");
+        }
+        // Same transaction, same root lock; failed snapshot creation or audit rolls back the assignments.
+        InvDeliveryNotice notice = createNotice(salesOrderId, shopDeptId, request.getVersion());
+        for (java.util.Map.Entry<Long, Long> entry : assignments.entrySet())
+        {
+            if (warehouseRepairMapper.insertAudit(salesOrderId, entry.getKey(), entry.getValue(), request.getVersion(),
+                    notice.getNoticeId(), SecurityUtils.getUserId(), SecurityUtils.getUsername(), shopDeptId) != 1)
+                throw new ServiceException("补仓审计未写入，操作已回滚");
+        }
+        return notice;
     }
 
     @Override
@@ -181,21 +247,17 @@ public class InvDeliveryNoticeServiceImpl extends InvBaseService implements IInv
         {
             throw new ServiceException("发货明细不能为空");
         }
-        InvDeliveryNotice notice = getExistingNotice(noticeId);
+        InvDeliveryNotice locator = getExistingNotice(noticeId);
+        InvSalesOrder salesOrder = lockNoticeSalesOrder(locator);
+        InvDeliveryNotice notice = noticeMapper.selectInvDeliveryNoticeByIdForUpdate(noticeId);
+        requireNoticeParent(notice, salesOrder);
+        InvStateGuard.requireDeliveryNoticeDeliverable(notice.getStatus());
         Long warehouseId = resolveDeliveryWarehouseId(notice, request);
         assertDeptType(warehouseId, DEPT_TYPE_WAREHOUSE, "发货仓库不合法");
         assertShopVisible(warehouseId, selectedShopDeptId, "无权操作该发货仓库");
         assertCanAccessNoticeFromSelectedContext(notice, selectedShopDeptId);
-        InvStateGuard.requireDeliveryNoticeDeliverable(notice.getStatus());
 
-        InvDeliveryNotice locked = noticeMapper.selectInvDeliveryNoticeByIdForUpdate(noticeId);
-        InvStateGuard.requireDeliveryNoticeDeliverable(locked.getStatus());
-        warehouseId = resolveDeliveryWarehouseId(locked, request);
-        assertDeptType(warehouseId, DEPT_TYPE_WAREHOUSE, "发货仓库不合法");
-        assertShopVisible(warehouseId, selectedShopDeptId, "无权操作该发货仓库");
-        assertCanAccessNoticeFromSelectedContext(locked, selectedShopDeptId);
-
-        List<InvDeliveryNoticeDetail> details = noticeDetailMapper.selectInvDeliveryNoticeDetailByNoticeId(noticeId);
+        List<InvDeliveryNoticeDetail> details = noticeDetailMapper.selectInvDeliveryNoticeDetailByNoticeIdForUpdate(noticeId);
         if (details.isEmpty())
         {
             throw new ServiceException("发货通知无明细");
@@ -208,7 +270,7 @@ public class InvDeliveryNoticeServiceImpl extends InvBaseService implements IInv
         }
 
         // 一次性查询销售明细，构建 salesDetailId -> InvSalesDetail 映射
-        List<InvSalesDetail> salesDetails = salesDetailMapper.selectInvSalesDetailByOrderId(notice.getSalesOrderId());
+        List<InvSalesDetail> salesDetails = salesDetailMapper.selectInvSalesDetailByOrderIdForUpdate(notice.getSalesOrderId());
         java.util.Map<Long, InvSalesDetail> salesDetailMap = new java.util.HashMap<>();
         for (InvSalesDetail sd : salesDetails)
         {
@@ -216,7 +278,6 @@ public class InvDeliveryNoticeServiceImpl extends InvBaseService implements IInv
         }
 
         // 查询销售单获取目标门店
-        InvSalesOrder salesOrder = salesOrderMapper.selectInvSalesOrderById(notice.getSalesOrderId());
         boolean crossStoreTransferPending = shouldCreateCrossStoreTransfer(notice, salesOrder);
         String transferOrderNo = null;
 
@@ -277,22 +338,10 @@ public class InvDeliveryNoticeServiceImpl extends InvBaseService implements IInv
                 throw new ServiceException("物料 [" + detail.getProductName() + "] 库存不足，当前可用库存: "
                         + (stock == null ? "0" : stock.getAvailableQuantity().toString()));
             }
-            if (stock.getCostPrice() == null)
-            {
-                throw new ServiceException("物料 [" + detail.getProductName()
-                        + "] 库存成本未知，无法出库");
-            }
-            if (stock.getCostPrice().compareTo(BigDecimal.ZERO) < 0)
-            {
-                throw new ServiceException("物料 [" + detail.getProductName()
-                        + "] 库存成本非法，无法出库");
-            }
-
             BigDecimal beforeQty = stock.getCurrentQuantity();
-            BigDecimal currentCostPrice = stock.getCostPrice()
-                    .setScale(2, RoundingMode.HALF_UP);
-            BigDecimal deductCost = toDeliver.multiply(currentCostPrice)
-                    .setScale(2, RoundingMode.HALF_UP);
+            InvStockCostAllocator.Allocation allocation = InvStockCostAllocator.allocate(stock, toDeliver);
+            BigDecimal currentCostPrice = allocation.unitCost();
+            BigDecimal deductCost = allocation.amount();
 
             anyDelivered = true;
 
@@ -311,7 +360,10 @@ public class InvDeliveryNoticeServiceImpl extends InvBaseService implements IInv
             outbound.setNoticeDetailId(detail.getDetailId());
             outbound.setCostPrice(currentCostPrice);
             outbound.setCostAmount(deductCost);
-            outboundRecordMapper.insertInvOutboundRecord(outbound);
+            if (outboundRecordMapper.insertInvOutboundRecord(outbound) != 1)
+            {
+                throw new ServiceException("销售出库记录写入失败");
+            }
 
             // 原子扣减库存
             int rows = stockMapper.deductInvStockWithCost(stock.getStockId(), stock.getVersion(), toDeliver, deductCost, SecurityUtils.getUsername());
@@ -341,10 +393,14 @@ public class InvDeliveryNoticeServiceImpl extends InvBaseService implements IInv
             log.setBeforeQuantity(beforeQty);
             log.setAfterQuantity(updatedStock.getCurrentQuantity());
             log.setCostPrice(currentCostPrice);
+            log.setCostAmount(deductCost);
             log.setCreateBy(SecurityUtils.getUsername());
             log.setCreateTime(new Date());
             log.setRemark("销售出库-发货通知");
-            stockLogMapper.insertInvStockLog(log);
+            if (stockLogMapper.insertInvStockLog(log) != 1)
+            {
+                throw new ServiceException("销售出库库存流水写入失败");
+            }
 
             // 更新通知明细已发数量和冻结成本快照
             BigDecimal batchCost = deductCost;
@@ -371,7 +427,7 @@ public class InvDeliveryNoticeServiceImpl extends InvBaseService implements IInv
         }
 
         // 判断是否全部发完
-        List<InvDeliveryNoticeDetail> updatedDetails = noticeDetailMapper.selectInvDeliveryNoticeDetailByNoticeId(noticeId);
+        List<InvDeliveryNoticeDetail> updatedDetails = noticeDetailMapper.selectInvDeliveryNoticeDetailByNoticeIdForUpdate(noticeId);
         boolean allDelivered = updatedDetails.stream().allMatch(d ->
         {
             BigDecimal deliveredQty = d.getDeliveredQty() != null ? d.getDeliveredQty() : BigDecimal.ZERO;
@@ -401,10 +457,11 @@ public class InvDeliveryNoticeServiceImpl extends InvBaseService implements IInv
         update.setUpdateBy(SecurityUtils.getUsername());
         noticeMapper.updateInvDeliveryNotice(update);
 
+        long revisionBeforeDelivery = InvSalesMutationGuard.version(salesOrder);
         // 通知全部发完 → 销售单状态改为已出库
         if (allDelivered)
         {
-            List<InvSalesDetail> sdList = salesDetailMapper.selectInvSalesDetailByOrderId(notice.getSalesOrderId());
+            List<InvSalesDetail> sdList = salesDetailMapper.selectInvSalesDetailByOrderIdForUpdate(notice.getSalesOrderId());
             boolean salesFullyDelivered = sdList.stream().allMatch(sd ->
             {
                 BigDecimal delivered = sd.getDeliveredQuantity() != null ? sd.getDeliveredQuantity() : BigDecimal.ZERO;
@@ -416,7 +473,7 @@ public class InvDeliveryNoticeServiceImpl extends InvBaseService implements IInv
                 soUpdate.setOrderId(notice.getSalesOrderId());
                 soUpdate.setStatus(InvStatusConstants.DELIVERED);
                 soUpdate.setUpdateBy(SecurityUtils.getUsername());
-                salesOrderMapper.updateInvSalesOrder(soUpdate);
+                InvSalesMutationGuard.update(salesOrderMapper, soUpdate, salesOrder);
 
                 if (crossStoreTransferPending)
                 {
@@ -426,6 +483,13 @@ public class InvDeliveryNoticeServiceImpl extends InvBaseService implements IInv
             }
         }
 
+        if (InvSalesMutationGuard.version(salesOrder) == revisionBeforeDelivery)
+        {
+            InvSalesOrder progress = new InvSalesOrder();
+            progress.setOrderId(salesOrder.getOrderId());
+            progress.setUpdateBy(SecurityUtils.getUsername());
+            InvSalesMutationGuard.update(salesOrderMapper, progress, salesOrder);
+        }
         return buildDeliveryResultMessage(crossStoreTransferPending, transferOrderNo);
     }
 
@@ -433,8 +497,10 @@ public class InvDeliveryNoticeServiceImpl extends InvBaseService implements IInv
     @Transactional(rollbackFor = Exception.class)
     public void cancelNotice(Long noticeId, Long selectedShopDeptId)
     {
-        // 行级锁防并发：先锁通知再校验状态
+        InvDeliveryNotice locator = getExistingNotice(noticeId);
+        InvSalesOrder salesOrder = lockNoticeSalesOrder(locator);
         InvDeliveryNotice notice = noticeMapper.selectInvDeliveryNoticeByIdForUpdate(noticeId);
+        requireNoticeParent(notice, salesOrder);
         if (notice == null)
         {
             throw new ServiceException("发货通知不存在");
@@ -452,16 +518,14 @@ public class InvDeliveryNoticeServiceImpl extends InvBaseService implements IInv
         update.setUpdateBy(SecurityUtils.getUsername());
         noticeMapper.updateInvDeliveryNotice(update);
         // 重新计算销售单状态
-        recalcSalesOrderStatus(notice.getSalesOrderId());
+        recalcSalesOrderStatus(salesOrder);
     }
 
-    private void recalcSalesOrderStatus(Long salesOrderId)
+    private void recalcSalesOrderStatus(InvSalesOrder lockedSo)
     {
-        // 行级锁防并发：锁销售单后再重算状态
-        InvSalesOrder lockedSo = salesOrderMapper.selectInvSalesOrderByIdForUpdate(salesOrderId);
-        if (lockedSo == null) return;
+        Long salesOrderId = lockedSo.getOrderId();
 
-        List<InvSalesDetail> sdList = salesDetailMapper.selectInvSalesDetailByOrderId(salesOrderId);
+        List<InvSalesDetail> sdList = salesDetailMapper.selectInvSalesDetailByOrderIdForUpdate(salesOrderId);
         // 销售单无明细，回退为 submitted
         if (sdList.isEmpty())
         {
@@ -469,7 +533,7 @@ public class InvDeliveryNoticeServiceImpl extends InvBaseService implements IInv
             soUpdate.setOrderId(salesOrderId);
             soUpdate.setStatus(InvStatusConstants.SUBMITTED);
             soUpdate.setUpdateBy(SecurityUtils.getUsername());
-            salesOrderMapper.updateInvSalesOrder(soUpdate);
+            InvSalesMutationGuard.update(salesOrderMapper, soUpdate, lockedSo);
             return;
         }
         // 所有明细已出库 → delivered
@@ -484,11 +548,11 @@ public class InvDeliveryNoticeServiceImpl extends InvBaseService implements IInv
             soUpdate.setOrderId(salesOrderId);
             soUpdate.setStatus(InvStatusConstants.DELIVERED);
             soUpdate.setUpdateBy(SecurityUtils.getUsername());
-            salesOrderMapper.updateInvSalesOrder(soUpdate);
+            InvSalesMutationGuard.update(salesOrderMapper, soUpdate, lockedSo);
             return;
         }
         // 仍有未取消的发货通知 → noticed
-        List<InvDeliveryNotice> activeNotices = noticeMapper.selectInvDeliveryNoticeBySalesOrderId(salesOrderId);
+        List<InvDeliveryNotice> activeNotices = noticeMapper.selectInvDeliveryNoticeBySalesOrderIdForUpdate(salesOrderId);
         boolean hasActiveNotice = activeNotices.stream()
                 .anyMatch(n -> !InvStatusConstants.CANCELLED.equals(n.getStatus()));
         String newStatus = hasActiveNotice ? InvStatusConstants.NOTICED : InvStatusConstants.SUBMITTED;
@@ -496,7 +560,22 @@ public class InvDeliveryNoticeServiceImpl extends InvBaseService implements IInv
         soUpdate.setOrderId(salesOrderId);
         soUpdate.setStatus(newStatus);
         soUpdate.setUpdateBy(SecurityUtils.getUsername());
-        salesOrderMapper.updateInvSalesOrder(soUpdate);
+        InvSalesMutationGuard.update(salesOrderMapper, soUpdate, lockedSo);
+    }
+
+    private InvSalesOrder lockNoticeSalesOrder(InvDeliveryNotice notice)
+    {
+        InvSalesOrder salesOrder = salesOrderMapper.selectInvSalesOrderByIdForUpdate(notice.getSalesOrderId());
+        if (salesOrder == null) throw new ServiceException("原销售单不存在");
+        if (InvStatusConstants.CANCELLED.equals(salesOrder.getStatus()) || InvStatusConstants.DRAFT.equals(salesOrder.getStatus()))
+            throw new ServiceException("原销售单状态已变化，请刷新后核对");
+        return salesOrder;
+    }
+
+    private void requireNoticeParent(InvDeliveryNotice notice, InvSalesOrder salesOrder)
+    {
+        if (notice == null || !java.util.Objects.equals(notice.getSalesOrderId(), salesOrder.getOrderId()))
+            throw new ServiceException("发货通知已变化，请刷新后核对");
     }
 
     private InvDeliveryNotice assertAndGetScopedNotice(Long noticeId, Long selectedShopDeptId)

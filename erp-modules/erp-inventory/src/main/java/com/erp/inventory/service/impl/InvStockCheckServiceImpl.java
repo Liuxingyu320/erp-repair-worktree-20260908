@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
 import java.util.LinkedHashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -91,7 +92,7 @@ public class InvStockCheckServiceImpl extends InvBaseService implements IInvStoc
         stockCheck.setCreateBy(currentUsername());
         checkMapper.insertInvStockCheck(stockCheck);
 
-        Set<Long> requestedProductIds = "selected".equals(stockCheck.getCheckScope())
+        Set<String> requestedProductIds = "selected".equals(stockCheck.getCheckScope())
                 ? resolveRequestedProductIds(stockCheck.getDetails()) : Collections.emptySet();
 
         // 拉取该店铺/仓库当前库存快照作为盘点明细。
@@ -116,7 +117,13 @@ public class InvStockCheckServiceImpl extends InvBaseService implements IInvStoc
 
             InvStockCheckDetail d = new InvStockCheckDetail();
             d.setCheckId(stockCheck.getCheckId());
-            d.setProductId(productId);
+            String itemType = row.get("itemType") == null ? "product" : row.get("itemType").toString();
+            Long itemId = toLong(row.get("itemId"));
+            if (itemId == null) itemId = productId;
+            stockCheckItemKey(itemType, itemId);
+            d.setItemType(itemType);
+            d.setItemId(itemId);
+            d.setProductId("product".equals(itemType) ? itemId : null);
             d.setProductName(productName);
             d.setProductCode(productCode);
             d.setUnit(unit);
@@ -230,7 +237,7 @@ public class InvStockCheckServiceImpl extends InvBaseService implements IInvStoc
     }
 
     private List<Map<String, Object>> filterSnapshotRows(InvStockCheck stockCheck,
-            List<Map<String, Object>> rows, Set<Long> requestedProductIds)
+            List<Map<String, Object>> rows, Set<String> requestedProductIds)
     {
         String scope = stockCheck.getCheckScope();
         if ("all".equals(scope))
@@ -242,7 +249,9 @@ public class InvStockCheckServiceImpl extends InvBaseService implements IInvStoc
         {
             for (Map<String, Object> row : rows)
             {
-                if (requestedProductIds.contains(toLong(row.get("productId"))))
+                if (requestedProductIds.contains(stockCheckItemKey(
+                        row.get("itemType") == null ? "product" : row.get("itemType").toString(),
+                        toLong(row.get("itemId")) == null ? toLong(row.get("productId")) : toLong(row.get("itemId")))))
                 {
                     selectedRows.add(row);
                 }
@@ -293,18 +302,27 @@ public class InvStockCheckServiceImpl extends InvBaseService implements IInvStoc
         return false;
     }
 
-    private Set<Long> resolveRequestedProductIds(List<InvStockCheckDetail> details)
+    private String stockCheckItemKey(String type, Long id)
     {
-        Set<Long> productIds = new LinkedHashSet<>();
+        if (!Set.of("product", "oe", "gift").contains(type) || id == null || id <= 0)
+        {
+            throw new ServiceException("盘点物料身份不完整，请重新选择盘点范围");
+        }
+        return type + ":" + id;
+    }
+
+    private Set<String> resolveRequestedProductIds(List<InvStockCheckDetail> details)
+    {
+        Set<String> productIds = new LinkedHashSet<>();
         if (details == null || details.isEmpty())
         {
             throw new ServiceException("请选择盘点商品");
         }
         for (InvStockCheckDetail detail : details)
         {
-            if (detail != null && detail.getProductId() != null)
+            if (detail != null)
             {
-                productIds.add(detail.getProductId());
+                productIds.add(stockCheckItemKey(detail.getItemType(), detail.getItemId()));
             }
         }
         if (productIds.isEmpty())
@@ -339,19 +357,21 @@ public class InvStockCheckServiceImpl extends InvBaseService implements IInvStoc
         update.setRecountThreshold(recountThreshold);
         update.setRemark(stockCheck.getRemark());
         update.setUpdateBy(SecurityUtils.getUsername());
+        saveDraftDetails(locked, stockCheck.getDetails(), false, recountThreshold);
         checkMapper.updateInvStockCheck(update);
-
-        saveDraftDetails(stockCheck.getCheckId(), stockCheck.getDetails(), false, recountThreshold);
         return getCheckDetail(stockCheck.getCheckId(), selectedShopDeptId);
     }
 
     @Override
+    @Transactional(readOnly = true, isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
     public InvStockCheck getCheckDetail(Long checkId, Long selectedShopDeptId)
     {
         InvStockCheck check = assertAndGetScopedCheck(checkId, selectedShopDeptId);
         List<InvStockCheckDetail> details = checkDetailMapper.selectInvStockCheckDetailByCheckId(checkId);
+        InvStockCheckRestartPolicy.decorate(check, details);
         if (isBlindInput(check))
         {
+            check.setLastInvalidDetailSnapshot(null);
             hideBlindSnapshot(details);
         }
         check.setDetails(details);
@@ -367,6 +387,7 @@ public class InvStockCheckServiceImpl extends InvBaseService implements IInvStoc
         {
             if (isBlindInput(check))
             {
+                check.setLastInvalidDetailSnapshot(null);
                 check.setProfitItemCount(null);
                 check.setLossItemCount(null);
                 check.setTotalDiffQuantity(null);
@@ -414,7 +435,7 @@ public class InvStockCheckServiceImpl extends InvBaseService implements IInvStoc
 
         if (details != null && !details.isEmpty())
         {
-            saveDraftDetails(checkId, details, false,
+            saveDraftDetails(locked, details, false,
                     normalizeRecountThreshold(locked.getRecountThreshold()));
         }
         List<InvStockCheckDetail> lockedDetails =
@@ -481,7 +502,7 @@ public class InvStockCheckServiceImpl extends InvBaseService implements IInvStoc
         }
     }
 
-    private void saveDraftDetails(Long checkId, List<InvStockCheckDetail> details,
+    private void saveDraftDetails(InvStockCheck locked, List<InvStockCheckDetail> details,
             boolean requireAnyDetail, BigDecimal recountThreshold)
     {
         if (details == null || details.isEmpty())
@@ -493,7 +514,8 @@ public class InvStockCheckServiceImpl extends InvBaseService implements IInvStoc
             return;
         }
 
-        List<InvStockCheckDetail> existingDetails = checkDetailMapper.selectInvStockCheckDetailByCheckId(checkId);
+        List<InvStockCheckDetail> existingDetails = checkDetailMapper.selectInvStockCheckDetailByCheckIdForUpdate(locked.getCheckId());
+        InvStockCheckRestartPolicy.validateInputs(locked, details, existingDetails);
         java.util.Map<Long, InvStockCheckDetail> detailMap = new java.util.HashMap<>();
         for (InvStockCheckDetail d : existingDetails)
         {
@@ -515,14 +537,21 @@ public class InvStockCheckServiceImpl extends InvBaseService implements IInvStoc
             {
                 throw new ServiceException("复盘数量不能为负");
             }
-            db.setActualQty(input.getActualQty());
+            boolean actualUnchanged = db.getActualQty() != null && input.getActualQty() != null
+                    && db.getActualQty().compareTo(input.getActualQty()) == 0;
             boolean recountRequired = requiresRecount(
                     db.getBookQty(), input.getActualQty(), recountThreshold);
-            BigDecimal recountQty = recountRequired ? input.getRecountQty() : null;
+            boolean preserveRecount = recountRequired && actualUnchanged && !input.isRecountQtySpecified();
+            BigDecimal recountQty = !recountRequired ? null
+                    : (preserveRecount ? db.getRecountQty() : input.getRecountQty());
+            db.setActualQty(input.getActualQty());
             db.setRecountRequired(recountRequired ? "1" : "0");
             db.setRecountQty(recountQty);
-            db.setRecountBy(recountQty == null ? null : SecurityUtils.getUsername());
-            db.setRecountTime(recountQty == null ? null : new Date());
+            if (!preserveRecount)
+            {
+                db.setRecountBy(recountQty == null ? null : SecurityUtils.getUsername());
+                db.setRecountTime(recountQty == null ? null : new Date());
+            }
             BigDecimal finalQty = recountQty == null ? input.getActualQty() : recountQty;
             BigDecimal diffQty = calculateDiffQty(finalQty, db.getBookQty());
             db.setDiffQty(diffQty);
@@ -634,19 +663,34 @@ public class InvStockCheckServiceImpl extends InvBaseService implements IInvStoc
         {
             throw new ServiceException("盘点单无明细");
         }
+        Set<Long> changed = InvStockCheckRestartPolicy.invalidatedIds(locked);
+        Map<Long, BigDecimal> quantities = new LinkedHashMap<>();
+        Map<Long, BigDecimal> costs = new LinkedHashMap<>();
         for (InvStockCheckDetail detail : details)
         {
-            InvStock stock = stockMapper.selectInvStockByProductShopWarehouseForUpdate(
-                    detail.getProductId(), locked.getShopDeptId(), locked.getShopDeptId());
+            InvStock stock = stockMapper.selectInvStockByItemShopWarehouseForUpdate(
+                    detail.getItemType(), detail.getItemId(), locked.getShopDeptId(), locked.getWarehouseId());
             BigDecimal currentQty = stock == null || stock.getCurrentQuantity() == null
                     ? BigDecimal.ZERO : stock.getCurrentQuantity();
             BigDecimal costPrice = stock == null || stock.getCostPrice() == null
                     ? (detail.getCostPrice() == null ? BigDecimal.ZERO : detail.getCostPrice())
                     : stock.getCostPrice();
-            checkDetailMapper.resetSnapshot(detail.getDetailId(), currentQty, costPrice);
+            quantities.put(detail.getDetailId(), currentQty);
+            costs.put(detail.getDetailId(), costPrice);
+            BigDecimal oldQty = detail.getBookQty() == null ? BigDecimal.ZERO : detail.getBookQty();
+            if (oldQty.compareTo(currentQty) != 0) changed.add(detail.getDetailId());
+        }
+        String history = InvStockCheckRestartPolicy.appendRound(locked, details, changed, SecurityUtils.getUsername());
+        for (InvStockCheckDetail detail : details)
+        {
+            if (changed.contains(detail.getDetailId()))
+                checkDetailMapper.resetSnapshot(detail.getDetailId(), quantities.get(detail.getDetailId()), costs.get(detail.getDetailId()));
+            else
+                checkDetailMapper.refreshSnapshotCost(detail.getDetailId(), costs.get(detail.getDetailId()));
         }
         InvStockCheck update = new InvStockCheck();
         update.setCheckId(checkId);
+        update.setRestartReferenceSnapshot(history);
         update.setStatus(InvStatusConstants.DRAFT);
         update.setUpdateBy(SecurityUtils.getUsername());
         checkMapper.updateInvStockCheck(update);
@@ -795,6 +839,7 @@ public class InvStockCheckServiceImpl extends InvBaseService implements IInvStoc
         for (InvStockCheckDetail detail : details)
         {
             detail.setBookQty(null);
+            detail.setPreviousBookQty(null);
             detail.setDiffQty(null);
             detail.setDiffType("none");
         }

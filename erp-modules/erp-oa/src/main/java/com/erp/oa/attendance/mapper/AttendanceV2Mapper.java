@@ -25,6 +25,7 @@ import com.erp.oa.attendance.domain.AttendanceSettlementModels.RemainingWorkConf
 public interface AttendanceV2Mapper
 {
     LocalDateTime selectDatabaseNow();
+    com.erp.oa.attendance.domain.AttendanceModels.DatabaseClock selectDatabaseClock();
 
     List<Shift> selectShifts(@Param("status") String status);
     Shift selectShiftById(@Param("shiftId") Long shiftId);
@@ -78,8 +79,8 @@ public interface AttendanceV2Mapper
             @Param("yesterday") LocalDate yesterday);
     List<Schedule> selectPublishedScheduleCandidatesForUser(
             @Param("userId") Long userId,
-            @Param("today") LocalDate today,
-            @Param("yesterday") LocalDate yesterday);
+            @Param("dateFrom") LocalDate dateFrom,
+            @Param("dateTo") LocalDate dateTo);
     int insertDraftSchedule(Schedule schedule);
     int updateDraftSchedule(Schedule schedule);
     int deleteDraftSchedule(@Param("scheduleId") Long scheduleId,
@@ -107,6 +108,13 @@ public interface AttendanceV2Mapper
     List<EmployeeOption> selectActiveEmployeeOptions(
             @Param("shopId") Long shopId,
             @Param("keyword") String keyword);
+    long countActiveEmployeeOptions(@Param("shopId") Long shopId,
+            @Param("keyword") String keyword);
+    List<EmployeeOption> selectActiveEmployeeOptionsPage(
+            @Param("shopId") Long shopId,
+            @Param("keyword") String keyword,
+            @Param("offset") long offset,
+            @Param("pageSize") int pageSize);
 
     int insertChallenge(Challenge challenge);
     Challenge selectChallengeByTokenForUpdate(
@@ -142,7 +150,7 @@ public interface AttendanceV2Mapper
     PunchEvent selectPunchByEvidenceId(@Param("evidenceId") Long evidenceId);
 
     int insertRemainingWorkConfirmation(RemainingWorkConfirmation value);
-    int invalidateUnsettledDayResultForRemainingWork(
+    int invalidateDayResultForRemainingWork(
             @Param("scheduleId") Long scheduleId,
             @Param("updateBy") String updateBy);
     RemainingWorkConfirmation selectRemainingWorkConfirmationById(

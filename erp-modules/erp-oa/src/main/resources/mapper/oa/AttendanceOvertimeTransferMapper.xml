@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.oa.attendance.leave.balance.AttendanceOvertimeTransferMapper">
+<resultMap id="transfer" type="com.erp.oa.attendance.leave.balance.AttendanceOvertimeTransferModels$Transfer">
+<result property="transferId" column="transfer_id"/>
+<result property="originalTransferId" column="original_transfer_id"/>
+<result property="bucketId" column="bucket_id"/>
+<result property="userId" column="user_id"/>
+<result property="shopId" column="shop_id"/>
+<result property="leaveTypeId" column="leave_type_id"/>
+<result property="legalEntityId" column="legal_entity_id"/>
+<result property="ownerDeptId" column="owner_dept_id"/>
+<result property="sourceDayResultId" column="source_day_result_id"/>
+<result property="sourceScheduleId" column="source_schedule_id"/>
+<result property="sourceVersion" column="source_version"/>
+<result property="ruleId" column="rule_id"/>
+<result property="mappingId" column="mapping_id"/>
+<result property="mappingVersion" column="mapping_version"/>
+<result property="operatorUserId" column="operator_user_id"/>
+<result property="action" column="action"/>
+<result property="clientRequestId" column="client_request_id"/>
+<result property="requestFingerprint" column="request_fingerprint"/>
+<result property="reason" column="reason"/>
+<result property="salaryMonth" column="salary_month"/>
+<result property="sourceBusinessDate" column="source_business_date"/>
+<result property="sourceSettledAt" column="source_settled_at"/>
+<result property="createTime" column="create_time"/>
+<result property="sourceWorkedMinutes" column="source_worked_minutes"/>
+<result property="sourceScheduledMinutes" column="source_scheduled_minutes"/>
+<result property="transferMinutes" column="transfer_minutes"/>
+<result property="reversed" column="reversed"/>
+</resultMap>
+<select id="selectTransfer" resultMap="transfer">SELECT * FROM oa_attendance_overtime_transfer WHERE transfer_id=#{id} <if test="lock">FOR UPDATE</if></select>
+<select id="selectRequest" resultMap="transfer">SELECT * FROM oa_attendance_overtime_transfer WHERE shop_id=#{shopId} AND operator_user_id=#{actor} AND BINARY client_request_id=BINARY #{key}</select>
+<select id="selectHistory" resultMap="transfer">
+ SELECT t.*,CASE WHEN r.transfer_id IS NULL THEN 0 ELSE 1 END reversed
+ FROM oa_attendance_overtime_transfer t LEFT JOIN oa_attendance_overtime_transfer r ON r.original_transfer_id=t.transfer_id AND r.action='REVERSE'
+ WHERE t.source_day_result_id=#{sourceId} AND t.action='APPLY' ORDER BY t.transfer_id DESC
+</select>
+<select id="selectBucketSources" resultMap="transfer">SELECT * FROM oa_attendance_overtime_transfer WHERE bucket_id=#{bucketId} AND action='APPLY'</select>
+<select id="countReversed" resultType="int">SELECT COUNT(*) FROM oa_attendance_overtime_transfer WHERE original_transfer_id=#{id} AND action='REVERSE'</select>
+<select id="countCurrentOwnership" resultType="int">
+ SELECT COUNT(*) FROM sys_user u JOIN sys_user_profile p ON p.user_id=u.user_id
+ JOIN sys_dept d ON d.dept_id=u.dept_id AND d.status='0' AND d.del_flag='0'
+ JOIN sys_dept shop ON shop.dept_id=#{shopId} AND shop.status='0' AND shop.del_flag='0'
+ WHERE u.user_id=#{userId} AND u.status='0' AND u.del_flag='0' AND p.legal_entity_id=#{legalEntityId}
+ AND (d.dept_id=shop.dept_id OR FIND_IN_SET(shop.dept_id,d.ancestors))
+ AND EXISTS(SELECT 1 FROM sys_dept owner JOIN sys_legal_entity le ON le.legal_entity_id=owner.legal_entity_id AND le.status='0'
+ WHERE (owner.dept_id=shop.dept_id OR FIND_IN_SET(owner.dept_id,shop.ancestors)) AND owner.status='0' AND owner.del_flag='0' AND owner.legal_entity_id=#{legalEntityId}) <if test="lock">FOR UPDATE</if>
+</select>
+<select id="countLaterTransfer" resultType="int">
+ SELECT COUNT(*) FROM sys_hr_lifecycle_action WHERE employee_id=#{userId} AND action_type='TRANSFER_CONFIRMED' AND business_status='CONFIRMED'
+ AND (effective_date IS NULL OR effective_date&gt;=#{sourceDate})
+</select>
+<select id="countPublishedSource" resultType="int">
+ SELECT COUNT(*) FROM oa_attendance_day_result d JOIN oa_attendance_schedule s ON s.schedule_id=d.schedule_id
+ WHERE d.day_result_id=#{sourceId} AND s.status='PUBLISHED' AND s.user_id=d.user_id AND s.shop_id=d.shop_id AND s.business_date=d.business_date
+</select>
+<select id="countValidSource" resultType="int">
+ SELECT COUNT(*) FROM oa_attendance_overtime_transfer t JOIN oa_attendance_day_result d ON d.day_result_id=t.source_day_result_id
+ JOIN oa_attendance_schedule s ON s.schedule_id=d.schedule_id AND s.status='PUBLISHED'
+ WHERE t.transfer_id=#{id} AND t.action='APPLY' AND d.settled_at IS NOT NULL AND d.row_version=t.source_version
+ AND d.schedule_id=t.source_schedule_id AND d.user_id=t.user_id AND d.shop_id=t.shop_id AND d.business_date=t.source_business_date
+ AND d.worked_minutes=t.source_worked_minutes AND d.scheduled_minutes=t.source_scheduled_minutes AND d.settled_at=t.source_settled_at
+ AND s.user_id=t.user_id AND s.shop_id=t.shop_id AND s.business_date=t.source_business_date
+ AND NOT EXISTS(SELECT 1 FROM oa_attendance_overtime_transfer r WHERE r.original_transfer_id=t.transfer_id AND r.action='REVERSE')
+</select>
+<insert id="insertTransfer" useGeneratedKeys="true" keyProperty="transferId">
+INSERT INTO oa_attendance_overtime_transfer (original_transfer_id,bucket_id,user_id,shop_id,leave_type_id,legal_entity_id,owner_dept_id,source_day_result_id,source_schedule_id,source_version,rule_id,mapping_id,mapping_version,operator_user_id,action,client_request_id,request_fingerprint,reason,salary_month,source_business_date,source_settled_at,source_worked_minutes,source_scheduled_minutes,transfer_minutes) VALUES (#{originalTransferId},#{bucketId},#{userId},#{shopId},#{leaveTypeId},#{legalEntityId},#{ownerDeptId},#{sourceDayResultId},#{sourceScheduleId},#{sourceVersion},#{ruleId},#{mappingId},#{mappingVersion},#{operatorUserId},#{action},#{clientRequestId},#{requestFingerprint},#{reason},#{salaryMonth},#{sourceBusinessDate},#{sourceSettledAt},#{sourceWorkedMinutes},#{sourceScheduledMinutes},#{transferMinutes})
+</insert>
+</mapper>

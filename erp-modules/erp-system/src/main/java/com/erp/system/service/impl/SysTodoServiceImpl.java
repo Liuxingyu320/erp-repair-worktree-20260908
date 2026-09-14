@@ -129,7 +129,7 @@ public class SysTodoServiceImpl implements ISysTodoService
     protected Long currentUserId() { return SecurityUtils.getUserId(); }
     protected boolean currentUserIsAdmin() { return SecurityUtils.isAdmin(); }
     protected boolean hasPermission(String permission) { return AuthUtil.hasPermi(permission); }
-    protected LocalDate currentDate() { return LocalDate.now(); }
+    protected LocalDate currentDate() { return LocalDate.now(java.time.ZoneId.of("Asia/Shanghai")); }
     protected long currentTimeMillis() { return System.currentTimeMillis(); }
 
     protected boolean healthCertificateIntakeEnabled()
@@ -194,7 +194,7 @@ public class SysTodoServiceImpl implements ISysTodoService
         List<SysTodoCandidateRow> candidates = employeeTypes.isEmpty()
                 ? Collections.emptyList()
                 : todoMapper.selectScopedTodoCandidates(
-                        query, employeeTypes, scope.currentDeptIds, scope.authorizedDeptIds);
+                        query, employeeTypes, scope.currentDeptIds, scope.authorizedDeptIds, currentDate());
         Set<String> healthWorkflowTypes = new LinkedHashSet<>();
         if (enabledTypes.contains(SysTodoTypes.HR_HEALTH_CERT_REVIEW))
         {

@@ -30,7 +30,7 @@
           :spellcheck="false"
           @keydown.enter="handleUnlock"
         />
-        <button type="button" class="unlock-btn" aria-label="解锁系统" :disabled="loading" @click="handleUnlock">
+        <button type="button" class="unlock-btn" aria-label="解锁系统" :disabled="loading || logoutLoading" @click="handleUnlock">
           <i v-if="!loading" class="el-icon-arrow-right" aria-hidden="true" />
           <i v-else class="el-icon-loading" aria-hidden="true" />
         </button>
@@ -39,7 +39,7 @@
       <div v-if="errorMsg" class="error-msg" role="alert">{{ errorMsg }}</div>
 
       <div class="lock-footer">
-        <a href="/login" @click.prevent="goLogin">退出重新登录</a>
+        <button type="button" :disabled="loading || logoutLoading" @click="goLogin">{{ logoutLoading ? '正在退出…' : '退出重新登录' }}</button>
       </div>
     </div>
   </div>
@@ -56,6 +56,7 @@ export default {
     return {
       password: '',
       loading: false,
+      logoutLoading: false,
       errorMsg: '',
       isShaking: false,
       currentTime: '',
@@ -76,6 +77,12 @@ export default {
       return this.nickName ? `${this.nickName}的头像` : '当前用户头像'
     }
   },
+  watch: {
+    '$store.state.user.sessionRevision'() { this.logoutSessionChanged() },
+    '$store.state.user.token'() { this.logoutSessionChanged() }
+  },
+  activated() { this._logoutInactive = false },
+  deactivated() { this.invalidateLogout() },
   mounted() {
     this.startClock()
     this.initParticles()
@@ -84,6 +91,7 @@ export default {
     })
   },
   beforeDestroy() {
+    this.invalidateLogout()
     clearInterval(this.timer)
     clearTimeout(this.shakeTimer)
     this.stopParticleAnimation()
@@ -118,6 +126,7 @@ export default {
       this.timer = setInterval(update, 1000)
     },
     async handleUnlock() {
+      if (this.loading || this.logoutLoading) return
       if (!this.password) {
         this.showError('请输入密码')
         return
@@ -143,13 +152,49 @@ export default {
       clearTimeout(this.shakeTimer)
       this.shakeTimer = setTimeout(() => { this.isShaking = false }, 600)
     },
+    logoutSession() {
+      const state = this.$store.state.user
+      return { sessionRevision: state.sessionRevision || 0, userId: String(state.id || ''), token: state.token || '' }
+    },
+    sameLogoutSession(expected) {
+      const current = this.logoutSession()
+      return !!expected && current.sessionRevision === expected.sessionRevision && current.userId === expected.userId && current.token === expected.token
+    },
+    invalidateLogout() {
+      this._logoutInactive = true
+      this._logoutAttempt = (this._logoutAttempt || 0) + 1
+      this.logoutLoading = false
+    },
+    logoutSessionChanged() {
+      // A confirmed logout clears both fields. Its returned completion identity authorizes navigation.
+      // A later login (including the same account) invalidates this page's pending attempt instead.
+      const current = this.logoutSession()
+      if (this.logoutLoading && (current.userId || current.token)) {
+        this._logoutAttempt = (this._logoutAttempt || 0) + 1
+        this.logoutLoading = false
+      }
+    },
     goLogin() {
-      Promise.resolve(this.$store.dispatch('lock/unlockScreen'))
-        .catch(() => {})
-        .then(() => this.$store.dispatch('LogOut'))
-        .finally(() => {
-          this.$router.replace('/login').catch(() => {})
-        })
+      if (this.loading || this.logoutLoading || this._logoutInactive) return Promise.resolve()
+      const originalSession = this.logoutSession()
+      const attempt = this._logoutAttempt = (this._logoutAttempt || 0) + 1
+      const active = () => !this._logoutInactive && this._logoutAttempt === attempt
+      this.logoutLoading = true
+      this.errorMsg = ''
+      return Promise.resolve().then(() => {
+        if (!active() || !this.sameLogoutSession(originalSession)) return
+        return this.$store.dispatch('LogOut', { failureFeedback: 'inline' })
+      }).then(result => {
+        if (!active() || !result || result.completed !== true || !this.sameLogoutSession(result)) return
+        return this.$router.replace('/login').catch(() => {})
+      }).catch(error => {
+        const inlineMessage = error && error.inlineMessage
+        if (active() && this.sameLogoutSession(originalSession) && (inlineMessage || !(error && error.notified))) {
+          this.showError(inlineMessage || (error && error.message) || '退出未完成，请保留当前锁定状态并重试')
+        }
+      }).finally(() => {
+        if (active()) this.logoutLoading = false
+      })
     },
     shouldAnimateParticles() {
       const reduceMotion = this.motionQuery
@@ -452,7 +497,7 @@ export default {
   margin-top: 24px;
 }
 
-.lock-footer a {
+.lock-footer button {
   min-height: 44px;
   display: inline-flex;
   align-items: center;
@@ -460,11 +505,17 @@ export default {
   font-size: 13px;
   text-decoration: none;
   transition: color 0.2s;
+  background: transparent;
+  border: 0;
+  font-family: inherit;
+  cursor: pointer;
 }
 
-.lock-footer a:hover {
+.lock-footer button:hover:not(:disabled) {
   color: var(--mobile-color-primary, #0b6b53);
 }
+
+.lock-footer button:disabled { opacity: 0.6; cursor: not-allowed; }
 
 @media (max-width: 768px) {
   .lock-container {

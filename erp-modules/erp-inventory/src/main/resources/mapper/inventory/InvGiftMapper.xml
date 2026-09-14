@@ -17,6 +17,7 @@
         <result property="guidePrice2" column="guide_price_2"/>
         <result property="supplierName" column="supplier_name"/>
         <result property="imageUrl" column="image_url"/>
+        <result property="imageUrlsText" column="image_urls"/>
         <result property="status" column="status"/>
         <result property="delFlag" column="del_flag"/>
         <result property="createBy" column="create_by"/>
@@ -30,7 +31,7 @@
         select g.gift_id, g.gift_code, g.category_id, c.category_name,
                g.gift_name, g.grade, g.spec, g.product_description,
                g.replenishment_unit, g.cost_price, g.guide_price_1, g.guide_price_2,
-               g.supplier_name, g.image_url, g.status, g.del_flag, g.create_by, g.create_time,
+               g.supplier_name, g.image_url, g.image_urls, g.status, g.del_flag, g.create_by, g.create_time,
                g.update_by, g.update_time, g.remark
         from inv_gift_box g
         left join inv_gift_category c on c.category_id = g.category_id and c.del_flag = '0'
@@ -62,6 +63,12 @@
         where g.gift_id = #{giftId} and g.del_flag = '0'
     </select>
 
+    <select id="selectInvGiftByIdForUpdate" parameterType="Long" resultMap="InvGiftResult">
+        <include refid="selectInvGiftVo"/>
+        where g.gift_id = #{giftId} and g.del_flag = '0'
+        for update
+    </select>
+
     <select id="selectInvGiftByCode" resultMap="InvGiftResult">
         <include refid="selectInvGiftVo"/>
         where g.del_flag = '0' and g.gift_code = #{giftCode}
@@ -89,11 +96,11 @@
     <insert id="insertInvGift" parameterType="InvGiftBox" useGeneratedKeys="true" keyProperty="giftId">
         insert into inv_gift_box (
             gift_code, category_id, gift_name, grade, spec, product_description,
-            replenishment_unit, cost_price, guide_price_1, guide_price_2, supplier_name, image_url,
+            replenishment_unit, cost_price, guide_price_1, guide_price_2, supplier_name, image_url, image_urls,
             status, del_flag, create_by, create_time, remark
         ) values (
             #{giftCode}, #{categoryId}, #{giftName}, #{grade}, #{spec}, #{productDescription},
-            #{replenishmentUnit}, #{costPrice}, #{guidePrice1}, #{guidePrice2}, #{supplierName}, #{imageUrl},
+            #{replenishmentUnit}, #{costPrice}, #{guidePrice1}, #{guidePrice2}, #{supplierName}, #{imageUrl}, #{imageUrlsText},
             #{status}, '0', #{createBy}, sysdate(), #{remark}
         )
     </insert>
@@ -104,17 +111,17 @@
             <if test="giftCode != null">gift_code = #{giftCode},</if>
             <if test="categoryId != null">category_id = #{categoryId},</if>
             <if test="giftName != null">gift_name = #{giftName},</if>
-            <if test="grade != null">grade = #{grade},</if>
-            <if test="spec != null">spec = #{spec},</if>
-            <if test="productDescription != null">product_description = #{productDescription},</if>
-            <if test="replenishmentUnit != null">replenishment_unit = #{replenishmentUnit},</if>
+            <if test="grade != null or _parameter.wasJsonFieldProvided('grade')">grade = #{grade},</if>
+            <if test="spec != null or _parameter.wasJsonFieldProvided('spec')">spec = #{spec},</if>
+            <if test="productDescription != null or _parameter.wasJsonFieldProvided('productDescription')">product_description = #{productDescription},</if>
+            <if test="replenishmentUnit != null or _parameter.wasJsonFieldProvided('replenishmentUnit')">replenishment_unit = #{replenishmentUnit},</if>
             <if test="costPrice != null">cost_price = #{costPrice},</if>
             <if test="guidePrice1 != null">guide_price_1 = #{guidePrice1},</if>
             <if test="guidePrice2 != null">guide_price_2 = #{guidePrice2},</if>
-            <if test="supplierName != null">supplier_name = #{supplierName},</if>
-            <if test="imageUrl != null">image_url = #{imageUrl},</if>
+            <if test="supplierName != null or _parameter.wasJsonFieldProvided('supplierName')">supplier_name = #{supplierName},</if>
+            <if test="imageUrlsText != null">image_url = #{imageUrl}, image_urls = #{imageUrlsText},</if>
             <if test="status != null">status = #{status},</if>
-            <if test="remark != null">remark = #{remark},</if>
+            <if test="remark != null or _parameter.wasJsonFieldProvided('remark')">remark = #{remark},</if>
             update_by = #{updateBy}, update_time = sysdate()
         </set>
         where gift_id = #{giftId}

@@ -1,3 +1,4 @@
+const { newUploadOperationId } = require('../../drive/uploadReceipt')
 'use strict'
 
 const {
@@ -76,6 +77,10 @@ function driveMobileErrorMessage(code, serverMessage) {
 function createMobileUploadState(file, targetSpaceId, targetParentId) {
   return {
     file,
+    name: file && file.name || '',
+    size: Number(file && file.size) || 0,
+    operationId: newUploadOperationId(),
+    freshUpload: true,
     targetSpaceId,
     targetParentId: targetParentId == null ? 0 : targetParentId,
     progress: 0,

@@ -28,6 +28,8 @@ import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 import com.erp.common.core.web.domain.AjaxResult;
+import com.erp.common.core.exception.ServiceException;
+import com.erp.oa.attendance.support.AttendancePunchRejectionPolicy;
 import com.erp.common.log.annotation.Log;
 import com.erp.common.log.enums.BusinessType;
 import com.erp.common.security.annotation.Logical;
@@ -164,9 +166,17 @@ public class AttendanceV2Controller extends OaBaseController
     @GetMapping("/employee-options")
     public AjaxResult employeeOptions(@RequestParam Long shopId,
             @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) Integer pageNum,
+            @RequestParam(required = false) Integer pageSize,
             HttpServletRequest request)
-    { return success(service.employeeOptions(shopId, keyword,
-            resolveAttendanceShopDeptId(request))); }
+    {
+        Long selectedShopId = resolveAttendanceShopDeptId(request);
+        if (pageNum == null && pageSize == null)
+            return success(service.employeeOptions(shopId, keyword,
+                    selectedShopId));
+        return success(service.employeeOptionsPage(shopId, keyword,
+                pageNum, pageSize, selectedShopId));
+    }
 
     @RequiresPermissions("oa:attendance:schedule:list")
     @GetMapping("/schedules")
@@ -215,15 +225,16 @@ public class AttendanceV2Controller extends OaBaseController
 
     @RequiresPermissions("oa:attendance:punch:self")
     @GetMapping("/today")
-    public AjaxResult today()
-    { return success(service.today()); }
+    public AjaxResult today(HttpServletRequest request)
+    { return success(service.today(resolveAttendanceShopDeptId(request))); }
 
     @RequiresPermissions("oa:attendance:punch:self")
     @Log(title = "申请打卡凭证", businessType = BusinessType.INSERT,
             isSaveRequestData = false, isSaveResponseData = false)
     @PostMapping("/punch/challenge")
-    public AjaxResult challenge(@Valid @RequestBody ChallengeCreate body)
-    { return success(service.issueChallenge(body)); }
+    public AjaxResult challenge(@Valid @RequestBody ChallengeCreate body,
+            HttpServletRequest request)
+    { return success(service.issueChallenge(body, resolveAttendanceShopDeptId(request))); }
 
     @RequiresPermissions("oa:attendance:punch:self")
     @Log(title = "员工现场打卡", businessType = BusinessType.INSERT,
@@ -238,9 +249,7 @@ public class AttendanceV2Controller extends OaBaseController
             @RequestParam @NotNull BigDecimal longitude,
             @RequestParam @NotNull BigDecimal accuracyMeters,
             @RequestParam @NotNull String clientCoordinateSystem,
-            @RequestParam
-            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
-                    LocalDateTime clientCaptureTime,
+            @RequestParam String clientCaptureTime,
             @RequestParam(required = false) String clientRequestId,
             @RequestParam(required = false) String deviceId,
             @RequestParam(required = false) String appVersion,
@@ -255,13 +264,25 @@ public class AttendanceV2Controller extends OaBaseController
         command.longitude = longitude;
         command.accuracyMeters = accuracyMeters;
         command.clientCoordinateSystem = clientCoordinateSystem;
-        command.clientCaptureTime = clientCaptureTime;
+        command.clientCaptureTimestamp = clientCaptureTime;
         command.clientRequestId = clientRequestId;
         command.deviceId = deviceId;
         command.appVersion = appVersion;
         command.clientIp = request.getRemoteAddr();
         command.userAgent = request.getHeader(HttpHeaders.USER_AGENT);
-        return success(service.punch(command, photo));
+        Long shopId = resolveAttendanceShopDeptId(request);
+        try
+        {
+            return success(service.punch(command, photo, shopId));
+        }
+        catch (ServiceException ex)
+        {
+            // The proxied transactional service has already rolled back here.
+            if (!AttendancePunchRejectionPolicy.isDefiniteRejection(ex)) throw ex;
+            return AjaxResult.error(422, ex.getMessage())
+                    .put("businessCode", AttendancePunchRejectionPolicy.BUSINESS_CODE)
+                    .put("clientRequestId", clientRequestId);
+        }
     }
 
     @RequiresPermissions("oa:attendance:punch:self")

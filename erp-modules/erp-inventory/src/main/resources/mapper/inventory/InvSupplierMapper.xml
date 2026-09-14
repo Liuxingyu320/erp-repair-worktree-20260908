@@ -50,6 +50,21 @@
         where s.supplier_id = #{supplierId}
     </select>
 
+    <!-- Lock the supplier alone before OE rows; directory joins must not change lock order. -->
+    <select id="selectInvSupplierByIdForUpdate" resultMap="InvSupplierResult">
+        select supplier_id, supplier_name, supplier_code, contact_person, contact_phone,
+               contact_email, address, settlement_method, cooperation_status, shop_dept_id,
+               status, create_by, create_time, update_by, update_time, remark
+        from inv_supplier where supplier_id = #{supplierId} for update
+    </select>
+
+    <!-- OE is a shared name-only catalog. Disabled rows remain references; deleted rows do not. -->
+    <select id="selectReferencingOeIdsForUpdate" resultType="Long">
+        select oe_item_id from inv_oe_item
+        where supplier_name = #{supplierName} and del_flag = '0'
+        order by oe_item_id for update
+    </select>
+
     <select id="selectInvSupplierByNameAndShop" resultMap="InvSupplierResult">
         <include refid="selectInvSupplierVo"/>
         where s.supplier_name = #{supplierName}

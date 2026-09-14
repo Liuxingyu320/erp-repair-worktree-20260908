@@ -4,6 +4,8 @@ import java.math.BigDecimal;
 import java.util.Date;
 import java.util.List;
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.alibaba.fastjson2.annotation.JSONField;
 import com.erp.common.core.annotation.Excel;
 import com.erp.common.core.web.domain.BaseEntity;
 
@@ -83,11 +85,20 @@ public class InvStockCheck extends BaseEntity
     private Long lastRejectedUserId;
     private String lastRejectedBy;
     private Date lastRejectedTime;
+    @JsonIgnore
+    @JSONField(serialize = false, deserialize = false)
+    private String restartReferenceSnapshot;
+
     private String lastInvalidReason;
     private String lastInvalidDetailSnapshot;
     private Date lastInvalidatedTime;
 
     private List<InvStockCheckDetail> details;
+
+    @JsonIgnore
+    @JSONField(serialize = false, deserialize = false)
+    public String getRestartReferenceSnapshot() { return restartReferenceSnapshot; }
+    public void setRestartReferenceSnapshot(String value) { restartReferenceSnapshot = value; }
 
     public Long getCheckId() { return checkId; }
     public void setCheckId(Long checkId) { this.checkId = checkId; }

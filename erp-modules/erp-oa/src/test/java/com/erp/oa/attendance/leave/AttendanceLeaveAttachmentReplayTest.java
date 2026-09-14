@@ -44,7 +44,7 @@ class AttendanceLeaveAttachmentReplayTest
         service = new AttendanceLeaveService(mapper, storage,
                 mock(AttendanceLeaveApprovalOutboxService.class),
                 mock(AttendanceLeaveApprovalAfterCommitTrigger.class),
-                mock(RemoteApprovalService.class), shop, gate);
+                mock(RemoteApprovalService.class), shop, gate, legacyQuota());
     }
 
     @AfterEach
@@ -114,5 +114,14 @@ class AttendanceLeaveAttachmentReplayTest
     {
         return new MockMultipartFile("file", "proof.pdf",
                 "application/pdf", new byte[] { 1, 2, 3 });
+    }
+
+    private static com.erp.oa.attendance.leave.balance.AttendanceLeaveQuotaService legacyQuota()
+    {
+        return org.mockito.Mockito.mock(com.erp.oa.attendance.leave.balance.AttendanceLeaveQuotaService.class, invocation -> {
+            String method=invocation.getMethod().getName();
+            if("hydrate".equals(method) || "copyPolicy".equals(method))return invocation.getArgument(0);
+            return org.mockito.Answers.RETURNS_DEFAULTS.answer(invocation);
+        });
     }
 }

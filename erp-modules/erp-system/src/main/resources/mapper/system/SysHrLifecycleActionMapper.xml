@@ -139,4 +139,51 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         limit #{limit}
     </select>
 
+    <select id="selectLifecycleContext" resultType="com.erp.system.domain.vo.HrEmployeeLifecycleContextVo">
+        select u.user_id as userId, u.nick_name as employeeName, p.employee_no as employeeNo,
+               p.employee_status as employeeStatus, u.status as accountStatus,
+               u.dept_id as scopeDeptId, d.dept_name as departmentName,
+               p.entry_date as entryDate, p.probation_start_date as probationStartDate,
+               p.contract_start_date as contractStartDate, p.contract_end_date as contractEndDate,
+               p.contract_type as contractTypeCode, p.contract_term as contractTermCode,
+               p.legal_entity_id as legalEntityId, p.legal_entity_code as legalEntityCode,
+               p.legal_entity as legalEntityName, coalesce(p.renewal_count, 0) as renewalCount,
+               sp.post_id as postId, sp.post_name as postName
+        from sys_user u inner join sys_user_profile p on p.user_id = u.user_id
+        left join sys_dept d on d.dept_id = u.dept_id
+        left join sys_post sp on sp.post_id = (
+            select sup.post_id from sys_user_post sup inner join sys_post active_post on active_post.post_id = sup.post_id
+            where sup.user_id = u.user_id and active_post.status = '0'
+            order by active_post.post_sort asc, active_post.post_id asc limit 1
+        )
+        where u.user_id = #{employeeId} and u.del_flag = '0'
+    </select>
+
+    <select id="selectLifecycleHistory" resultType="com.erp.system.domain.vo.HrEmployeeLifecycleContextVo$History">
+        select a.action_id as actionId, a.action_type as actionType, a.effective_date as effectiveDate,
+               a.business_status as businessStatus, a.operator_name as operatorName,
+               o.status as deliveryStatus, o.remote_task_id as taskId
+        from sys_hr_lifecycle_action a
+        left join sys_hr_sign_event_outbox o on o.action_id = a.action_id and o.event_version = a.version
+        where a.employee_id = #{employeeId}
+        <choose>
+            <when test="scenario == 'REGULARIZE'">and a.action_type = 'REGULARIZATION_CONFIRMED'</when>
+            <when test="scenario == 'RENEWAL'">and a.action_type in ('RENEWAL_DECISION','RENEWAL_CONFIRMED','RENEWAL_DECLINED')</when>
+            <otherwise>and 1 = 0</otherwise>
+        </choose>
+        order by a.action_id desc limit 20
+    </select>
+
+    <select id="selectRenewalCycleTypes" resultType="java.lang.String">
+        select action_type from sys_hr_lifecycle_action
+        where employee_id = #{employeeId} and source_type = 'HR_RENEWAL' and source_business_id = #{cycleKey}
+          and action_type in ('RENEWAL_DECISION','RENEWAL_CONFIRMED','RENEWAL_DECLINED')
+    </select>
+
+    <select id="countUnfinishedRenewal" resultType="int">
+        select count(*) from sys_hr_lifecycle_action a
+        left join sys_hr_sign_event_outbox o on o.action_id = a.action_id and o.event_version = a.version
+        where a.employee_id = #{employeeId} and a.action_type in ('RENEWAL_CONFIRMED','RENEWAL_DECLINED')
+          and (o.outbox_id is null or o.status in ('PENDING','RETRY','SENDING','DEAD'))
+    </select>
 </mapper>

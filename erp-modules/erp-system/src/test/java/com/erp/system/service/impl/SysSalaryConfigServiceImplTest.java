@@ -547,6 +547,9 @@ class SysSalaryConfigServiceImplTest
             SysUserSalarySchemeMapper userSalarySchemeMapper)
     {
         SysSalaryConfigServiceImpl service = new SysSalaryConfigServiceImpl();
+        // Isolate the retained legacy implementation; real write rejection is covered separately.
+        ReflectionTestUtils.setField(service, "legacySalaryWrites",
+                org.mockito.Mockito.mock(com.erp.common.security.service.LegacySalaryWriteGuard.class));
         ReflectionTestUtils.setField(service, "schemeMapper", schemeMapper);
         ReflectionTestUtils.setField(service, "itemMapper", itemMapper);
         ReflectionTestUtils.setField(service, "roleSalarySchemeMapper", roleSalarySchemeMapper);

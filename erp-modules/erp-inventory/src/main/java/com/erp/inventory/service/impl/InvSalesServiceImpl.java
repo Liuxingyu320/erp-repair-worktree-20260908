@@ -16,7 +16,6 @@ import com.erp.inventory.domain.vo.InventoryItemSnapshot;
 import com.erp.inventory.mapper.InvNumberSequenceMapper;
 import com.erp.inventory.mapper.InvCustomerMapper;
 import com.erp.inventory.mapper.InvOutboundRecordMapper;
-import com.erp.inventory.mapper.InvProductMapper;
 import com.erp.inventory.mapper.InvSalesDetailMapper;
 import com.erp.inventory.mapper.InvSalesOrderMapper;
 import com.erp.inventory.mapper.InvSalesReturnDetailMapper;
@@ -56,9 +55,6 @@ public class InvSalesServiceImpl extends InvBaseService implements IInvSalesServ
     private InvSalesReturnDetailMapper salesReturnDetailMapper;
 
     @Autowired
-    private InvProductMapper productMapper;
-
-    @Autowired
     private InventoryItemResolver itemResolver;
 
     @Autowired
@@ -87,11 +83,21 @@ public class InvSalesServiceImpl extends InvBaseService implements IInvSalesServ
     public InvSalesOrder saveDraft(InvSalesOrder order, List<InvSalesDetail> details, Long selectedShopDeptId)
     {
         Long shopDeptId = requireStoreContext(selectedShopDeptId, "请选择门店");
+        if (order == null) throw new ServiceException("销售单不能为空");
+        InvSalesOrder locked = order.getOrderId() == null ? null : lockScopedSales(order.getOrderId(), selectedShopDeptId);
+        if (locked != null)
+        {
+            InvStateGuard.requireDraftForEdit(locked.getStatus());
+            InvSalesMutationGuard.requireVersion(order.getVersion(), locked);
+        }
         rejectUnsupportedTargetStore(order, shopDeptId);
         applyCustomerSnapshot(order, shopDeptId);
+        if (details != null) itemResolver.lockReferences(details.stream().filter(java.util.Objects::nonNull)
+                .map(detail -> InventoryItemResolver.referenceKey(detail.getItemType(), detail.getItemId(), detail.getProductId())).toList());
         applyCatalogItemsForDraft(order, details, selectedShopDeptId);
         if (order.getOrderId() == null)
         {
+            order.setVersion(0L);
             order.setShopDeptId(shopDeptId);
             order.setApplicantId(SecurityUtils.getUserId());
             order.setApplicantName(SecurityUtils.getUsername());
@@ -111,11 +117,11 @@ public class InvSalesServiceImpl extends InvBaseService implements IInvSalesServ
         }
         else
         {
-            InvSalesOrder db = assertAndGetScopedSales(order.getOrderId(), selectedShopDeptId);
-            InvStateGuard.requireDraftForEdit(db.getStatus());
+            // Original sales row is already locked before catalog/reference work.
             order.setStatus(InvStatusConstants.DRAFT);
             order.setUpdateBy(SecurityUtils.getUsername());
-            salesOrderMapper.updateInvSalesOrder(order);
+            order.getParams().put("updateContent", true);
+            InvSalesMutationGuard.update(salesOrderMapper, order, locked);
             if (details != null)
             {
                 salesDetailMapper.deleteInvSalesDetailByOrderId(order.getOrderId());
@@ -313,12 +319,18 @@ public class InvSalesServiceImpl extends InvBaseService implements IInvSalesServ
     @Transactional(rollbackFor = Exception.class)
     public InvSalesOrder submitSales(InvSalesOrder order, List<InvSalesDetail> details, Long selectedShopDeptId)
     {
+        if (details == null || details.isEmpty()) throw new ServiceException("请添加至少一条销售明细");
+        for (InvSalesDetail detail : details)
+        {
+            if (detail == null || detail.getWarehouseId() == null || detail.getWarehouseId() <= 0)
+                throw new ServiceException("请为每条销售明细选择出库仓库，核对后提交");
+        }
         InvSalesOrder saved = saveDraft(order, details, selectedShopDeptId);
         InvSalesOrder update = new InvSalesOrder();
         update.setOrderId(saved.getOrderId());
         update.setStatus(InvStatusConstants.SUBMITTED);
         update.setUpdateBy(SecurityUtils.getUsername());
-        salesOrderMapper.updateInvSalesOrder(update);
+        InvSalesMutationGuard.update(salesOrderMapper, update, saved);
         return salesOrderMapper.selectInvSalesOrderById(saved.getOrderId());
     }
 
@@ -388,13 +400,29 @@ public class InvSalesServiceImpl extends InvBaseService implements IInvSalesServ
     @Transactional(rollbackFor = Exception.class)
     public void cancelSales(Long orderId, Long selectedShopDeptId)
     {
-        InvSalesOrder order = assertAndGetScopedSales(orderId, selectedShopDeptId);
+        cancelSales(orderId, selectedShopDeptId, null);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void cancelSales(Long orderId, Long selectedShopDeptId, Long expectedVersion)
+    {
+        InvSalesOrder order = lockScopedSales(orderId, selectedShopDeptId);
+        InvSalesMutationGuard.requireVersion(expectedVersion, order);
         InvStateGuard.requireCancelableDocument(order.getStatus());
         InvSalesOrder update = new InvSalesOrder();
         update.setOrderId(orderId);
         update.setStatus(InvStatusConstants.CANCELLED);
         update.setUpdateBy(SecurityUtils.getUsername());
-        salesOrderMapper.updateInvSalesOrder(update);
+        InvSalesMutationGuard.update(salesOrderMapper, update, order);
+    }
+
+    private InvSalesOrder lockScopedSales(Long orderId, Long selectedShopDeptId)
+    {
+        InvSalesOrder db = salesOrderMapper.selectInvSalesOrderByIdForUpdate(orderId);
+        if (db == null) throw new ServiceException("销售单不存在");
+        assertShopVisible(db.getShopDeptId(), selectedShopDeptId, "无权访问该店铺销售单");
+        return db;
     }
 
     private InvSalesOrder assertAndGetScopedSales(Long orderId, Long selectedShopDeptId)
@@ -406,43 +434,6 @@ public class InvSalesServiceImpl extends InvBaseService implements IInvSalesServ
         }
         assertShopVisible(db.getShopDeptId(), selectedShopDeptId, "无权访问该店铺销售单");
         return db;
-    }
-
-    private Map<Long, InvProduct> selectProductsByDetailIds(List<InvSalesDetail> details, Long selectedShopDeptId)
-    {
-        Map<Long, InvProduct> productsById = new HashMap<>();
-        if (details == null)
-        {
-            return productsById;
-        }
-        for (InvSalesDetail detail : details)
-        {
-            if (detail == null || detail.getProductId() == null || productsById.containsKey(detail.getProductId()))
-            {
-                continue;
-            }
-            InvProduct product = productMapper.selectInvProductById(detail.getProductId());
-            if (product == null)
-            {
-                throw new ServiceException("商品不存在: " + detail.getProductId());
-            }
-            if (product.getShopDeptId() != null)
-            {
-                assertRelatedShopVisible(product.getShopDeptId(), selectedShopDeptId, productScopeError(product, selectedShopDeptId));
-            }
-            productsById.put(detail.getProductId(), product);
-        }
-        return productsById;
-    }
-
-    private String productScopeError(InvProduct product, Long selectedShopDeptId)
-    {
-        String productName = product.getProductName() == null || product.getProductName().isEmpty()
-                ? String.valueOf(product.getProductId()) : product.getProductName();
-        String ownerName = deptScopeMapper.selectDeptNameById(product.getShopDeptId());
-        String currentName = deptScopeMapper.selectDeptNameById(selectedShopDeptId);
-        return "无权使用商品「" + productName + "」；商品所属组织：" + displayDept(ownerName, product.getShopDeptId())
-                + "，当前组织：" + displayDept(currentName, selectedShopDeptId);
     }
 
     private String productScopeError(InventoryItemSnapshot item, Long selectedShopDeptId)

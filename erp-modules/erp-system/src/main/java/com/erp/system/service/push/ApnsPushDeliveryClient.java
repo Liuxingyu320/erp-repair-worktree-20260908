@@ -2,6 +2,7 @@ package com.erp.system.service.push;
 
 import java.io.File;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -16,13 +17,15 @@ import com.erp.system.config.PushNotificationProperties;
 import com.erp.system.domain.SysUserDeviceToken;
 import com.eatthepath.pushy.apns.ApnsClient;
 import com.eatthepath.pushy.apns.ApnsClientBuilder;
+import com.eatthepath.pushy.apns.DeliveryPriority;
+import com.eatthepath.pushy.apns.PushType;
 import com.eatthepath.pushy.apns.PushNotificationResponse;
 import com.eatthepath.pushy.apns.auth.ApnsSigningKey;
 import com.eatthepath.pushy.apns.util.SimpleApnsPushNotification;
 import com.eatthepath.pushy.apns.util.TokenUtil;
 
 /**
- * iOS APNs HTTP/2推送。P8私钥只在首次实际投递时按需读取。
+ * iOS APNs HTTP/2推送。P8私钥或P12推送证书只在首次实际投递时按需读取。
  */
 @Component
 public class ApnsPushDeliveryClient implements PushDeliveryClient
@@ -178,11 +181,10 @@ public class ApnsPushDeliveryClient implements PushDeliveryClient
         try
         {
             PushNotificationProperties.Apns apns = properties.getApns();
-            ApnsClient client = new ApnsClientBuilder()
-                    .setApnsServer(resolveApnsHost(apns))
-                    .setSigningKey(ApnsSigningKey.loadFromPkcs8File(new File(apns.getPrivateKeyPath()),
-                            apns.getTeamId().trim(), apns.getKeyId().trim()))
-                    .build();
+            ApnsClientBuilder builder = new ApnsClientBuilder()
+                    .setApnsServer(resolveApnsHost(apns));
+            configureAuthentication(builder, apns);
+            ApnsClient client = builder.build();
             runtimeClient = client;
             return envelope -> sendWithApns(client, envelope);
         }
@@ -192,11 +194,29 @@ public class ApnsPushDeliveryClient implements PushDeliveryClient
         }
     }
 
+    static void configureAuthentication(ApnsClientBuilder builder, PushNotificationProperties.Apns apns)
+            throws Exception
+    {
+        if ("certificate".equalsIgnoreCase(apns.getAuthMode()))
+        {
+            builder.setClientCredentials(new File(apns.getCertificatePath()),
+                    apns.getCertificatePassword() == null ? "" : apns.getCertificatePassword());
+        }
+        else if ("token".equalsIgnoreCase(apns.getAuthMode()))
+        {
+            builder.setSigningKey(ApnsSigningKey.loadFromPkcs8File(new File(apns.getPrivateKeyPath()),
+                    apns.getTeamId().trim(), apns.getKeyId().trim()));
+        }
+        else
+        {
+            throw new IllegalArgumentException("Unsupported APNs authentication mode");
+        }
+    }
+
     private static ApnsGatewayResponse sendWithApns(ApnsClient client, ApnsEnvelope envelope)
             throws DeliveryException
     {
-        SimpleApnsPushNotification notification = new SimpleApnsPushNotification(
-                TokenUtil.sanitizeTokenString(envelope.getToken()), envelope.getTopic(), envelope.getPayload());
+        SimpleApnsPushNotification notification = buildNotification(envelope);
         try
         {
             PushNotificationResponse<SimpleApnsPushNotification> response = client.sendNotification(notification)
@@ -222,6 +242,13 @@ public class ApnsPushDeliveryClient implements PushDeliveryClient
         {
             throw DeliveryException.retryable("APNS_CONNECTION_FAILURE", exception.getCause());
         }
+    }
+
+    static SimpleApnsPushNotification buildNotification(ApnsEnvelope envelope)
+    {
+        return new SimpleApnsPushNotification(TokenUtil.sanitizeTokenString(envelope.getToken()),
+                envelope.getTopic(), envelope.getPayload(), Instant.now().plusSeconds(86400),
+                DeliveryPriority.IMMEDIATE, PushType.ALERT);
     }
 
     private static String buildPayload(UserNotificationCommand command)

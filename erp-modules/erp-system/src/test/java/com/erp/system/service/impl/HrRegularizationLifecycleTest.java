@@ -76,7 +76,7 @@ class HrRegularizationLifecycleTest
                 outboxMapper, mock(SysHrRenewalGuardMapper.class), postMapper,
                 mock(com.erp.system.mapper.SysDeptMapper.class),
                 mock(com.erp.system.mapper.SysUserMapper.class),
-                userPostMapper, userShopService, objectMapper);
+                userPostMapper, userShopService, objectMapper, org.mockito.Mockito.mock(com.erp.system.service.impl.HrSalarySourceService.class));
         ReflectionTestUtils.setField(service, "clock", java.time.Clock.fixed(
                 java.time.Instant.parse("2026-07-12T02:03:04Z"),
                 java.time.ZoneOffset.UTC));
@@ -452,8 +452,12 @@ class HrRegularizationLifecycleTest
 
     private Long confirm(HrRegularizationRequest request, Long operatorId, boolean admin)
     {
-        return service.confirmRegularization(9L, request, operatorId, "配置HR", admin,
-                "10.0.0.8", "JUnit-UA");
+        try (org.mockito.MockedStatic<com.erp.common.security.auth.AuthUtil> authorization =
+                org.mockito.Mockito.mockStatic(com.erp.common.security.auth.AuthUtil.class))
+        {
+            return service.confirmRegularization(9L, request, operatorId, "配置HR", admin,
+                    "10.0.0.8", "JUnit-UA");
+        }
     }
 
     private void stubBeforePostValidation()

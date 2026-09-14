@@ -30,6 +30,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import com.erp.common.core.exception.ServiceException;
 import com.erp.system.api.domain.UserNotificationCommand;
 import com.erp.system.api.domain.UserNotificationResult;
+import com.erp.system.config.InAppPushProperties;
 import com.erp.system.domain.SysUserDeviceToken;
 import com.erp.system.domain.SysUserNotification;
 import com.erp.system.domain.SysUserPushDelivery;
@@ -255,6 +256,7 @@ class SysUserNotificationServiceImplTest
         assertMapped(configuration, SysUserPushDeliveryMapper.class, "selectByBusinessKeyHash");
         assertMapped(configuration, SysUserPushDeliveryMapper.class, "claimForSending");
         assertMapped(configuration, SysUserPushDeliveryMapper.class, "markSent");
+        assertMapped(configuration, SysUserPushDeliveryMapper.class, "markSkipped");
         assertMapped(configuration, SysUserPushDeliveryMapper.class, "markRetry");
         assertMapped(configuration, SysUserPushDeliveryMapper.class, "markDead");
         assertMapped(configuration, SysUserDeviceTokenMapper.class, "upsertDeviceToken");
@@ -442,6 +444,51 @@ class SysUserNotificationServiceImplTest
         verify(client).deliver(token, command);
     }
 
+    @Test
+    void disabledPushIsRetryableAndNeverMarkedSent()
+    {
+        when(deviceTokenMapper.selectEnabledByUserId(42L)).thenReturn(List.of(tokenRequest()));
+        allowNewPushDelivery();
+
+        UserNotificationResult result = service.publish(mobileCommand());
+
+        assertThat(result.getAccepted()).isFalse();
+        assertThat(result.getStatus()).isEqualTo("DISABLED");
+        verify(pushDeliveryMapper).markRetry(501L, 1L, "DISABLED");
+        org.mockito.Mockito.verify(pushDeliveryMapper, org.mockito.Mockito.never()).markSent(any(), any(), any());
+    }
+
+    @Test
+    void missingDeviceIsSkippedAndSkippedReplayDoesNotClaimDelivery()
+    {
+        when(deviceTokenMapper.selectEnabledByUserId(42L)).thenReturn(List.of());
+        allowNewPushDelivery();
+
+        UserNotificationResult result = service.publish(mobileCommand());
+
+        assertThat(result.getAccepted()).isTrue();
+        assertThat(result.getStatus()).isEqualTo("NO_DEVICE");
+        verify(pushDeliveryMapper).markSkipped(501L, 1L, "NO_DEVICE");
+        org.mockito.Mockito.verify(pushDeliveryMapper, org.mockito.Mockito.never()).markSent(any(), any(), any());
+    }
+
+    @Test
+    void historicalDisabledSentRecordMustNotClaimItWasDeliveredOrSendHistoricalPush()
+    {
+        UserNotificationCommand command = mobileCommand();
+        SysUserPushDelivery old = pushDelivery(command, "SENT", 4L, Date.from(NOW));
+        old.setLastResult("DISABLED");
+        when(pushDeliveryMapper.insertIgnore(any())).thenReturn(0);
+        when(pushDeliveryMapper.selectByBusinessKeyHash(42L, "MOBILE_PUSH",
+                SysUserNotificationServiceImpl.businessKeyHash(command.getBusinessKey()))).thenReturn(old);
+
+        UserNotificationResult result = service.publish(command);
+
+        assertThat(result.getAccepted()).isFalse();
+        assertThat(result.getStatus()).isEqualTo("DISABLED");
+        org.mockito.Mockito.verifyNoInteractions(deviceTokenMapper);
+    }
+
     private static UserNotificationCommand command()
     {
         UserNotificationCommand command = new UserNotificationCommand();
@@ -475,7 +522,9 @@ class SysUserNotificationServiceImplTest
     private SysUserNotificationServiceImpl serviceWith(List<PushDeliveryClient> clients)
     {
         return new SysUserNotificationServiceImpl(notificationMapper, deviceTokenMapper,
-                pushDeliveryMapper, clients, Clock.fixed(NOW, ZoneOffset.UTC));
+                pushDeliveryMapper, clients,
+                new InAppNotificationWriter(notificationMapper, null, new InAppPushProperties()),
+                Clock.fixed(NOW, ZoneOffset.UTC));
     }
 
     private void allowNewPushDelivery()
@@ -491,6 +540,9 @@ class SysUserNotificationServiceImplTest
                 org.mockito.ArgumentMatchers.eq(0L),
                 any(Date.class))).thenReturn(1);
         org.mockito.Mockito.lenient().when(pushDeliveryMapper.markSent(
+                org.mockito.ArgumentMatchers.eq(501L),
+                org.mockito.ArgumentMatchers.eq(1L), any())).thenReturn(1);
+        org.mockito.Mockito.lenient().when(pushDeliveryMapper.markSkipped(
                 org.mockito.ArgumentMatchers.eq(501L),
                 org.mockito.ArgumentMatchers.eq(1L), any())).thenReturn(1);
         org.mockito.Mockito.lenient().when(pushDeliveryMapper.markRetry(

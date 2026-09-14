@@ -30,7 +30,9 @@ public class UserSecurityStateChangedListener
     {
         try
         {
-            tokenService.invalidateUserSessions(event.getUserId(), event.getRetainedToken());
+            tokenService.invalidateUserSessions(event.getUserId(),
+                    UserSessionInvalidationService.PASSWORD_CHANGED.equals(event.getReasonCode())
+                            ? event.getRetainedToken() : null);
             mapper.markDone(event.getEventId());
         }
         catch (RuntimeException ex)

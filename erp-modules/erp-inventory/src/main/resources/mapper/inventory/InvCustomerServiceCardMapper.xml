@@ -216,6 +216,37 @@
         order by service_date desc, record_id desc limit 100
     </select>
 
+    <sql id="RecordHistoryScope">
+        customer_id = #{customerId} and shop_dept_id = #{shopDeptId}
+        <if test="snapshotMaxRecordId != null">and record_id &lt;= #{snapshotMaxRecordId}</if>
+        <if test="dateFrom != null">and service_date &gt;= #{dateFrom}</if>
+        <if test="dateTo != null">and service_date &lt; date_add(#{dateTo}, interval 1 day)</if>
+        <if test="keyword != null">
+            and (tea_served like concat('%', #{keywordLike}, '%') escape '!'
+              or preference_snapshot like concat('%', #{keywordLike}, '%') escape '!'
+              or caution_snapshot like concat('%', #{keywordLike}, '%') escape '!'
+              or service_note like concat('%', #{keywordLike}, '%') escape '!'
+              or service_user_name like concat('%', #{keywordLike}, '%') escape '!')
+        </if>
+    </sql>
+    <select id="selectRecordSnapshotMaxId" resultType="long">
+        select coalesce(max(record_id),0) from inv_customer_service_record
+        where customer_id = #{customerId} and shop_dept_id = #{shopDeptId}
+    </select>
+    <select id="countRecordHistory" resultType="long">
+        select count(*) from inv_customer_service_record where <include refid="RecordHistoryScope"/>
+    </select>
+    <select id="selectRecordHistoryPage" resultMap="RecordResult">
+        select record_id, customer_id, service_date, service_user_id, service_user_name,
+               party_size, tea_served, preference_snapshot, caution_snapshot,
+               service_note, consumption_amount, shop_dept_id, request_key, source_client, create_by, create_time
+        from inv_customer_service_record where <include refid="RecordHistoryScope"/>
+        <if test="beforeRecordId != null">
+            and (service_date &lt; #{beforeServiceDate} or (service_date = #{beforeServiceDate} and record_id &lt; #{beforeRecordId}))
+        </if>
+        order by service_date desc, record_id desc limit #{pageSize}
+    </select>
+
     <update id="touchLastVisit">
         update inv_customer_service_profile
         set last_visit_date = case when last_visit_date is null or last_visit_date &lt; #{serviceDate}

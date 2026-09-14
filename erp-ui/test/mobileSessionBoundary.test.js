@@ -429,6 +429,8 @@ async function run() {
   assert.deepStrictEqual(currentRequestHeaders(runtime), {},
     "FedLogOut must clear the previous organization")
   assertSensitiveSessionCleared(state, runtime)
+  assert.ok(runtime.dispatches.includes("lock/unlockScreen"),
+    "local logout must clear the previous account screen lock")
   runtime.flushTimers()
   await fedLogoutPromise
   assert.deepStrictEqual(runtime.pushDisableTokens.slice(-1), ["local-token"])
@@ -481,6 +483,8 @@ async function run() {
   assert.strictEqual(cookieFailureRuntime.selectedDeptId, "dept-cookie-session",
     "cookie logout failure must not clear local organization while the server session remains authenticated")
   assert.strictEqual(cookieFailureRuntime.removedTokenCalls, 0)
+  assert.ok(!cookieFailureRuntime.dispatches.includes("lock/unlockScreen"),
+    "failed Cookie logout must retain the screen lock")
   assert.strictEqual(cookieFailureRuntime.alertCalls.length, 1,
     "cookie logout failure must offer a visible retry message")
 
@@ -492,6 +496,8 @@ async function run() {
   cookieSuccessRuntime.selectedDeptId = "dept-cookie-success"
   await cookieSuccessModule.actions.LogOut(cookieSuccessHarness.context)
   assertSensitiveSessionCleared(cookieSuccessHarness.state, cookieSuccessRuntime)
+  assert.ok(cookieSuccessRuntime.dispatches.includes("lock/unlockScreen"),
+    "confirmed Cookie logout must clear the old screen lock")
   assert.deepStrictEqual(currentRequestHeaders(cookieSuccessRuntime), {},
     "confirmed Cookie logout must clear the previous organization")
   assert.deepStrictEqual(cookieSuccessRuntime.logoutTokens, [undefined],

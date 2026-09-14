@@ -9,6 +9,8 @@ import jakarta.validation.constraints.Size;
 import com.erp.common.core.annotation.Excel;
 import com.erp.common.core.web.domain.BaseEntity;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 
 public class OaLaborContract extends BaseEntity
@@ -84,6 +86,24 @@ public class OaLaborContract extends BaseEntity
 
     @Excel(name = "试用期结束日期")
     private String probationEndDate;
+
+    private boolean probationStartDateSpecified;
+    private boolean probationEndDateSpecified;
+    @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
+    private boolean identityManuallyVerified;
+    @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
+    @Size(max = 200, message = "身份核对说明不能超过200个字符")
+    private String identityVerificationNote;
+
+    @JsonIgnore
+    public boolean isProbationStartDateSpecified() { return probationStartDateSpecified; }
+    @JsonIgnore
+    public boolean isProbationEndDateSpecified() { return probationEndDateSpecified; }
+    public boolean isIdentityManuallyVerified() { return identityManuallyVerified; }
+    public void setIdentityManuallyVerified(boolean value) { identityManuallyVerified = value; }
+    public String getIdentityVerificationNote() { return identityVerificationNote; }
+    public void setIdentityVerificationNote(String value) { identityVerificationNote = value; }
+
 
     @Excel(name = "基本工资")
     private BigDecimal baseSalary;
@@ -222,10 +242,10 @@ public class OaLaborContract extends BaseEntity
     public void setContractEndDate(String contractEndDate) { this.contractEndDate = contractEndDate; }
 
     public String getProbationStartDate() { return probationStartDate; }
-    public void setProbationStartDate(String probationStartDate) { this.probationStartDate = probationStartDate; }
+    public void setProbationStartDate(String probationStartDate) { this.probationStartDate = probationStartDate == null || probationStartDate.isBlank() ? null : probationStartDate; this.probationStartDateSpecified = true; }
 
     public String getProbationEndDate() { return probationEndDate; }
-    public void setProbationEndDate(String probationEndDate) { this.probationEndDate = probationEndDate; }
+    public void setProbationEndDate(String probationEndDate) { this.probationEndDate = probationEndDate == null || probationEndDate.isBlank() ? null : probationEndDate; this.probationEndDateSpecified = true; }
 
     public BigDecimal getBaseSalary() { return baseSalary; }
     public void setBaseSalary(BigDecimal baseSalary) { this.baseSalary = baseSalary; }

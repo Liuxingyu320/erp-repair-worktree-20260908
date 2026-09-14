@@ -25,7 +25,7 @@ assert.ok(
 )
 assert.ok(
   page.includes("办理日期") && page.includes("到期日期") &&
-    page.includes("续证不会覆盖历史") && page.includes("reviewHealthCertificate"),
+    page.includes("续证保留历史") && page.includes("reviewHealthCertificate"),
   "health certificate page should preserve history and expose the review lifecycle"
 )
 assert.ok(

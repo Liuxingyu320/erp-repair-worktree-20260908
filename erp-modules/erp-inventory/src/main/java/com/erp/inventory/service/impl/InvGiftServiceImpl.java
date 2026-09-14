@@ -1,6 +1,7 @@
 package com.erp.inventory.service.impl;
 
 import java.util.List;
+import com.erp.common.core.utils.file.ImageUrlList;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -16,6 +17,9 @@ import com.erp.inventory.util.InventoryCodeUtils;
 @Service
 public class InvGiftServiceImpl extends InvBaseService implements IInvGiftService
 {
+    @Autowired
+    private InvCatalogDeletionService catalogDeletionService;
+
     @Autowired
     private InvGiftMapper giftMapper;
 
@@ -44,6 +48,7 @@ public class InvGiftServiceImpl extends InvBaseService implements IInvGiftServic
         String categoryCode = ensureCategoryCode(category);
         if (gift.getGiftId() == null)
         {
+            prepareImages(gift, null);
             gift.setGiftCode(resolveCreateCode(gift.getGiftCode(), categoryCode, null));
             gift.setStatus(defaultStatus(gift.getStatus()));
             gift.setCreateBy(SecurityUtils.getUsername());
@@ -51,7 +56,8 @@ public class InvGiftServiceImpl extends InvBaseService implements IInvGiftServic
         }
         else
         {
-            InvGiftBox db = assertAndGetGift(gift.getGiftId());
+            InvGiftBox db = lockGift(gift.getGiftId());
+            prepareImages(gift, db);
             gift.setGiftCode(resolveUpdateCode(gift.getGiftCode(), categoryCode, gift.getGiftId(), db));
             gift.setUpdateBy(SecurityUtils.getUsername());
             giftMapper.updateInvGift(gift);
@@ -60,15 +66,9 @@ public class InvGiftServiceImpl extends InvBaseService implements IInvGiftServic
     }
 
     @Override
-    @Transactional(rollbackFor = Exception.class)
     public void deleteGiftByIds(Long[] giftIds, Long selectedDeptId)
     {
-        requireWarehouseContext(selectedDeptId, "请先选择仓库后再维护礼盒资料");
-        for (Long giftId : giftIds)
-        {
-            assertAndGetGift(giftId);
-        }
-        giftMapper.deleteInvGiftByIds(giftIds);
+        catalogDeletionService.delete("gift", giftIds, selectedDeptId);
     }
 
     @Override
@@ -109,7 +109,9 @@ public class InvGiftServiceImpl extends InvBaseService implements IInvGiftServic
                         failMsg.append("<br/>第").append(i + 1).append("行：礼盒已存在，勾选更新后可覆盖");
                         continue;
                     }
+                    existing = lockGift(existing.getGiftId());
                     gift.setGiftId(existing.getGiftId());
+                    prepareImages(gift, existing);
                     gift.setGiftCode(resolveUpdateCode(gift.getGiftCode(), categoryCode, gift.getGiftId(), existing));
                     gift.setUpdateBy(username);
                     giftMapper.updateInvGift(gift);
@@ -117,6 +119,7 @@ public class InvGiftServiceImpl extends InvBaseService implements IInvGiftServic
                 }
                 else
                 {
+                    prepareImages(gift, null);
                     gift.setGiftCode(resolveCreateCode(gift.getGiftCode(), categoryCode, null));
                     gift.setStatus(defaultStatus(gift.getStatus()));
                     gift.setCreateBy(username);
@@ -133,6 +136,23 @@ public class InvGiftServiceImpl extends InvBaseService implements IInvGiftServic
         return "成功导入" + successCount + "条，更新" + updateCount + "条，失败" + failCount + "条" + failMsg;
     }
 
+    private InvGiftBox lockGift(Long id)
+    {
+        InvGiftBox persisted = giftMapper.selectInvGiftByIdForUpdate(id);
+        if (persisted == null) throw new ServiceException("资料不存在或已删除");
+        return persisted;
+    }
+
+    private void prepareImages(InvGiftBox gift, InvGiftBox persisted)
+    {
+        String images = ImageUrlList.prepare(gift.getImageUrlsText(), gift.getRawImageUrl(),
+                persisted == null ? null : persisted.getImageUrlsText(),
+                persisted == null ? null : persisted.getRawImageUrl());
+        if (persisted == null && images == null) images = "[]";
+        gift.setImageUrlsText(images);
+        gift.setImageUrl(images == null ? null : ImageUrlList.cover(images, null));
+    }
+
     private void normalize(InvGiftBox gift)
     {
         gift.setGiftCode(trimToNull(gift.getGiftCode()));
@@ -143,7 +163,7 @@ public class InvGiftServiceImpl extends InvBaseService implements IInvGiftServic
         gift.setProductDescription(trimToNull(gift.getProductDescription()));
         gift.setReplenishmentUnit(trimToNull(gift.getReplenishmentUnit()));
         gift.setSupplierName(trimToNull(gift.getSupplierName()));
-        gift.setImageUrl(trimToNull(gift.getImageUrl()));
+        gift.setRemark(trimToNull(gift.getRemark()));
         gift.setStatus(defaultStatus(gift.getStatus()));
     }
 

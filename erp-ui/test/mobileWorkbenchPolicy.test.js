@@ -45,10 +45,10 @@ assert.deepStrictEqual(
 )
 
 const metrics = [
-  { label: "待入库", value: "1", unit: "单" },
-  { label: "待发货", value: "2", unit: "单" },
-  { label: "低库存", value: "3", unit: "款" },
-  { label: "今日开单", value: "4", unit: "单" }
+  { key: "pendingReceiveCount", label: "待入库", value: "1", unit: "单" },
+  { key: "pendingDeliverCount", label: "待发货", value: "2", unit: "单" },
+  { key: "lowStockCount", label: "低库存", value: "3", unit: "款" },
+  { key: "todaySalesCount", label: "今日开单", value: "4", unit: "单" }
 ]
 const mappedMetrics = applyWorkbenchSummaryToMetrics(metrics, {
   pendingReceiveCount: 7,
@@ -57,8 +57,8 @@ const mappedMetrics = applyWorkbenchSummaryToMetrics(metrics, {
 })
 assert.deepStrictEqual(
   mappedMetrics.map(item => item.value),
-  ["7", "0", "3", "4"],
-  "summary metrics should update known finite counts, clamp negatives, and retain unavailable values"
+  ["7", "0", "—", "—"],
+  "summary metrics should update known finite counts, clamp negatives, and mark unavailable values as unknown"
 )
 assert.notStrictEqual(mappedMetrics[0], metrics[0])
 assert.deepStrictEqual(metrics.map(item => item.value), ["1", "2", "3", "4"])
@@ -168,3 +168,6 @@ assert.deepStrictEqual(
 )
 
 console.log("mobileWorkbenchPolicy tests passed")
+
+assert.deepStrictEqual(applyWorkbenchSummaryToMetrics([{key:"todaySalesCount",label:"改名",value:"0"},{key:"pendingReturnCount",label:"待退货",value:"0"}],{todaySalesCount:null,pendingReturnCount:0}).map(x=>x.value),["—","0"])
+assert.ok(!warehouseProfile.metrics.some(x=>x.key==="todaySalesCount"))

@@ -1,3 +1,5 @@
+const { buildTransferApprovalPayload } = require("../../../utils/transferApprovalPayload")
+
 function buildEditableQuantityItems(rows, options) {
   const sourceRows = Array.isArray(rows) ? rows : []
   const source = options || {}
@@ -41,18 +43,6 @@ function filterDeliveryNoticeRowsByWarehouse(rows, warehouseId) {
   })
 }
 
-function buildTransferApprovalPayload(transferId, options) {
-  const source = options || {}
-  const payload = {
-    transferId,
-    taskId: source.taskId,
-    action: normalizeAction(source.action || "approve"),
-    comment: normalizeComment(source.comment)
-  }
-  validateApprovalPayload(payload, "审批意见不能为空")
-  return payload
-}
-
 function selectPendingShipment(detail, options) {
   const shipments = Array.isArray(detail && detail.shipments) ? detail.shipments : []
   const pendingShipments = shipments.filter(item => String(item.status || "").trim() === "pending_receive")
@@ -79,7 +69,7 @@ function buildStockCheckInputPayload(detailRows, inputRows) {
     const input = findInputItem(inputs, detailId, ["detailId", "checkDetailId"])
     if (!input) return items
 
-    const actualQuantity = firstNumber(input, ["actualQuantity", "quantity"])
+    const actualQuantity = firstNumber(input, ["actualQuantity", "actualQty", "quantity"])
     if (actualQuantity === null || actualQuantity < 0) {
       throw new Error("实盘数量不能为空")
     }
@@ -87,6 +77,20 @@ function buildStockCheckInputPayload(detailRows, inputRows) {
     const item = {
       detailId,
       actualQty: normalizeQuantity(actualQuantity)
+    }
+    // Keep the token from the opened form. The runtime's fresh GET must not bless stale input.
+    if (input.snapshotVersion != null) item.snapshotVersion = input.snapshotVersion
+    const hasRecount = Object.prototype.hasOwnProperty.call(input, "recountQty") ||
+      Object.prototype.hasOwnProperty.call(input, "recountQuantity")
+    const unchangedActual = firstNumber(row, ["actualQuantity", "actualQty", "checkQuantity"]) === actualQuantity
+    const recountSource = hasRecount ? input : (unchangedActual ? row : {})
+    const rawRecount = firstValue(recountSource, ["recountQty", "recountQuantity"])
+    if (rawRecount !== undefined && rawRecount !== null && rawRecount !== "") {
+      const recount = Number(rawRecount)
+      if (!Number.isFinite(recount) || recount < 0) throw new Error("复盘数量不能小于0")
+      item.recountQty = normalizeQuantity(recount)
+    } else if (hasRecount) {
+      item.recountQty = null
     }
     items.push(item)
     return items
@@ -192,22 +196,8 @@ function normalizeQuantity(value) {
   return Number(numberValue.toFixed(2))
 }
 
-function normalizeAction(action) {
-  const normalized = String(action || "").trim()
-  if (normalized !== "approve" && normalized !== "reject") {
-    throw new Error("审批动作必须为approve或reject")
-  }
-  return normalized
-}
-
 function normalizeComment(comment) {
   return comment === undefined || comment === null ? "" : String(comment).trim()
-}
-
-function validateApprovalPayload(payload, emptyMessage) {
-  if (payload.action !== "approve" && !payload.comment) {
-    throw new Error(emptyMessage)
-  }
 }
 
 module.exports = {

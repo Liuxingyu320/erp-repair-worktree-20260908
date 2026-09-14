@@ -6,6 +6,22 @@ const babel = require("../node_modules/@babel/core")
 
 const componentPath = path.resolve(__dirname, "../src/components/FileUpload/index.vue")
 
+
+function loadProgressUtility() {
+  const file = path.resolve(__dirname, '../src/utils/uploadProgress.js')
+  const code = babel.transformSync(fs.readFileSync(file, 'utf8'), { babelrc: false, configFile: false,
+    plugins: [require.resolve('@babel/plugin-transform-modules-commonjs')] }).code
+  const module = { exports: {} }
+  vm.runInNewContext(code, { module, exports: module.exports, File: globalThis.File,
+    require(id) {
+      if (id === '@/utils/shopContext') return { getSelectedDeptId: () => null }
+      if (id === 'element-ui/packages/upload/src/ajax') return () => ({ abort() {} })
+      throw new Error('Unexpected upload utility dependency ' + id)
+    }
+  })
+  return module.exports
+}
+
 function loadComponent() {
   const source = fs.readFileSync(componentPath, "utf8")
   const script = source.match(/<script>([\s\S]*?)<\/script>/)
@@ -22,6 +38,8 @@ function loadComponent() {
     module,
     exports: module.exports,
     require(request) {
+      if (request === "@/utils/uploadProgress") return loadProgressUtility()
+      if (request === "@/components/UploadQueue") return {}
       if (request === "@/utils/auth") return { getToken() { return "token" } }
       if (request === "@/utils/sessionMode") {
         return {
@@ -71,7 +89,8 @@ function createHarness(component, existing = [], options = {}) {
   const instance = Object.assign(component.data.call(props), props, {
     fileList: existing.map(item => Object.assign({}, item)),
     $set(target, key, value) { target[key] = value },
-    $emit(type, value) { events.push({ type, value }) },
+    $delete(target, key) { delete target[key] },
+    $emit(type, value) { if (type === "input") events.push({ type, value }) },
     $modal: {
       loading() { loading.opens += 1 },
       closeLoading() { loading.closes += 1 },
@@ -119,14 +138,14 @@ function run() {
   const networkB = file("network-b")
   register(networkLast, networkA, networkB)
   networkLast.instance.handleUploadSuccess(success("/network-a.pdf"), networkA)
-  assert.deepStrictEqual(networkLast.loading, { opens: 1, closes: 0 },
-    "one settled file must not close loading while another uid remains pending")
+  assert.deepStrictEqual(networkLast.loading, { opens: 0, closes: 0 },
+    "uploads no longer acquire or close a fullscreen loading overlay")
   networkLast.instance.handleUploadError(new Error("offline"), networkB)
   assert.deepStrictEqual(urls(networkLast.instance), ["/existing.pdf", "/network-a.pdf"])
   assert.deepStrictEqual(networkLast.removed, [],
     "Element has already removed network failures before invoking on-error")
   assert.strictEqual(networkLast.events.length, 1)
-  assert.deepStrictEqual(networkLast.loading, { opens: 1, closes: 1 })
+  assert.deepStrictEqual(networkLast.loading, { opens: 0, closes: 0 })
 
   const elementNetworkA = file("element-network-a")
   const elementNetworkB = file("element-network-b")
@@ -144,7 +163,7 @@ function run() {
   assert.strictEqual(elementNetwork.loading.closes, 0)
   elementNetwork.instance.handleUploadSuccess(success("/element-network-b.pdf"), elementNetworkB)
   assert.deepStrictEqual(urls(elementNetwork.instance), ["/element-network-b.pdf"])
-  assert.deepStrictEqual(elementNetwork.loading, { opens: 1, closes: 1 })
+  assert.deepStrictEqual(elementNetwork.loading, { opens: 0, closes: 0 })
 
   const businessFirst = createHarness(component)
   const businessA = file("business-a")
@@ -156,7 +175,7 @@ function run() {
   assert.deepStrictEqual(urls(businessFirst.instance), ["/business-b.pdf"])
   assert.deepStrictEqual(businessFirst.removed, ["business-a"])
   assert.strictEqual(businessFirst.events.length, 1)
-  assert.deepStrictEqual(businessFirst.loading, { opens: 1, closes: 1 })
+  assert.deepStrictEqual(businessFirst.loading, { opens: 0, closes: 0 })
 
   const allFailed = createHarness(component, [{ name: "/kept.pdf", url: "/kept.pdf" }])
   const failedA = file("failed-a")
@@ -167,7 +186,7 @@ function run() {
   assert.deepStrictEqual(urls(allFailed.instance), ["/kept.pdf"])
   assert.strictEqual(allFailed.events.length, 0)
   assert.deepStrictEqual(allFailed.removed, ["failed-a"])
-  assert.deepStrictEqual(allFailed.loading, { opens: 1, closes: 1 })
+  assert.deepStrictEqual(allFailed.loading, { opens: 0, closes: 0 })
 
   const reverseSuccess = createHarness(component)
   const selectedFirst = file("selected-first")
@@ -187,7 +206,7 @@ function run() {
   assert.strictEqual(Object.keys(validation.instance.uploadOperations).length, 0)
   register(validation, valid)
   validation.instance.handleUploadSuccess(success("/valid.pdf"), valid)
-  assert.deepStrictEqual(validation.loading, { opens: 1, closes: 1 })
+  assert.deepStrictEqual(validation.loading, { opens: 0, closes: 0 })
 
   const duplicateCallbacks = createHarness(component)
   const stable = file("stable")
@@ -219,7 +238,7 @@ function run() {
   assert.deepStrictEqual(missingUrl.removed, ["missing-url"])
   assert.strictEqual(missingUrl.events.length, 0)
   assert.strictEqual(missingUrl.errors.length, 1)
-  assert.deepStrictEqual(missingUrl.loading, { opens: 1, closes: 1 })
+  assert.deepStrictEqual(missingUrl.loading, { opens: 0, closes: 0 })
 
   const overlapping = createHarness(component)
   const overlapA = file("overlap-a")
@@ -235,8 +254,8 @@ function run() {
     "/overlap-a.pdf", "/overlap-b.pdf", "/overlap-c.pdf"
   ])
   assert.strictEqual(overlapping.events.length, 1)
-  assert.deepStrictEqual(overlapping.loading, { opens: 1, closes: 1 },
-    "overlapping selections in one continuous busy period must share one loading and emit")
+  assert.deepStrictEqual(overlapping.loading, { opens: 0, closes: 0 },
+    "overlapping selections keep zero fullscreen overlays and retain the original single input emission")
 
   const consecutive = createHarness(component)
   const roundOne = file("round-one")
@@ -245,10 +264,10 @@ function run() {
   const roundTwo = file("round-two")
   register(consecutive, roundTwo)
   consecutive.instance.handleUploadSuccess(success("/round-two.pdf"), roundTwo)
-  assert.deepStrictEqual(consecutive.loading, { opens: 2, closes: 2 })
+  assert.deepStrictEqual(consecutive.loading, { opens: 0, closes: 0 })
   assert.strictEqual(consecutive.events.length, 2)
   consecutive.instance.handleUploadError(new Error("obsolete"), roundOne)
-  assert.deepStrictEqual(consecutive.loading, { opens: 2, closes: 2 },
+  assert.deepStrictEqual(consecutive.loading, { opens: 0, closes: 0 },
     "callbacks from an old busy period must not affect a newer completed period")
 
   const retry = createHarness(component)
@@ -260,7 +279,7 @@ function run() {
   retry.instance.handleUploadSuccess(success("/retried.pdf"), retryNewUid)
   assert.deepStrictEqual(urls(retry.instance), ["/retried.pdf"])
   assert.deepStrictEqual(retry.removed, [])
-  assert.deepStrictEqual(retry.loading, { opens: 2, closes: 2 })
+  assert.deepStrictEqual(retry.loading, { opens: 0, closes: 0 })
 
   const sameUidRetry = createHarness(component)
   const oldAttempt = file("same-uid", "old.pdf")
@@ -276,7 +295,7 @@ function run() {
   sameUidRetry.instance.handleUploadSuccess(success("/new-attempt.pdf"), newAttempt)
   assert.deepStrictEqual(urls(sameUidRetry.instance), ["/new-attempt.pdf"])
   assert.deepStrictEqual(sameUidRetry.removed, [])
-  assert.deepStrictEqual(sameUidRetry.loading, { opens: 2, closes: 2 })
+  assert.deepStrictEqual(sameUidRetry.loading, { opens: 0, closes: 0 })
 
   const boundedLedger = createHarness(component)
   const firstBoundedFile = file("bounded-0")
@@ -317,7 +336,7 @@ function run() {
   assert.strictEqual(Object.keys(anchored.instance.uploadOperations).length, 0)
   assert.strictEqual(Object.keys(anchored.instance.uploadPeriodResults).length, 0,
     "the per-period success buffer must be released as soon as the busy period settles")
-  assert.deepStrictEqual(anchored.loading, { opens: 1, closes: 1 })
+  assert.deepStrictEqual(anchored.loading, { opens: 0, closes: 0 })
   assert.strictEqual(anchored.events.length, 1)
 
   const destroyed = createHarness(component)
@@ -327,8 +346,8 @@ function run() {
   destroyed.instance.handleUploadSuccess(success("/buffered-before-destroy.pdf"), destroyedA)
   component.beforeDestroy.call(destroyed.instance)
   component.beforeDestroy.call(destroyed.instance)
-  assert.deepStrictEqual(destroyed.loading, { opens: 1, closes: 1 },
-    "destroy must close only this component's owned loading and remain idempotent")
+  assert.deepStrictEqual(destroyed.loading, { opens: 0, closes: 0 },
+    "destroy must not touch global loading and must remain idempotent")
   assert.strictEqual(Object.keys(destroyed.instance.uploadOperations).length, 0)
   assert.strictEqual(Object.keys(destroyed.instance.uploadPeriodResults).length, 0)
   const destroyedSnapshot = {
@@ -345,7 +364,7 @@ function run() {
   }, destroyedSnapshot, "callbacks after destroy must not emit, remove, or toast")
 
   const parentObject = { name: "/object.pdf", url: "/object.pdf" }
-  const objectWatcher = { fileList: [], value: "must-not-be-used" }
+  const objectWatcher = Object.assign(createHarness(component).instance, { fileList: [], value: "must-not-be-used" })
   component.watch.value.handler.call(objectWatcher, parentObject)
   assert.strictEqual(objectWatcher.fileList.length, 1)
   assert.strictEqual(objectWatcher.fileList[0].url, "/object.pdf")
@@ -356,7 +375,7 @@ function run() {
 
   const parentArrayObject = { name: "/array.pdf", url: "/array.pdf" }
   const parentArray = [parentArrayObject, "/string.pdf"]
-  const arrayWatcher = { fileList: [], value: "must-not-be-used" }
+  const arrayWatcher = Object.assign(createHarness(component).instance, { fileList: [], value: "must-not-be-used" })
   component.watch.value.handler.call(arrayWatcher, parentArray)
   assert.deepStrictEqual(
     Array.from(arrayWatcher.fileList, item => item.url),

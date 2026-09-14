@@ -6,6 +6,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
+import com.erp.common.core.utils.file.ImageUrlList;
 import java.util.Locale;
 import java.util.Objects;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -27,6 +28,9 @@ import com.erp.inventory.util.InventoryCodeUtils;
 @Service
 public class InvOeServiceImpl extends InvBaseService implements IInvOeService
 {
+    @Autowired
+    private InvCatalogDeletionService catalogDeletionService;
+
     @Autowired
     private InvOeMapper oeMapper;
 
@@ -72,6 +76,7 @@ public class InvOeServiceImpl extends InvBaseService implements IInvOeService
         applySupplierFromCatalog(item, selectedDeptId, false);
         if (item.getOeItemId() == null)
         {
+            prepareImages(item, null);
             prepareNewPurchaseReference(item);
             item.setOeItemCode(resolveCreateCode(item.getOeItemCode(), categoryCode, null));
             item.setStatus(defaultStatus(item.getStatus()));
@@ -80,7 +85,8 @@ public class InvOeServiceImpl extends InvBaseService implements IInvOeService
         }
         else
         {
-            InvOeItem db = assertAndGetOe(item.getOeItemId());
+            InvOeItem db = lockOe(item.getOeItemId());
+            prepareImages(item, db);
             preparePurchaseReferenceUpdate(item, db);
             item.setOeItemCode(resolveUpdateCode(item.getOeItemCode(), categoryCode, item.getOeItemId(), db));
             assertActiveFixedAssetReferenceComplete(item, db);
@@ -91,19 +97,9 @@ public class InvOeServiceImpl extends InvBaseService implements IInvOeService
     }
 
     @Override
-    @Transactional(rollbackFor = Exception.class)
     public void deleteOeByIds(Long[] oeItemIds, Long selectedDeptId)
     {
-        requireWarehouseContext(selectedDeptId, "请先选择仓库后再维护OE器皿");
-        for (Long oeItemId : oeItemIds)
-        {
-            assertAndGetOe(oeItemId);
-            if (oeMapper.countFixedAssetConfigByOeItemId(oeItemId) > 0)
-            {
-                throw new ServiceException("OE器皿已被固定资产配置引用，不能删除，请先停用");
-            }
-        }
-        oeMapper.deleteInvOeByIds(oeItemIds);
+        catalogDeletionService.delete("oe", oeItemIds, selectedDeptId);
     }
 
     @Override
@@ -146,7 +142,9 @@ public class InvOeServiceImpl extends InvBaseService implements IInvOeService
                         failMsg.append("<br/>第").append(i + 1).append("行：OE器皿已存在，勾选更新后可覆盖");
                         continue;
                     }
+                    existing = lockOe(existing.getOeItemId());
                     item.setOeItemId(existing.getOeItemId());
+                    prepareImages(item, existing);
                     preparePurchaseReferenceUpdate(item, existing);
                     item.setOeItemCode(resolveUpdateCode(item.getOeItemCode(), categoryCode, item.getOeItemId(), existing));
                     assertActiveFixedAssetReferenceComplete(item, existing);
@@ -156,6 +154,7 @@ public class InvOeServiceImpl extends InvBaseService implements IInvOeService
                 }
                 else
                 {
+                    prepareImages(item, null);
                     prepareNewPurchaseReference(item);
                     item.setOeItemCode(resolveCreateCode(item.getOeItemCode(), categoryCode, null));
                     item.setStatus(defaultStatus(item.getStatus()));
@@ -170,11 +169,31 @@ public class InvOeServiceImpl extends InvBaseService implements IInvOeService
             }
             catch (Exception e)
             {
+                // A database lock failure can invalidate the entire transaction, including earlier rows.
+                // Never turn that rollback into a partial-success import report.
+                if (e instanceof org.springframework.dao.ConcurrencyFailureException conflict) throw conflict;
                 failCount++;
                 failMsg.append("<br/>第").append(i + 1).append("行：").append(e.getMessage());
             }
         }
         return "成功导入" + successCount + "条，更新" + updateCount + "条，失败" + failCount + "条，待完善" + completionCount + "条" + failMsg;
+    }
+
+    private InvOeItem lockOe(Long id)
+    {
+        InvOeItem persisted = oeMapper.selectInvOeByIdForUpdate(id);
+        if (persisted == null) throw new ServiceException("资料不存在或已删除");
+        return persisted;
+    }
+
+    private void prepareImages(InvOeItem item, InvOeItem persisted)
+    {
+        String images = ImageUrlList.prepare(item.getImageUrlsText(), item.getRawImageUrl(),
+                persisted == null ? null : persisted.getImageUrlsText(),
+                persisted == null ? null : persisted.getRawImageUrl());
+        if (persisted == null && images == null) images = "[]";
+        item.setImageUrlsText(images);
+        item.setImageUrl(images == null ? null : ImageUrlList.cover(images, null));
     }
 
     private void normalize(InvOeItem item)
@@ -187,9 +206,9 @@ public class InvOeServiceImpl extends InvBaseService implements IInvOeService
         item.setOrderUnit(trimToNull(item.getOrderUnit()));
         item.setSupplierName(trimToNull(item.getSupplierName()));
         item.setSupplierPhone(trimToNull(item.getSupplierPhone()));
-        item.setImageUrl(trimToNull(item.getImageUrl()));
         item.setPurchaseReferenceUrl(trimToNull(item.getPurchaseReferenceUrl()));
         item.setPurchaseReferenceNote(trimToNull(item.getPurchaseReferenceNote()));
+        item.setRemark(trimToNull(item.getRemark()));
         item.setStatus(defaultStatus(item.getStatus()));
     }
 
@@ -260,8 +279,17 @@ public class InvOeServiceImpl extends InvBaseService implements IInvOeService
         {
             throw new ServiceException("供应商不存在、已停用或非合作中，请先在供应商管理维护后再选择");
         }
-        item.setSupplierName(supplier.getSupplierName());
-        item.setSupplierPhone(supplier.getContactPhone());
+        // Supplier mutations take this same lock before checking OE references.
+        // The preliminary name lookup may be stale after waiting, so recheck the locked identity.
+        InvSupplier locked = supplierMapper.selectInvSupplierByIdForUpdate(supplier.getSupplierId());
+        if (locked == null || !Objects.equals(locked.getSupplierName(), supplier.getSupplierName())
+                || !Objects.equals(locked.getShopDeptId(), supplier.getShopDeptId())
+                || !"0".equals(locked.getStatus()) || !"0".equals(locked.getCooperationStatus()))
+        {
+            throw new ServiceException("供应商已变化、停用或删除，请重新选择供应商");
+        }
+        item.setSupplierName(locked.getSupplierName());
+        item.setSupplierPhone(locked.getContactPhone());
     }
 
     private InvOeCategory assertAndGetCategory(Long categoryId)
@@ -420,9 +448,9 @@ public class InvOeServiceImpl extends InvBaseService implements IInvOeService
         List<String> missingFields = new ArrayList<>();
         addMissing(missingFields, "器皿编码", effectiveString(item.getOeItemCode(), db.getOeItemCode()));
         addMissing(missingFields, "器皿名称", effectiveString(item.getOeItemName(), db.getOeItemName()));
-        addMissing(missingFields, "器皿图片", effectiveString(item.getImageUrl(), db.getImageUrl()));
-        addMissing(missingFields, "规格/描述", effectiveString(item.getItemDescription(), db.getItemDescription()));
-        addMissing(missingFields, "领用单位", effectiveString(item.getOrderUnit(), db.getOrderUnit()));
+        addMissing(missingFields, "器皿图片", item.getImageUrlsText() == null ? db.getImageUrl() : item.getImageUrl());
+        addMissing(missingFields, "规格/描述", item.wasJsonFieldProvided("itemDescription") ? item.getItemDescription() : effectiveString(item.getItemDescription(), db.getItemDescription()));
+        addMissing(missingFields, "领用单位", item.wasJsonFieldProvided("orderUnit") ? item.getOrderUnit() : effectiveString(item.getOrderUnit(), db.getOrderUnit()));
         if (!isHttpsPurchaseReference(referenceUrl))
         {
             missingFields.add("同款购买链接");

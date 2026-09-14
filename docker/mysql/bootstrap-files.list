@@ -87,6 +87,7 @@ erp_role_post_position_sort_20260628.sql
 erp_sign_profile_dictionary_20260711.sql
 erp_system_user_notification_20260711.sql
 erp_system_user_push_delivery_20260717.sql
+erp_system_notification_push_outbox_20260912.sql
 erp_unified_approval_schema_20260716.sql
 erp_unified_approval_seed_20260716.sql
 erp_unified_todo_center_20260710.sql
@@ -116,3 +117,41 @@ erp_oa_attendance_client_idempotency_20260822.sql
 erp_oa_attendance_time_credit_20260823.sql
 erp_employee_salary_import_20260908.sql
 erp_attendance_v2_only_20260908.sql
+
+# Ordered OE / gift images; run before upgraded inventory and OA services.
+erp_inventory_image_gallery_20260909.sql
+
+# Receipt facts must exist before persistent purchase receive/quality commands.
+erp_inventory_receipt_quality_20260713.sql
+
+# Purchase quality request identity and sales return item compatibility.
+erp_inventory_quality_command_20260909.sql
+erp_inventory_sales_return_item_20260909.sql
+
+# Stock-check generic item identity, preserving historical quantities.
+erp_inventory_stock_check_item_identity_20260909.sql
+
+# Contract salary source; additive schema and history-only menu labels.
+erp_employee_salary_source_20260911.sql
+erp_legacy_salary_readonly_menu_20260911.sql
+
+# 20260912 accepted repair release: schema/menu registration only, no automatic role grants.
+# Keep the contract source and existing return/notification/check schemas ahead of these additions.
+erp_hr_employee_salary_edit_permission_20260912.sql
+erp_inventory_purchase_return_lock_indexes_20260912.sql
+erp_system_user_notification_page_index_20260912.sql
+erp_inventory_stock_check_restart_20260912.sql
+# Attendance dependency closure: existing V2/client idempotency/time-credit -> A -> B -> C.
+# C stays subject to final release acceptance; installing schema does not enable accrual or leave types.
+erp_oa_attendance_leave_balance_20260912.sql
+erp_oa_attendance_overtime_transfer_20260912.sql
+erp_oa_attendance_leave_quota_20260912.sql
+
+# 20260913 joint plan: apply schema before matching API/UI; no automatic production execution.
+erp_cloud_drive_upload_operation_20260913.sql
+erp_job_durable_deletion_20260913.sql
+erp_inventory_sales_revision_20260913.sql
+erp_inventory_catalog_reference_indexes_20260913.sql
+erp_oa_reimbursement_export_recovery_20260913.sql
+erp_oa_fixed_asset_config_batch_20260913.sql
+erp_security_session_retention_digest_20260913.sql

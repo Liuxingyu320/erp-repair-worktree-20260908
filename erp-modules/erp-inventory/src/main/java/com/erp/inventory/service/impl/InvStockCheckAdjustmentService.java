@@ -47,8 +47,8 @@ public class InvStockCheckAdjustmentService
         Map<Long, InvStock> lockedStocks = new LinkedHashMap<>();
         for (InvStockCheckDetail detail : details)
         {
-            InvStock stock = stockMapper.selectInvStockByProductShopWarehouseForUpdate(
-                    detail.getProductId(), check.getShopDeptId(), check.getWarehouseId());
+            InvStock stock = stockMapper.selectInvStockByItemShopWarehouseForUpdate(
+                    detail.getItemType(), detail.getItemId(), check.getShopDeptId(), check.getWarehouseId());
             lockedStocks.put(detail.getDetailId(), stock);
             BigDecimal currentQuantity = stock == null || stock.getCurrentQuantity() == null
                     ? BigDecimal.ZERO : stock.getCurrentQuantity();
@@ -58,6 +58,8 @@ public class InvStockCheckAdjustmentService
                 InvStockCheckSnapshotChange change = new InvStockCheckSnapshotChange();
                 change.setDetailId(detail.getDetailId());
                 change.setProductId(detail.getProductId());
+                change.setItemType(detail.getItemType());
+                change.setItemId(detail.getItemId());
                 change.setProductName(detail.getProductName());
                 change.setBookQuantity(bookQuantity);
                 change.setCurrentQuantity(currentQuantity);
@@ -97,6 +99,7 @@ public class InvStockCheckAdjustmentService
         BigDecimal beforeQuantity = safe(stock.getCurrentQuantity());
         BigDecimal costPrice = stock.getCostPrice() == null
                 ? safe(detail.getCostPrice()) : stock.getCostPrice();
+        BigDecimal movementCost = null;
         int rows;
         String movementType;
         String remark;
@@ -114,18 +117,23 @@ public class InvStockCheckAdjustmentService
             {
                 throw new ServiceException("商品 [" + detail.getProductName() + "] 可用库存不足，无法盘亏");
             }
+            InvStockCostAllocator.Allocation allocation = InvStockCostAllocator.allocate(stock, deduction);
+            costPrice = allocation.unitCost();
+            movementCost = allocation.amount();
             rows = stockMapper.deductInvStockWithCost(stock.getStockId(), stock.getVersion(), deduction,
-                    deduction.multiply(costPrice), operatorName);
+                    movementCost, operatorName);
             movementType = InvStatusConstants.MOVEMENT_STOCK_CHECK_LOSS;
             remark = "盘点审批-盘亏";
         }
-        if (rows == 0)
+        if (rows != 1)
         {
             throw new ServiceException("商品 [" + detail.getProductName() + "] 库存已发生变化，请重新盘点");
         }
         InvStock updated = stockMapper.selectInvStockById(stock.getStockId());
         InvStockLog log = new InvStockLog();
         log.setProductId(detail.getProductId());
+        log.setItemType(detail.getItemType());
+        log.setItemId(detail.getItemId());
         log.setShopDeptId(check.getShopDeptId());
         log.setWarehouseId(check.getWarehouseId());
         log.setMovementType(movementType);
@@ -135,15 +143,21 @@ public class InvStockCheckAdjustmentService
         log.setChangeQuantity(diffQuantity);
         log.setBeforeQuantity(beforeQuantity);
         log.setAfterQuantity(updated.getCurrentQuantity());
-        log.setCostPrice(updated.getCostPrice());
+        log.setCostPrice(movementCost == null ? updated.getCostPrice() : costPrice);
+        log.setCostAmount(movementCost);
         log.setCreateBy(operatorName);
         log.setCreateTime(new Date());
         log.setRemark(remark);
-        stockLogMapper.insertInvStockLog(log);
+        if (stockLogMapper.insertInvStockLog(log) != 1)
+        {
+            throw new ServiceException("盘点库存流水写入失败");
+        }
 
         InvStockCheckAdjustmentEntry adjustment = new InvStockCheckAdjustmentEntry();
         adjustment.setDetailId(detail.getDetailId());
         adjustment.setProductId(detail.getProductId());
+        adjustment.setItemType(detail.getItemType());
+        adjustment.setItemId(detail.getItemId());
         adjustment.setProductName(detail.getProductName());
         adjustment.setBeforeQuantity(beforeQuantity);
         adjustment.setChangeQuantity(diffQuantity);

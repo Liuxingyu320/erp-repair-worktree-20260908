@@ -1,6 +1,9 @@
 package com.erp.oa.domain;
 
 import java.math.BigDecimal;
+import java.util.List;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.erp.common.core.utils.file.ImageUrlList;
 import jakarta.validation.constraints.NotNull;
 import com.erp.common.core.annotation.Excel;
 import com.erp.common.core.web.domain.BaseEntity;
@@ -9,15 +12,21 @@ public class OaFixedAssetConfig extends BaseEntity
 {
     private static final long serialVersionUID = 1L;
 
+    @com.fasterxml.jackson.databind.annotation.JsonSerialize(using=com.fasterxml.jackson.databind.ser.std.ToStringSerializer.class)
     private Long configId;
+    private Long expectedVersion;
+    public Long getExpectedVersion() { return expectedVersion; }
+    public void setExpectedVersion(Long value) { expectedVersion = value; }
 
     @NotNull(message = "店铺不能为空")
+    @com.fasterxml.jackson.databind.annotation.JsonSerialize(using=com.fasterxml.jackson.databind.ser.std.ToStringSerializer.class)
     private Long shopDeptId;
 
     @Excel(name = "店铺")
     private String shopDeptName;
 
     @NotNull(message = "OE器皿不能为空")
+    @com.fasterxml.jackson.databind.annotation.JsonSerialize(using=com.fasterxml.jackson.databind.ser.std.ToStringSerializer.class)
     private Long oeItemId;
 
     @Excel(name = "OE编码")
@@ -31,6 +40,7 @@ public class OaFixedAssetConfig extends BaseEntity
     private String orderUnit;
 
     private String imageUrl;
+    private String imageUrlsText;
 
     private String purchaseReferenceUrl;
 
@@ -114,8 +124,12 @@ public class OaFixedAssetConfig extends BaseEntity
     public void setItemDescription(String itemDescription) { this.itemDescription = itemDescription; }
     public String getOrderUnit() { return orderUnit; }
     public void setOrderUnit(String orderUnit) { this.orderUnit = orderUnit; }
-    public String getImageUrl() { return imageUrl; }
+    public String getImageUrl() { return ImageUrlList.cover(imageUrlsText, imageUrl); }
     public void setImageUrl(String imageUrl) { this.imageUrl = imageUrl; }
+    @JsonIgnore
+    public String getImageUrlsText() { return imageUrlsText; }
+    public void setImageUrlsText(String value) { imageUrlsText = value; }
+    public List<String> getImageUrls() { return ImageUrlList.read(imageUrlsText, imageUrl); }
     public String getPurchaseReferenceUrl() { return purchaseReferenceUrl; }
     public void setPurchaseReferenceUrl(String purchaseReferenceUrl) { this.purchaseReferenceUrl = purchaseReferenceUrl; }
     public String getPurchaseReferenceNote() { return purchaseReferenceNote; }

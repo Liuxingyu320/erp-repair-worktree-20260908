@@ -10,18 +10,19 @@ export function getReimbursementAvailability() {
   })
 }
 
-export function listMyReimbursements(params) {
-  return request({ url: `${BASE_URL}/my`, method: 'get', params })
+export function listMyReimbursements(params, options) {
+  return request({ url: `${BASE_URL}/my`, method: 'get', params, silentError: options && options.silentError === true })
 }
 
 export function listFinanceReimbursements(params) {
   return request({ url: `${BASE_URL}/finance`, method: 'get', params })
 }
 
-export function getReimbursement(reimbursementId) {
+export function getReimbursement(reimbursementId, options) {
   return request({
     url: `${BASE_URL}/${reimbursementId}`,
-    method: 'get'
+    method: 'get',
+    silentError: options && options.silentError === true
   })
 }
 
@@ -129,11 +130,11 @@ export function getReimbursementInvoice(
   })
 }
 
-export function createReimbursementExport(reimbursementIds) {
+export function createReimbursementExport(reimbursementIds, requestId) {
   return request({
     url: `${BASE_URL}/finance/exports`,
     method: 'post',
-    data: { reimbursementIds },
+    data: { reimbursementIds, ...(requestId ? { requestId } : {}) },
     timeout: 0,
     silentError: true
   })
@@ -147,4 +148,12 @@ export function downloadReimbursementExport(batchId) {
     timeout: 0,
     silentError: true
   })
+}
+
+export function listReimbursementExports(params) {
+  return request({ url: `${BASE_URL}/finance/exports`, method: 'get', params, silentError: true })
+}
+
+export function getReimbursementExportCommand(requestId) {
+  return request({ url: `${BASE_URL}/finance/exports/commands/${encodeURIComponent(requestId)}`, method: 'get', silentError: true })
 }

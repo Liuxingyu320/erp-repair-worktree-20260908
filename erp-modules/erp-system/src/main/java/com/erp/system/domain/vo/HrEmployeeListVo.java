@@ -12,6 +12,10 @@ import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 /** Safe default employee list/export row; deliberately has no ID, bank or address fields. */
 public class HrEmployeeListVo
 {
+    private LocalDate healthCertificateNextValidFrom;
+    public LocalDate getHealthCertificateNextValidFrom(){return healthCertificateNextValidFrom;}
+    public void setHealthCertificateNextValidFrom(LocalDate value){healthCertificateNextValidFrom=value;}
+
     /** Keep employee identifiers exact in JavaScript clients. */
     @JsonSerialize(using = ToStringSerializer.class)
     private Long userId;

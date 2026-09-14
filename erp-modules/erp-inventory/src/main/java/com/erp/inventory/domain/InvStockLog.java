@@ -88,6 +88,9 @@ public class InvStockLog
     @Excel(name = "单位成本")
     private BigDecimal costPrice;
 
+    /** Exact positive cost of the movement, when recorded; direction follows changeQuantity. */
+    private BigDecimal costAmount;
+
     @Excel(name = "操作人")
     private String createBy;
 
@@ -156,6 +159,8 @@ public class InvStockLog
     public void setCreateBy(String createBy) { this.createBy = createBy; }
     public Date getCreateTime() { return createTime; }
     public void setCreateTime(Date createTime) { this.createTime = createTime; }
+    public BigDecimal getCostAmount() { return costAmount; }
+    public void setCostAmount(BigDecimal value) { costAmount = value; }
     public BigDecimal getCostPrice() { return costPrice; }
     public void setCostPrice(BigDecimal costPrice) { this.costPrice = costPrice; }
     public String getRemark() { return remark; }

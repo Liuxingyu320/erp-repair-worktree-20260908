@@ -88,6 +88,24 @@ class AttendanceTimeCreditServiceTest
     }
 
     @Test
+    void existingOffsetCannotReuseAlreadyConvertedSourceMinutes()
+    {
+        DayResult source=result(1L,LocalDate.of(2026,8,20),480,540,0),target=result(2L,LocalDate.of(2026,8,23),480,480,60);
+        when(mapper.selectDayResultById(2L)).thenReturn(target);when(mapper.selectDayResultsForUpdate(any())).thenReturn(List.of(source,target));
+        when(mapper.selectNetSourceTransferred(1L)).thenReturn(50);
+        assertThatThrownBy(()->service.apply(apply(1L,2L,11),201L)).hasMessageContaining("可用余额");
+        service.apply(apply(1L,2L,10),201L);verify(mapper).insertAdjustment(any());
+    }
+    @Test
+    void invalidConfirmedSourceCannotBeUsedByTheOldOffsetEndpoint()
+    {
+        DayResult source=result(1L,LocalDate.of(2026,8,20),480,540,0),target=result(2L,LocalDate.of(2026,8,23),480,480,60);
+        when(mapper.selectDayResultById(2L)).thenReturn(target);when(mapper.selectDayResultsForUpdate(any())).thenReturn(List.of(source,target));
+        when(mapper.countInvalidSourceTransfers(1L)).thenReturn(1);
+        assertThatThrownBy(()->service.apply(apply(1L,2L,10),201L)).hasMessageContaining("转休来源已失效");verify(mapper,never()).insertAdjustment(any());
+    }
+
+    @Test
     @DisplayName("候选加班日不包含当前早退日")
     void shouldExcludeTargetDayFromSourceCandidates()
     {

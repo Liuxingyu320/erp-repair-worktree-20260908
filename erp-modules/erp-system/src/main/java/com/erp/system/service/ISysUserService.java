@@ -272,6 +272,10 @@ public interface ISysUserService
      */
     public int activateUserPassword(Long userId, String password, String updateBy);
 
+    /** Atomically changes the current password version and records its session revocation. */
+    int changeOwnPassword(Long userId, String expectedPasswordHash, String passwordHash,
+            String updateBy, String retainedUserKey);
+
     /**
      * 通过用户ID删除用户
      * 

@@ -155,7 +155,13 @@ public class TransferSignScenarioRule implements OaSignScenarioRule
         {
             return needsData(List.of("PLAN_TEMPLATE_SNAPSHOT_MISSING"), changes.riskCodes());
         }
-        TemplateDecision templateDecision = validateTemplates(version, templates);
+        if (changes.salaryChanged() && templates.stream().noneMatch(template -> template != null
+                && OaSignTemplateType.TRANSFER_SALARY_CONFIRM.equals(code(template.getTemplateType()))))
+            return needsData(List.of("SALARY_CONFIRMATION_TEMPLATE_MISSING"), changes.riskCodes());
+        if (!changes.salaryChanged()) templates = templates.stream().filter(template -> template == null
+                || !OaSignTemplateType.TRANSFER_SALARY_CONFIRM.equals(code(template.getTemplateType()))).toList();
+        TemplateDecision templateDecision = templates.isEmpty()
+                ? new TemplateDecision(true, false) : validateTemplates(version, templates);
         if (!templateDecision.valid())
         {
             return needsData(List.of("PLAN_TEMPLATE_INVALID"), changes.riskCodes());
@@ -365,12 +371,7 @@ public class TransferSignScenarioRule implements OaSignScenarioRule
     private boolean salaryChanged(HrEmployeeSigningSnapshot before,
             HrEmployeeSigningSnapshot after)
     {
-        return !moneyEquals(before.getBaseSalary(), after.getBaseSalary())
-                || !moneyEquals(before.getPostSalary(), after.getPostSalary())
-                || !moneyEquals(before.getFieldAllowance(), after.getFieldAllowance())
-                || !moneyEquals(before.getPerformanceSalary(), after.getPerformanceSalary())
-                || !moneyEquals(before.getSalaryTotal(), after.getSalaryTotal())
-                || !Objects.equals(trim(before.getSalaryVersion()), trim(after.getSalaryVersion()));
+        return TransferSalaryChangePolicy.changed(before, after);
     }
 
     private boolean eligible(OaSignPlanVersion candidate,
@@ -583,7 +584,7 @@ public class TransferSignScenarioRule implements OaSignScenarioRule
                 + ";职级:" + text(before.getJobGradeCode()) + "→" + text(after.getJobGradeCode())
                 + ";地点:" + text(before.getWorkLocation()) + "→" + text(after.getWorkLocation())
                 + ";法律主体:" + text(before.getLegalEntityName()) + "→" + text(after.getLegalEntityName())
-                + ";薪资合计:" + moneyText(before.getSalaryTotal()) + "→" + moneyText(after.getSalaryTotal());
+                + (salaryChanged(before, after) ? ";薪资合计:" + moneyText(before.getSalaryTotal()) + "→" + moneyText(after.getSalaryTotal()) : "");
         return value.length() <= 500 ? value : value.substring(0, 500);
     }
 

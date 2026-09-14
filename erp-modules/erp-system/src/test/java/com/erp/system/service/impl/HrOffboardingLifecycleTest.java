@@ -77,7 +77,7 @@ class HrOffboardingLifecycleTest
         service = new HrLifecycleServiceImpl(configMapper, profileMapper, actionMapper,
                 outboxMapper, mock(SysHrRenewalGuardMapper.class), mock(SysPostMapper.class),
                 mock(SysDeptMapper.class), userMapper, userPostMapper, userShopService,
-                objectMapper);
+                objectMapper, org.mockito.Mockito.mock(com.erp.system.service.impl.HrSalarySourceService.class));
         ReflectionTestUtils.setField(service, "clock", Clock.fixed(NOW, ZoneId.of("UTC")));
     }
 

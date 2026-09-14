@@ -42,7 +42,7 @@ function createMobileActionRuntime(api) {
     return Promise.reject(new Error("unsupported mobile action"))
   }
 
-  function saveMobileFeatureForm(featureKey, data) {
+  function saveMobileFeatureForm(featureKey, data, options) {
     const payload = Object.assign({}, data || {})
     const submitAction = payload.submitAction
     delete payload.submitAction
@@ -68,8 +68,14 @@ function createMobileActionRuntime(api) {
     }
     if (featureKey === "fixedAssetRepair") {
       return Promise.resolve(call("precheckFixedAssetRepair", payload)).then(response => {
+        if (options && typeof options.isCurrent === "function" && !options.isCurrent()) {
+          throw new Error("表单已变化，请重新检查后提交")
+        }
         const precheck = unwrapResponseData(response)
-        if (precheck && precheck.allowed === false) {
+        if (!precheck || typeof precheck.allowed !== "boolean") {
+          throw new Error("未取得有效的报修预检结果，请重试")
+        }
+        if (precheck.allowed === false) {
           throw createFixedAssetQuotaError(precheck)
         }
         return call("submitFixedAssetRepair", payload)
@@ -90,15 +96,15 @@ function createMobileActionRuntime(api) {
     if (actionId === "submitSales") {
       return Promise.resolve(call("getSalesDetail", orderId)).then(res => call("submitSales", (res && res.data) || {}))
     }
-    if (actionId === "createDeliveryNotice") return call("createDeliveryNotice", orderId)
-    if (actionId === "cancelSales") return call("cancelSales", orderId)
+    if (actionId === "createDeliveryNotice") return call("createDeliveryNotice", orderId, getMobileActionRow(item).version)
+    if (actionId === "cancelSales") return call("cancelSales", orderId, getMobileActionRow(item).version)
     return Promise.reject(new Error("unsupported sales action"))
   }
 
   function runPurchaseAction(actionId, item, options) {
     const orderId = requireTargetId("purchase", item)
     if (actionId === "submitPurchase") {
-      return Promise.resolve(call("getPurchaseDetail", orderId)).then(res => call("submitPurchase", (res && res.data) || {}))
+      return call("submitPurchaseDraft", orderId)
     }
     if (actionId === "deletePurchaseDraft") return call("deleteDraftPurchase", orderId)
     if (actionId === "qualityCheckPurchase") {
@@ -118,31 +124,30 @@ function createMobileActionRuntime(api) {
       })
     }
     if (actionId === "receivePurchaseAll") {
-      return Promise.resolve(call("getPurchaseDetail", orderId)).then(res => {
-        const detail = (res && res.data) || {}
-        const actionPayload = resolveActionPayload(options)
-        const inputItems = resolveQuantityInputItems(actionPayload)
-        const items = buildEditableQuantityItems(detail.details || [], {
-          totalKeys: ["quantity"],
-          doneKeys: ["receivedQuantity"],
-          quantityKey: "receiveQuantity",
-          inputItems,
-          allowAllRemaining: shouldUseAllRemaining(actionPayload)
+      const recovery = deps.purchaseReceiveRecovery
+      if (!recovery) return Promise.reject(new Error("收货恢复服务不可用，未发送请求"))
+      const frozen = JSON.parse(JSON.stringify(resolveActionPayload(options)))
+      const scope = options && options.receiveScope
+      if (!scope) return Promise.reject(new Error("请重新打开收货窗口确认账号和组织"))
+      return recovery.run({
+        orderId, scope, isCurrent: options.isCurrent,
+        observedRequestId: options.receiveObservedRequestId,
+        recoveryOnly: options.receiveRecoveryOnly === true,
+        requestId: options.receiveRequestId,
+        buildPayload: () => Promise.resolve(call("getPurchaseReceiveContext", orderId)).then(res => {
+          const detail = (res && res.data) || {}
+          if (String(detail.orderId) !== String(orderId)) throw new Error("采购详情身份无法确认")
+          const items = buildEditableQuantityItems(detail.details || [], {
+            totalKeys: ["quantity"], doneKeys: ["receivedQuantity"], quantityKey: "receiveQuantity",
+            inputItems: resolveQuantityInputItems(frozen), allowAllRemaining: shouldUseAllRemaining(frozen)
+          })
+          if (items.length === 0) throw new Error("没有可收货明细")
+          const arrivedTime = normalizeBackendDateTime(frozen.arrivedTime)
+          if (!arrivedTime) throw new Error("请选择实际到货时间")
+          const payload = { warehouseId: frozen.warehouseId || scope.dept, arrivedTime, items }
+          copyOptionalTextFields(payload, frozen, ["supplierBatchNo", "deliveryNoteNo", "remark"])
+          return payload
         })
-        if (items.length === 0) throw new Error("没有可收货明细")
-        const arrivedTime = normalizeBackendDateTime(actionPayload.arrivedTime)
-        if (!arrivedTime) throw new Error("请选择实际到货时间")
-        const receivePayload = {
-          warehouseId: actionPayload.warehouseId || detail.warehouseId || (options && options.selectedDeptId),
-          arrivedTime,
-          items
-        }
-        copyOptionalTextFields(receivePayload, actionPayload, [
-          "supplierBatchNo",
-          "deliveryNoteNo",
-          "remark"
-        ])
-        return call("receivePurchase", orderId, receivePayload)
       })
     }
     if (actionId === "cancelPurchase") return call("cancelPurchase", orderId)
@@ -152,7 +157,7 @@ function createMobileActionRuntime(api) {
   function runSalesReturnAction(actionId, item) {
     const returnId = requireTargetId("salesReturn", item)
     if (actionId === "submitSalesReturn") {
-      return Promise.resolve(call("getSalesReturn", returnId)).then(res => call("submitSalesReturn", (res && res.data) || {}))
+      return call("submitSalesReturnDraft", returnId)
     }
     if (actionId === "confirmSalesReturn") return call("confirmSalesReturn", returnId)
     if (actionId === "cancelSalesReturn") return call("cancelSalesReturn", returnId)
@@ -162,7 +167,7 @@ function createMobileActionRuntime(api) {
   function runPurchaseReturnAction(actionId, item) {
     const returnId = requireTargetId("purchaseReturn", item)
     if (actionId === "submitPurchaseReturn") {
-      return Promise.resolve(call("getPurchaseReturn", returnId)).then(res => call("submitPurchaseReturn", (res && res.data) || {}))
+      return call("submitPurchaseReturnDraft", returnId)
     }
     if (actionId === "confirmPurchaseReturn") return call("confirmPurchaseReturn", returnId)
     if (actionId === "cancelPurchaseReturn") return call("cancelPurchaseReturn", returnId)

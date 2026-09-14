@@ -49,14 +49,14 @@ assert.ok(
 )
 
 assert.ok(
-  stockSource.includes(`v-hasPermi="['inv:category:list', 'inv:category:tree']"`) ||
+  stockSource.includes('v-hasPermi="categoryPermissions"') && stockSource.includes('["inv:category:list", "inv:category:tree"]') ||
     stockSource.includes(`v-hasPermi="['inv:category:list','inv:category:tree']"`),
   "stock page category refresh should allow category management or readonly category tree permission"
 )
 
 assert.ok(
   stockSource.includes("categoryLoadError") &&
-    stockSource.includes("分类加载失败，请联系管理员授权"),
+    stockSource.includes("分类加载失败，请重试或检查权限"),
   "stock page should show a category tree load failure message instead of silently showing only all inventory"
 )
 

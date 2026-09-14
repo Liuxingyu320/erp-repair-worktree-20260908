@@ -25,6 +25,7 @@ class HrEmployeeHealthCertificateNativeMySqlTest
     void migratedSchemaExecutesTheCurrentEmployeeMapperQuery() throws Exception
     {
         Configuration configuration=new Configuration();
+        HealthCertificateMapperFragments.register(configuration);
         configuration.getTypeAliasRegistry().registerAlias("SysUser",
                 com.erp.system.api.domain.SysUser.class);
         configuration.getTypeAliasRegistry().registerAlias("SysDept",
@@ -44,7 +45,7 @@ class HrEmployeeHealthCertificateNativeMySqlTest
         BoundSql bound=configuration.getMappedStatement(
                 "com.erp.system.mapper.SysUserMapper.selectHrEmployeeList")
                 .getBoundSql(query);
-        assertThat(bound.getParameterMappings()).isEmpty();
+        assertThat(bound.getParameterMappings()).isNotEmpty();
 
         String url=System.getenv("ERP_HR_NATIVE_TEST_URL");
         String username=System.getenv().getOrDefault(
@@ -56,6 +57,7 @@ class HrEmployeeHealthCertificateNativeMySqlTest
             HrNativeMySqlTestSupport.requireIsolatedDatabase(connection);
             try(PreparedStatement statement=connection.prepareStatement(bound.getSql()))
             {
+                for (int index=0;index<bound.getParameterMappings().size();index++) statement.setDate(index+1,java.sql.Date.valueOf(java.time.LocalDate.now(java.time.ZoneId.of("Asia/Shanghai"))));
                 statement.setMaxRows(5);
                 try(ResultSet rows=statement.executeQuery())
                 {

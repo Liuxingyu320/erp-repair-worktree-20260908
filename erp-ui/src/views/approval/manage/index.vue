@@ -28,6 +28,7 @@
           :template-load-error="templateLoadError"
           @refresh-templates="loadTemplates"
           @changed="loadTemplates"
+          @check-version="checkVersion"
         />
       </el-tab-pane>
       <el-tab-pane name="monitor">
@@ -36,7 +37,7 @@
       </el-tab-pane>
       <el-tab-pane name="validation">
         <span slot="label"><i class="el-icon-circle-check"></i> 配置检查</span>
-        <validation-panel v-if="visitedTabs.validation" :templates="templates" />
+        <validation-panel ref="validationPanel" v-if="visitedTabs.validation" :templates="templates" />
       </el-tab-pane>
     </el-tabs>
   </div>
@@ -71,6 +72,11 @@ export default {
   },
   created() { this.loadTemplates() },
   methods: {
+    checkVersion(selection) {
+      this.$set(this.visitedTabs, 'validation', true)
+      this.activeTab = 'validation'
+      this.$nextTick(() => this.$refs.validationPanel && this.$refs.validationPanel.openRunDialog(selection))
+    },
     loadTemplates() {
       this.templateLoading = true
       this.templateLoadError = null

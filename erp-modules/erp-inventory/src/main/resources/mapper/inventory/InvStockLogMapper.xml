@@ -28,6 +28,7 @@
         <result property="beforeQuantity" column="before_quantity"/>
         <result property="afterQuantity" column="after_quantity"/>
         <result property="costPrice" column="cost_price"/>
+        <result property="costAmount" column="cost_amount"/>
         <result property="createBy" column="create_by"/>
         <result property="createTime" column="create_time"/>
         <result property="remark" column="remark"/>
@@ -52,7 +53,7 @@
                l.batch_no, l.expiry_date, l.serial_no, l.location_code, l.location_name,
                l.movement_type, l.business_type, l.business_id, l.business_no,
                l.change_quantity, l.before_quantity, l.after_quantity,
-               l.cost_price, l.create_by, l.create_time, l.remark
+               l.cost_price, l.cost_amount, l.create_by, l.create_time, l.remark
         from inv_stock_log l
              left join inv_product p on p.product_id = l.product_id and p.del_flag = '0'
              left join inv_oe_item oe on coalesce(l.item_type, 'product') = 'oe' and oe.oe_item_id = coalesce(l.item_id, l.product_id) and oe.del_flag = '0'
@@ -122,12 +123,12 @@
             item_type, item_id, product_id, shop_dept_id, warehouse_id, movement_type, business_type,
             batch_no, expiry_date, serial_no, location_code, location_name,
             business_id, business_no, change_quantity, before_quantity, after_quantity,
-            cost_price, create_by, create_time, remark
+            cost_price, cost_amount, create_by, create_time, remark
         ) values (
             coalesce(#{itemType}, 'product'), coalesce(#{itemId}, #{productId}), #{productId}, #{shopDeptId}, #{warehouseId}, #{movementType}, #{businessType},
             #{batchNo}, #{expiryDate}, #{serialNo}, #{locationCode}, #{locationName},
             #{businessId}, #{businessNo}, #{changeQuantity}, #{beforeQuantity}, #{afterQuantity},
-            #{costPrice}, #{createBy}, sysdate(), #{remark}
+            #{costPrice}, #{costAmount}, #{createBy}, sysdate(), #{remark}
         )
     </insert>
 

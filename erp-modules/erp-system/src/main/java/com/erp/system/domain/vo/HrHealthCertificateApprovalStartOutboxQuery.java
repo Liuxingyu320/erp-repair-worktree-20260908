@@ -7,6 +7,9 @@ public class HrHealthCertificateApprovalStartOutboxQuery extends BaseEntity
 {
     private static final long serialVersionUID = 1L;
 
+    private Long certificateId;
+    public Long getCertificateId() { return certificateId; }
+    public void setCertificateId(Long value) { certificateId = value; }
     private Long outboxId;
     private String status;
 

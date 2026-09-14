@@ -753,6 +753,15 @@ const mobileRouteDefinitions = [
     }
   },
   {
+    path: '/mobile/messages',
+    component: () => import('@/views/mobile/messages/index'),
+    hidden: true,
+    meta: {
+      title: '我的消息',
+      mobileFeature: { featureKey: 'messages', title: '我的消息', requiresBusinessContext: false }
+    }
+  },
+  {
     path: '/mobile/profile',
     component: () => import('@/views/mobile/profile/index'),
     hidden: true,
@@ -769,6 +778,7 @@ const mobileRouteDefinitions = [
         actions: [
           { label: '刷新资料', icon: 'refresh', behavior: 'refresh' },
           { label: '通知公告', icon: 'bell', path: '/mobile/notice' },
+          { label: '我的消息', icon: 'message', path: '/mobile/messages' },
           { label: '切换店铺', icon: 'warehouse', behavior: 'select-shop', contextualLabel: 'switchBusinessContext' },
           { label: '退出登录', icon: 'logout', behavior: 'logout' }
         ],
@@ -1169,6 +1179,7 @@ const mobileRouteDefinitions = [
         actions: [
           { label: '个人资料', icon: 'user', path: '/mobile/profile' },
           { label: '通知公告', icon: 'bell', path: '/mobile/notice' },
+          { label: '我的消息', icon: 'message', path: '/mobile/messages' },
           { label: '云盘', icon: 'cloud', tone: 'blue', path: '/mobile/drive', permissions: ['drive:access'], featureFlag: 'drive', placement: 'more' },
           { label: '切换店铺', icon: 'warehouse', behavior: 'select-shop', contextualLabel: 'switchBusinessContext' },
           { label: '刷新状态', icon: 'refresh', behavior: 'refresh' },

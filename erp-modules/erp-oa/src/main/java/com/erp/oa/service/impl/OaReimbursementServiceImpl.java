@@ -185,10 +185,13 @@ public class OaReimbursementServiceImpl
         {
             throw new ServiceException("报销申请不能为空");
         }
+        if (requested.getReimbursementId() == null && (requested.getExpectedBaseRound() != null || requested.getExpectedVersion() != null))
+            throw new ServiceException("请先保存草稿，再提交指定版本");
         if (requested.getReimbursementId() != null)
         {
             OaReimbursement current = requireOwnedForUpdate(
                     requested.getReimbursementId(), selectedShopDeptId);
+            requireSubmitCommandBoundary(requested, current);
             if (PENDING.equals(current.getStatus())
                     && current.getApprovalInstanceId() != null)
             {
@@ -244,8 +247,25 @@ public class OaReimbursementServiceImpl
     public OaReimbursement withdraw(Long reimbursementId, String reason,
             Long selectedShopDeptId)
     {
+        return withdraw(reimbursementId, reason, selectedShopDeptId, null, null);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public OaReimbursement withdraw(Long reimbursementId, String reason,
+            Long selectedShopDeptId, Long expectedApprovalInstanceId,
+            Integer expectedApprovalRound)
+    {
         OaReimbursement current = requireOwnedForUpdate(reimbursementId,
                 selectedShopDeptId);
+        if (expectedApprovalInstanceId != null || expectedApprovalRound != null)
+        {
+            if (expectedApprovalInstanceId == null || expectedApprovalRound == null
+                    || expectedApprovalInstanceId <= 0 || expectedApprovalRound < 1
+                    || !Objects.equals(expectedApprovalInstanceId, current.getApprovalInstanceId())
+                    || !Objects.equals(expectedApprovalRound, current.getApprovalRound()))
+                throw new ServiceException("审批实例或轮次已变化，原撤回请求不能用于新的审批");
+        }
         if (WITHDRAWN.equals(current.getStatus()))
         {
             return loadDetail(reimbursementId);
@@ -270,6 +290,23 @@ public class OaReimbursementServiceImpl
                             "撤回报销审批失败"));
         }
         return loadDetail(reimbursementId);
+    }
+
+    private void requireSubmitCommandBoundary(OaReimbursement requested, OaReimbursement current)
+    {
+        Integer baseRound = requested.getExpectedBaseRound();
+        Long expectedVersion = requested.getExpectedVersion();
+        // Compatibility phase: old clients retain their previous behavior until rollout is complete.
+        if (baseRound == null && expectedVersion == null) return;
+        if (baseRound == null || expectedVersion == null || baseRound < 0
+                || baseRound == Integer.MAX_VALUE || expectedVersion < 0)
+            throw new ServiceException("提交缺少有效的原草稿版本与审批轮次");
+        int currentRound = current.getApprovalRound() == null ? 0 : current.getApprovalRound();
+        if ((PENDING.equals(current.getStatus()) || SUBMITTING.equals(current.getStatus()))
+                && currentRound == baseRound + 1) return;
+        if (!EDITABLE.contains(current.getStatus()) || currentRound != baseRound
+                || !Objects.equals(expectedVersion, current.getRowVersion()))
+            throw new ServiceException("草稿版本或审批轮次已变化，原提交请求不能发起新的审批轮次");
     }
 
     @Override

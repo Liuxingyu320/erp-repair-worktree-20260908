@@ -2,6 +2,7 @@ package com.erp.system.service.impl;
 
 import java.time.Clock;
 import java.time.LocalDate;
+import com.erp.system.support.HrHealthCertificateSelection;
 import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.Collections;
@@ -313,7 +314,8 @@ public class HrHealthCertificateServiceImpl
     public List<HrHealthCertificateVo> selectList(
             HrHealthCertificateVo query)
     {
-        return decorate(accessService.selectScopedList(query));
+        query = dateQuery(query);
+        return decorate(accessService.selectScopedList(query), query.getAsOfDate());
     }
 
     @Override
@@ -321,7 +323,7 @@ public class HrHealthCertificateServiceImpl
             HrHealthCertificateVo query)
     {
         HrHealthCertificateOpsSummaryVo summary =
-                accessService.selectOpsSummary(query);
+                accessService.selectOpsSummary(dateQuery(query));
         if (summary == null)
         {
             summary = new HrHealthCertificateOpsSummaryVo();
@@ -379,25 +381,32 @@ public class HrHealthCertificateServiceImpl
         {
             throw new ServiceException("员工档案不存在");
         }
-        if ("APPROVED".equals(decision))
+        HrHealthCertificateVo locked = mapper.selectByIdForUpdate(certificateId);
+        if (locked == null || !certificate.getUserId().equals(locked.getUserId()))
         {
-            mapper.clearCurrentByUserId(certificate.getUserId(), reviewerName);
+            throw new ServiceException("健康证已变化，请刷新后重试");
         }
         int affected = mapper.reviewCertificate(certificateId,
                 request.getVersion(), decision,
-                "APPROVED".equals(decision) ? "Y" : null,
+                null,
                 reviewerUserId, reviewerName,
                 rejectionReason);
         if (affected != 1)
         {
             throw new ServiceException("健康证已被其他人审核，请刷新后重试");
         }
+        if ("APPROVED".equals(decision)) reconcileCurrent(certificate.getUserId(), reviewerName);
         return decorate(mapper.selectById(certificateId));
     }
 
     @Override
-    public Map<Long, HrHealthCertificateVo> selectCurrentProjection(
-            List<Long> userIds)
+    public Map<Long, HrHealthCertificateVo> selectCurrentProjection(List<Long> userIds)
+    {
+        return selectCurrentProjectionAt(userIds, today());
+    }
+
+    @Override
+    public Map<Long, HrHealthCertificateVo> selectCurrentProjectionAt(List<Long> userIds, LocalDate asOfDate)
     {
         if (userIds == null || userIds.isEmpty())
         {
@@ -410,8 +419,9 @@ public class HrHealthCertificateServiceImpl
             return Collections.emptyMap();
         }
         Map<Long, HrHealthCertificateVo> values = new LinkedHashMap<>();
+        LocalDate day = asOfDate == null ? today() : asOfDate;
         for (HrHealthCertificateVo row : decorate(
-                mapper.selectCurrentByUserIds(unique)))
+                mapper.selectCurrentByUserIds(unique, day), day))
         {
             values.put(row.getUserId(), row);
         }
@@ -459,12 +469,13 @@ public class HrHealthCertificateServiceImpl
         {
             return retry("INVALID_BUSINESS_ID", "健康证业务ID不是有效数字");
         }
-        HrHealthCertificateVo certificate = mapper.selectByIdForUpdate(
-                certificateId);
-        if (certificate == null)
-        {
+        HrHealthCertificateVo owner = mapper.selectById(certificateId);
+        if (owner == null) return stale(request, "BUSINESS_NOT_FOUND", "健康证记录不存在");
+        if (mapper.lockEmployeeProfile(owner.getUserId()) == null)
+            return retry("EMPLOYEE_PROFILE_MISSING", "员工档案不存在");
+        HrHealthCertificateVo certificate = mapper.selectByIdForUpdate(certificateId);
+        if (certificate == null || !owner.getUserId().equals(certificate.getUserId()))
             return stale(request, "BUSINESS_NOT_FOUND", "健康证记录不存在");
-        }
         if (request.getEventKey().equals(
                 certificate.getLastApprovalEventKey()))
         {
@@ -515,23 +526,16 @@ public class HrHealthCertificateServiceImpl
         {
             reason = reason.substring(0, 300);
         }
-        if (mapper.lockEmployeeProfile(certificate.getUserId()) == null)
-        {
-            return retry("EMPLOYEE_PROFILE_MISSING", "员工档案不存在");
-        }
-        if ("APPROVED".equals(expected))
-        {
-            mapper.clearCurrentByUserId(certificate.getUserId(), operatorName);
-        }
         int affected = mapper.applyApprovalResult(certificateId,
                 certificate.getVersion(), request.getInstanceId(),
                 request.getBusinessRound(), request.getEventKey(), expected,
-                "APPROVED".equals(expected) ? "Y" : null,
+                null,
                 payload.operatorId(), operatorName, reason);
         if (affected != 1)
         {
             throw new ServiceException("健康证审批回调并发冲突");
         }
+        if ("APPROVED".equals(expected)) reconcileCurrent(certificate.getUserId(), operatorName);
         return accepted("ACCEPTED", "健康证审批状态已更新");
     }
 
@@ -698,36 +702,74 @@ public class HrHealthCertificateServiceImpl
     private record CallbackPayload(String targetStatus, String reason,
             Long operatorId, String operatorName) { }
 
-    private List<HrHealthCertificateVo> decorate(
-            List<HrHealthCertificateVo> rows)
+    private LocalDate today() { return LocalDate.now(clock.withZone(BUSINESS_ZONE)); }
+
+    private HrHealthCertificateVo dateQuery(HrHealthCertificateVo query)
     {
-        if (rows == null)
-        {
-            return Collections.emptyList();
-        }
-        rows.forEach(this::decorate);
+        if (query == null) query = new HrHealthCertificateVo();
+        java.time.LocalDateTime now = java.time.LocalDateTime.now(clock.withZone(BUSINESS_ZONE));
+        query.setAsOfDate(now.toLocalDate());
+        query.setAsOfTime(now);
+        return query;
+    }
+
+    private void reconcileCurrent(Long userId, String operator)
+    {
+        LocalDate day = today();
+        List<HrHealthCertificateVo> rows = mapper.selectByUserIdForUpdate(userId);
+        HrHealthCertificateVo chosen = HrHealthCertificateSelection.choose(rows, day);
+        if (chosen != null && !HrHealthCertificateSelection.effective(chosen, day)) chosen = null;
+        Long desiredId = chosen == null ? null : chosen.getCertificateId();
+        List<HrHealthCertificateVo> flags = rows == null ? List.of() : rows.stream()
+                .filter(row -> "Y".equals(row.getCurrentFlag())).toList();
+        if ((desiredId == null && flags.isEmpty()) || (flags.size() == 1
+                && java.util.Objects.equals(flags.get(0).getCertificateId(), desiredId))) return;
+        mapper.clearCurrentByUserId(userId, operator);
+        if (desiredId != null && mapper.setCurrentCertificate(userId, desiredId, day, operator) != 1)
+            throw new ServiceException("健康证当前状态更新冲突，请重试");
+    }
+
+    private List<HrHealthCertificateVo> decorate(List<HrHealthCertificateVo> rows)
+    {
+        return decorate(rows, today());
+    }
+
+    private List<HrHealthCertificateVo> decorate(List<HrHealthCertificateVo> rows, LocalDate day)
+    {
+        if (rows == null) return Collections.emptyList();
+        rows.forEach(row -> decorate(row, day));
         return rows;
     }
 
     private HrHealthCertificateVo decorate(HrHealthCertificateVo row)
     {
-        if (row == null)
-        {
-            return null;
-        }
+        return decorate(row, today());
+    }
+
+    private HrHealthCertificateVo decorate(HrHealthCertificateVo row, LocalDate day)
+    {
+        if (row == null) return null;
         row.setAttachmentPresent(row.getAttachmentNodeId() != null);
-        if (!"APPROVED".equals(row.getReviewStatus())
-                || !"Y".equals(row.getCurrentFlag()))
+        row.setDaysRemaining(null);
+        if (!"APPROVED".equals(row.getReviewStatus()))
         {
             row.setHealthCertificateStatus(row.getReviewStatus());
-            row.setDaysRemaining(null);
             return row;
         }
-        long days = ChronoUnit.DAYS.between(LocalDate.now(clock),
-                row.getExpiresOn());
+        if (!HrHealthCertificateSelection.validDates(row))
+        {
+            row.setHealthCertificateStatus("INVALID_DATES");
+            return row;
+        }
+        if (HrHealthCertificateSelection.starts(row).isAfter(day))
+        {
+            row.setHealthCertificateStatus("NOT_YET_EFFECTIVE");
+            row.setNextValidFrom(HrHealthCertificateSelection.starts(row));
+            return row;
+        }
+        long days = ChronoUnit.DAYS.between(day, row.getExpiresOn());
         row.setDaysRemaining(days);
-        row.setHealthCertificateStatus(days < 0 ? "EXPIRED"
-                : days <= 30 ? "EXPIRING" : "VALID");
+        row.setHealthCertificateStatus(days < 0 ? "EXPIRED" : days <= 30 ? "EXPIRING" : "VALID");
         return row;
     }
 

@@ -23,6 +23,7 @@ import com.erp.common.log.enums.BusinessType;
 import com.erp.common.security.annotation.IdempotentSubmit;
 import com.erp.common.security.annotation.RequiresPermissions;
 import com.erp.inventory.domain.InvGiftBox;
+import com.erp.inventory.domain.dto.InvGiftEditRequest;
 import com.erp.inventory.service.IInvGiftService;
 
 @RestController
@@ -52,7 +53,7 @@ public class InvGiftController extends InvBaseController
     @IdempotentSubmit(timeout = 30)
     @Log(title = "礼盒管理", businessType = BusinessType.INSERT)
     @PostMapping
-    public AjaxResult add(@Validated @RequestBody InvGiftBox gift, HttpServletRequest request)
+    public AjaxResult add(@Validated @RequestBody InvGiftEditRequest gift, HttpServletRequest request)
     {
         return success(giftService.saveGift(gift, resolveShopDeptId(request)));
     }
@@ -61,7 +62,7 @@ public class InvGiftController extends InvBaseController
     @IdempotentSubmit(timeout = 30)
     @Log(title = "礼盒管理", businessType = BusinessType.UPDATE)
     @PostMapping("/update")
-    public AjaxResult edit(@Validated @RequestBody InvGiftBox gift, HttpServletRequest request)
+    public AjaxResult edit(@Validated @RequestBody InvGiftEditRequest gift, HttpServletRequest request)
     {
         return success(giftService.saveGift(gift, resolveShopDeptId(request)));
     }

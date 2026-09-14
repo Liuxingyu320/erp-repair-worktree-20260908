@@ -66,6 +66,7 @@ public class AttendanceLeaveService
     private final ShopScopeService shopScopeService;
     private final BusinessFeatureGate featureGate;
     private final Clock clock;
+    private final com.erp.oa.attendance.leave.balance.AttendanceLeaveQuotaService quota;
 
     @Autowired
     public AttendanceLeaveService(AttendanceLeaveMapper mapper,
@@ -74,10 +75,10 @@ public class AttendanceLeaveService
             AttendanceLeaveApprovalAfterCommitTrigger trigger,
             RemoteApprovalService approvalService,
             ShopScopeService shopScopeService,
-            BusinessFeatureGate featureGate)
+            BusinessFeatureGate featureGate, com.erp.oa.attendance.leave.balance.AttendanceLeaveQuotaService quota)
     {
         this(mapper, storage, outboxService, trigger, approvalService,
-                shopScopeService, featureGate, Clock.systemDefaultZone());
+                shopScopeService, featureGate, Clock.systemDefaultZone(), quota);
     }
 
     AttendanceLeaveService(AttendanceLeaveMapper mapper,
@@ -86,7 +87,7 @@ public class AttendanceLeaveService
             AttendanceLeaveApprovalAfterCommitTrigger trigger,
             RemoteApprovalService approvalService,
             ShopScopeService shopScopeService,
-            BusinessFeatureGate featureGate, Clock clock)
+            BusinessFeatureGate featureGate, Clock clock, com.erp.oa.attendance.leave.balance.AttendanceLeaveQuotaService quota)
     {
         this.mapper = mapper;
         this.storage = storage;
@@ -96,6 +97,7 @@ public class AttendanceLeaveService
         this.shopScopeService = shopScopeService;
         this.featureGate = featureGate;
         this.clock = clock;
+        this.quota = quota;
     }
 
     public List<LeaveType> listTypes(String status)
@@ -107,7 +109,8 @@ public class AttendanceLeaveService
             throw new ServiceException("LEAVE_TYPE_STATUS_INVALID");
         if (!hasPermission("oa:attendance:leave:type:list"))
             normalized = "ENABLED";
-        return mapper.selectLeaveTypes(normalized);
+        List<LeaveType> types=mapper.selectLeaveTypes(normalized);
+        return types==null?List.of():types.stream().map(AttendanceLeaveAmountPolicy::effectiveType).toList();
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -143,22 +146,26 @@ public class AttendanceLeaveService
     public LeaveType changeTypeStatus(Long leaveTypeId, String status,
             Long rowVersion)
     {
-        requireType(leaveTypeId);
+        LeaveType current=requireType(leaveTypeId);
         String target = status == null ? ""
                 : status.trim().toUpperCase(Locale.ROOT);
         if (!Set.of("ENABLED", "DISABLED").contains(target))
             throw new ServiceException("LEAVE_TYPE_STATUS_INVALID");
+        if("ENABLED".equals(target))validateType(current,false);
         if (mapper.updateLeaveTypeStatus(leaveTypeId, target, rowVersion,
                 operator()) != 1)
             throw new ServiceException("LEAVE_TYPE_VERSION_CONFLICT");
         return mapper.selectLeaveTypeById(leaveTypeId);
     }
 
-    @Transactional(rollbackFor = Exception.class)
+    @Transactional(rollbackFor = Exception.class, isolation=org.springframework.transaction.annotation.Isolation.READ_COMMITTED)
     public LeaveRequest saveDraft(SaveDraft body, Long selectedShopId)
     {
         requireEnabled();
         if (body == null) throw new ServiceException("LEAVE_DRAFT_REQUIRED");
+        com.erp.oa.attendance.leave.balance.AttendanceOvertimeTransferSourceGuard.requireReadCommittedWriteTransaction();
+        SaveDraft frozen=new SaveDraft();frozen.leaveRequestId=body.leaveRequestId;frozen.clientRequestId=body.clientRequestId;frozen.leaveTypeId=body.leaveTypeId;frozen.startTime=body.startTime;frozen.endTime=body.endTime;frozen.reason=body.reason;frozen.rowVersion=body.rowVersion;frozen.requestedDays=body.requestedDays;
+        frozen.quotaPolicySnapshot=quota.copyPolicy(body.quotaPolicySnapshot);body=frozen;
         Long userId = SecurityUtils.getUserId();
         if (body.leaveRequestId == null)
         {
@@ -177,7 +184,7 @@ public class AttendanceLeaveService
                     return replay(replay, fingerprint);
             }
             String userName = requireActiveEmployee(userId, shopId);
-            LeaveType type = requireEnabledType(body.leaveTypeId);
+            LeaveType type = requireEnabledTypeForUpdate(body.leaveTypeId);
             LeaveRequest value = new LeaveRequest();
             value.leaveRequestNo = nextNo("AL");
             value.clientRequestId = clientRequestId;
@@ -213,7 +220,9 @@ public class AttendanceLeaveService
         if (!EDITABLE.contains(current.status))
             throw new ServiceException("LEAVE_STATUS_NOT_EDITABLE");
         requireVersion(body.rowVersion, current.rowVersion);
-        LeaveType type = requireEnabledType(body.leaveTypeId);
+        LeaveType type = requireEnabledTypeForUpdate(body.leaveTypeId);
+        if(Objects.equals(current.leaveTypeId,body.leaveTypeId) && body.quotaPolicySnapshot==null)
+            body.quotaPolicySnapshot=quota.copyPolicy(quota.hydrate(current).quotaPolicySnapshot);
         applyDraft(current, body, type);
         current.setUpdateBy(operator());
         if (mapper.updateLeaveDraft(current) != 1)
@@ -221,6 +230,31 @@ public class AttendanceLeaveService
         current.rowVersion++;
         replaceSegments(current, type);
         return detail(current.leaveRequestId, selectedShopId);
+    }
+
+    /** Read-only business operation: locks snapshot inputs but never writes or recalculates credit. */
+    @Transactional(rollbackFor = Exception.class, isolation=org.springframework.transaction.annotation.Isolation.READ_COMMITTED)
+    public com.erp.oa.attendance.leave.balance.AttendanceLeaveQuotaModels.PolicyPreview previewPolicy(Long leaveRequestId,SaveDraft body,Long selectedShopId)
+    {
+        requireEnabled();
+        if(body==null || leaveRequestId==null)throw new ServiceException("LEAVE_DRAFT_REQUIRED");
+        com.erp.oa.attendance.leave.balance.AttendanceOvertimeTransferSourceGuard.requireReadCommittedWriteTransaction();
+        SaveDraft proposed=new SaveDraft();proposed.leaveRequestId=leaveRequestId;proposed.rowVersion=body.rowVersion;
+        proposed.leaveTypeId=body.leaveTypeId;proposed.startTime=body.startTime;proposed.endTime=body.endTime;
+        proposed.reason=body.reason;proposed.requestedDays=body.requestedDays;
+        LeaveRequest original=requireOwnedForUpdate(leaveRequestId,selectedShopId);
+        requireEditable(original);requireVersion(proposed.rowVersion,original.rowVersion);
+        requireActiveEmployee(original.userId,original.shopId);
+        LeaveType type=requireEnabledTypeForUpdate(proposed.leaveTypeId);
+        LeaveRequest candidate=new LeaveRequest();candidate.leaveRequestId=original.leaveRequestId;candidate.rowVersion=original.rowVersion;
+        candidate.userId=original.userId;candidate.userName=original.userName;candidate.shopId=original.shopId;
+        // The caller's old policy is intentionally not an input to this explicit current-policy preview.
+        applyDraft(candidate,proposed,type);
+        var preview=new com.erp.oa.attendance.leave.balance.AttendanceLeaveQuotaModels.PolicyPreview();
+        preview.leaveRequestId=candidate.leaveRequestId;preview.rowVersion=original.rowVersion;preview.userId=original.userId;preview.shopId=original.shopId;
+        preview.leaveTypeId=candidate.leaveTypeId;preview.startTime=candidate.startTime;preview.endTime=candidate.endTime;preview.reason=candidate.reason;
+        preview.requestedDays=candidate.requestedDays;preview.totalMinutes=candidate.totalMinutes;preview.quotaUnits=candidate.quotaUnits;preview.quotaPolicySnapshot=candidate.quotaPolicySnapshot;
+        return preview;
     }
 
     public LeaveRequest detail(Long leaveRequestId, Long selectedShopId)
@@ -256,7 +290,7 @@ public class AttendanceLeaveService
         List<LeaveRequest> rows = mapper.selectLeaveRequestsByUser(
                 SecurityUtils.getUserId(), shopId, normalizeStatus(status),
                 dateFrom, dateTo);
-        return rows == null ? List.of() : rows;
+        return rows == null ? List.of() : rows.stream().map(quota::hydrate).toList();
     }
 
     public List<LeaveRequest> listShop(Long shopId, Long userId,
@@ -268,7 +302,7 @@ public class AttendanceLeaveService
         Long target = requireSameShop(shopId, selectedShopId);
         List<LeaveRequest> rows = mapper.selectLeaveRequestsByShop(target,
                 userId, normalizeStatus(status), dateFrom, dateTo);
-        return rows == null ? List.of() : rows;
+        return rows == null ? List.of() : rows.stream().map(quota::hydrate).toList();
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -368,7 +402,7 @@ public class AttendanceLeaveService
         }
     }
 
-    @Transactional(rollbackFor = Exception.class)
+    @Transactional(rollbackFor = Exception.class, isolation=org.springframework.transaction.annotation.Isolation.READ_COMMITTED)
     public LeaveRequest submit(Long leaveRequestId, Long expectedVersion,
             Long selectedShopId)
     {
@@ -397,7 +431,7 @@ public class AttendanceLeaveService
         requireVersion(expectedVersion, current.rowVersion);
         requireEditable(current);
         requireActiveEmployee(current.userId, current.shopId);
-        LeaveType type = requireEnabledType(current.leaveTypeId);
+        LeaveType type = requireEnabledTypeForUpdate(current.leaveTypeId);
         validateRequest(current, type, current.leaveRequestId);
         int overlappingSchedules = mapper.countOverlappingPublishedSchedules(
                 current.userId, current.shopId, current.startTime,
@@ -411,15 +445,18 @@ public class AttendanceLeaveService
             if (scheduledWorkMinutes == null || scheduledWorkMinutes <= 0)
                 throw new ServiceException("LEAVE_NO_SCHEDULED_WORK");
         }
+        int round = (current.businessRound == null ? 0 : current.businessRound) + 1;
+        quota.reserve(current,type,round);
         // Drafts can outlive both leave-type policy edits and schedule changes.
         // Refresh the derived pay/schedule snapshot at the submit boundary so
         // approval and settlement never consume stale draft segments.
         replaceSegments(current, type);
         int attachments = mapper.countLeaveAttachments(leaveRequestId);
-        if (requiresAttachment(type, current.totalMinutes)
+        if (requiresAttachment(type, policyMinutes(current,type))
                 && attachments <= 0)
             throw new ServiceException("LEAVE_ATTACHMENT_REQUIRED_BY_POLICY");
-        if (!Boolean.TRUE.equals(type.approvalRequired))
+        if (!Boolean.TRUE.equals(type.approvalRequired) && !AttendanceLeaveAmountPolicy.requiresBalance(type)
+                && !(type.typeCode!=null && AttendanceLeaveAmountPolicy.STANDARD_CODES.contains(type.typeCode)))
         {
             if (mapper.markLeaveAutoApproved(leaveRequestId, current.status,
                     current.rowVersion, operator()) != 1)
@@ -428,8 +465,6 @@ public class AttendanceLeaveService
                     operator());
             return detail(leaveRequestId, selectedShopId);
         }
-        int round = (current.businessRound == null ? 0
-                : current.businessRound) + 1;
         Long version = current.rowVersion;
         if (mapper.markLeaveSubmitting(leaveRequestId, current.status,
                 version, round, operator()) != 1)
@@ -490,9 +525,11 @@ public class AttendanceLeaveService
         value.startTime = body.startTime;
         value.endTime = body.endTime;
         value.reason = body.reason == null ? null : body.reason.trim();
+        value.requestedDays = body.requestedDays;
         value.rowVersion = body.rowVersion == null ? value.rowVersion
                 : body.rowVersion;
         validateRequest(value, type, value.leaveRequestId);
+        quota.freezeDraft(value,type,body.quotaPolicySnapshot);
     }
 
     private void validateRequest(LeaveRequest value, LeaveType type,
@@ -513,13 +550,13 @@ public class AttendanceLeaveService
                 .toMinutes();
         if (minutes <= 0 || minutes > MAX_RANGE_DAYS * 24L * 60L)
             throw new ServiceException("LEAVE_MINUTES_INVALID");
-        if (type.minMinutes != null && minutes < type.minMinutes)
+        if (value.requestedDays == null && type.minMinutes != null && minutes < type.minMinutes)
             throw new ServiceException("LEAVE_BELOW_MINIMUM");
-        if (type.maxMinutesPerRequest != null
+        if (value.requestedDays == null && type.maxMinutesPerRequest != null
                 && minutes > type.maxMinutesPerRequest)
             throw new ServiceException("LEAVE_ABOVE_MAXIMUM");
         int step = type.stepMinutes == null ? 1 : type.stepMinutes;
-        if (minutes % step != 0)
+        if (value.requestedDays == null && minutes % step != 0)
             throw new ServiceException("LEAVE_STEP_MISMATCH");
         LocalDate lastDate = value.endTime.minusNanos(1).toLocalDate();
         if (!Boolean.TRUE.equals(type.allowCrossDay)
@@ -637,10 +674,12 @@ public class AttendanceLeaveService
         variables.put("startTime", value.startTime.toString());
         variables.put("endTime", value.endTime.toString());
         variables.put("totalMinutes", value.totalMinutes);
+        if(value.requestedDays!=null)variables.put("requestedDays",value.requestedDays.toPlainString());
+        if(value.quotaPolicySnapshot!=null){variables.put("quotaPolicySnapshot",value.quotaPolicySnapshot);variables.put("quotaUnits",value.quotaUnits==null?null:value.quotaUnits.toString());}
         variables.put("reason", value.reason);
         variables.put("attachmentCount", Math.max(0, attachmentCount));
         variables.put("attachmentRequired",
-                requiresAttachment(type, value.totalMinutes));
+                requiresAttachment(type, policyMinutes(value,type)));
         variables.put("shopId", value.shopId);
         request.setVariables(variables);
         Map<String, String> route = new LinkedHashMap<>();
@@ -680,6 +719,7 @@ public class AttendanceLeaveService
 
     private LeaveRequest attachChildren(LeaveRequest value)
     {
+        quota.hydrate(value);
         value.segments = mapper.selectLeaveSegments(value.leaveRequestId);
         value.attachments = mapper.selectLeaveAttachments(value.leaveRequestId);
         value.attachmentCount = value.attachments == null ? 0
@@ -696,6 +736,9 @@ public class AttendanceLeaveService
 
     private String draftFingerprint(SaveDraft body)
     {
+        if(body.requestedDays!=null || body.quotaPolicySnapshot!=null)
+            return AttendanceClientRequestSupport.fingerprint("OA_ATTENDANCE_LEAVE_DRAFT_V2",body.leaveTypeId,body.startTime,body.endTime,
+                    body.reason==null?null:body.reason.trim(),body.requestedDays==null?null:body.requestedDays.stripTrailingZeros().toPlainString(),AttendanceLeaveAmountPolicy.fingerprint(body.quotaPolicySnapshot));
         return AttendanceClientRequestSupport.fingerprint(
                 "OA_ATTENDANCE_LEAVE_DRAFT_V1", body.leaveTypeId,
                 body.startTime, body.endTime,
@@ -706,8 +749,13 @@ public class AttendanceLeaveService
     {
         LeaveType value = id == null ? null : mapper.selectLeaveTypeById(id);
         if (value == null) throw new ServiceException("LEAVE_TYPE_NOT_FOUND");
-        return value;
+        return AttendanceLeaveAmountPolicy.effectiveType(value);
     }
+
+    private int policyMinutes(LeaveRequest request,LeaveType type)
+    {return request.requestedDays==null || request.quotaPolicySnapshot==null?request.totalMinutes:Math.toIntExact(AttendanceLeaveAmountPolicy.units(request,type,request.quotaPolicySnapshot)/1_000_000L);}
+    private LeaveType requireEnabledTypeForUpdate(Long id)
+    {LeaveType type=mapper.selectLeaveTypeForUpdate(id);if(type==null)throw new ServiceException("LEAVE_TYPE_NOT_FOUND");if(!"ENABLED".equals(type.status))throw new ServiceException("LEAVE_TYPE_DISABLED");return AttendanceLeaveAmountPolicy.effectiveType(type);}
 
     private LeaveType requireEnabledType(Long id)
     {
@@ -743,8 +791,11 @@ public class AttendanceLeaveService
                 || value.paidRatio.compareTo(BigDecimal.ONE) > 0)
             throw new ServiceException("LEAVE_PAID_RATIO_INVALID");
         value.balanceRequired = bool(value.balanceRequired, false);
-        if (Boolean.TRUE.equals(value.balanceRequired))
-            throw new ServiceException("LEAVE_BALANCE_POLICY_NOT_CONFIGURED");
+        AttendanceLeaveAmountPolicy.effectiveType(value);
+        if(value.minutesPerDay!=null && (value.minutesPerDay.signum()<=0 || value.minutesPerDay.compareTo(BigDecimal.valueOf(1440))>0 || value.minutesPerDay.stripTrailingZeros().scale()>6))
+            throw new ServiceException("每日分钟须为HR明确配置的正数且不超过1440分钟");
+        if(!Boolean.TRUE.equals(value.balanceRequired) && Set.of("DAY","HALF_DAY").contains(value.unitMode) && value.minutesPerDay==null)
+            throw new ServiceException("按天假种请先由HR配置每日分钟换算");
         value.attachmentRequired = bool(value.attachmentRequired, false);
         value.allowCrossDay = bool(value.allowCrossDay, true);
         value.approvalRequired = bool(value.approvalRequired, true);

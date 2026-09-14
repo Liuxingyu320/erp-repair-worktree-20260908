@@ -45,9 +45,10 @@ export function delJob(jobId) {
 }
 
 // 任务状态修改
-export function changeJobStatus(jobId, status) {
+export function changeJobStatus(jobId, status, revision) {
   const data = {
     jobId,
+    revision,
     status
   }
   return request({
@@ -59,9 +60,10 @@ export function changeJobStatus(jobId, status) {
 
 
 // 定时任务立即执行一次
-export function runJob(jobId, jobGroup) {
+export function runJob(jobId, jobGroup, revision) {
   const data = {
     jobId,
+    revision,
     jobGroup
   }
   return request({
@@ -69,4 +71,12 @@ export function runJob(jobId, jobGroup) {
     method: 'put',
     data: data
   })
+}
+
+// Durable deletion: a lost HTTP reply is resolved with the original batch ID.
+export function deleteJobSnapshot(data) {
+  return request({url: '/schedule/job/deletions', method: 'post', data, silentError: true})
+}
+export function getJobDeletionReceipt(batchId) {
+  return request({url: '/schedule/job/deletions/' + encodeURIComponent(batchId), method: 'get', silentError: true})
 }

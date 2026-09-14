@@ -1,5 +1,8 @@
 package com.erp.inventory.service;
 
+import com.erp.inventory.domain.vo.InvCustomerServiceRecordQuery;
+import com.erp.inventory.domain.vo.InvCustomerServiceRecordPage;
+
 import java.util.List;
 import com.erp.inventory.domain.dto.InvCustomerServiceCardArchiveRequest;
 import com.erp.inventory.domain.dto.InvCustomerServiceCardSaveRequest;
@@ -19,6 +22,7 @@ public interface IInvCustomerServiceCardService
     List<InvCustomerServiceAuditVo> selectAuditList(InvCustomerServiceAuditQuery query,
             Long selectedShopDeptId, int pageNum, int pageSize);
     InvCustomerServiceCardVo selectById(Long customerId, Long selectedShopDeptId);
+    InvCustomerServiceRecordPage selectRecords(Long customerId, InvCustomerServiceRecordQuery query, Long selectedShopDeptId);
     InvCustomerServiceCardVo create(InvCustomerServiceCardSaveRequest request, Long selectedShopDeptId);
     InvCustomerServiceCardVo update(Long customerId, InvCustomerServiceCardSaveRequest request,
             Long selectedShopDeptId);

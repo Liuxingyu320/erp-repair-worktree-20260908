@@ -25,19 +25,21 @@ function install() {
         labelField: 'dictLabel',
         valueField: 'dictValue',
         request(dictMeta) {
-          const storeDict = searchDictByKey(store.getters.dict, dictMeta.type)
-          if (storeDict) {
-            return new Promise(resolve => { resolve(storeDict) })
-          } else {
-            return new Promise((resolve, reject) => {
-              getDicts(dictMeta.type).then(res => {
-                store.dispatch('dict/setDict', { key: dictMeta.type, value: res.data })
-                resolve(res.data)
-              }).catch(error => {
-                reject(error)
-              })
+          const read = remaining => {
+            const cached = searchDictByKey(store.getters.dict, dictMeta.type)
+            if (cached) return Promise.resolve(cached)
+            const revision = store.state.dict.revisions[dictMeta.type] || 0
+            const epoch = store.state.dict.epoch
+            return getDicts(dictMeta.type).then(res => {
+              if (revision !== (store.state.dict.revisions[dictMeta.type] || 0) || epoch !== store.state.dict.epoch) {
+                if (remaining) return read(remaining - 1)
+                throw Error('字典已变化，请重新读取')
+              }
+              store.dispatch('dict/setDict', { key: dictMeta.type, value: res.data, revision, epoch })
+              return res.data
             })
           }
+          return read(1)
         },
       },
     },

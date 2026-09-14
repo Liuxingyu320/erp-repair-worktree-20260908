@@ -95,4 +95,57 @@ class TokenServiceTest
         loginUser.setSysUser(user);
         return loginUser;
     }
+
+    @Test
+    void displayBatchesAreBoundedAndPreserveMissingAndInvalidPositions()
+    {
+        RedisService redis = mock(RedisService.class);
+        TokenService tokens = new TokenService();
+        ReflectionTestUtils.setField(tokens, "redisService", redis);
+        List<String> keys = java.util.stream.IntStream.range(0, 1001)
+                .mapToObj(i -> CacheConstants.LOGIN_TOKEN_KEY + i).toList();
+        when(redis.getMultiCacheObject(any(Collection.class))).thenAnswer(invocation -> {
+            Collection<?> batch = invocation.getArgument(0);
+            assertThat(batch.size()).isLessThanOrEqualTo(500);
+            List<Object> values = new java.util.ArrayList<>();
+            for (Object ignored : batch) values.add(loginUser(22L));
+            values.set(0, null);
+            if (values.size() > 1) values.set(1, "invalid-session");
+            return values;
+        });
+        List<LoginUser> users = tokens.getLoginUsersForDisplay(keys);
+        assertThat(users).hasSize(1001);
+        assertThat(users.get(0)).isNull();
+        assertThat(users.get(1)).isNull();
+        assertThat(users.get(2).getUserid()).isEqualTo(22L);
+        assertThat(users.get(500)).isNull();
+        assertThat(users.get(1000)).isNull();
+        verify(redis, org.mockito.Mockito.times(3)).getMultiCacheObject(any(Collection.class));
+        verify(redis, never()).getCacheSnapshot(any(String.class));
+    }
+
+    @Test
+    void displayIncompleteReadAndRedisFailureCannotBecomeAnEmptyList()
+    {
+        RedisService redis = mock(RedisService.class);
+        TokenService tokens = new TokenService();
+        ReflectionTestUtils.setField(tokens, "redisService", redis);
+        List<String> keys = List.of(CacheConstants.LOGIN_TOKEN_KEY + "one");
+        when(redis.getMultiCacheObject(keys)).thenReturn(List.of());
+        assertThatThrownBy(() -> tokens.getLoginUsersForDisplay(keys))
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("不完整");
+        when(redis.getMultiCacheObject(keys)).thenThrow(new IllegalStateException("offline"));
+        assertThatThrownBy(() -> tokens.getLoginUsersForDisplay(keys)).hasMessage("offline");
+    }
+
+    @Test
+    void displayRejectsOtherNamespacesBeforeReadingRedis()
+    {
+        RedisService redis = mock(RedisService.class);
+        TokenService tokens = new TokenService();
+        ReflectionTestUtils.setField(tokens, "redisService", redis);
+        assertThatThrownBy(() -> tokens.getLoginUsersForDisplay(List.of("unrelated:key")))
+                .isInstanceOf(IllegalArgumentException.class);
+        verify(redis, never()).getMultiCacheObject(any(Collection.class));
+    }
 }

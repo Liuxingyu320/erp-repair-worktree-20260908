@@ -114,6 +114,7 @@
         left join sys_dept d on d.dept_id = u.dept_id
         where 1 = 1
         <if test="outboxId != null">and o.outbox_id = #{outboxId}</if>
+        <if test="certificateId != null">and o.certificate_id = #{certificateId}</if>
         <if test="status != null and status != ''">and o.status = #{status}</if>
         ${params.dataScope}
         order by case o.status when 'FAILED' then 0

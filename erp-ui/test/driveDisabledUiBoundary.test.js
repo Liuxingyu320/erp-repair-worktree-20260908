@@ -44,15 +44,17 @@ function auditExternalDriveReferences() {
     if (/@\/api\/drive/.test(source)) driveApiConsumers.push(relative)
   })
   assert.deepStrictEqual(visibleReferences.sort(), [
+    "src/components/TransferEvidencePicker.vue",
     "src/views/hr/healthCertificate/index.vue",
     "src/views/inventory/customer/index.vue",
     "src/views/mobile/mobileNavigation.js",
     "src/views/mobile/mobileRouteDefinitions.js"
   ], "drive-external user-visible references must stay within the audited protected files")
   assert.deepStrictEqual(driveApiConsumers.sort(), [
+    "src/components/TransferEvidencePicker.vue",
     "src/views/hr/healthCertificate/index.vue",
     "src/views/inventory/customer/index.vue"
-  ], "only the two explicitly gated business forms may consume the recent-drive API")
+  ], "only the explicitly gated business forms and controlled transfer evidence picker may consume drive APIs")
 }
 
 function esm(defaultValue, named = {}) {
@@ -162,6 +164,9 @@ async function verifyCustomerDriveBoundary() {
     getCustomerServiceCardCapabilities: () => Promise.resolve({ data: { writeEnabled: true } })
   }
   const component = loadComponent(customerPath, {
+    "@/utils/shopContext": { getSelectedDeptId: () => "20" },
+    "@/utils/uiOperationScope": require("../src/utils/uiOperationScope"),
+    "@/views/inventory/components/CustomerServiceHistory.vue": esm({}),
     "@/api/drive": driveApi,
     "@/api/inventory/customer": customerApi,
     vue: esm({ component() {} }),
@@ -192,6 +197,8 @@ async function verifyCustomerDriveBoundary() {
 async function verifyHealthDriveBoundary() {
   let recentCalls = 0
   const component = loadComponent(healthPath, {
+    "@/utils/shopContext": new Function("sessionStorage", read("src/utils/shopContext.js").replace(/export /g, "") + ";return { getSelectedDeptId }")({ getItem: key => key === "selected_dept_id" ? "10" : null }),
+    "@/utils/uiOperationScope": require("../src/utils/uiOperationScope"),
     "@/api/drive": {
       listRecentDriveNodes() {
         recentCalls += 1

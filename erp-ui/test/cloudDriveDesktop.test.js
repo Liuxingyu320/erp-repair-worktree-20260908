@@ -175,8 +175,8 @@ assert.ok(
 assert.ok(
   page.includes("pumpUploads()") &&
     page.includes("selectUploadStartCandidates(this.uploadItems, 2)") &&
-    page.includes("markUploadDone") &&
-    page.includes("markUploadFailed") &&
+    page.includes("applyUploadReceipt") &&
+    page.includes("pendingUpload") &&
     page.includes("parseDriveBlobError"),
   "upload queue should run two items, isolate failures and continue pumping"
 )
@@ -185,7 +185,7 @@ assert.ok(
     page.includes('controller.signal') &&
     page.includes('cancelUpload(itemId)') &&
     page.includes('cancelAllUploads()') &&
-    page.includes('isDriveRequestCanceled(error)') &&
+    page.includes('getDriveUploadReceipt(item.operationId)') &&
     read('src/api/drive/index.js').includes('signal') &&
     uploadQueue.includes("$emit('cancel'") &&
     uploadQueue.includes("canceled: '已取消'"),

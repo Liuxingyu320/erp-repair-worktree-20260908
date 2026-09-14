@@ -706,6 +706,7 @@ export default {
       roleOptions: [],
       derivedPreviewTimer: null,
       derivedPreviewSequence: 0,
+      userFormSession: 0,
       employeeStatusOptions: Array(),
       employeeStatusOptionsLoaded: false,
       employeeCategoryOptions: ["全职", "兼职", "实习", "劳务", "退休返聘", "外包"],
@@ -890,7 +891,7 @@ export default {
       this.scheduleDerivedPreview()
     },
     open(value) {
-      if (!value) this.resetDerivedPreviewLifecycle()
+      if (!value) this.beginUserFormSession()
     }
   },
   created() {
@@ -901,7 +902,7 @@ export default {
     this.loadEmployeeStatusOptions()
   },
   beforeDestroy() {
-    this.resetDerivedPreviewLifecycle()
+    this.beginUserFormSession()
     this.removeUserDialogFocusGuard()
   },
   methods: {
@@ -910,17 +911,47 @@ export default {
         return item === value || (item && item.value === value)
       })
     },
+    beginUserFormSession() {
+      this.userFormSession += 1
+      this.resetDerivedPreviewLifecycle()
+      return this.userFormSession
+    },
+    isCurrentUserFormSession(session) {
+      return session === this.userFormSession
+    },
+    applyUserFormSession(session, apply) {
+      if (!this.isCurrentUserFormSession(session) || typeof apply !== "function") return
+      apply()
+    },
+    cloneUserSaveValue(value) {
+      return this.cloneFormValue(value)
+    },
+    captureUserSaveSnapshot() {
+      return {
+        session: this.userFormSession,
+        userId: this.form && this.form.userId,
+        reasonCode: this.piiReasonCode,
+        basePayload: this.cloneUserSaveValue(this.buildUserManagePayload()) || {},
+        piiPayload: this.cloneUserSaveValue(this.buildPiiPayload())
+      }
+    },
     scheduleDerivedPreview() {
       if (!this.open || !this.form) return
+      const session = this.userFormSession
       clearTimeout(this.derivedPreviewTimer)
-      this.derivedPreviewTimer = setTimeout(() => this.loadDerivedPreview(), 250)
+      this.derivedPreviewTimer = setTimeout(() => {
+        if (!this.isCurrentUserFormSession(session)) return
+        this.loadDerivedPreview()
+      }, 250)
     },
     loadDerivedPreview() {
+      if (!this.open || !this.form) return
+      const session = this.userFormSession
       const profile = (this.form && this.form.profile) || {}
       const requestSequence = ++this.derivedPreviewSequence
       const payload = {
         deptId: this.form.deptId,
-        postIds: this.form.postIds || [],
+        postIds: this.cloneUserSaveValue(this.form.postIds || []) || [],
         profile: {
           workStartDate: profile.workStartDate,
           entryDate: profile.entryDate,
@@ -928,9 +959,9 @@ export default {
           employeeStatus: profile.employeeStatus
         }
       }
-      previewUserDerivedProfile(payload).then(response => {
-        if (requestSequence !== this.derivedPreviewSequence || !this.open) return
-        this.$set(this.form, "profile", { ...profile, ...(response.data || {}) })
+      previewUserDerivedProfile(payload, { silentError: true }).then(response => {
+        if (requestSequence !== this.derivedPreviewSequence || !this.isCurrentUserFormSession(session) || !this.open) return
+        this.$set(this.form, "profile", { ...((this.form && this.form.profile) || profile), ...(response.data || {}) })
       }).catch(() => {})
     },
     resetDerivedPreviewLifecycle() {
@@ -1313,6 +1344,10 @@ export default {
     },
     // 表单重置
     reset() {
+      this.beginUserFormSession()
+      this.credentialVisible = false
+      this.temporaryCredential = null
+      this.credentialNextUser = null
       this.activeProfileTab = "account"
       this.piiReasonCode = "BUSINESS_PROCESSING"
       this.piiLoaded = false
@@ -1379,20 +1414,30 @@ export default {
     handleAdd() {
       this.captureUserDialogTrigger("addUserButton")
       this.reset()
-      getUser().then(response => {
-        this.postOptions = response.posts
-        this.roleOptions = response.roles
-        this.open = true
-        this.title = "添加用户"
-        this.scheduleDerivedPreview()
+      const session = this.userFormSession
+      getUser(undefined, { silentError: true }).then(response => {
+        this.applyUserFormSession(session, () => {
+          this.postOptions = response.posts
+          this.roleOptions = response.roles
+          this.open = true
+          this.title = "添加用户"
+          this.scheduleDerivedPreview()
+        })
+      }).catch(() => {
+        this.applyUserFormSession(session, () => {
+          this.$modal.msgError("用户资料加载失败，请重试")
+        })
       })
     },
     /** 修改按钮操作 */
     handleUpdate(row) {
       this.captureUserDialogTrigger()
       this.reset()
+      const session = this.userFormSession
       const userId = row.userId || this.ids
-      getUser(userId).then(response => {
+      const reasonCode = this.piiReasonCode
+      getUser(userId, { silentError: true }).then(response => {
+        if (!this.isCurrentUserFormSession(session)) return
         this.form = response.data
         this.ensureFormProfile()
         this.postOptions = response.posts
@@ -1400,19 +1445,29 @@ export default {
         this.$set(this.form, "postIds", response.postIds)
         this.$set(this.form, "roleIds", response.roleIds)
         const loadPii = this.$auth && this.$auth.hasPermi("system:user:pii:read")
-          ? getUserPii(userId, this.piiReasonCode).then(piiResponse => {
-            this.applyPiiToForm(piiResponse.data || {})
-            this.piiInitialValues = captureUserPiiSnapshot(this.form)
-            this.piiLoaded = true
+          ? getUserPii(userId, reasonCode, { silentError: true }).then(piiResponse => {
+            this.applyUserFormSession(session, () => {
+              this.applyPiiToForm(piiResponse.data || {})
+              this.piiInitialValues = captureUserPiiSnapshot(this.form)
+              this.piiLoaded = true
+            })
           }).catch(() => {
-            this.piiLoadFailed = true
-            this.$modal.msgWarning("个人信息加载失败，当前仅可修改账号基础信息")
+            this.applyUserFormSession(session, () => {
+              this.piiLoadFailed = true
+              this.$modal.msgWarning("个人信息加载失败，当前仅可修改账号基础信息")
+            })
           })
           : Promise.resolve()
         return loadPii.then(() => {
-          this.open = true
-          this.title = "修改用户"
-          this.scheduleDerivedPreview()
+          this.applyUserFormSession(session, () => {
+            this.open = true
+            this.title = "修改用户"
+            this.scheduleDerivedPreview()
+          })
+        })
+      }).catch(() => {
+        this.applyUserFormSession(session, () => {
+          this.$modal.msgError("用户资料加载失败，请重试")
         })
       })
     },
@@ -1463,15 +1518,18 @@ export default {
         this.retryPiiAfterCreate()
         return
       }
+      const session = this.userFormSession
       this.$refs["form"].validate(valid => {
-        if (!valid) return
-        const basePayload = this.buildUserManagePayload()
-        const piiPayload = this.buildPiiPayload()
-        if (this.form.userId === undefined && this.managementUxV2Enabled) {
-          this.confirmNewUserSetup(basePayload).then(() => this.persistUserForm(basePayload, piiPayload)).catch(() => {})
+        if (!valid || !this.isCurrentUserFormSession(session)) return
+        const snapshot = this.captureUserSaveSnapshot()
+        if (snapshot.userId === undefined && this.managementUxV2Enabled) {
+          this.confirmNewUserSetup(snapshot.basePayload).then(() => {
+            if (!this.isCurrentUserFormSession(session)) return
+            return this.persistUserForm(snapshot)
+          }).catch(() => {})
           return
         }
-        this.persistUserForm(basePayload, piiPayload)
+        this.persistUserForm(snapshot).catch(() => {})
       })
     },
     confirmNewUserSetup(payload) {
@@ -1507,46 +1565,69 @@ export default {
       const selected = new Set((ids || []).map(String))
       return (options || []).filter(item => selected.has(String(item[idKey]))).map(item => item[nameKey]).filter(Boolean).join("、")
     },
-    persistUserForm(basePayload, piiPayload) {
-      if (this.form.userId != undefined) {
-        return updateUser(basePayload).then(() => {
+    persistUserForm(snapshot) {
+      const session = snapshot.session
+      const basePayload = this.cloneUserSaveValue(snapshot.basePayload) || {}
+      const piiPayload = this.cloneUserSaveValue(snapshot.piiPayload)
+      const reasonCode = snapshot.reasonCode
+      const targetUserId = snapshot.userId
+      if (targetUserId != undefined) {
+        return updateUser(basePayload, { silentError: true }).then(() => {
           if (!piiPayload) return null
-          return updateUserPii(this.form.userId, piiPayload, this.piiReasonCode, false)
+          return updateUserPii(targetUserId, piiPayload, reasonCode, false, { silentError: true })
             .catch(error => {
-              this.$modal.msgError("账号基础信息已保存、PII 未保存，请重试")
+              this.applyUserFormSession(session, () => {
+                this.$modal.msgError("账号基础信息已保存、PII 未保存，请重试")
+              })
               throw error
             })
+        }, error => {
+          this.applyUserFormSession(session, () => {
+            this.$modal.msgError("账号基础信息保存失败，请重试")
+          })
+          throw error
         }).then(() => {
-          this.$modal.msgSuccess("修改成功")
-          this.open = false
-          this.getList()
+          this.applyUserFormSession(session, () => {
+            this.$modal.msgSuccess("修改成功")
+            this.open = false
+            this.getList()
+          })
         })
       }
       const createdUser = Object.assign({}, basePayload)
-      return addUser(basePayload).then(response => {
+      return addUser(basePayload, { silentError: true }).then(response => {
         const credential = response && response.data && response.data.temporaryCredential
         const userId = credential && credential.userId
         const finish = () => {
-          this.open = false
-          this.getList()
-          this.showTemporaryCredential(response, createdUser)
+          this.applyUserFormSession(session, () => {
+            this.open = false
+            this.getList()
+            this.showTemporaryCredential(response, createdUser)
+          })
         }
         if (!piiPayload || !userId) {
           finish()
           return
         }
-        return updateUserPii(userId, piiPayload, this.piiReasonCode, true)
+        return updateUserPii(userId, piiPayload, reasonCode, true, { silentError: true })
           .then(finish)
           .catch(() => {
-            this.piiSaveFailure = true
-            this.piiRetryUserId = userId
-            this.piiCreatedUser = Object.assign({}, createdUser, { userId })
-            this.$set(this.form, "userId", userId)
-            this.title = "账号已创建、PII 未保存"
-            this.getList()
-            this.showTemporaryCredential(response, null)
-            this.$modal.msgError("账号已创建、PII 未保存，请点击重试保存个人信息")
+            this.applyUserFormSession(session, () => {
+              this.piiSaveFailure = true
+              this.piiRetryUserId = userId
+              this.piiCreatedUser = Object.assign({}, createdUser, { userId })
+              this.$set(this.form, "userId", userId)
+              this.title = "账号已创建、PII 未保存"
+              this.getList()
+              this.showTemporaryCredential(response, null)
+              this.$modal.msgError("账号已创建、PII 未保存，请点击重试保存个人信息")
+            })
           })
+      }, error => {
+        this.applyUserFormSession(session, () => {
+          this.$modal.msgError("账号创建失败，请重试")
+        })
+        throw error
       })
     },
     buildUserManagePayload() {
@@ -1573,18 +1654,25 @@ export default {
       this.$set(this.form, "profile", profile)
     },
     retryPiiAfterCreate() {
-      const payload = this.buildPiiPayload()
-      if (!payload || !this.piiRetryUserId) return
-      updateUserPii(this.piiRetryUserId, payload, this.piiReasonCode, true).then(() => {
-        const createdUser = this.piiCreatedUser
-        this.piiSaveFailure = false
-        this.piiRetryUserId = null
-        this.open = false
-        this.getList()
-        this.$modal.msgSuccess("个人信息保存成功")
-        if (createdUser) this.confirmShopScopeAfterCreate(createdUser)
+      const session = this.userFormSession
+      const userId = this.piiRetryUserId
+      const reasonCode = this.piiReasonCode
+      const payload = this.cloneUserSaveValue(this.buildPiiPayload())
+      const createdUser = this.cloneUserSaveValue(this.piiCreatedUser)
+      if (!payload || !userId) return
+      updateUserPii(userId, payload, reasonCode, true, { silentError: true }).then(() => {
+        this.applyUserFormSession(session, () => {
+          this.piiSaveFailure = false
+          this.piiRetryUserId = null
+          this.open = false
+          this.getList()
+          this.$modal.msgSuccess("个人信息保存成功")
+          if (createdUser) this.confirmShopScopeAfterCreate(createdUser)
+        })
       }).catch(() => {
-        this.$modal.msgError("PII 仍未保存，请检查字段或联系具备用户修改权限的管理员")
+        this.applyUserFormSession(session, () => {
+          this.$modal.msgError("PII 仍未保存，请检查字段或联系具备用户修改权限的管理员")
+        })
       })
     },
     buildUserChangeRequest() {

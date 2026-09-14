@@ -31,12 +31,14 @@ public class AttendanceLeaveApprovalOutboxService
 
     private final AttendanceLeaveMapper mapper;
     private final ObjectMapper objectMapper;
+    private final com.erp.oa.attendance.leave.balance.AttendanceLeaveQuotaService quota;
 
     public AttendanceLeaveApprovalOutboxService(AttendanceLeaveMapper mapper,
-            ObjectMapper objectMapper)
+            ObjectMapper objectMapper, com.erp.oa.attendance.leave.balance.AttendanceLeaveQuotaService quota)
     {
         this.mapper = mapper;
         this.objectMapper = objectMapper;
+        this.quota = quota;
     }
 
     @Transactional(propagation = Propagation.MANDATORY,
@@ -123,14 +125,17 @@ public class AttendanceLeaveApprovalOutboxService
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW,
-            rollbackFor = Exception.class)
+            rollbackFor = Exception.class, isolation=org.springframework.transaction.annotation.Isolation.READ_COMMITTED)
     public void finalizeRemoteSuccess(ApprovalOutbox candidate, String operator)
     {
         if (candidate == null || candidate.outboxId == null)
             throw new PermanentFailure("OUTBOX_NOT_FOUND",
                     "请假审批发件箱不存在");
-        ApprovalOutbox row = mapper.selectApprovalOutboxByIdForUpdate(
-                candidate.outboxId);
+        ApprovalOutbox hint=mapper.selectApprovalOutboxById(candidate.outboxId);
+        if(hint==null)throw new PermanentFailure("OUTBOX_NOT_FOUND","请假审批发件箱不存在");
+        LeaveRequest request=mapper.selectLeaveRequestByIdForUpdate(hint.leaveRequestId);
+        ApprovalOutbox row = mapper.selectApprovalOutboxByIdForUpdate(candidate.outboxId);
+        if(row!=null && !Objects.equals(row.leaveRequestId,hint.leaveRequestId))throw new ServiceException("LEAVE_APPROVAL_SOURCE_CHANGED");
         if (row == null)
             throw new PermanentFailure("OUTBOX_NOT_FOUND",
                     "请假审批发件箱不存在");
@@ -148,8 +153,6 @@ public class AttendanceLeaveApprovalOutboxService
         if (!Objects.equals(row.businessRound, row.remoteBusinessRound))
             throw new PermanentFailure("REMOTE_ROUND_MISMATCH",
                     "请假审批实例轮次不一致");
-        LeaveRequest request = mapper.selectLeaveRequestByIdForUpdate(
-                row.leaveRequestId);
         if (request == null)
             throw new PermanentFailure("LEAVE_REQUEST_NOT_FOUND",
                     "请假申请不存在");
@@ -179,6 +182,7 @@ public class AttendanceLeaveApprovalOutboxService
                     row.remoteInstanceId, safeOperator(operator)) != 1)
                 throw new ServiceException("LEAVE_APPROVAL_FINALIZE_RETRY");
         }
+        quota.confirmLinked(request,row.businessRound);
         assertUpdated(mapper.markApprovalCompleted(row.outboxId, row.status,
                 row.rowVersion));
         row.status = COMPLETED;
@@ -187,10 +191,12 @@ public class AttendanceLeaveApprovalOutboxService
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW,
-            rollbackFor = Exception.class)
+            rollbackFor = Exception.class, isolation=org.springframework.transaction.annotation.Isolation.READ_COMMITTED)
     public void markRetry(ApprovalOutbox row, LocalDateTime nextRetryAt,
             Integer httpStatus, String errorCode, String error)
     {
+        LeaveRequest request=mapper.selectLeaveRequestByIdForUpdate(row.leaveRequestId);
+        quota.reviewUnknown(request,row.businessRound);
         assertUpdated(mapper.markApprovalRetry(row.outboxId, row.status,
                 row.rowVersion, nextRetryAt, httpStatus,
                 truncate(errorCode, 64), truncate(error, 500)));
@@ -203,10 +209,15 @@ public class AttendanceLeaveApprovalOutboxService
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW,
-            rollbackFor = Exception.class)
+            rollbackFor = Exception.class, isolation=org.springframework.transaction.annotation.Isolation.READ_COMMITTED)
     public void markFailed(ApprovalOutbox row, Integer httpStatus,
             String errorCode, String error)
     {
+        LeaveRequest request=mapper.selectLeaveRequestByIdForUpdate(row.leaveRequestId);
+        boolean neverAttempted="INVALID_PAYLOAD".equals(errorCode) && Integer.valueOf(1).equals(row.attemptCount)
+                && row.remoteInstanceId==null && row.remoteSucceededAt==null && row.lastHttpStatus==null;
+        if(neverAttempted && request!=null)quota.failBeforeRemote(request,row.businessRound,"START_NOT_ATTEMPTED");
+        else quota.reviewUnknown(request,row.businessRound);
         assertUpdated(mapper.markApprovalFailed(row.outboxId, row.status,
                 row.rowVersion, httpStatus, truncate(errorCode, 64),
                 truncate(error, 500)));

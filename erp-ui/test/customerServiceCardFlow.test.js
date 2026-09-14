@@ -21,14 +21,14 @@ const compactPage = page.replace(/\s+/g, " ")
 
 assert.ok(
   page.includes("客户服务卡") && page.includes("喜欢的茶") &&
-    page.includes("注意事项") && page.includes("人均预算") && page.includes("历史服务记录"),
+    page.includes("注意事项") && page.includes("人均预算") && page.includes("<customer-service-history "),
   "desktop should replace legacy customer management with service-card content"
 )
 assert.ok(
   page.includes("addCustomerServiceRecord") && page.includes("updateCustomerServiceCard") &&
     /requestKey:\s*this\.key\(["']record["']\)/.test(page) &&
     /requestKey:\s*this\.key\(["']card["']\)/.test(page) &&
-    page.includes("addCustomerServiceRecord(this.selected.customerId, { ...this.record })"),
+    page.includes("addCustomerServiceRecord(customerId,{...record})"),
   "store employees should edit cards and reuse one idempotency key across retries"
 )
 assert.ok(

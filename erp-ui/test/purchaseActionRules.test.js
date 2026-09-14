@@ -12,9 +12,9 @@ assert.strictEqual(
 )
 
 assert.strictEqual(
-  canReceivePurchase({ status: "submitted", qcStatus: "pending" }),
-  false,
-  "pending quality check purchase should not show receive action"
+  canReceivePurchase({ status: "submitted", qcStatus: "pending", remainingQuantity: 3 }),
+  true,
+  "pending inspection of a previous batch must not prevent another arrival"
 )
 
 assert.strictEqual(
@@ -76,3 +76,11 @@ assert.strictEqual(
   true,
   "unreceived submitted purchase should show cancel action"
 )
+
+for (const row of [
+  { status: "submitted", qcStatus: "pending", remainingQuantity: 0 },
+  { status: "received", qcStatus: "pending", remainingQuantity: 3 },
+  { status: "draft", qcStatus: "pending", remainingQuantity: 3 },
+  { status: "cancelled", qcStatus: "pending", remainingQuantity: 3 }
+]) assert.strictEqual(canReceivePurchase(row), false, "zero remaining or a non-submitted order must not receive")
+console.log("purchase action rules regression passed")

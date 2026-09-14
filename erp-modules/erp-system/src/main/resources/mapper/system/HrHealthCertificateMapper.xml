@@ -32,7 +32,47 @@
         <result property="employeeName" column="employee_name"/>
         <result property="currentDeptId" column="current_dept_id"/>
         <result property="currentDeptName" column="current_dept_name"/>
+        <result property="nextValidFrom" column="next_valid_from"/>
     </resultMap>
+
+
+    <!-- Static include properties only: owner/asOfExpr are mapper-authored SQL, never request text.
+         Effective certificates win; retain a unique effective current cache; then deterministic order.
+         Expired history is the fallback before a future certificate. Invalid dates are excluded. -->
+    <sql id="chosenCertificateId">
+        (select h.certificate_id from hr_employee_health_certificate h
+         where h.user_id = ${owner} and h.del_flag = '0' and h.review_status = 'APPROVED'
+           and coalesce(h.valid_from, h.issued_date) is not null
+           and h.issued_date &lt;= h.expires_on
+           and coalesce(h.valid_from, h.issued_date) &lt;= h.expires_on
+         order by case
+             when coalesce(h.valid_from, h.issued_date) &lt;= ${asOfExpr} and h.expires_on &gt;= ${asOfExpr} then 0
+             when h.expires_on &lt; ${asOfExpr} then 1 else 2 end,
+             case when h.current_flag = 'Y'
+                  and coalesce(h.valid_from, h.issued_date) &lt;= ${asOfExpr} and h.expires_on &gt;= ${asOfExpr}
+                  and (select count(*) from hr_employee_health_certificate v
+                       where v.user_id=h.user_id and v.del_flag='0' and v.review_status='APPROVED'
+                         and v.current_flag='Y' and v.issued_date &lt;= v.expires_on
+                         and coalesce(v.valid_from,v.issued_date) &lt;= ${asOfExpr}
+                         and v.expires_on &gt;= ${asOfExpr}) = 1 then 0 else 1 end,
+             case when coalesce(h.valid_from,h.issued_date) &gt; ${asOfExpr}
+                  then coalesce(h.valid_from,h.issued_date) end asc,
+             coalesce(h.valid_from,h.issued_date) desc, h.reviewed_time desc, h.certificate_id desc
+         limit 1)
+    </sql>
+
+    <sql id="chosenRow">
+        c.certificate_id = <include refid="chosenCertificateId">
+            <property name="owner" value="c.user_id"/>
+            <property name="asOfExpr" value="#{asOfDate}"/>
+        </include>
+    </sql>
+    <sql id="failedApprovalStartCondition">
+        c.review_status = 'APPROVAL_SUBMITTING' and exists (
+            select 1 from hr_health_certificate_approval_start_outbox o
+            where o.certificate_id = c.certificate_id and o.business_round = c.approval_round and o.status = 'FAILED')
+    </sql>
+    <sql id="pendingReviewCondition">c.review_status in ('PENDING_REVIEW', 'APPROVAL_PENDING')</sql>
 
     <sql id="columns">
         c.certificate_id, c.user_id, c.dept_id_snapshot, c.certificate_no,
@@ -57,9 +97,23 @@
         where c.certificate_id = #{certificateId} and c.del_flag = '0'
     </select>
 
+    <!-- Outer FOR UPDATE owns certificate rows only. Display metadata subqueries have no locking clause:
+         profile/user/dept workflows must not acquire locks in reverse order through a joined row lock. -->
+    <sql id="lockedColumns">
+        c.*,
+        (select p.employee_no from sys_user_profile p where p.user_id=c.user_id) employee_no,
+        (select u.nick_name from sys_user u where u.user_id=c.user_id) employee_name,
+        (select u.dept_id from sys_user u where u.user_id=c.user_id) current_dept_id,
+        (select d.dept_name from sys_user u left join sys_dept d on d.dept_id=u.dept_id
+         where u.user_id=c.user_id) current_dept_name
+    </sql>
+    <sql id="lockableCertificateOwner">
+        exists (select 1 from sys_user u where u.user_id=c.user_id and u.del_flag='0')
+    </sql>
     <select id="selectByIdForUpdate" resultMap="CertificateResult">
-        select <include refid="columns"/> <include refid="fromSql"/>
+        select <include refid="lockedColumns"/> from hr_employee_health_certificate c
         where c.certificate_id = #{certificateId} and c.del_flag = '0'
+          and <include refid="lockableCertificateOwner"/>
         for update
     </select>
 
@@ -70,10 +124,22 @@
                  c.create_time desc, c.certificate_id desc
     </select>
 
+    <select id="selectByUserIdForUpdate" resultMap="CertificateResult">
+        select <include refid="lockedColumns"/> from hr_employee_health_certificate c
+        where c.user_id = #{userId} and c.del_flag = '0'
+          and <include refid="lockableCertificateOwner"/>
+        order by c.certificate_id for update
+    </select>
+
     <select id="selectCurrentByUserIds" resultMap="CertificateResult">
-        select <include refid="columns"/> <include refid="fromSql"/>
+        select <include refid="columns"/>,
+            (select min(coalesce(f.valid_from,f.issued_date)) from hr_employee_health_certificate f
+             where f.user_id=c.user_id and f.del_flag='0' and f.review_status='APPROVED'
+               and f.issued_date &lt;= f.expires_on and coalesce(f.valid_from,f.issued_date) &lt;= f.expires_on
+               and coalesce(f.valid_from,f.issued_date) &gt; #{asOfDate}) next_valid_from
+        <include refid="fromSql"/>
         where c.del_flag = '0' and c.review_status = 'APPROVED'
-          and c.current_flag = 'Y' and c.user_id in
+          and <include refid="chosenRow"/> and c.user_id in
         <foreach collection="userIds" item="userId" open="(" close=")" separator=",">
             #{userId}
         </foreach>
@@ -84,11 +150,17 @@
         select <include refid="columns"/> <include refid="fromSql"/>
         where c.del_flag = '0'
         <if test="certificateId != null">and c.certificate_id = #{certificateId}</if>
-        <if test="reviewStatus != null and reviewStatus != ''">and c.review_status = #{reviewStatus}</if>
+        <choose>
+            <when test="reviewStatus == 'APPROVAL_START_FAILED'">and <include refid="failedApprovalStartCondition"/></when>
+            <when test="reviewStatus == 'PENDING_ALL'">and <include refid="pendingReviewCondition"/></when>
+            <otherwise><if test="reviewStatus != null and reviewStatus != ''">and c.review_status = #{reviewStatus}</if></otherwise>
+        </choose>
         <if test="currentDeptId != null">and u.dept_id = #{currentDeptId}</if>
-        <if test="healthCertificateStatus == 'EXPIRED'">and c.current_flag = 'Y' and c.expires_on &lt; current_date()</if>
-        <if test="healthCertificateStatus == 'EXPIRING'">and c.current_flag = 'Y' and c.expires_on between current_date() and date_add(current_date(), interval 30 day)</if>
-        <if test="healthCertificateStatus == 'EXPIRING_OR_EXPIRED'">and c.current_flag = 'Y' and c.review_status = 'APPROVED' and c.expires_on &lt;= date_add(current_date(), interval 30 day)</if>
+        <if test="healthCertificateStatus == 'EXPIRED'">and <include refid="chosenRow"/> and coalesce(c.valid_from,c.issued_date) &lt;= #{asOfDate} and c.expires_on &lt; #{asOfDate}</if>
+        <if test="healthCertificateStatus == 'EXPIRING'">and <include refid="chosenRow"/> and coalesce(c.valid_from,c.issued_date) &lt;= #{asOfDate} and c.expires_on between #{asOfDate} and date_add(#{asOfDate}, interval 30 day)</if>
+        <if test="healthCertificateStatus == 'EXPIRING_OR_EXPIRED'">and <include refid="chosenRow"/> and coalesce(c.valid_from,c.issued_date) &lt;= #{asOfDate} and c.expires_on &lt;= date_add(#{asOfDate}, interval 30 day)</if>
+        <if test="healthCertificateStatus == 'VALID'">and <include refid="chosenRow"/> and coalesce(c.valid_from,c.issued_date) &lt;= #{asOfDate} and c.expires_on &gt; date_add(#{asOfDate}, interval 30 day)</if>
+        <if test="healthCertificateStatus == 'NOT_YET_EFFECTIVE'">and c.review_status='APPROVED' and coalesce(c.valid_from,c.issued_date) &gt; #{asOfDate}</if>
         ${params.dataScope}
         order by case c.review_status when 'PENDING_REVIEW' then 0 else 1 end,
                  c.expires_on, c.certificate_id desc
@@ -97,26 +169,19 @@
     <select id="selectOpsSummary"
             parameterType="com.erp.system.domain.vo.HrHealthCertificateVo"
             resultType="com.erp.system.domain.vo.HrHealthCertificateOpsSummaryVo">
-        select coalesce(sum(case when c.review_status = 'PENDING_REVIEW'
-                                 then 1 else 0 end), 0) pendingReviewCount,
-               coalesce(sum(case when c.current_flag = 'Y'
-                                  and c.review_status = 'APPROVED'
-                                  and c.expires_on &gt; date_add(current_date(), interval 30 day)
-                                 then 1 else 0 end), 0) validCount,
-               coalesce(sum(case when c.current_flag = 'Y'
-                                  and c.review_status = 'APPROVED'
-                                  and c.expires_on between current_date()
-                                      and date_add(current_date(), interval 30 day)
-                                 then 1 else 0 end), 0) expiringCount,
-               coalesce(sum(case when c.current_flag = 'Y'
-                                  and c.review_status = 'APPROVED'
-                                  and c.expires_on &lt; current_date()
-                                 then 1 else 0 end), 0) expiredCount,
-               min(case when c.review_status = 'PENDING_REVIEW'
-                        then c.create_time end) oldestPendingTime,
-               coalesce(timestampdiff(hour,
-                   min(case when c.review_status = 'PENDING_REVIEW'
-                            then c.create_time end), sysdate()), 0) oldestPendingHours
+        select coalesce(sum(case when <include refid="pendingReviewCondition"/> then 1 else 0 end),0) pendingReviewCount,
+               coalesce(sum(case when c.review_status='PENDING_REVIEW' then 1 else 0 end),0) legacyPendingCount,
+               coalesce(sum(case when c.review_status='APPROVAL_PENDING' then 1 else 0 end),0) approvalPendingCount,
+               coalesce(sum(case when c.review_status='APPROVAL_SUBMITTING' then 1 else 0 end),0) approvalSubmittingCount,
+               coalesce(sum(case when <include refid="failedApprovalStartCondition"/> then 1 else 0 end),0) approvalStartFailedCount,
+               coalesce(sum(case when <include refid="chosenRow"/> and coalesce(c.valid_from,c.issued_date) &lt;= #{asOfDate}
+                    and c.expires_on &gt; date_add(#{asOfDate}, interval 30 day) then 1 else 0 end),0) validCount,
+               coalesce(sum(case when <include refid="chosenRow"/> and coalesce(c.valid_from,c.issued_date) &lt;= #{asOfDate}
+                    and c.expires_on between #{asOfDate} and date_add(#{asOfDate}, interval 30 day) then 1 else 0 end),0) expiringCount,
+               coalesce(sum(case when <include refid="chosenRow"/> and c.expires_on &lt; #{asOfDate} then 1 else 0 end),0) expiredCount,
+               min(case when <include refid="pendingReviewCondition"/> then c.create_time end) oldestPendingTime,
+               coalesce(timestampdiff(hour,min(case when <include refid="pendingReviewCondition"/>
+                    then c.create_time end), #{asOfTime}),0) oldestPendingHours
         <include refid="fromSql"/>
         where c.del_flag = '0'
         <if test="currentDeptId != null">and u.dept_id = #{currentDeptId}</if>
@@ -126,7 +191,8 @@
     <select id="selectReminderCandidates" resultMap="CertificateResult">
         select <include refid="columns"/> <include refid="fromSql"/>
         where c.del_flag = '0' and c.review_status = 'APPROVED'
-          and c.current_flag = 'Y' and c.expires_on &lt;= #{expiresThrough}
+          and <include refid="chosenRow"/> and coalesce(c.valid_from,c.issued_date) &lt;= #{asOfDate}
+          and c.expires_on &lt;= #{expiresThrough}
           and c.certificate_id &gt; #{afterCertificateId}
           and (p.employee_status is null or p.employee_status &lt;&gt; '离职')
         order by c.certificate_id
@@ -206,6 +272,14 @@
         set current_flag = null, update_by = #{updateBy},
             update_time = sysdate(), version = version + 1
         where user_id = #{userId} and current_flag = 'Y' and del_flag = '0'
+    </update>
+
+    <update id="setCurrentCertificate">
+        update hr_employee_health_certificate
+        set current_flag = 'Y', update_by = #{updateBy}, update_time = sysdate(), version = version + 1
+        where certificate_id = #{certificateId} and user_id = #{userId}
+          and review_status = 'APPROVED' and del_flag = '0' and current_flag is null
+          and coalesce(valid_from,issued_date) &lt;= #{asOfDate} and expires_on &gt;= #{asOfDate}
     </update>
 
     <update id="reviewCertificate">

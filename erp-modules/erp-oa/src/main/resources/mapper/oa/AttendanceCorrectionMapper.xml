@@ -127,6 +127,21 @@
         where e.punch_event_id = #{punchEventId}
     </select>
 
+    <!-- A valid approved WRONG_TYPE moves the effective source. Keep the raw
+         event available via selectPunchEventRef for audit, but let its old slot
+         receive a missing-punch correction instead of another physical event. -->
+    <sql id="notMovedByApprovedCorrection">
+        not exists (
+            select 1 from oa_attendance_correction_request moved
+            where moved.original_punch_event_id = e.punch_event_id
+              and moved.schedule_id = e.schedule_id and moved.user_id = e.user_id
+              and moved.shop_id = e.shop_id and moved.business_date = e.business_date
+              and moved.status = 'APPROVED' and moved.correction_type = 'WRONG_TYPE'
+              and moved.target_punch_type in ('IN', 'OUT')
+              and moved.target_punch_type != e.punch_type
+        )
+    </sql>
+
     <select id="selectSchedulePunchEvents"
             resultType="com.erp.oa.attendance.correction.AttendanceCorrectionModels$PunchEventRef">
         select e.punch_event_id punchEventId, e.schedule_id scheduleId,
@@ -143,23 +158,26 @@
          and ss.schedule_id = e.schedule_id
         where e.schedule_id = #{scheduleId} and e.user_id = #{userId}
           and e.verification_status = 'ACCEPTED'
+          and <include refid="notMovedByApprovedCorrection"/>
         order by e.server_punch_time, e.punch_event_id
     </select>
 
     <select id="countAcceptedPunchEvents" resultType="int">
         select count(*)
-        from oa_attendance_punch_event
-        where schedule_id = #{scheduleId} and user_id = #{userId}
-          and punch_type = #{punchType}
-          and verification_status = 'ACCEPTED'
+        from oa_attendance_punch_event e
+        where e.schedule_id = #{scheduleId} and e.user_id = #{userId}
+          and e.punch_type = #{punchType}
+          and e.verification_status = 'ACCEPTED'
+          and <include refid="notMovedByApprovedCorrection"/>
     </select>
 
     <select id="countAcceptedPunchEventsForSlot" resultType="int">
         select count(*)
-        from oa_attendance_punch_event
-        where schedule_id = #{scheduleId} and user_id = #{userId}
-          and punch_slot_key = #{punchSlotKey}
-          and verification_status = 'ACCEPTED'
+        from oa_attendance_punch_event e
+        where e.schedule_id = #{scheduleId} and e.user_id = #{userId}
+          and e.punch_slot_key = #{punchSlotKey}
+          and e.verification_status = 'ACCEPTED'
+          and <include refid="notMovedByApprovedCorrection"/>
     </select>
 
     <select id="selectApprovedLeaveSegmentsForSchedule"

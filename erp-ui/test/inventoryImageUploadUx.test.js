@@ -37,7 +37,7 @@ assert.ok(
 
 for (const [name, source] of [["gift", giftPage], ["OE", oePage]]) {
   assert.ok(
-    source.includes('<image-upload v-model="form.imageUrl"'),
+    source.includes('v-model="form.imageUrls"'),
     `${name} image maintenance should use click-to-upload`
   )
   assert.ok(

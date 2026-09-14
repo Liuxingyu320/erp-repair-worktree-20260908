@@ -9,6 +9,11 @@ public class UserNotificationResult implements Serializable
 {
     private static final long serialVersionUID = 1L;
 
+    /**
+     * Accepted means the request needs no automatic retry. For MOBILE_PUSH,
+     * NO_DEVICE is a terminal skip; only DELIVERED/DUPLICATE attest provider acceptance.
+     * DISABLED is not accepted and may be retried after configuration is repaired.
+     */
     private boolean accepted;
 
     private Long notificationId;

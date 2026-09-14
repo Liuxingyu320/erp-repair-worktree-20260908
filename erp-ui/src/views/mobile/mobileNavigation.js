@@ -50,6 +50,7 @@ const mobileSelfServiceFeatureKeys = [
   "attendance",
   "salary",
   "notice",
+  "messages",
   "profile",
   "mine"
 ]
@@ -81,6 +82,7 @@ const mobileContextOptionalPaths = [
   MOBILE_ROUTES.mine,
   MOBILE_ROUTES.profile,
   MOBILE_ROUTES.notice,
+  MOBILE_ROUTES.messages,
   MOBILE_ROUTES.drive,
   MOBILE_ROUTES.todo,
   MOBILE_ROUTES.signPackage
@@ -100,6 +102,7 @@ const mobileMineActivePaths = [
   MOBILE_ROUTES.mine,
   MOBILE_ROUTES.profile,
   MOBILE_ROUTES.notice,
+  MOBILE_ROUTES.messages,
   MOBILE_ROUTES.drive,
   MOBILE_ROUTES.todo,
   MOBILE_ROUTES.signPackage
@@ -174,10 +177,10 @@ const storeProfile = {
     subtitle: "销售 · 库存 · 退货 · 补货"
   },
   metrics: [
-    { label: "今日销售", value: "0", unit: "单", icon: "trend", tone: "blue" },
-    { label: "待发货", value: "0", unit: "单", icon: "truck", tone: "teal" },
-    { label: "低库存", value: "0", unit: "种", icon: "alert", tone: "red" },
-    { label: "待退货", value: "0", unit: "单", icon: "sales", tone: "amber" }
+    { key: "todaySalesCount", label: "今日销售", value: "—", unit: "单", icon: "trend", tone: "blue" },
+    { key: "pendingDeliverCount", label: "待发货", value: "—", unit: "单", icon: "truck", tone: "teal" },
+    { key: "lowStockCount", label: "低库存", value: "—", unit: "种", icon: "alert", tone: "red" },
+    { key: "pendingReturnCount", label: "待退货", value: "—", unit: "单", icon: "sales", tone: "amber" }
   ],
   priorityItems: [
     { title: "销售待发货", code: "STORE-SALES", meta: "门店订单 · 待处理", status: "待发货", tone: "blue", icon: "document", imageType: "boxes" },
@@ -214,10 +217,10 @@ const warehouseProfile = {
     subtitle: "入库 · 出库 · 退货 · 调拨"
   },
   metrics: [
-    { label: "待入库", value: "0", unit: "单", icon: "inbound", tone: "amber" },
-    { label: "待出库", value: "0", unit: "单", icon: "truck", tone: "teal" },
-    { label: "待盘点", value: "0", unit: "单", icon: "check", tone: "blue" },
-    { label: "待退货", value: "0", unit: "单", icon: "return", tone: "red" }
+    { key: "pendingReceiveCount", label: "待入库", value: "—", unit: "单", icon: "inbound", tone: "amber" },
+    { key: "pendingDeliverCount", label: "待出库", value: "—", unit: "单", icon: "truck", tone: "teal" },
+    { key: "pendingStockCheckCount", label: "待盘点", value: "—", unit: "单", icon: "check", tone: "blue" },
+    { key: "pendingReturnCount", label: "待退货", value: "—", unit: "单", icon: "return", tone: "red" }
   ],
   priorityItems: [
     { title: "采购待入库", code: "WH-INBOUND", meta: "供应商到货 · 待验收", status: "待入库", tone: "amber", icon: "package", imageType: "pallet" },

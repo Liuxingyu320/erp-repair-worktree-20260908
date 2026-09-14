@@ -38,6 +38,7 @@
         <result property="lastRejectedUserId" column="last_rejected_user_id"/>
         <result property="lastRejectedBy" column="last_rejected_by"/>
         <result property="lastRejectedTime" column="last_rejected_time"/>
+        <result property="restartReferenceSnapshot" column="restart_reference_snapshot"/>
         <result property="lastInvalidReason" column="last_invalid_reason"/>
         <result property="lastInvalidDetailSnapshot" column="last_invalid_detail_snapshot"/>
         <result property="lastInvalidatedTime" column="last_invalidated_time"/>
@@ -71,7 +72,7 @@
                s.approved_user_id, s.approved_by, s.approved_time,
                s.last_reject_reason, s.last_rejected_user_id, s.last_rejected_by,
                s.last_rejected_time, s.last_invalid_reason,
-               s.last_invalid_detail_snapshot, s.last_invalidated_time,
+               s.last_invalid_detail_snapshot, s.last_invalidated_time, s.restart_reference_snapshot,
                s.create_by, s.create_time, s.update_by, s.update_time, s.remark
         from inv_stock_check s
              left join sys_dept shop_dept on shop_dept.dept_id = s.shop_dept_id
@@ -102,7 +103,7 @@
                approved_user_id, approved_by, approved_time,
                last_reject_reason, last_rejected_user_id, last_rejected_by,
                last_rejected_time, last_invalid_reason,
-               last_invalid_detail_snapshot, last_invalidated_time,
+               last_invalid_detail_snapshot, last_invalidated_time, restart_reference_snapshot,
                create_by, create_time, update_by, update_time, remark
         from inv_stock_check
         where check_id = #{checkId}
@@ -278,6 +279,7 @@
             <if test="lastRejectedUserId != null">last_rejected_user_id = #{lastRejectedUserId},</if>
             <if test="lastRejectedBy != null">last_rejected_by = #{lastRejectedBy},</if>
             <if test="lastRejectedTime != null">last_rejected_time = #{lastRejectedTime},</if>
+            <if test="restartReferenceSnapshot != null">restart_reference_snapshot = #{restartReferenceSnapshot},</if>
             <if test="lastInvalidReason != null">last_invalid_reason = #{lastInvalidReason},</if>
             <if test="lastInvalidDetailSnapshot != null">last_invalid_detail_snapshot = #{lastInvalidDetailSnapshot},</if>
             <if test="lastInvalidatedTime != null">last_invalidated_time = #{lastInvalidatedTime},</if>

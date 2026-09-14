@@ -6,6 +6,8 @@ public class InvStockCheckAdjustmentEntry
 {
     private Long detailId;
     private Long productId;
+    private String itemType;
+    private Long itemId;
     private String productName;
     private BigDecimal beforeQuantity;
     private BigDecimal changeQuantity;
@@ -14,6 +16,10 @@ public class InvStockCheckAdjustmentEntry
 
     public Long getDetailId() { return detailId; }
     public void setDetailId(Long detailId) { this.detailId = detailId; }
+    public String getItemType() { return itemType == null || itemType.isBlank() ? "product" : itemType; }
+    public void setItemType(String itemType) { this.itemType = itemType; }
+    public Long getItemId() { return itemId == null ? productId : itemId; }
+    public void setItemId(Long itemId) { this.itemId = itemId; }
     public Long getProductId() { return productId; }
     public void setProductId(Long productId) { this.productId = productId; }
     public String getProductName() { return productName; }

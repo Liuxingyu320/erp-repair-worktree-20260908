@@ -113,6 +113,26 @@ public class SysNoticeReadServiceImpl implements ISysNoticeReadService
         return noticeReadMapper.selectReadUsersByNoticeId(noticeId, searchValue);
     }
 
+    @Override
+    @Transactional(readOnly = true, isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
+    public com.erp.system.domain.vo.SysNoticeReadPage selectReadUsersPage(Long noticeId, String searchValue)
+    {
+        try
+        {
+            if (noticeId == null || noticeId <= 0) throw new ServiceException("公告ID无效");
+            List<SysNoticeReadUserVo> rows = noticeReadMapper.selectReadUsersByNoticeId(noticeId, searchValue);
+            long total = new com.github.pagehelper.PageInfo<>(rows).getTotal();
+            // Do not allow the pending pagination context to constrain the summary.
+            com.github.pagehelper.PageHelper.clearPage();
+            com.erp.system.domain.vo.SysNoticeReadSummary summary = noticeReadMapper.selectReadSummary(noticeId);
+            return new com.erp.system.domain.vo.SysNoticeReadPage(rows, total, summary);
+        }
+        finally
+        {
+            com.github.pagehelper.PageHelper.clearPage();
+        }
+    }
+
     /**
      * 删除公告时清理对应已读记录
      */

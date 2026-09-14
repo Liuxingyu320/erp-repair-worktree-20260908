@@ -32,6 +32,7 @@ async function main() {
     'getFixedAssetPrecheckFromError', 'mobileErrorMessage', `return function(submitAction = 'save') {${body}}`)(
       runtime.saveMobileFeatureForm, result => recovery.acknowledge(result), () => null, error => error.message)
   const target = { featureKey: 'transfer', formSheet: { config: {}, open: true, mode: 'create' },
+    snapshotMobileFormData: data => JSON.stringify(data || {}),
     canUseMobileSubmitMode: () => true, getMobileFormValidationError: () => null,
     normalizeMobileFormPayload: () => ({ details: [{ productId: 1, quantity: 2 }] }),
     showActionSuccess() {}, closeMobileForm() { this.formSheet.open = false }, closeItem() {},

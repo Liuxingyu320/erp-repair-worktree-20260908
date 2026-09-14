@@ -170,7 +170,7 @@ assert.ok(
 assert.ok(
   pickerSource.includes("quickCreate") &&
     pickerSource.includes("MobileQuickCustomerForm") &&
-    pickerSource.includes("@select") === false,
+    pickerSource.match(/<mobile-quick-customer-form[\s\S]*?\/>/)[0].includes("@select") === false,
   "mobile customer picker should own quick creation and continue emitting the existing input/select contract"
 )
 

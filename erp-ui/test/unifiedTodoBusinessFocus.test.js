@@ -516,6 +516,9 @@ function loadVueComponent(relativePath, overrides) {
     module: { exports: {} },
     exports: {},
     require(request) {
+      if (request === '@/utils/uiOperationScope') return require('../src/utils/uiOperationScope')
+      if (request === '@/utils/oaPurchaseContext') return require('../src/utils/oaPurchaseContext')
+      if (request === '@/utils/todoBusinessFocus') return require('../src/utils/todoBusinessFocus')
       if (request.includes("todoBusinessFocus")) return require("../src/mixins/todoBusinessFocus")
       if (request.includes("signDateTime")) return require("../src/utils/signDateTime")
       if (request === "./mobileSignPackagePolicy") {
@@ -523,6 +526,9 @@ function loadVueComponent(relativePath, overrides) {
       }
       return {}
     },
+    ApprovalCommandRecovery: {},
+    createApprovalCommandRecovery: () => ({}),
+    getSelectedDeptId: () => '20',
     Treeselect: {},
     ImageUpload: {},
     approvalStatusLabel: status => status || "",
@@ -710,10 +716,11 @@ async function runOaDesktopFocusBehavior() {
   "desktop returned purchases must consume the shared exact-detail focus mixin")
 
   const exactPurchaseId = "9007199254740999"
+  let lossyPurchaseDetail = false
   const purchaseComponent = loadVueComponent("../src/views/oa/purchase/index.vue", {
     closePurchase() { return Promise.resolve() },
     getPurchaseDetail(id) {
-      return Promise.resolve({ data: { purchaseId: Number(id), status: "rejected", title: "精确采购" } })
+      return Promise.resolve({ data: { purchaseId: lossyPurchaseDetail ? Number(id) : id, status: "returned", title: "精确采购" } })
     },
     listMyPurchases() { return Promise.resolve({ rows: [], total: 0 }) },
     savePurchase() { return Promise.resolve({ data: {} }) },
@@ -724,7 +731,11 @@ async function runOaDesktopFocusBehavior() {
   })
   await purchaseContext.openForm({ purchaseId: exactPurchaseId })
   assert.strictEqual(String(purchaseContext.form.purchaseId), exactPurchaseId,
-    "returned purchase editing must preserve the authoritative requested id after a lossy JSON detail response")
+    "returned purchase editing must preserve the exact string business ID from a matching detail response")
+  lossyPurchaseDetail = true
+  await purchaseContext.openForm({ purchaseId: exactPurchaseId })
+  assert.strictEqual(purchaseContext.formReady, false, "unsafe rounded response ID must not permit editing another record")
+  assert.ok(purchaseContext.formError.includes("采购申请已变化"), "lossy ID response must be recoverable by an explicit reload")
 
 }
 

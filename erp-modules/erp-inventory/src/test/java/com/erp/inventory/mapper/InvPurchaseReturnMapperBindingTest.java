@@ -10,6 +10,7 @@ import org.apache.ibatis.session.Configuration;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import com.erp.inventory.domain.InvPurchaseOrder;
+import com.erp.inventory.domain.InvPurchaseDetail;
 import com.erp.inventory.domain.InvPurchaseReturn;
 
 @DisplayName("采购退货 Mapper 绑定")
@@ -24,6 +25,8 @@ class InvPurchaseReturnMapperBindingTest
                 "InvPurchaseOrder", InvPurchaseOrder.class);
         configuration.getTypeAliasRegistry().registerAlias(
                 "InvPurchaseReturn", InvPurchaseReturn.class);
+        configuration.getTypeAliasRegistry().registerAlias("InvPurchaseDetail", InvPurchaseDetail.class);
+        parseMapper(configuration, "mapper/inventory/InvPurchaseDetailMapper.xml");
         parseMapper(configuration, "mapper/inventory/InvPurchaseOrderMapper.xml");
         parseMapper(configuration, "mapper/inventory/InvPurchaseReturnMapper.xml");
 
@@ -46,7 +49,7 @@ class InvPurchaseReturnMapperBindingTest
                 "where o.shop_dept_id = #{shopDeptId}",
                 "o.status not in ('draft', 'cancelled')",
                 "purchase_return.status in ('submitted', 'returned')",
-                "return_detail.purchase_detail_id = source_detail.detail_id");
+                "return_detail.purchase_detail_id = d.detail_id");
         assertThat(returnXml).contains(
                 "where r.applicant_id = #{applicantId}",
                 "remark = #{remark}",

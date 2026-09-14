@@ -70,6 +70,14 @@ class AttendanceV2SegmentPunchStateMachineTest
         SecurityContextHolder.setUserName("张三");
         TransactionSynchronizationManager.initSynchronization();
         mapper = mock(AttendanceV2Mapper.class);
+        when(mapper.selectDatabaseClock()).thenAnswer(inv -> {
+            var local = mapper.selectDatabaseNow();
+            if (local == null) return null;
+            var sample = new com.erp.oa.attendance.domain.AttendanceModels.DatabaseClock();
+            sample.localTime = local;
+            sample.epochMillis = local.toInstant(java.time.ZoneOffset.ofHours(8)).toEpochMilli();
+            return sample;
+        });
         locationPolicy = mock(AttendanceLocationAuditPolicy.class);
         addressResolver = mock(AttendanceAddressResolver.class);
         evidenceStorage = mock(AttendanceEvidenceStorageService.class);
@@ -79,6 +87,8 @@ class AttendanceV2SegmentPunchStateMachineTest
         BusinessFeatureGate gate = mock(BusinessFeatureGate.class);
         doNothing().when(gate).requireEnabled(
                 BusinessFeatureGate.ATTENDANCE_V2);
+        ShopScopeService shopScope = mock(ShopScopeService.class);
+        when(shopScope.resolveRequiredShopDept(101L)).thenReturn(101L);
         service = new AttendanceV2Service(mapper, rules, locationPolicy,
                 new AttendanceCoordinateTransformer(),
                 new AttendanceGeoFence(),
@@ -87,7 +97,7 @@ class AttendanceV2SegmentPunchStateMachineTest
                 new AttendanceDaySettlementCalculator(rules),
                 evidenceStorage,
                 new AttendanceV2Properties(), runtimePolicy,
-                mock(ShopScopeService.class), gate,
+                shopScope, gate,
                 Clock.fixed(Instant.parse("2026-08-20T00:00:00Z"),
                         ZoneId.of("Asia/Shanghai")));
     }
@@ -106,7 +116,7 @@ class AttendanceV2SegmentPunchStateMachineTest
         LocalDateTime now = DAY.atTime(7, 45);
         stubToday(now, List.of(), List.of());
 
-        TodayContext context = service.today();
+        TodayContext context = service.today(101L);
 
         assertThat(context.punchModeSnapshot).isEqualTo("PER_WORK_SEGMENT");
         assertThat(context.canPunch).isTrue();
@@ -131,7 +141,7 @@ class AttendanceV2SegmentPunchStateMachineTest
         stubToday(now, List.of(event(101L, 91L, "IN", DAY.atTime(8, 0)),
                 event(102L, 91L, "OUT", DAY.atTime(12, 0))), List.of());
 
-        TodayContext context = service.today();
+        TodayContext context = service.today(101L);
 
         assertThat(context.canPunch).isFalse();
         assertThat(context.state).isEqualTo("BETWEEN_SEGMENTS");
@@ -149,7 +159,7 @@ class AttendanceV2SegmentPunchStateMachineTest
         morningLeave.endTime = DAY.atTime(12, 0);
         stubToday(now, List.of(), List.of(morningLeave));
 
-        TodayContext context = service.today();
+        TodayContext context = service.today(101L);
 
         assertThat(context.punchSlots.get(0).status).isEqualTo("EXEMPT_LEAVE");
         assertThat(context.punchSlots.get(1).status).isEqualTo("EXEMPT_LEAVE");
@@ -167,7 +177,7 @@ class AttendanceV2SegmentPunchStateMachineTest
         stubToday(now, List.of(event(101L, 91L, "IN", DAY.atTime(8, 0))),
                 List.of());
 
-        TodayContext context = service.today();
+        TodayContext context = service.today(101L);
 
         assertThat(context.punchSlots.get(1).punchSlotKey)
                 .isEqualTo("SEGMENT:91:OUT");
@@ -189,7 +199,7 @@ class AttendanceV2SegmentPunchStateMachineTest
         afterIsland.endTime = DAY.atTime(12, 0);
         stubToday(now, List.of(), List.of(beforeIsland, afterIsland));
 
-        TodayContext context = service.today();
+        TodayContext context = service.today(101L);
 
         assertThat(context.punchSlots.get(0).status)
                 .isEqualTo("REMAINING_WORK_PENDING");
@@ -203,12 +213,38 @@ class AttendanceV2SegmentPunchStateMachineTest
     }
 
     @Test
+    void reviewedWorkIslandKeepsLaterSegmentPunchableAndCannotHideItsMissingPunches()
+    {
+        LeaveSegmentSource before = new LeaveSegmentSource();
+        before.startTime = DAY.atTime(8, 0); before.endTime = DAY.atTime(10, 0);
+        LeaveSegmentSource after = new LeaveSegmentSource();
+        after.startTime = DAY.atTime(11, 0); after.endTime = DAY.atTime(12, 0);
+        var confirmed = new com.erp.oa.attendance.domain.AttendanceSettlementModels.RemainingWorkConfirmationSource();
+        confirmed.confirmationId = 801L; confirmed.scheduleId = 31L;
+        confirmed.userId = 9L; confirmed.shopId = 101L; confirmed.businessDate = DAY;
+        confirmed.remainingStart = DAY.atTime(10, 0); confirmed.remainingEnd = DAY.atTime(11, 0);
+        confirmed.decision = "ATTENDED";
+        confirmed.actualArrivalTime = confirmed.remainingStart;
+        confirmed.actualDepartureTime = confirmed.remainingEnd;
+        when(mapper.selectRemainingWorkConfirmationSources(31L, false)).thenReturn(List.of(confirmed));
+        stubToday(DAY.atTime(13, 45), List.of(), List.of(before, after));
+        TodayContext context = service.today(101L);
+        assertThat(context.punchSlots.get(0).status).isEqualTo("REMAINING_WORK_CONFIRMED");
+        assertThat(context.punchSlots.get(0).completed).isTrue();
+        assertThat(context.punchSlots.get(0).requiresRemainingWorkConfirmation).isFalse();
+        assertThat(context.nextPunchSlot.punchSlotKey).isEqualTo("SEGMENT:93:IN");
+        assertThat(context.canPunch).isTrue();
+        stubToday(DAY.atTime(23, 0), List.of(), List.of(before, after));
+        assertThat(service.today(101L).state).isEqualTo("CLOSED_WITH_MISSING");
+    }
+
+    @Test
     void dayEndWithOnlyExpiredMissingSlotsIsNotReportedCompleted()
     {
         LocalDateTime now = DAY.atTime(19, 0);
         stubToday(now, List.of(), List.of());
 
-        TodayContext context = service.today();
+        TodayContext context = service.today(101L);
 
         assertThat(context.state).isEqualTo("CLOSED_WITH_MISSING");
         assertThat(context.canPunch).isFalse();
@@ -237,7 +273,7 @@ class AttendanceV2SegmentPunchStateMachineTest
         request.punchType = "IN";
         request.punchSlotKey = "SEGMENT:91:IN";
 
-        var response = service.issueChallenge(request);
+        var response = service.issueChallenge(request, 101L);
 
         assertThat(response.punchSlotKey).isEqualTo("SEGMENT:91:IN");
         ArgumentCaptor<Challenge> challenge = ArgumentCaptor.forClass(
@@ -249,7 +285,7 @@ class AttendanceV2SegmentPunchStateMachineTest
                 .isEqualTo("SEGMENT:91:IN");
 
         request.punchSlotKey = "SEGMENT:93:IN";
-        assertThatThrownBy(() -> service.issueChallenge(request))
+        assertThatThrownBy(() -> service.issueChallenge(request, 101L))
                 .isInstanceOf(ServiceException.class)
                 .hasMessage("PUNCH_SLOT_NOT_NEXT");
     }
@@ -284,7 +320,7 @@ class AttendanceV2SegmentPunchStateMachineTest
         command.punchSlotKey = "SEGMENT:93:IN";
         command.clientCaptureTime = now;
 
-        assertThatThrownBy(() -> service.punch(command, null))
+        assertThatThrownBy(() -> service.punch(command, null, 101L))
                 .isInstanceOf(ServiceException.class)
                 .hasMessage("PUNCH_SLOT_CHALLENGE_MISMATCH");
         verify(locationPolicy, never()).requireValid(any(), any(), any(), any());
@@ -324,7 +360,7 @@ class AttendanceV2SegmentPunchStateMachineTest
         command.punchSlotKey = "SEGMENT:91:IN";
         command.clientCaptureTime = now;
 
-        assertThatThrownBy(() -> service.punch(command, null))
+        assertThatThrownBy(() -> service.punch(command, null, 101L))
                 .isInstanceOf(ServiceException.class)
                 .hasMessage("PUNCH_DAY_RESULT_ALREADY_SETTLED");
         verify(locationPolicy, never()).requireValid(any(), any(), any(), any());
@@ -402,7 +438,7 @@ class AttendanceV2SegmentPunchStateMachineTest
         command.clientCoordinateSystem = "WGS84";
         MultipartFile photo = mock(MultipartFile.class);
 
-        var result = service.punch(command, photo);
+        var result = service.punch(command, photo, 101L);
 
         assertThat(result.event.scheduleSegmentSnapshotId).isEqualTo(91L);
         assertThat(result.event.punchSlotKey).isEqualTo("SEGMENT:91:OUT");
@@ -422,7 +458,7 @@ class AttendanceV2SegmentPunchStateMachineTest
         Schedule schedule = schedule();
         when(mapper.selectDatabaseNow()).thenReturn(now);
         when(mapper.selectPublishedScheduleCandidatesForUser(9L,
-                now.toLocalDate(), now.toLocalDate().minusDays(1)))
+                now.toLocalDate().minusDays(2), now.toLocalDate().plusDays(1)))
                 .thenReturn(List.of(schedule));
         when(mapper.countActiveEmployeeInShop(9L, 101L)).thenReturn(1);
         stubSegmentState(schedule, accepted, leaves, false);

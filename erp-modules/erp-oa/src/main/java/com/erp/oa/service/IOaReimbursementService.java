@@ -20,6 +20,15 @@ public interface IOaReimbursementService
     OaReimbursement withdraw(Long reimbursementId, String reason,
             Long selectedShopDeptId);
 
+    default OaReimbursement withdraw(Long reimbursementId, String reason,
+            Long selectedShopDeptId, Long expectedApprovalInstanceId,
+            Integer expectedApprovalRound)
+    {
+        if (expectedApprovalInstanceId != null || expectedApprovalRound != null)
+            throw new IllegalStateException("当前服务不支持指定审批轮次撤回");
+        return withdraw(reimbursementId, reason, selectedShopDeptId);
+    }
+
     boolean isSubmissionEnabled();
 
     Map<String, Object> recognitionAvailability();

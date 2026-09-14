@@ -147,6 +147,20 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         for update
     </select>
 
+    <select id="lockPublishedVersionsByPlanId" resultMap="PlanVersionResult">
+        select <include refid="planVersionColumns"/>
+        from oa_sign_plan_version
+        where plan_id = #{planId} and publish_status = 'PUBLISHED'
+        order by version_id asc
+        for update
+    </select>
+
+    <update id="enableForNewMatching">
+        update oa_sign_plan_version set matching_status = 'ENABLED'
+        where version_id = #{versionId} and publish_status = 'PUBLISHED'
+          and matching_status = 'DISABLED'
+    </update>
+
     <select id="lockPlanTemplateBindings" resultMap="SourcePlanBindingResult">
         select id, plan_id, template_id, template_type, sort_order
         from oa_sign_plan_template

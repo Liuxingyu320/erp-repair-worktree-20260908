@@ -59,7 +59,8 @@ class DriveControllerContractTest
         assertPermission(DriveNodeController.class.getMethod(
                 "createFolder", DriveFolderCreateRequest.class));
         assertPermission(DriveNodeController.class.getMethod(
-                "upload", MultipartFile.class, Long.class, Long.class));
+                "upload", MultipartFile.class, Long.class, Long.class, String.class));
+        assertPermission(DriveNodeController.class.getMethod("uploadReceipt", String.class));
         assertPermission(DriveNodeController.class.getMethod(
                 "rename", Long.class, DriveRenameRequest.class));
         assertPermission(DriveNodeController.class.getMethod(

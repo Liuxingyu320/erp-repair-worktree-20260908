@@ -35,31 +35,9 @@
         </span>
       </section>
 
-      <div class="hr-drawer-section">
-        <h4>当前健康证</h4>
-        <el-descriptions :column="2" border size="small">
-          <el-descriptions-item label="证件状态">
-            <el-tag :type="healthCertificateType" size="mini">{{ healthCertificateLabel }}</el-tag>
-          </el-descriptions-item>
-          <el-descriptions-item label="附件">{{ detail.healthCertificateAttachmentPresent ? "已绑定受控附件" : "未绑定附件" }}</el-descriptions-item>
-          <el-descriptions-item label="办理日期">{{ detail.healthCertificateIssuedDate || "-" }}</el-descriptions-item>
-          <el-descriptions-item label="到期日期">{{ detail.healthCertificateExpiresOn || "-" }}</el-descriptions-item>
-        </el-descriptions>
-      </div>
-
-      <div class="hr-drawer-section">
-        <h4>当前健康证</h4>
-        <el-descriptions :column="2" border size="small">
-          <el-descriptions-item label="证件状态">
-            <el-tag :type="healthCertificateType" size="mini">{{ healthCertificateLabel }}</el-tag>
-          </el-descriptions-item>
-          <el-descriptions-item label="附件">{{ detail.healthCertificateAttachmentPresent ? "已绑定受控附件" : "未绑定附件" }}</el-descriptions-item>
-          <el-descriptions-item label="办理日期">{{ detail.healthCertificateIssuedDate || "-" }}</el-descriptions-item>
-          <el-descriptions-item label="到期日期">{{ detail.healthCertificateExpiresOn || "-" }}</el-descriptions-item>
-        </el-descriptions>
-      </div>
-
       <div class="hr-drawer-actions">
+        <el-button size="mini" type="primary" plain @click="$emit('regularize', detail)" v-hasPermi="['hr:employee:regularize']">办理转正</el-button>
+        <el-button size="mini" type="success" plain @click="$emit('renewal', detail)" v-hasPermi="['hr:employee:renewal']">办理续签</el-button>
         <el-button size="mini" type="primary" icon="el-icon-edit" @click="$emit('edit', detail)" v-hasPermi="['hr:employee:edit']">编辑档案</el-button>
         <el-button
           v-if="showOnboardContractActions"
@@ -85,6 +63,7 @@
             <p>用于健康证状态确认与到期提醒</p>
           </div>
         </div>
+        <p v-if="detail.healthCertificateNextValidFrom" class="hr-health-renewal">已通过的续证将于 {{ detail.healthCertificateNextValidFrom }} 生效；生效前不替换当前有效证。</p>
         <div class="hr-health-grid">
           <div class="hr-health-item is-status">
             <span class="hr-health-item__icon"><i class="el-icon-medal" /></span>
@@ -212,6 +191,7 @@
         </div>
       </section>
 
+      <hr-salary-source-panel :employee-id="detail.userId" :visible="visible" />
       <section class="hr-drawer-section hr-detail-section">
         <div class="hr-section-heading">
           <span class="hr-section-heading__icon is-detail"><i class="el-icon-document" /></span>
@@ -251,6 +231,7 @@
 </template>
 
 <script>
+import HrSalarySourcePanel from "./HrSalarySourcePanel"
 import HrSensitiveFieldValue from "./HrSensitiveFieldValue"
 import { DETAIL_GROUPS, SENSITIVE_FIELDS, groupMissingProfileFields, profileFieldLabel, resolveMissingProfileFields } from "./hrFieldConfig"
 import { signingOptionsForKey, signingProfileLabel } from "./signingProfileOptions"
@@ -266,7 +247,7 @@ function normalizePositiveDecimalId(value) {
 
 export default {
   name: "HrProfileDetailDrawer",
-  components: { HrSensitiveFieldValue },
+  components: { HrSensitiveFieldValue, HrSalarySourcePanel },
   props: {
     visible: {
       type: Boolean,
@@ -354,7 +335,7 @@ export default {
     },
     healthCertificateLabel() {
       const status = this.detail && this.detail.healthCertificateStatus
-      return { VALID: "有效", EXPIRING: "即将到期", EXPIRED: "已过期", NOT_SUBMITTED: "未提交" }[status] || "未提交"
+      return { NOT_YET_EFFECTIVE: "当前无有效证，续证待生效", INVALID_DATES: "日期待核对", VALID: "有效", EXPIRING: "即将到期", EXPIRED: "已过期", NOT_SUBMITTED: "未提交" }[status] || "未提交"
     },
     healthCertificateType() {
       const status = this.detail && this.detail.healthCertificateStatus

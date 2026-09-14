@@ -18,6 +18,7 @@ public class OaFixedAssetRepairPrecheckVo
     private String itemDescription;
     private String orderUnit;
     private String imageUrl;
+    private List<String> imageUrls;
     private String purchaseReferenceUrl;
     private String purchaseReferenceNote;
     private Boolean purchaseReferenceReady;
@@ -45,6 +46,8 @@ public class OaFixedAssetRepairPrecheckVo
     public void setOrderUnit(String orderUnit) { this.orderUnit = orderUnit; }
     public String getImageUrl() { return imageUrl; }
     public void setImageUrl(String imageUrl) { this.imageUrl = imageUrl; }
+    public List<String> getImageUrls() { return imageUrls; }
+    public void setImageUrls(List<String> value) { imageUrls = value; }
     public String getPurchaseReferenceUrl() { return purchaseReferenceUrl; }
     public void setPurchaseReferenceUrl(String purchaseReferenceUrl) { this.purchaseReferenceUrl = purchaseReferenceUrl; }
     public String getPurchaseReferenceNote() { return purchaseReferenceNote; }

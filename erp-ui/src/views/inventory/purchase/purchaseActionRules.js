@@ -19,8 +19,7 @@ function receivedQuantity(row) {
 
 function canReceivePurchase(row) {
   const status = normalizeStatus(row && row.status)
-  const qcStatus = normalizeStatus(row && row.qcStatus)
-  if (status !== "submitted" || qcStatus === "pending") return false
+  if (status !== "submitted") return false
   return !hasKnownRemainingQuantity(row) || remainingQuantity(row) > 0
 }
 

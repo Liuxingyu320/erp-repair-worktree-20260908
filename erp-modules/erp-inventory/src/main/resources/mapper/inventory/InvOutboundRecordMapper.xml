@@ -29,6 +29,18 @@
         where sales_order_id = #{orderId}
     </select>
 
+    <select id="selectInvOutboundRecordBySalesDetailId" resultMap="InvOutboundRecordResult">
+        select o.outbound_id, o.sales_order_id, o.order_no, o.item_type, o.item_id,
+               o.product_id, o.shop_dept_id, o.quantity, o.create_by, o.create_time, o.remark,
+               o.notice_id, o.notice_detail_id, o.cost_price, o.cost_amount
+        from inv_outbound_record o
+        inner join inv_delivery_notice_detail d on d.detail_id = o.notice_detail_id
+        inner join inv_delivery_notice n on n.notice_id = d.notice_id and n.notice_id = o.notice_id
+        where o.sales_order_id = #{salesOrderId} and n.sales_order_id = #{salesOrderId}
+          and d.sales_detail_id = #{salesDetailId}
+        order by o.outbound_id
+    </select>
+
     <insert id="insertInvOutboundRecord" parameterType="InvOutboundRecord" useGeneratedKeys="true" keyProperty="outboundId">
         insert into inv_outbound_record (
             sales_order_id, order_no, item_type, item_id, product_id, shop_dept_id,

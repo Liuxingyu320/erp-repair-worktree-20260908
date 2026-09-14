@@ -23,6 +23,7 @@ import com.erp.common.log.enums.BusinessType;
 import com.erp.common.security.annotation.IdempotentSubmit;
 import com.erp.common.security.annotation.RequiresPermissions;
 import com.erp.inventory.domain.InvOeItem;
+import com.erp.inventory.domain.dto.InvOeEditRequest;
 import com.erp.inventory.service.IInvOeService;
 
 @RestController
@@ -59,7 +60,7 @@ public class InvOeController extends InvBaseController
     @IdempotentSubmit(timeout = 30)
     @Log(title = "OE管理", businessType = BusinessType.INSERT)
     @PostMapping
-    public AjaxResult add(@Validated @RequestBody InvOeItem item, HttpServletRequest request)
+    public AjaxResult add(@Validated @RequestBody InvOeEditRequest item, HttpServletRequest request)
     {
         return success(oeService.saveOe(item, resolveShopDeptId(request)));
     }
@@ -68,7 +69,7 @@ public class InvOeController extends InvBaseController
     @IdempotentSubmit(timeout = 30)
     @Log(title = "OE管理", businessType = BusinessType.UPDATE)
     @PostMapping("/update")
-    public AjaxResult edit(@Validated @RequestBody InvOeItem item, HttpServletRequest request)
+    public AjaxResult edit(@Validated @RequestBody InvOeEditRequest item, HttpServletRequest request)
     {
         return success(oeService.saveOe(item, resolveShopDeptId(request)));
     }

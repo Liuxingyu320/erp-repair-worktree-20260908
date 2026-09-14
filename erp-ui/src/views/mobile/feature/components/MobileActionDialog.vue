@@ -45,26 +45,32 @@
             </select>
           </label>
           <section v-if="showQuality && !qualityLegacyMode && qualityRows.length" class="mobile-quality-list">
+            <p>勾选本次检验的商品，未勾选商品继续待检。</p>
+            <div class="quality-selection-actions">
+              <label><input type="checkbox" :checked="qualityRows.every(isQualitySelected)" @change="setQualitySelection($event.target.checked)">全选</label>
+              <button type="button" @click="fillSelectedQualityPassed">所选全部合格</button>
+              <button type="button" @click="clearSelectedQualityResults">清空分类数量</button>
+            </div>
             <article v-for="row in qualityRows" :key="row.batchDetailId" class="mobile-quality-row">
               <header>
-                <strong>{{ row.itemName || row.itemCode || row.batchDetailId }}</strong>
+                <label><input v-model="row.qcSelected" type="checkbox">选择检验：{{ row.itemName || row.itemCode || row.batchDetailId }}</label>
                 <span>待检 {{ row.pendingQuantity }} {{ row.unit || '' }}</span>
               </header>
               <div class="mobile-quality-grid">
-                <label><span>本次检验</span><input v-model.number="row.inspectedQuantity" type="number" min="0" :max="row.pendingQuantity" step="0.01"></label>
-                <label><span>合格</span><input v-model.number="row.acceptedQuantity" type="number" min="0" step="0.01"></label>
-                <label><span>拒收</span><input v-model.number="row.rejectedQuantity" type="number" min="0" step="0.01"></label>
-                <label><span>让步</span><input v-model.number="row.concessionQuantity" type="number" min="0" step="0.01"></label>
+                <label><span>本次检验</span><input v-model.number="row.inspectedQuantity" :disabled="!isQualitySelected(row)" type="number" min="0" :max="row.pendingQuantity" step="0.01"></label>
+                <label><span>合格</span><input v-model.number="row.acceptedQuantity" :disabled="!isQualitySelected(row)" type="number" min="0" step="0.01"></label>
+                <label><span>拒收</span><input v-model.number="row.rejectedQuantity" :disabled="!isQualitySelected(row)" type="number" min="0" step="0.01"></label>
+                <label><span>让步</span><input v-model.number="row.concessionQuantity" :disabled="!isQualitySelected(row)" type="number" min="0" step="0.01"></label>
               </div>
               <label>
                 <span>缺陷等级</span>
-                <select v-model="row.defectLevel">
+                <select v-model="row.defectLevel" :disabled="!isQualitySelected(row)">
                   <option value="">选填</option><option value="minor">轻微</option><option value="major">一般</option><option value="critical">严重</option>
                 </select>
               </label>
               <label>
                 <span>拒收/让步原因</span>
-                <textarea v-model.trim="row.defectReason" rows="2" placeholder="有拒收或让步数量时必填" />
+                <textarea v-model.trim="row.defectReason" :disabled="!isQualitySelected(row)" rows="2" placeholder="有拒收或让步数量时必填" />
               </label>
             </article>
           </section>
@@ -125,10 +131,10 @@
                     <option v-if="hasDiscrepancyDecision(row, 'WRITE_OFF')" value="WRITE_OFF">核销差异</option>
                   </select>
                 </label>
-                <label>
-                  <span>{{ row.attachmentRequired ? "附件引用（必填）" : "附件引用（可选）" }}</span>
-                  <input v-model.trim="row.attachmentRefs" type="text" maxlength="2000" :placeholder="row.attachmentRequired ? '残损终结处置需填写受控附件节点' : '受控附件节点编号，可选'">
-                </label>
+                <div class="transfer-evidence-field">
+                  <span>{{ row.attachmentRequired ? "凭证附件（必填）" : "凭证附件（可选）" }}</span>
+                  <transfer-evidence-picker v-if="open" v-model="row.attachmentRefs" :context-key="evidenceEpoch + ':' + selectedDeptId + ':discrepancy:' + discrepancyId + ':' + row.detailId + ':' + row.category" :required="row.attachmentRequired && ['RETURN_SOURCE', 'WRITE_OFF'].includes(row.decision)" @upload-state="$set(row, 'evidenceState', $event)"/>
+                </div>
                 <label>
                   <span>逐项说明</span>
                   <textarea v-model.trim="row.note" rows="2" maxlength="1000" placeholder="可补充本类别处置依据" />
@@ -170,6 +176,7 @@
                   placeholder="有短少、拒收或残损时必填"
                 />
               </label>
+              <div><span>凭证附件</span><transfer-evidence-picker v-if="open" v-model="row.attachmentRefs" :context-key="evidenceEpoch + ':' + selectedDeptId + ':receipt:' + shipmentId + ':' + row.detailId" @upload-state="$set(row, 'evidenceState', $event)"/></div>
             </article>
           </section>
           <section v-else-if="quantityRows.length" class="action-quantity-list">
@@ -177,8 +184,14 @@
               <div>
                 <strong>{{ row.productName || row.productCode || row.detailId }}</strong>
                 <span>{{ row.meta }}</span>
+                <span v-if="isStockCheckQuantityAction() && row.needsSnapshotReview">库存已变化，请重新核对</span>
+                <span v-if="isStockCheckQuantityAction() && row.previousActualQty != null">上轮实盘 {{ row.previousActualQty }}<template v-if="row.previousRecountQty != null"> · 上轮复盘 {{ row.previousRecountQty }}</template></span>
               </div>
-              <input v-model.number="row.quantity" type="number" min="0" :max="row.remaining" step="0.01" :aria-label="quantityInputLabel(row)">
+              <input v-model.number="row.quantity" @input="handleStockCheckActualChange(row)" type="number" min="0" :max="isStockCheckQuantityAction() ? undefined : row.remaining" step="0.01" :aria-label="quantityInputLabel(row)">
+              <label v-if="isStockCheckQuantityAction() && (Number(rawItem.recountThreshold || 0) > 0 || row.recountRequired === '1')">
+                复盘数量（达到阈值时填写）
+                <input v-model.number="row.recountQty" type="number" min="0" step="0.01" :aria-label="(row.productName || row.productCode || row.detailId) + '复盘数量'">
+              </label>
             </article>
           </section>
           <section v-if="stockDifferenceRows.length" class="action-quantity-list">
@@ -249,6 +262,7 @@ function normalizeReceiveTime(value) {
 
 export default {
   name: "MobileActionDialog",
+  components: { TransferEvidencePicker: () => import("@/components/TransferEvidencePicker.vue") },
   props: {
     open: Boolean,
     action: { type: Object, default: () => ({}) },
@@ -268,6 +282,7 @@ export default {
       receiptBatchId: "",
       qualityRows: [],
       qualityRequestToken: 0,
+      evidenceEpoch: 0,
       shipmentId: "",
       arrivedTime: "",
       supplierBatchNo: "",
@@ -409,6 +424,7 @@ export default {
       return (row.productName || row.productCode || row.detailId || "明细") + "处理数量"
     },
     resetDialog() {
+      this.evidenceEpoch++
       this.comment = ""
       this.qcResult = ""
       this.qualityLoading = false
@@ -479,7 +495,8 @@ export default {
         itemCode: item.itemCode,
         unit: item.unit,
         pendingQuantity: Number(item.pendingQuantity || 0),
-        inspectedQuantity: Number(item.pendingQuantity || 0),
+        qcSelected: false,
+        inspectedQuantity: 0,
         acceptedQuantity: 0,
         rejectedQuantity: 0,
         concessionQuantity: 0,
@@ -593,9 +610,16 @@ export default {
             ? (remaining === "" ? "必须录入实盘数量" : "已录实盘 " + remaining)
             : "剩余 " + remaining,
           quantity: remaining,
+          recountQty: row.recountQty == null ? "" : row.recountQty,
+          recountRequired: row.recountRequired,
+          snapshotVersion: row.snapshotVersion,
+          previousActualQty: row.previousActualQty,
+          previousRecountQty: row.previousRecountQty,
+          needsSnapshotReview: row.needsSnapshotReview,
           rejectedQuantity: 0,
           damagedQuantity: 0,
-          discrepancyNote: ""
+          discrepancyNote: "",
+          attachmentRefs: ""
         }
       }).filter(row => row.detailId !== undefined && (this.isStockCheckQuantityAction() || row.quantity > 0))
     },
@@ -637,6 +661,9 @@ export default {
         "submitStockCheck"
       ].indexOf(this.action.id) > -1
     },
+    handleStockCheckActualChange(row) {
+      if (this.isStockCheckQuantityAction()) row.recountQty = ""
+    },
     normalizeQuantityRows() {
       return this.quantityRows.map(row => {
         const quantity = Number(row.quantity)
@@ -644,11 +671,16 @@ export default {
           detailId: row.detailId,
           quantity
         }
+        if (this.isStockCheckQuantityAction()) {
+          if (row.snapshotVersion != null) normalized.snapshotVersion = row.snapshotVersion
+          normalized.recountQty = row.recountQty === "" || row.recountQty == null ? null : Number(row.recountQty)
+        }
         if (this.showTransferReceipt) {
           normalized.receiveQuantity = quantity
           normalized.rejectedQuantity = Number(row.rejectedQuantity)
           normalized.damagedQuantity = Number(row.damagedQuantity)
           normalized.discrepancyNote = String(row.discrepancyNote || "").trim()
+          normalized.attachmentRefs = String(row.attachmentRefs || "").trim()
         }
         return normalized
       }).filter(row => row.detailId !== undefined && Number.isFinite(row.quantity))
@@ -691,7 +723,10 @@ export default {
         if (rawQuantity === "" || rawQuantity === null || rawQuantity === undefined) return true
         const quantity = Number(rawQuantity)
         return row.detailId === undefined || !Number.isFinite(quantity) ||
-          quantity > Number(row.remaining) || (allowZero ? quantity < 0 : quantity <= 0)
+          (!this.isStockCheckQuantityAction() && quantity > Number(row.remaining)) ||
+          (allowZero ? quantity < 0 : quantity <= 0) ||
+          (this.isStockCheckQuantityAction() && row.recountQty !== "" && row.recountQty != null &&
+            (!Number.isFinite(Number(row.recountQty)) || Number(row.recountQty) < 0))
       })
       if (invalidRow) {
         this.error = this.action.id === "confirmTransferSource"
@@ -724,11 +759,11 @@ export default {
       const invalid = this.discrepancyRows.find(row => {
         const validDecision = (row.decisionOptions || []).some(option => option.value === row.decision)
         const needsAttachment = row.attachmentRequired && ["RETURN_SOURCE", "WRITE_OFF"].indexOf(row.decision) > -1
-        return !validDecision || (needsAttachment && !String(row.attachmentRefs || "").trim())
+        return !validDecision || (needsAttachment && !require("@/utils/transferEvidence").hasEvidence(row.attachmentRefs))
       })
       if (invalid) {
         this.error = invalid.attachmentRequired
-          ? invalid.itemName + "：残损终结处置必须填写附件节点"
+          ? invalid.itemName + "：残损终结处置必须上传或选择凭证附件"
           : invalid.itemName + "：请选择该类别允许的处置决定"
         return false
       }
@@ -744,6 +779,26 @@ export default {
         attachmentRefs: String(row.attachmentRefs || "").trim()
       }))
     },
+    isQualitySelected(row) {
+      return !!row && (row.qcSelected === true || (row.qcSelected === undefined && Number(row.inspectedQuantity) > 0))
+    },
+    setQualitySelection(selected) {
+      this.qualityRows.forEach(row => this.$set(row, 'qcSelected', selected))
+    },
+    fillSelectedQualityPassed() {
+      this.qualityRows.filter(this.isQualitySelected).forEach(row => {
+        const inspected = Number(row.inspectedQuantity), pending = Number(row.pendingQuantity)
+        row.inspectedQuantity = Number.isFinite(inspected) && inspected > 0 && inspected <= pending ? inspected : pending
+        row.acceptedQuantity = row.inspectedQuantity
+        row.rejectedQuantity = 0; row.concessionQuantity = 0
+        row.defectLevel = ''; row.defectReason = ''
+      })
+    },
+    clearSelectedQualityResults() {
+      this.qualityRows.filter(this.isQualitySelected).forEach(row => {
+        row.acceptedQuantity = 0; row.rejectedQuantity = 0; row.concessionQuantity = 0
+      })
+    },
     buildQualityItems() {
       if (!this.showQuality || this.qualityLegacyMode) return []
       if (this.qualityLoading || this.qualityLoadFailed || !this.receiptBatchId || !this.qualityRows.length) {
@@ -753,6 +808,7 @@ export default {
       const items = []
       for (let index = 0; index < this.qualityRows.length; index += 1) {
         const row = this.qualityRows[index]
+        if (!this.isQualitySelected(row)) continue
         const inspected = Number(row.inspectedQuantity)
         const accepted = Number(row.acceptedQuantity)
         const rejected = Number(row.rejectedQuantity)
@@ -763,8 +819,7 @@ export default {
           this.error = itemName + "：质检数量必须是非负数"
           return null
         }
-        if (inspected === 0 && accepted === 0 && rejected === 0 && concession === 0) continue
-        if (inspected <= 0 || inspected > Number(row.pendingQuantity)) {
+        if (inspected <= 0 || !Number.isFinite(Number(row.pendingQuantity)) || inspected > Number(row.pendingQuantity)) {
           this.error = itemName + "：本次检验数量不能超过待检数量"
           return null
         }
@@ -787,12 +842,17 @@ export default {
         })
       }
       if (!items.length) {
-        this.error = "请至少完成一条质检明细"
+        this.error = "请至少勾选并完成一条质检明细"
         return null
       }
       return items
     },
     confirm() {
+      const evidenceRows = this.showTransferDiscrepancy ? this.discrepancyRows : this.showTransferReceipt ? this.quantityRows : []
+      if (evidenceRows.some(row => row.evidenceState && !row.evidenceState.valid)) {
+        this.error = "凭证尚未上传完成、不可用或未选择，请先处理附件"
+        return
+      }
       if (this.action.requiresComment && !this.comment) {
         this.error = "处理意见不能为空"
         return
@@ -848,7 +908,7 @@ export default {
         note: this.showTransferDiscrepancy ? this.comment : undefined,
         allRemaining: true,
         items: this.showTransferDiscrepancy ? this.normalizeDiscrepancyRows() : quantityRows,
-        details: quantityRows.map(row => ({ detailId: row.detailId, actualQuantity: row.quantity }))
+        details: quantityRows.map(row => ({ detailId: row.detailId, actualQuantity: row.quantity, recountQty: row.recountQty, ...(row.snapshotVersion == null ? {} : { snapshotVersion: row.snapshotVersion }) }))
       }
       this.$emit("confirm", payload)
     }
@@ -920,6 +980,9 @@ export default {
   font-weight: 900;
 }
 
+.quality-selection-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.quality-selection-actions label { display: flex; gap: 6px; align-items: center; }
+.quality-selection-actions button { min-height: 36px; padding: 6px 10px; }
 .mobile-quality-list {
   display: grid;
   gap: 12px;

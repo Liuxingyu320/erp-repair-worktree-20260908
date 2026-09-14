@@ -50,6 +50,9 @@ public class HrEmployeeProfileVo
     private Map<String, List<String>> missingByResponsibility = new LinkedHashMap<>();
     private Map<String, Object> fields = new LinkedHashMap<>();
     private Map<String, Object> profile = new LinkedHashMap<>();
+    private LocalDate healthCertificateNextValidFrom;
+    public LocalDate getHealthCertificateNextValidFrom(){return healthCertificateNextValidFrom;}
+    public void setHealthCertificateNextValidFrom(LocalDate value){healthCertificateNextValidFrom=value;}
     private String healthCertificateStatus;
     private LocalDate healthCertificateIssuedDate;
     private LocalDate healthCertificateExpiresOn;

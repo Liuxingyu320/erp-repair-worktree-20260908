@@ -13,6 +13,9 @@ public interface InvPurchaseReturnDetailMapper
     int updateInvPurchaseReturnDetail(InvPurchaseReturnDetail detail);
     int deleteInvPurchaseReturnDetailByReturnId(Long returnId);
     int batchInsertInvPurchaseReturnDetail(List<InvPurchaseReturnDetail> details);
+    /** Current committed reservations after locking the original purchase order. */
+    List<InvPurchaseReturnDetail> selectReservedDetailsForUpdate(@Param("purchaseOrderId") Long purchaseOrderId,
+            @Param("excludeReturnId") Long excludeReturnId);
     BigDecimal sumHistoricalReturnQuantity(@Param("purchaseOrderId") Long purchaseOrderId,
             @Param("productId") Long productId, @Param("excludeReturnId") Long excludeReturnId);
     BigDecimal sumHistoricalReturnQuantityByPurchaseDetailId(@Param("purchaseOrderId") Long purchaseOrderId,

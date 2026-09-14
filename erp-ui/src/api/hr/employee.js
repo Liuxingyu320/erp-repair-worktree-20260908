@@ -2,9 +2,10 @@ import request from "@/utils/request"
 
 export const HR_EXPORT_ACTION = "system/hr/employee/export"
 
-export const listHrEmployees = params => request({
+export const listHrEmployees = (params, options) => request({
   url: "/system/hr/employee/list",
   method: "get",
+  silentError: options && options.silentError === true,
   params
 })
 
@@ -19,9 +20,10 @@ export const getHrEmployeeFormOptions = () => request({
   method: "get"
 })
 
-export const getHrEmployee = userId => request({
+export const getHrEmployee = (userId, options) => request({
   url: `/system/hr/employee/${userId}`,
-  method: "get"
+  method: "get",
+  silentError: options && options.silentError === true
 })
 
 export const initializeHrEmployeeProfile = userId => request({
@@ -84,4 +86,14 @@ export const exportHrEmployeeSensitive = data => request({
   method: "post",
   data,
   responseType: "blob"
+})
+
+export const getHrEmployeeLifecycleContext = (userId, scenario) => request({
+  url: `/system/hr/employee/${userId}/${scenario === "REGULARIZE" ? "regularize" : "renewal"}/context`,
+  method: "get", silentError: true
+})
+
+export const confirmHrEmployeeLifecycle = (userId, scenario, data) => request({
+  url: `/system/hr/employee/${userId}/${scenario === "REGULARIZE" ? "regularize" : "renewal/confirm"}`,
+  method: "post", data, silentError: true
 })

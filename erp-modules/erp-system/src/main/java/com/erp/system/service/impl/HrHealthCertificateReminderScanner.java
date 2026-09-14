@@ -71,7 +71,7 @@ public class HrHealthCertificateReminderScanner
     public void scan()
     {
         log.debug("健康证到期提醒扫描仅处理已审核当前证件，不受新受理开关影响");
-        LocalDate today = LocalDate.now(clock);
+        LocalDate today = LocalDate.now(clock.withZone(SHANGHAI));
         List<Integer> thresholds = thresholds();
         int maxDays = thresholds.stream().mapToInt(Integer::intValue)
                 .max().orElse(30);
@@ -79,7 +79,7 @@ public class HrHealthCertificateReminderScanner
         while (true)
         {
             List<HrHealthCertificateVo> rows = mapper.selectReminderCandidates(
-                    today.plusDays(maxDays), afterCertificateId, BATCH_SIZE);
+                    today, today.plusDays(maxDays), afterCertificateId, BATCH_SIZE);
             if (rows == null || rows.isEmpty()) return;
             for (HrHealthCertificateVo row : rows)
             {

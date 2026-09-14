@@ -24,8 +24,8 @@ assert.ok(messagePage.includes("resolvePushRoute"), "message navigation should r
 assert.ok(messagePage.includes("JSON.parse"), "route parameters should be parsed as data")
 assert.ok(messagePage.includes("loadError") && messagePage.includes("加载失败"),
   "message list failures should be visible and retryable instead of looking like an empty inbox")
-assert.ok(messagePage.includes("READ_BATCH_SIZE") && messagePage.includes("unread.slice"),
-  "mark-all should use bounded batches rather than start an unbounded number of requests")
+assert.ok(messagePage.includes("markAllUserNotificationsRead") && notificationApi.includes("/read-all") && messagePage.includes("snapshotMaxId"),
+  "mark-all should use one account-scoped snapshot request instead of per-notification requests")
 assert.ok(!messagePage.includes("window.open"), "messages must never open a server-provided URL")
 assert.ok(!messagePage.includes("location.href"), "messages must never assign a server-provided URL")
 

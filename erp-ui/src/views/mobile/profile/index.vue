@@ -15,7 +15,7 @@
           <button type="button" :disabled="isPreviewMode || avatarSaving" @click="chooseAvatar">
             {{ isPreviewMode ? "预览模式" : avatarSaving ? "上传中" : "更换头像" }}
           </button>
-          <input ref="avatarInput" hidden type="file" accept="image/*" :disabled="isPreviewMode || avatarSaving" @change="uploadSelectedAvatar">
+          <input ref="avatarInput" hidden type="file" accept=".jpg,.jpeg,.png,image/jpeg,image/png" :disabled="isPreviewMode || avatarSaving" @change="uploadSelectedAvatar">
         </div>
         <div class="profile-identity">
           <h2>{{ user.nickName || user.userName || "当前用户" }}</h2>
@@ -32,12 +32,16 @@
 
       <section class="profile-shortcuts" aria-label="账号快捷操作">
         <button type="button" @click="goNotice">通知公告</button>
+        <button type="button" @click="$router.push('/mobile/messages').catch(() => {})">我的消息</button>
         <button type="button" @click="goSelectShop">{{ switchContextLabel }}</button>
         <button type="button" class="danger" :disabled="isPreviewMode" @click="logoutMobile">退出登录</button>
       </section>
 
+      <native-push-status :preview="isPreviewMode" />
+
       <nav class="profile-tabs" aria-label="个人资料设置">
-        <button :class="{ active: activeSection === 'profile' }" type="button" @click="setSection('profile')">基本资料</button>
+        <button :class="{ active: activeSection === 'profile' }" type="button" @click="setSection('profile')">个人编辑</button>
+        <button :class="{ active: activeSection === 'hr-profile' }" type="button" @click="setSection('hr-profile')">HR 档案</button>
         <button :class="{ active: activeSection === 'reset-password' }" type="button" @click="setSection('reset-password')">修改密码</button>
       </nav>
 
@@ -47,7 +51,7 @@
         <button type="button" @click="loadProfile">重新加载</button>
       </section>
 
-      <form v-else-if="activeSection === 'profile'" class="profile-card profile-form" novalidate @submit.prevent="saveProfile">
+      <form id="mobile-profile-edit-form" v-else-if="activeSection === 'profile'" class="profile-card profile-form" novalidate @submit.prevent="saveProfile">
         <h2 class="mobile-section-title">基本信息</h2>
         <label for="mobile-profile-nickname">
           <span>用户昵称</span>
@@ -106,10 +110,6 @@
         <label for="mobile-profile-ethnicity"><span>民族</span><input id="mobile-profile-ethnicity" v-model.trim="profileForm.ethnicity" maxlength="64" :disabled="isPreviewMode"></label>
         <label for="mobile-profile-political-status"><span>政治面貌</span><input id="mobile-profile-political-status" v-model.trim="profileForm.politicalStatus" maxlength="64" :disabled="isPreviewMode"></label>
 
-        <h2 class="mobile-section-title">身份与户籍 <small>只读</small></h2>
-        <dl class="mobile-readonly-list">
-          <div v-for="item in identityItems" :key="item.key"><dt>{{ item.label }}</dt><dd>{{ displayProfileValue(profileData[item.key]) }}</dd></div>
-        </dl>
 
         <h2 class="mobile-section-title">教育经历</h2>
         <label v-for="item in educationInputs" :key="item.key" :for="'mobile-' + item.key">
@@ -117,7 +117,7 @@
           <input :id="'mobile-' + item.key" v-model.trim="profileForm[item.key]" :type="item.type || 'text'" :maxlength="item.maxlength" :disabled="isPreviewMode">
         </label>
 
-        <h2 class="mobile-section-title">银行与社保</h2>
+        <h2 class="mobile-section-title">银行卡信息</h2>
         <label for="mobile-profile-bank-name"><span>开户银行</span><input id="mobile-profile-bank-name" v-model.trim="profileForm.bankName" maxlength="128" :disabled="isPreviewMode"></label>
         <label for="mobile-profile-bank-account">
           <span>更换银行卡号</span>
@@ -125,10 +125,20 @@
           <small>当前：{{ displayProfileValue(profileData.bankAccountMasked) }}</small>
           <small v-if="profileErrors.bankAccount" class="field-error">{{ profileErrors.bankAccount }}</small>
         </label>
+
+        <p v-if="profileMessage" :class="['form-message', profileMessageType]" role="alert">{{ profileMessage }}</p>
+      </form>
+
+      <section v-else-if="activeSection === 'hr-profile'" class="profile-card profile-form" aria-label="HR 维护的只读档案">
+        <p class="password-hint">以下档案由 HR 维护，如需更正请联系 HR。</p>
+        <h2 class="mobile-section-title">身份与户籍 <small>只读</small></h2>
+        <dl class="mobile-readonly-list">
+          <div v-for="item in identityItems" :key="item.key"><dt>{{ item.label }}</dt><dd>{{ displayProfileValue(profileData[item.key]) }}</dd></div>
+        </dl>
+        <h2 class="mobile-section-title">银行与社保 <small>只读</small></h2>
         <dl class="mobile-readonly-list">
           <div v-for="item in socialItems" :key="item.key"><dt>{{ item.label }}</dt><dd>{{ displayProfileValue(profileData[item.key]) }}</dd></div>
         </dl>
-
         <h2 class="mobile-section-title">任职信息 <small>只读</small></h2>
         <dl class="mobile-readonly-list">
           <div v-for="item in employmentItems" :key="item.key"><dt>{{ item.label }}</dt><dd>{{ displayProfileValue(profileData[item.key]) }}</dd></div>
@@ -138,11 +148,7 @@
         <dl class="mobile-readonly-list">
           <div v-for="item in contractItems" :key="item.key"><dt>{{ item.label }}</dt><dd>{{ displayProfileValue(profileData[item.key]) }}</dd></div>
         </dl>
-        <p v-if="profileMessage" :class="['form-message', profileMessageType]" role="alert">{{ profileMessage }}</p>
-        <button class="primary full" type="submit" :disabled="isPreviewMode || profileSaving">
-          {{ profileSaving ? "保存中..." : "保存基本资料" }}
-        </button>
-      </form>
+      </section>
 
       <form v-else class="profile-card profile-form" novalidate @submit.prevent="savePassword">
         <label for="mobile-profile-old-password">
@@ -168,6 +174,21 @@
       </form>
     </main>
 
+    <div v-if="activeSection === 'profile' && !loading && !loadError" class="profile-save-bar" aria-label="保存个人资料">
+      <span role="status">{{ profileDirty ? '有未保存的修改' : '资料已同步' }}</span>
+      <button class="primary" type="submit" form="mobile-profile-edit-form" :disabled="isPreviewMode || profileSaving">{{ profileSaving ? '保存中...' : '保存基本资料' }}</button>
+    </div>
+
+    <el-dialog title="还有未保存的修改" :visible.sync="leavePromptOpen" width="min(92vw, 420px)" append-to-body :close-on-click-modal="false" :close-on-press-escape="!leaveSaving" :show-close="false" @closed="cancelLeave">
+      <p>离开前，可以保存个人资料和密码修改，也可以放弃本次修改。</p>
+      <p v-if="leaveError" class="form-message error" role="alert">{{ leaveError }}</p>
+      <div class="profile-leave-actions">
+        <button class="primary" type="button" :disabled="leaveSaving" @click="saveAndLeave">{{ leaveSaving ? '正在保存...' : '保存后离开' }}</button>
+        <button type="button" :disabled="leaveSaving || profileSaving || passwordSaving" @click="discardAndLeave">放弃修改</button>
+        <button type="button" :disabled="leaveSaving" @click="cancelLeave">继续编辑</button>
+      </div>
+    </el-dialog>
+
     <nav class="mobile-profile-bottom-nav mobile-system-bottom-nav" aria-label="手机底部导航">
       <button v-for="item in bottomNav" :key="item.label" :class="{ active: isBottomNavItemActive(item) }" type="button" @click="openNavigation(item)">
         <svg-icon :icon-class="item.icon" />
@@ -179,6 +200,7 @@
 
 <script>
 import cache from "@/plugins/cache"
+import { displayProfileDate } from "@/utils/profileDisplayDate"
 import defAva from "@/assets/images/profile.jpg"
 import { getSelectedDeptContext } from "@/utils/shopContext"
 import { resetPasswordResetReminderState } from "@/utils/passwordResetReminder"
@@ -209,6 +231,7 @@ function requestErrorMessage(error, fallback) {
 
 export default {
   name: "MobileProfilePage",
+  components: { NativePushStatus: () => import("../components/NativePushStatus.vue") },
   data() {
     return {
       loading: false,
@@ -229,6 +252,17 @@ export default {
       passwordSaving: false,
       passwordMessage: "",
       passwordMessageType: "",
+      profileBaseline: null,
+      pageEpoch: 0,
+      readEpoch: 0,
+      pageActive: true,
+      profileSavePromise: null,
+      passwordSavePromise: null,
+      leavePromptOpen: false,
+      leaveSaving: false,
+      leaveError: "",
+      leaveResolver: null,
+      pendingNavigation: null,
       educationInputs: [
         { key: "firstEducation", label: "第一学历", maxlength: 64 },
         { key: "firstDegree", label: "第一学位", maxlength: 64 },
@@ -291,7 +325,13 @@ export default {
     },
     passwordPolicyType() {
       return cache.session.get("pwrChrtype") || "0"
-    }
+    },
+    profileDirty() {
+      return !this.isPreviewMode && Boolean(this.profileBaseline) && Object.keys(this.profileForm).some(key => String(this.profileForm[key] || "") !== String(this.profileBaseline[key] || ""))
+    },
+    passwordDirty() { return !this.isPreviewMode && Object.values(this.passwordForm).some(value => Boolean(value)) },
+    hasUnsavedChanges() { return this.profileDirty || this.passwordDirty }
+
   },
   watch: {
     "$route.query.mode"() {
@@ -303,55 +343,132 @@ export default {
       startMobileViewportSync()
       this.applyRouteMode()
       this.loadProfile()
+      if (typeof window !== "undefined") window.addEventListener("beforeunload", this.warnBeforeUnload)
     } catch (e) {
       console.error('Profile page created error:', e)
       this.loadError = '个人资料页面加载失败，请刷新重试'
       this.loading = false
     }
   },
+  activated() {
+    this.pageActive = true
+    if ((!this.profileBaseline || this.loadError) && !this.loading) this.loadProfile()
+  },
+  deactivated() { this.invalidateProfilePage() },
+  beforeRouteLeave(to, from, next) {
+    if (!this.hasUnsavedChanges && !this.profileSaving && !this.passwordSaving) { next(); return }
+    // End this transition immediately. Vue Router otherwise cancels an earlier
+    // pending transition when another navigation is attempted during the dialog.
+    next(false)
+    if (this.pendingNavigation) return
+    const target = typeof to === 'string' ? to : to.fullPath
+    this.pendingNavigation = target
+    this.requestLeave().then(allowed => {
+      if (this.pendingNavigation !== target) return
+      this.pendingNavigation = null
+      if (allowed && this.pageActive && !this.hasUnsavedChanges) this.$router.push(target).catch(() => {})
+    })
+  },
   beforeDestroy() {
+    this.invalidateProfilePage()
     stopMobileViewportSync()
+    if (typeof window !== "undefined") window.removeEventListener("beforeunload", this.warnBeforeUnload)
   },
   methods: {
+    profileOperation() {
+      return { epoch: this.pageEpoch, userId: String(this.$store && this.$store.getters && this.$store.getters.id || ''), preview: this.isPreviewMode }
+    },
+    isCurrentProfileOperation(operation) {
+      const current = this.profileOperation()
+      return this.pageActive && operation.epoch === current.epoch && operation.userId === current.userId && operation.preview === current.preview
+    },
+    invalidateProfilePage() {
+      this.pageActive = false
+      this.pageEpoch += 1
+      this.readEpoch += 1
+      this.loading = false
+      this.profileSaving = false
+      this.passwordSaving = false
+      this.profileSavePromise = null
+      this.passwordSavePromise = null
+      this.pendingNavigation = null
+      this.finishLeave(false)
+    },
+    warnBeforeUnload(event) {
+      if (!this.pageActive || (!this.hasUnsavedChanges && !this.profileSaving && !this.passwordSaving)) return
+      event.preventDefault()
+      event.returnValue = ''
+      return ''
+    },
+    requestLeave() {
+      if (!this.hasUnsavedChanges && !this.profileSaving && !this.passwordSaving) return Promise.resolve(true)
+      if (this.leaveResolver) return Promise.resolve(false)
+      this.leaveError = ''
+      this.leavePromptOpen = true
+      return new Promise(resolve => { this.leaveResolver = resolve })
+    },
+    finishLeave(allowed) {
+      const resolve = this.leaveResolver
+      this.leaveResolver = null
+      this.leavePromptOpen = false
+      this.leaveSaving = false
+      if (resolve) resolve(allowed)
+    },
+    cancelLeave() { if (!this.leaveSaving) this.finishLeave(false) },
+    discardAndLeave() {
+      if (this.leaveSaving || this.profileSaving || this.passwordSaving) return
+      if (this.profileBaseline) this.profileForm = Object.assign({}, this.profileBaseline)
+      this.passwordForm = { oldPassword: '', newPassword: '', confirmPassword: '' }
+      this.finishLeave(true)
+    },
+    async saveAndLeave() {
+      if (this.leaveSaving || !this.leaveResolver) return
+      const resolver = this.leaveResolver
+      this.leaveSaving = true
+      this.leaveError = ''
+      let success = true
+      if (this.profileDirty || this.profileSaving) success = await this.saveProfile()
+      if (success && (this.passwordDirty || this.passwordSaving)) success = await this.savePassword()
+      if (this.leaveResolver !== resolver) return
+      this.leaveSaving = false
+      if (success && !this.hasUnsavedChanges) this.finishLeave(true)
+      else this.leaveError = '尚有内容未保存，请检查资料或密码提示；本次会保留输入并停留在此页。'
+    },
     isBottomNavItemActive(item) {
       return Boolean(item && isMobileBottomNavItemActive(item.path, this.$route.path))
     },
     applyRouteMode() {
       const mode = this.$route.query && this.$route.query.mode
-      this.activeSection = mode === "reset-password" ? "reset-password" : "profile"
+      this.activeSection = mode === "reset-password" ? "reset-password" : mode === "hr-profile" ? "hr-profile" : "profile"
     },
     setSection(section) {
       this.activeSection = section
-      const query = section === "reset-password" ? { mode: "reset-password" } : {}
+      const query = section === "profile" ? {} : { mode: section }
       if (this.isPreviewMode) query.preview = "1"
       this.$router.replace({ path: "/mobile/profile", query }).catch(() => {})
     },
     loadProfile() {
-      try {
-        if (this.isPreviewMode) {
-          this.applyLoadedProfile(this.previewProfile(), "店铺员工", "移动预览")
-          this.loading = false
-          this.loadError = ""
-          return
-        }
-        this.loading = true
-        this.loadError = ""
-        getUserProfile().then(response => {
-          this.applyLoadedProfile(
-            (response && response.data) || {},
-            (response && response.roleGroup) || "",
-            (response && response.postGroup) || ""
-          )
-        }).catch(error => {
-          this.loadError = requestErrorMessage(error, "个人资料加载失败，请重试")
-        }).finally(() => {
-          this.loading = false
-        })
-      } catch (e) {
-        console.error('loadProfile error:', e)
-        this.loadError = '个人资料加载失败，请刷新重试'
+      const epoch = ++this.readEpoch
+      const operation = this.profileOperation()
+      const current = () => this.isCurrentProfileOperation(operation) && epoch === this.readEpoch
+      if (this.profileDirty || this.profileSaving) return Promise.resolve(false)
+      if (this.isPreviewMode) {
+        this.applyLoadedProfile(this.previewProfile(), "店铺员工", "移动预览")
         this.loading = false
+        this.loadError = ""
+        return Promise.resolve(true)
       }
+      this.loading = true
+      this.loadError = ""
+      return getUserProfile({ silentError: true }).then(response => {
+        if (!current()) return false
+        if (!response || !response.data || typeof response.data !== "object") throw new Error("个人资料返回为空，请重试")
+        this.applyLoadedProfile(response.data, response.roleGroup || "", response.postGroup || "")
+        return true
+      }).catch(error => {
+        if (current()) this.loadError = requestErrorMessage(error, "个人资料加载失败，请重试")
+        return false
+      }).finally(() => { if (current()) this.loading = false })
     },
     previewProfile() {
       return {
@@ -372,6 +489,10 @@ export default {
       }
     },
     applyLoadedProfile(user, roleGroup, postGroup) {
+      this.pageEpoch += 1
+      this.profileSaving = false
+      this.profileSavePromise = null
+      this.loading = false
       this.user = user || {}
       this.roleGroup = roleGroup || ""
       this.postGroup = postGroup || ""
@@ -385,42 +506,61 @@ export default {
       }
       EDITABLE_PROFILE_KEYS.forEach(key => { form[key] = profile[key] || (key === "currentAddress" ? this.user.currentAddress || "" : "") })
       this.profileForm = form
+      this.profileBaseline = Object.assign({}, form)
     },
     saveProfile() {
-      if (this.isPreviewMode) return
+      if (this.profileSaving) return this.profileSavePromise || Promise.resolve(false)
+      if (this.isPreviewMode || !this.pageActive || this.loading || this.loadError || !this.profileBaseline) return Promise.resolve(false)
       this.profileErrors = validateMobileProfile(this.profileForm)
       this.profileMessage = ""
-      if (Object.keys(this.profileErrors).length) return
-      this.profileSaving = true
+      if (Object.keys(this.profileErrors).length) return Promise.resolve(false)
+      const operation = this.profileOperation()
+      const snapshot = Object.assign({}, this.profileForm)
       const payload = {
-        nickName: String(this.profileForm.nickName || "").trim(),
-        phonenumber: String(this.profileForm.phonenumber || "").trim(),
-        email: String(this.profileForm.email || "").trim(),
-        sex: this.profileForm.sex
+        nickName: String(snapshot.nickName || "").trim(),
+        phonenumber: String(snapshot.phonenumber || "").trim(),
+        email: String(snapshot.email || "").trim(),
+        sex: snapshot.sex
       }
-      EDITABLE_PROFILE_KEYS.forEach(key => { payload[key] = this.profileForm[key] })
-      if (this.profileForm.bankAccount) payload.bankAccount = String(this.profileForm.bankAccount).trim()
-      updateUserProfile(payload).then(() => {
-        this.user = Object.assign({}, this.user, payload, {
-          profile: Object.assign({}, this.profileData, payload)
+      EDITABLE_PROFILE_KEYS.forEach(key => { payload[key] = snapshot[key] })
+      if (snapshot.bankAccount) payload.bankAccount = String(snapshot.bankAccount).trim()
+      this.profileSaving = true
+      const promise = updateUserProfile(payload, { silentError: true }).then(() => {
+        if (!this.isCurrentProfileOperation(operation)) return false
+        const safe = Object.assign({}, payload)
+        delete safe.bankAccount
+        const profile = Object.assign({}, this.profileData, safe)
+        delete profile.bankAccount
+        if (payload.bankAccount) profile.bankAccountMasked = "****" + payload.bankAccount.slice(-4)
+        this.user = Object.assign({}, this.user, safe, { profile })
+        delete this.user.bankAccount
+        const baseline = Object.assign({}, safe, { bankAccount: "" })
+        Object.keys(this.profileForm).forEach(key => {
+          if (this.profileForm[key] === snapshot[key]) this.$set(this.profileForm, key, baseline[key] == null ? "" : baseline[key])
         })
+        this.profileBaseline = baseline
         if (this.$store && this.$store.commit) this.$store.commit("SET_NICK_NAME", payload.nickName)
         this.profileMessageType = "success"
-        this.profileMessage = "基本资料已保存"
-        this.profileForm.bankAccount = ""
+        this.profileMessage = this.profileDirty ? "资料已保存，当前还有未保存的修改" : "基本资料已保存"
+        return !this.profileDirty
       }).catch(error => {
-        this.profileMessageType = "error"
-        this.profileMessage = requestErrorMessage(error, "资料保存失败，请重试")
+        if (this.isCurrentProfileOperation(operation)) {
+          this.profileMessageType = "error"
+          this.profileMessage = requestErrorMessage(error, "资料保存失败，请重试")
+        }
+        return false
       }).finally(() => {
-        this.profileSaving = false
+        if (this.isCurrentProfileOperation(operation)) { this.profileSaving = false; this.profileSavePromise = null }
       })
+      this.profileSavePromise = promise
+      return promise
     },
     chooseAvatar() {
       if (!this.isPreviewMode && !this.avatarSaving && this.$refs.avatarInput) this.$refs.avatarInput.click()
     },
     displayProfileValue(value) {
       if (value === undefined || value === null || value === "") return "暂无"
-      return String(value).includes("T") ? String(value).slice(0, 10) : value
+      return displayProfileDate(value)
     },
     uploadSelectedAvatar(event) {
       if (this.isPreviewMode) return
@@ -428,8 +568,8 @@ export default {
       const file = input && input.files && input.files[0]
       if (!file) return
       this.profileMessageType = "error"
-      if (!file.type || file.type.indexOf("image/") !== 0) {
-        this.profileMessage = "请选择 JPG、PNG 等图片文件"
+      if (!/\.(jpe?g|png)$/i.test(file.name) || !/^image\/(jpeg|jpg|png)$/i.test(file.type || "")) {
+        this.profileMessage = "仅支持 JPG、JPEG、PNG 头像，请先转换其他相册格式"
         input.value = ""
         return
       }
@@ -456,32 +596,35 @@ export default {
       })
     },
     savePassword() {
-      if (this.isPreviewMode) return
+      if (this.passwordSaving) return this.passwordSavePromise || Promise.resolve(false)
+      if (this.isPreviewMode || !this.pageActive) return Promise.resolve(false)
       this.passwordErrors = validateMobilePassword(this.passwordForm, this.passwordPolicyType)
       this.passwordMessage = ""
-      if (Object.keys(this.passwordErrors).length) return
+      if (Object.keys(this.passwordErrors).length) return Promise.resolve(false)
+      const operation = this.profileOperation()
+      const snapshot = Object.assign({}, this.passwordForm)
       this.passwordSaving = true
-      updateUserPwd(this.passwordForm.oldPassword, this.passwordForm.newPassword).then(() => {
-        this.passwordForm = { oldPassword: "", newPassword: "", confirmPassword: "" }
+      const promise = updateUserPwd(snapshot.oldPassword, snapshot.newPassword).then(() => {
+        if (!this.isCurrentProfileOperation(operation)) return false
+        Object.keys(snapshot).forEach(key => { if (this.passwordForm[key] === snapshot[key]) this.passwordForm[key] = "" })
         resetPasswordResetReminderState()
         this.passwordMessageType = "success"
-        this.passwordMessage = "密码修改成功"
+        this.passwordMessage = this.passwordDirty ? "密码已修改，当前还有未保存的输入" : "密码修改成功"
+        return !this.passwordDirty
       }).catch(error => {
-        this.passwordMessageType = "error"
-        this.passwordMessage = requestErrorMessage(error, "密码修改失败，请重试")
+        if (this.isCurrentProfileOperation(operation)) {
+          this.passwordMessageType = "error"
+          this.passwordMessage = requestErrorMessage(error, "密码修改失败，请重试")
+        }
+        return false
       }).finally(() => {
-        this.passwordSaving = false
+        if (this.isCurrentProfileOperation(operation)) { this.passwordSaving = false; this.passwordSavePromise = null }
       })
+      this.passwordSavePromise = promise
+      return promise
     },
     goHome() {
-      try {
-        const homePath = getMobileHomePath(this.selectedContext.deptType, this.userPermissions)
-        this.$router.push(homePath).catch(() => {
-          location.href = homePath
-        })
-      } catch (e) {
-        location.href = '/workbench' // fallback
-      }
+      this.openPath(getMobileHomePath(this.selectedContext.deptType, this.userPermissions))
     },
     goNotice() {
       this.openPath("/mobile/notice")
@@ -506,7 +649,8 @@ export default {
         this.$router.push(route).catch(() => {})
       } catch (e) {
         console.error('Navigation error:', e)
-        location.href = '/workbench'
+        this.profileMessageType = 'error'
+        this.profileMessage = '暂时无法打开页面，请重试'
       }
     },
     logoutMobile() {
@@ -514,8 +658,9 @@ export default {
         confirmButtonText: "退出",
         cancelButtonText: "取消",
         type: "warning"
-      }).then(() => this.$store.dispatch("LogOut")).then(() => {
-        location.href = "/index"
+      }).then(() => this.requestLeave()).then(allowed => {
+        if (!allowed) return
+        return this.$store.dispatch("LogOut").then(() => { location.href = "/index" })
       }).catch(() => {})
     }
   }
@@ -540,7 +685,8 @@ export default {
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   padding: max(22px, env(safe-area-inset-top)) 18px 0;
-  padding-bottom: calc(var(--mobile-bottom-nav-total) + 24px);
+  padding-bottom: calc(var(--mobile-bottom-nav-total, 78px) + 108px);
+  scroll-padding-bottom: calc(var(--mobile-bottom-nav-total, 78px) + 108px);
   box-sizing: border-box;
 }
 
@@ -708,6 +854,30 @@ button {
   color: var(--mobile-color-primary);
   box-shadow: 0 4px 12px rgba(31, 63, 48, 0.08);
 }
+
+.profile-save-bar {
+  position: fixed;
+  z-index: 110;
+  top: calc(var(--mobile-viewport-offset-top, 0px) + var(--mobile-viewport-height, 100dvh) - var(--mobile-bottom-nav-total, 78px) - 76px);
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(calc(100% - 24px), 456px);
+  min-height: 68px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  box-sizing: border-box;
+  padding: 10px 12px;
+  border: 1px solid #d5e1da;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 -4px 20px rgba(31, 63, 48, .12);
+}
+
+.profile-save-bar span { color: #52685c; font-size: 12px; }
+.profile-save-bar button { flex-shrink: 0; }
+.profile-leave-actions { display: grid; gap: 10px; margin-top: 18px; }
 
 .profile-form {
   display: grid;

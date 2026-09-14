@@ -307,6 +307,8 @@ export default {
       cameraOpen: false,
       cameraReady: false,
       cameraStream: null,
+      browserCameraEpoch: 0,
+      browserCameraBusy: false,
       cameraVisibilityHandler: null,
       deptChangeHandler: null,
       attendanceContextEpoch: 0,
@@ -370,6 +372,8 @@ export default {
       if (this.restNotice) return '休息中'
       const labels = {
         READY_IN: '可上班打卡', READY_OUT: '可下班打卡', COMPLETED: '已完成',
+        REMAINING_WORK_CONFIRMED: '已核验', REMAINING_WORK_CONFIRMATION_REQUIRED: '待核验',
+        REMAINING_WORK_EVIDENCE_REQUIRED: '待补证', REMAINING_WORK_CONFIRMATION_INVALID: '核验异常',
         NO_SCHEDULE: '无排班', LOCKED_NO_SCHEDULE: '无排班', OUTSIDE_WINDOW: '窗口外',
         LOCKED_OUTSIDE_WINDOW: '窗口外', BETWEEN_SEGMENTS: '休息中', LOCKED_BETWEEN_SEGMENTS: '休息中', ON_BREAK: '休息中', RESTING: '休息中', ON_LEAVE: '已请假'
       }
@@ -405,7 +409,7 @@ export default {
     }
   },
   created() {
-    this.applyRouteView()
+    this.applyRouteView(false)
     if (this.activeView === 'today') this.loadToday()
     if (this.activeView === 'records') this.loadRecords()
   },
@@ -434,25 +438,29 @@ export default {
     this.revokeUrl('evidenceUrl')
   },
   methods: {
-    applyRouteView() {
+    applyRouteView(load = true) {
       const query = this.$route && this.$route.query ? this.$route.query : {}
       const todoTabs = {
         OA_ATTENDANCE_LEAVE_APPROVAL: 'leave',
         OA_ATTENDANCE_CORRECTION_APPROVAL: 'correction'
       }
       const requested = String(query.tab || todoTabs[query.todoType] || 'today')
-      this.activeView = ['today', 'records', 'leave', 'correction'].indexOf(requested) > -1 ? requested : 'today'
-      if (this.activeView !== 'today') this.stopBrowserCamera()
+      const view = ['today', 'records', 'leave', 'correction'].indexOf(requested) > -1 ? requested : 'today'
+      if (view !== this.activeView) this.setAttendanceView(view, load)
     },
-    selectView(view) {
+    setAttendanceView(view, load = true) {
+      if (view !== this.activeView) this.nextAttendanceContextEpoch()
       if (this.activeView === 'today' && view !== 'today') {
-        this.nextAttendanceContextEpoch()
         this.resetPendingCapture({ keepError: true })
         this.closeEvidencePreview()
       }
       this.activeView = view
+      if (!load) return
       if (view === 'today' && !this.loading) this.loadToday()
-      if (view === 'records' && !this.recordRows.length) this.loadRecords()
+      if (view === 'records' && !this.recordsLoading && !this.recordRows.length) this.loadRecords()
+    },
+    selectView(view) {
+      this.setAttendanceView(view)
       if (!this.$router || !this.$route) return
       const query = Object.assign({}, this.$route.query || {}, { tab: view })
       delete query.todoType
@@ -554,6 +562,11 @@ export default {
     loadToday() {
       const owner = this.punchOwner()
       const epoch = this.nextAttendanceContextEpoch()
+      const captureWasPending = Boolean(this.pending.challengeToken || this.pending.location || this.photo || this.cameraOpen)
+      this.resetPendingCapture({ keepError: true })
+      if (captureWasPending && !this.serverAccepted && !this.punchOutcomeUnknown) {
+        this.flowError = '考勤状态已刷新，请重新定位并拍摄现场照片。'
+      }
       this.loading = true
       this.loadError = ''
       this.punchAttemptState = readAttendancePunchAttempt(owner)
@@ -618,10 +631,13 @@ export default {
       this.flowError = ''
       this.successMessage = ''
       this.busy = true
-      createPunchChallenge({ scheduleId: this.gate.scheduleId, punchType: this.gate.punchType, punchSlotKey: this.gate.punchSlotKey || undefined }).then(response => {
+      return createPunchChallenge({ scheduleId: this.gate.scheduleId, punchType: this.gate.punchType, punchSlotKey: this.gate.punchSlotKey || undefined }).then(response => {
         if (!this.attendanceContextValid(owner, epoch)) throw new Error('身份或门店已切换，本次未开始打卡。')
         const challenge = dataOf(response) || {}
         if (!challenge.challengeToken) throw new Error('服务端未返回一次性打卡凭证')
+        if (!/Z$/.test(String(challenge.expiresAtUtc || '')) || !Number.isFinite(Date.parse(challenge.expiresAtUtc))) {
+          throw new Error('服务端未返回有效的打卡时间，请刷新页面；若仍失败请联系管理员更新考勤服务。')
+        }
         if (String(challenge.punchType || this.gate.punchType).toUpperCase() !== this.gate.punchType) {
           throw new Error('服务端打卡类型已变化，请刷新后重试')
         }
@@ -629,7 +645,7 @@ export default {
           throw new Error('服务端打卡工作段已变化，请刷新后重试')
         }
         this.pending.challengeToken = challenge.challengeToken
-        this.pending.expiresAt = challenge.expiresAt || ''
+        this.pending.expiresAt = challenge.expiresAtUtc
         this.pending.scheduleId = challenge.scheduleId || this.gate.scheduleId
         this.pending.punchType = String(challenge.punchType || this.gate.punchType).toUpperCase()
         this.pending.punchSlotKey = String(challenge.punchSlotKey || this.gate.punchSlotKey || '')
@@ -713,7 +729,11 @@ export default {
       const owner = this.pendingOwner
       const epoch = this.pendingContextEpoch
       if (!this.attendanceContextValid(owner, epoch)) return Promise.resolve()
+      const cameraEpoch = this.nextBrowserCameraEpoch()
+      const isCurrent = () => this.browserCameraContextValid(owner, epoch, cameraEpoch)
+      if (!isCurrent()) return Promise.resolve()
       this.busy = true
+      this.browserCameraBusy = true
       this.flowError = ''
       let mediaDevices
       try {
@@ -724,11 +744,13 @@ export default {
       } catch (error) {
         this.flowError = error.message || '无法启用实时相机，本次未打卡。'
         this.busy = false
+        this.browserCameraBusy = false
         return Promise.resolve()
       }
+      let requestedStream = null
       return mediaDevices.getUserMedia(liveCameraConstraints()).then(stream => {
-        if (!this.attendanceContextValid(owner, epoch)) {
-          stopMediaStream(stream)
+        requestedStream = stream
+        if (!isCurrent()) {
           throw new Error('ATTENDANCE_CONTEXT_CHANGED')
         }
         requireEnvironmentStream(stream)
@@ -736,6 +758,7 @@ export default {
         this.cameraReady = false
         this.cameraOpen = true
         return this.$nextTick().then(() => {
+          if (!isCurrent()) throw new Error('ATTENDANCE_CONTEXT_CHANGED')
           const video = this.$refs.liveCameraVideo
           if (!video) throw new Error('实时相机画面初始化失败')
           video.srcObject = stream
@@ -743,8 +766,9 @@ export default {
           return playback && typeof playback.then === 'function' ? playback : undefined
         })
       }).catch(error => {
+        stopMediaStream(requestedStream)
+        if (!isCurrent()) return
         this.stopBrowserCamera()
-        if (!this.attendanceContextValid(owner, epoch)) return
         const signal = String(error && (error.message || error.name) || '')
         if (/NotAllowed|PermissionDenied/i.test(signal)) {
           this.flowError = '相机权限被拒绝，本次不能打卡。请在当前网站设置中允许相机后重试。'
@@ -754,7 +778,10 @@ export default {
           this.flowError = signal || '无法打开实时相机，本次未打卡。'
         }
       }).finally(() => {
-        if (this.attendanceContextValid(owner, epoch)) this.busy = false
+        if (isCurrent()) {
+          this.busy = false
+          this.browserCameraBusy = false
+        }
       })
     },
     captureBrowserPhoto() {
@@ -762,28 +789,44 @@ export default {
       const owner = this.pendingOwner
       const epoch = this.pendingContextEpoch
       if (!this.attendanceContextValid(owner, epoch)) return Promise.resolve()
+      const cameraEpoch = Number(this.browserCameraEpoch) || 0
+      const isCurrent = () => this.browserCameraContextValid(owner, epoch, cameraEpoch)
+      if (!isCurrent()) return Promise.resolve()
       if (this.challengeExpired()) {
         this.flowError = '拍照前打卡凭证已过期，请重新开始。'
         this.resetPendingCapture({ keepError: true })
         return Promise.resolve()
       }
       this.busy = true
+      this.browserCameraBusy = true
       this.flowError = ''
       return captureLiveFrame(this.$refs.liveCameraVideo).then(file => {
-        if (!this.attendanceContextValid(owner, epoch)) {
-          this.stopBrowserCamera()
-          return false
-        }
+        if (!isCurrent()) return false
         this.stopBrowserCamera()
         this.acceptPhoto(file)
       }).catch(error => {
-        if (!this.attendanceContextValid(owner, epoch)) return
+        if (!isCurrent()) return
         this.flowError = error && error.message ? error.message : '现场照片拍摄失败，请重试。'
       }).finally(() => {
-        if (this.attendanceContextValid(owner, epoch)) this.busy = false
+        if (isCurrent()) {
+          this.busy = false
+          this.browserCameraBusy = false
+        }
       })
     },
+    nextBrowserCameraEpoch() {
+      const current = Number(this.browserCameraEpoch) || 0
+      this.browserCameraEpoch = current >= Number.MAX_SAFE_INTEGER ? 1 : current + 1
+      return this.browserCameraEpoch
+    },
+    browserCameraContextValid(owner, epoch, cameraEpoch) {
+      return this.attendanceContextValid(owner, epoch) && cameraEpoch === (Number(this.browserCameraEpoch) || 0) &&
+        (typeof document === 'undefined' || document.visibilityState !== 'hidden')
+    },
     stopBrowserCamera() {
+      this.nextBrowserCameraEpoch()
+      if (this.browserCameraBusy) this.busy = false
+      this.browserCameraBusy = false
       const video = this.$refs && this.$refs.liveCameraVideo
       if (video && video.srcObject) video.srcObject = null
       stopMediaStream(this.cameraStream)
@@ -868,7 +911,7 @@ export default {
       }
       this.clearPhoto()
       this.photo = file
-      this.photoCapturedAt = this.localDateTime(new Date(capturedAt))
+      this.photoCapturedAt = new Date(capturedAt).toISOString()
       this.photoPreviewUrl = URL.createObjectURL(file)
       this.flowError = ''
     },
@@ -928,13 +971,9 @@ export default {
           String(result.event.punchType || '').toUpperCase() === attempt.punchType &&
           String(result.event.punchSlotKey || '') === attempt.punchSlotKey
       }).then(outcome => {
-        if (!this.attendanceContextValid(owner, epoch)) {
-          this.resetPendingCapture({ keepError: true })
-          this.serverAccepted = false
-          this.punchAttemptState = readAttendancePunchAttempt(this.punchOwner())
-          this.flowError = '打卡期间身份或门店已切换；旧请求结果未在当前门店展示，请切回原门店核对。'
-          return false
-        }
+        // The attempt runner retains the old owner's result in storage.
+        // Retired callbacks must not touch a new page/store capture.
+        if (!this.attendanceContextValid(owner, epoch)) return false
         this.punchAttemptState = readAttendancePunchAttempt(owner)
         if (outcome.status === 'blocked') {
           this.flowError = outcome.message || '无法安全追踪打卡结果，本次未提交。'
@@ -964,13 +1003,9 @@ export default {
           return this.loadToday()
         })
       }).catch(error => {
-        if (!this.attendanceContextValid(owner, epoch)) {
-          this.resetPendingCapture({ keepError: true })
-          this.serverAccepted = false
-          this.punchAttemptState = readAttendancePunchAttempt(this.punchOwner())
-          this.flowError = '打卡期间身份或门店已切换；旧请求结果未在当前门店展示，请切回原门店核对。'
-          return false
-        }
+        // The attempt runner retains the old owner's result in storage.
+        // Retired callbacks must not touch a new page/store capture.
+        if (!this.attendanceContextValid(owner, epoch)) return false
         this.resetPendingCapture({ keepError: true })
         this.punchAttemptState = readAttendancePunchAttempt(owner)
         this.flowError = this.punchErrorText(error)
@@ -1000,11 +1035,7 @@ export default {
         challengeToken: attempt.challengeToken
       }).then(response => {
         const reconciliation = reconcileAttendancePunchStatus(dataOf(response), owner)
-        if (!this.attendanceContextValid(owner, epoch)) {
-          this.punchAttemptState = readAttendancePunchAttempt(this.punchOwner())
-          this.flowError = '核对期间身份或门店已切换，旧结果未在当前门店展示。'
-          return false
-        }
+        if (!this.attendanceContextValid(owner, epoch)) return false
         this.punchAttemptState = reconciliation
         if (reconciliation.status === 'settled') {
           const accepted = this.applySettledPunchAttempt(reconciliation, owner)
@@ -1028,12 +1059,9 @@ export default {
         }
         return false
       }).catch(error => {
-        const stillCurrent = this.attendanceContextValid(owner, epoch)
-        const currentOwner = stillCurrent ? owner : this.punchOwner()
-        this.punchAttemptState = readAttendancePunchAttempt(currentOwner)
-        this.flowError = stillCurrent
-          ? attendanceErrorText(error, '打卡终态查询失败，仍保持冻结。')
-          : '核对期间身份或门店已切换，旧结果未在当前门店展示。'
+        if (!this.attendanceContextValid(owner, epoch)) return false
+        this.punchAttemptState = readAttendancePunchAttempt(owner)
+        this.flowError = attendanceErrorText(error, '打卡终态查询失败，仍保持冻结。')
       }).finally(() => {
         if (this.attendanceContextValid(owner, epoch)) this.punchStatusChecking = false
       })
@@ -1187,10 +1215,19 @@ export default {
     punchSlotCompleted(slot) {
       const source = slot || {}
       const status = String(source.status || source.slotStatus || '').toUpperCase()
+      if (['CORRECTION_REQUIRED', 'MISSED', 'REMAINING_WORK_PENDING', 'REMAINING_WORK_EVIDENCE_REQUIRED', 'REMAINING_WORK_INVALID'].includes(status)) return false
       return source.completed === true || source.punched === true || Boolean(source.punchEventId || source.eventId || source.serverPunchTime || source.punchedAt) || ['COMPLETED', 'PUNCHED', 'DONE'].includes(status)
     },
     punchSlotStatusText(slot) {
       const source = slot || {}
+      if (source.status === 'CORRECTED') return '已补卡'
+      if (source.status === 'CORRECTION_REQUIRED') return '原卡已更正，需补卡'
+      if (source.status === 'EXEMPT_LEAVE') return '请假免打卡'
+      if (source.status === 'MISSED') return '缺卡'
+      if (source.status === 'REMAINING_WORK_PENDING') return '待核验'
+      if (source.status === 'REMAINING_WORK_CONFIRMED') return '已核验'
+      if (source.status === 'REMAINING_WORK_EVIDENCE_REQUIRED') return '待补证'
+      if (source.status === 'REMAINING_WORK_INVALID') return '核验记录异常'
       const punchedAt = punchTimeText(source.serverPunchTime || source.punchedAt)
       if (this.punchSlotCompleted(source)) return punchedAt ? `已打卡 ${punchedAt}` : '已打卡'
       if (source.punchSlotKey && source.punchSlotKey === (this.context.nextPunchSlot && this.context.nextPunchSlot.punchSlotKey)) {
@@ -1223,11 +1260,6 @@ export default {
     },
     fileSizeText(size) {
       return `${(Number(size || 0) / 1024 / 1024).toFixed(2)}MB`
-    },
-    localDateTime(date) {
-      const value = date instanceof Date ? date : new Date(date)
-      const pad = (number, length = 2) => String(number).padStart(length, '0')
-      return `${value.getFullYear()}-${pad(value.getMonth() + 1)}-${pad(value.getDate())}T${pad(value.getHours())}:${pad(value.getMinutes())}:${pad(value.getSeconds())}.${pad(value.getMilliseconds(), 3)}`
     },
     punchErrorText(error) {
       const signal = [error && error.businessCode, error && error.code, error && error.message].filter(Boolean).join(' ')

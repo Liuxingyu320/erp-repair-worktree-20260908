@@ -83,9 +83,10 @@ public class AttendanceTimeCreditService
         return value;
     }
 
-    @Transactional
+    @Transactional(isolation=org.springframework.transaction.annotation.Isolation.READ_COMMITTED)
     public Adjustment apply(Apply command, Long selectedShopId)
     {
+        com.erp.oa.attendance.leave.balance.AttendanceOvertimeTransferSourceGuard.requireReadCommittedWriteTransaction();
         requireEnabled();
         if (command == null || command.sourceDayResultId == null
                 || command.targetDayResultId == null
@@ -127,7 +128,10 @@ public class AttendanceTimeCreditService
 
         int rawOvertime = Math.max(0, nonNegative(source.workedMinutes)
                 - nonNegative(source.scheduledMinutes));
-        int used = value(mapper.selectNetSourceUsed(source.dayResultId));
+        int transferred = value(mapper.selectNetSourceTransferred(source.dayResultId));
+        if (transferred < 0 || mapper.countInvalidSourceTransfers(source.dayResultId) > 0)
+            throw new ServiceException("转休来源已失效或重算，请先核对原核定");
+        int used = Math.addExact(value(mapper.selectNetSourceUsed(source.dayResultId)), transferred);
         int rawEarly = nonNegative(target.earlyLeaveMinutes);
         int offset = value(mapper.selectNetTargetOffset(target.dayResultId));
         validateLedgerBounds(rawOvertime, used, rawEarly, offset);
@@ -162,10 +166,11 @@ public class AttendanceTimeCreditService
         return mapper.selectAdjustmentById(value.adjustmentId);
     }
 
-    @Transactional
+    @Transactional(isolation=org.springframework.transaction.annotation.Isolation.READ_COMMITTED)
     public Adjustment reverse(Long adjustmentId, Reverse command,
             Long selectedShopId)
     {
+        com.erp.oa.attendance.leave.balance.AttendanceOvertimeTransferSourceGuard.requireReadCommittedWriteTransaction();
         requireEnabled();
         if (adjustmentId == null || adjustmentId <= 0 || command == null)
             throw new ServiceException("撤销参数无效");

@@ -117,7 +117,7 @@
         <el-row :gutter="12">
           <el-col :span="8">
             <el-form-item label="盘点日期" prop="checkDate">
-              <el-date-picker v-model="form.checkDate" value-format="yyyy-MM-dd" type="date" placeholder="请选择日期" style="width:100%"/>
+              <el-date-picker v-model="form.checkDate" value-format="yyyy-MM-dd" type="date" placeholder="请选择日期" style="width:100%" :disabled="formSubmitLocked"/>
             </el-form-item>
           </el-col>
           <el-col :span="8">
@@ -188,6 +188,7 @@
                 :step="1"
                 controls-position="right"
                 style="width:100%"
+                :disabled="formSubmitLocked"
                 @change="handleRecountThresholdChange"
               />
               <div class="field-help">0 表示不强制复盘</div>
@@ -195,7 +196,7 @@
           </el-col>
         </el-row>
         <el-form-item label="备注">
-          <el-input v-model="form.remark" type="textarea" :rows="2" maxlength="500" placeholder="请输入备注"/>
+          <el-input v-model="form.remark" type="textarea" :rows="2" maxlength="500" placeholder="请输入备注" :disabled="formSubmitLocked"/>
         </el-form-item>
 
         <template v-if="!form.checkId">
@@ -239,9 +240,9 @@
             >
               <el-option
                 v-for="item in checkStockOptions"
-                :key="item.productId"
+                :key="checkStockItemKey(item)"
                 :label="checkStockOptionLabel(item)"
-                :value="item.productId"
+                :value="checkStockItemKey(item)"
               />
             </el-select>
           </el-form-item>
@@ -269,6 +270,13 @@
           <el-divider content-position="left">盘点明细</el-divider>
           <div class="detail-filter-toolbar">
             <div class="detail-filter-control">
+              <el-input v-model.trim="formDetailKeyword" size="small" clearable placeholder="商品名称或编码" aria-label="查找盘点商品" style="width:220px" />
+              <el-select v-model="formDetailFilter" size="small" aria-label="盘点录入筛选" style="width:150px">
+                <el-option label="全部商品" value="all" />
+                <el-option label="未录入" value="unentered" />
+                <el-option v-if="!isBlindInputForm" label="有差异" value="difference" />
+                <el-option label="需重新核对" value="review" />
+              </el-select>
               <span class="detail-filter-label">商品分类</span>
               <el-select
                 v-model="formDetailCategoryId"
@@ -290,8 +298,16 @@
             </div>
           </div>
           <div class="detail-total-banner">
-            <span>总共 {{ filteredFormDetails.length }} 个商品</span>
+            <span>显示 {{ filteredFormDetails.length }} / {{ form.details.length }} 个商品</span>
           </div>
+          <el-alert
+            v-if="unsavedStockCheckInput"
+            class="unsaved-input-alert"
+            type="warning"
+            :closable="false"
+            show-icon
+            title="当前还有未保存的实盘修改"
+          />
           <el-alert
             v-if="isBlindInputForm"
             class="blind-check-alert"
@@ -310,6 +326,16 @@
                 </div>
               </template>
             </el-table-column>
+            <el-table-column v-if="form.details.some(hasStockCheckReference)" label="上轮参考" min-width="170">
+              <template slot-scope="scope">
+                <div v-if="hasStockCheckReference(scope.row)">
+                  <div>初盘 {{ formatQuantity(scope.row.previousActualQty) }} / 复盘 {{ formatQuantity(scope.row.previousRecountQty) }}</div>
+                  <div v-if="!isBlindInputForm">原账面 {{ formatQuantity(scope.row.previousBookQty) }}</div>
+                  <el-tag v-if="scope.row.needsSnapshotReview" :type="isActualQtyMissing(scope.row) ? 'warning' : 'info'" size="mini">{{ isActualQtyMissing(scope.row) ? '库存变化，需重新核对' : '已重新录入' }}</el-tag>
+                  <span v-else>库存未变，保留原录入</span>
+                </div>
+              </template>
+            </el-table-column>
             <el-table-column v-if="!isBlindInputForm" label="盘前库存" prop="bookQty" width="110" align="right"/>
             <el-table-column label="初盘数量" width="150" align="right">
               <template slot-scope="scope">
@@ -320,6 +346,7 @@
                   size="small"
                   controls-position="right"
                   style="width: 130px"
+                  :disabled="formSubmitLocked"
                   @change="handleActualQtyChange(scope.row)"
                 />
               </template>
@@ -334,6 +361,7 @@
                   size="small"
                   controls-position="right"
                   style="width: 140px"
+                  :disabled="formSubmitLocked"
                   @change="refreshDiff(scope.row)"
                 />
                 <span v-else class="muted-quantity">无需复盘</span>
@@ -356,7 +384,7 @@
         </template>
       </el-form>
       <div slot="footer">
-        <el-button @click="formOpen = false">关闭</el-button>
+        <el-button @click="closeStockCheckForm">关闭</el-button>
         <el-button v-if="!form.checkId" v-hasPermi="['inv:stockCheck:add']" type="primary" :loading="submitLoading" @click="createDraft">
           创建草稿
         </el-button>
@@ -407,7 +435,14 @@
       <el-divider content-position="left">盘点明细</el-divider>
       <div class="detail-filter-toolbar">
         <div class="detail-filter-control">
-          <span class="detail-filter-label">商品分类</span>
+          <el-input v-model.trim="detailKeyword" size="small" clearable placeholder="商品名称或编码" aria-label="查找盘点商品" style="width:220px" />
+              <el-select v-model="detailFilter" size="small" aria-label="盘点录入筛选" style="width:150px">
+                <el-option label="全部商品" value="all" />
+                <el-option label="未录入" value="unentered" />
+                <el-option v-if="!isBlindCheck(detail)" label="有差异" value="difference" />
+                <el-option label="需重新核对" value="review" />
+              </el-select>
+              <span class="detail-filter-label">商品分类</span>
           <el-select
             v-model="detailDetailCategoryId"
             filterable
@@ -428,7 +463,7 @@
         </div>
       </div>
       <div class="detail-total-banner">
-        <span>总共 {{ filteredDetailDetails.length }} 个商品</span>
+        <span>显示 {{ filteredDetailDetails.length }} / {{ detail.details.length }} 个商品</span>
       </div>
       <el-table :data="filteredDetailDetails" size="small" border class="stock-check-detail-table">
         <el-table-column label="商品" min-width="220">
@@ -440,6 +475,15 @@
           </template>
         </el-table-column>
         <el-table-column label="盘前库存" prop="bookQty" width="110" align="right"/>
+        <el-table-column v-if="detail.details.some(hasStockCheckReference)" label="上轮参考" min-width="170">
+          <template slot-scope="scope">
+            <div v-if="hasStockCheckReference(scope.row)">
+              <div>初盘 {{ formatQuantity(scope.row.previousActualQty) }} / 复盘 {{ formatQuantity(scope.row.previousRecountQty) }}</div>
+              <div v-if="!isBlindCheck(detail)">原账面 {{ formatQuantity(scope.row.previousBookQty) }}</div>
+              <el-tag v-if="scope.row.needsSnapshotReview" type="warning" size="mini">{{ isActualQtyMissing(scope.row) ? '需重新核对' : '已重新录入' }}</el-tag>
+            </div>
+          </template>
+        </el-table-column>
         <el-table-column label="初盘数量" prop="actualQty" width="110" align="right"/>
         <el-table-column label="复盘数量" width="110" align="right">
           <template slot-scope="scope">
@@ -665,6 +709,17 @@ export default {
     return {
       loading: false,
       submitLoading: false,
+      formSession: 0,
+      unsavedStockCheckInput: false,
+      formSubmitLocked: false,
+      formLoading: false,
+      formWritable: false,
+      formTargetCheckId: undefined,
+      formBoundCheckId: undefined,
+      formLifecycleInactive: false,
+      submitConfirmToken: 0,
+      submitConfirmPending: false,
+      stockCheckNeedsReview: false,
       list: [],
       total: 0,
       dateRange: [],
@@ -697,6 +752,7 @@ export default {
       sampleSize: 20,
       productCategoryCache: {},
       formDetailCategoryId: undefined,
+      formDetailKeyword: "", formDetailFilter: "all", detailKeyword: "", detailFilter: "all", restartLoadingId: null,
       detailDetailCategoryId: undefined,
       detail: { details: [] },
       form: this.emptyForm(),
@@ -754,14 +810,14 @@ export default {
       return (this.list || []).filter(row => row.status === "completed").length
     },
     filteredFormDetails() {
-      return this.filterDetailsByCategory(this.form.details, this.formDetailCategoryId)
+      return this.filterStockCheckRows(this.filterDetailsByCategory(this.form.details, this.formDetailCategoryId), this.formDetailKeyword, this.formDetailFilter, this.isBlindInputForm)
     },
     filteredDetailDetails() {
-      return this.filterDetailsByCategory(this.detail.details, this.detailDetailCategoryId)
+      return this.filterStockCheckRows(this.filterDetailsByCategory(this.detail.details, this.detailDetailCategoryId), this.detailKeyword, this.detailFilter, this.isBlindCheck(this.detail))
     },
     isBlindInputForm() {
       return this.form && this.form.blindCheck === "1" &&
-        (this.form.status === "draft" || this.form.status === "rejected")
+        ["draft", "rejected", "returned"].includes(this.form.status)
     },
     showRecountColumn() {
       return Number(this.form && this.form.recountThreshold || 0) > 0 ||
@@ -787,10 +843,86 @@ export default {
         : this.approvalAction === "reject" ? "请输入拒绝原因" : "可填写复核意见"
     }
   },
+  watch: {
+    formOpen(value) {
+      if (!value) this.invalidateFormSession()
+    }
+  },
   created() {
     this.getList()
   },
+  activated() {
+    this.formLifecycleInactive = false
+    this.formSession += 1
+    this.submitConfirmToken += 1
+    this.submitConfirmPending = false
+    this.submitLoading = false
+    this.formSubmitLocked = false
+    if (this.formOpen && this.form && this.form.checkId != null) {
+      this.formLoading = false
+      this.formWritable = true
+      this.formTargetCheckId = this.form.checkId
+      this.formBoundCheckId = this.form.checkId
+    } else if (this.formOpen) {
+      this.formLoading = false
+      this.formWritable = true
+    }
+  },
+  deactivated() {
+    this.formLifecycleInactive = true
+    this.invalidateFormSession()
+  },
+  beforeDestroy() {
+    this.invalidateFormSession()
+  },
   methods: {
+    beginFormSession() {
+      this.formSession += 1
+      this.submitConfirmToken += 1
+      this.submitConfirmPending = false
+      this.submitLoading = false
+      this.formSubmitLocked = false
+      this.unsavedStockCheckInput = false
+      this.stockCheckNeedsReview = false
+      return this.formSession
+    },
+    invalidateFormSession() {
+      this.formSession += 1
+      this.submitConfirmToken += 1
+      this.submitConfirmPending = false
+      this.submitLoading = false
+      this.formSubmitLocked = false
+      this.formWritable = false
+      this.formLoading = false
+    },
+    isCurrentFormSession(session) {
+      return session === this.formSession
+    },
+    applyFormSession(session, apply) {
+      if (!this.isCurrentFormSession(session) || typeof apply !== "function") return
+      apply()
+    },
+    isBoundInputForm() {
+      return !this.formLifecycleInactive && !this.formLoading && this.formWritable &&
+        this.form && this.form.checkId != null &&
+        String(this.form.checkId) === String(this.formBoundCheckId) &&
+        String(this.form.checkId) === String(this.formTargetCheckId)
+    },
+    cloneStockCheckValue(value) {
+      if (value === undefined) return undefined
+      return JSON.parse(JSON.stringify(value))
+    },
+    sameStockCheckQty(left, right) {
+      if (left === null || left === undefined || left === "") {
+        return right === null || right === undefined || right === ""
+      }
+      if (right === null || right === undefined || right === "") return false
+      return Number(left) === Number(right)
+    },
+    closeStockCheckForm() {
+      this.invalidateFormSession()
+      this.formOpen = false
+    },
     emptyForm() {
       const currentDeptId = getSelectedDeptId()
       return {
@@ -845,6 +977,11 @@ export default {
     },
     openCreate() {
       if (!this.ensureSelectedContext()) return
+      this.beginFormSession()
+      this.formLoading = false
+      this.formWritable = true
+      this.formTargetCheckId = undefined
+      this.formBoundCheckId = undefined
       this.form = this.emptyForm()
       this.counterOptions = []
       this.createScope = "all"
@@ -854,20 +991,42 @@ export default {
       this.checkStockOptions = []
       this.sampleSize = 20
       this.formDetailCategoryId = undefined
+      this.formDetailKeyword = ""; this.formDetailFilter = "all"
       this.formOpen = true
       this.searchCounterCandidates("")
       this.$nextTick(() => this.$refs.formRef && this.$refs.formRef.clearValidate())
     },
     openInput(row) {
       if (!this.ensureWritableCheck(row)) return
-      getStockCheck(row.checkId).then(res => {
-        this.form = Object.assign(this.emptyForm(), res.data || {})
-        this.form.details = (this.form.details || []).map(item => this.normalizeDetail(item))
-        this.formDetailCategoryId = undefined
-        this.loadCategoryOptions()
-        this.hydrateDetailCategories(this.form.details)
-        this.formOpen = true
-        this.$nextTick(() => this.$refs.formRef && this.$refs.formRef.clearValidate())
+      const session = this.beginFormSession()
+      const checkId = row.checkId
+      this.formLoading = true
+      this.formWritable = false
+      this.formTargetCheckId = checkId
+      this.formBoundCheckId = undefined
+      return getStockCheck(checkId, { silentError: true }).then(res => {
+        this.applyFormSession(session, () => {
+          if (String(this.formTargetCheckId) !== String(checkId)) return
+          this.form = Object.assign(this.emptyForm(), res.data || {})
+          this.form.details = (this.form.details || []).map(item => this.normalizeDetail(item))
+          this.formDetailCategoryId = undefined
+          this.formDetailKeyword = ""; this.formDetailFilter = "all"
+          this.unsavedStockCheckInput = false
+          this.stockCheckNeedsReview = false
+          this.formBoundCheckId = checkId
+          this.formWritable = true
+          this.formLoading = false
+          this.loadCategoryOptions()
+          this.hydrateDetailCategories(this.form.details)
+          this.formOpen = true
+          this.$nextTick(() => this.$refs.formRef && this.$refs.formRef.clearValidate())
+        })
+      }).catch(() => {
+        this.applyFormSession(session, () => {
+          if (String(this.formTargetCheckId) !== String(checkId)) return
+          this.formLoading = false
+          this.$modal.msgError("盘点单加载失败，请重试")
+        })
       })
     },
     openDetail(row) {
@@ -875,6 +1034,7 @@ export default {
         this.detail = Object.assign({ details: [] }, row || {}, res.data || {})
         this.detail.details = (this.detail.details || []).map(item => this.normalizeDetail(item))
         this.detailDetailCategoryId = undefined
+        this.detailKeyword = ""; this.detailFilter = "all"
         this.loadCategoryOptions()
         this.hydrateDetailCategories(this.detail.details)
         this.detailOpen = true
@@ -1025,9 +1185,10 @@ export default {
       })
     },
     createDraft() {
-      if (!this.ensureSelectedContext()) return
+      if (!this.ensureSelectedContext() || this.formLifecycleInactive || this.formLoading) return
+      const session = this.formSession
       this.$refs.formRef.validate(valid => {
-        if (!valid) return
+        if (!valid || !this.isCurrentFormSession(session)) return
         if (this.createScope === "category" && !this.selectedCheckCategoryId) {
           this.$modal.msgError("请选择盘点商品分类")
           return
@@ -1040,65 +1201,249 @@ export default {
           this.$modal.msgError("抽盘数量必须在 1 到 1000 之间")
           return
         }
+        if (this.submitLoading) return
         this.submitLoading = true
-        createStockCheck(this.buildCreatePayload()).then(res => {
-          this.$modal.msgSuccess("盘点草稿已创建，已通知指定盘点人")
-          this.form = Object.assign(this.emptyForm(), res.data || {})
-          this.form.details = (this.form.details || []).map(item => this.normalizeDetail(item))
-          this.formDetailCategoryId = undefined
-          this.loadCategoryOptions()
-          this.hydrateDetailCategories(this.form.details)
-          this.getList()
+        createStockCheck(this.buildCreatePayload(), { silentError: true }).then(res => {
+          this.applyFormSession(session, () => {
+            this.$modal.msgSuccess("盘点草稿已创建，已通知指定盘点人")
+            this.form = Object.assign(this.emptyForm(), res.data || {})
+            this.form.details = (this.form.details || []).map(item => this.normalizeDetail(item))
+            this.formDetailCategoryId = undefined
+          this.formDetailKeyword = ""; this.formDetailFilter = "all"
+            this.unsavedStockCheckInput = false
+            this.stockCheckNeedsReview = false
+            this.formBoundCheckId = this.form.checkId
+            this.formTargetCheckId = this.form.checkId
+            this.formWritable = true
+            this.formLoading = false
+            this.loadCategoryOptions()
+            this.hydrateDetailCategories(this.form.details)
+            this.getList()
+          })
+        }).catch(() => {
+          this.applyFormSession(session, () => {
+            this.$modal.msgError("盘点草稿创建失败，请重试")
+          })
         }).finally(() => {
-          this.submitLoading = false
+          this.applyFormSession(session, () => {
+            this.submitLoading = false
+          })
         })
       })
     },
     saveActualQty() {
-      if (!this.canInput(this.form) || !this.ensureWritableCheck(this.form)) return
+      if (!this.canInput(this.form) || !this.ensureWritableCheck(this.form) || !this.isBoundInputForm() || this.submitLoading) return
+      this.submitConfirmToken += 1
+      this.submitConfirmPending = false
+      const session = this.formSession
+      const checkId = this.form.checkId
       this.$refs.formRef.validate(valid => {
-        if (!valid || !this.validateDetails(false)) return
+        if (!valid || !this.isCurrentFormSession(session) || !this.isBoundInputForm() ||
+          String(this.form.checkId) !== String(checkId) || !this.validateDetails(false)) return
+        if (this.submitLoading) return
+        const snapshot = this.cloneStockCheckValue(this.buildInputPayload())
         this.submitLoading = true
-        inputStockCheck(this.form.checkId, this.buildInputPayload()).then(res => {
-          this.$modal.msgSuccess("实盘数据已保存")
-          this.form = Object.assign(this.emptyForm(), res.data || this.form)
-          this.form.details = (this.form.details || []).map(item => this.normalizeDetail(item))
-          this.getList()
+        inputStockCheck(checkId, snapshot, { silentError: true }).then(res => {
+          this.applyFormSession(session, () => {
+            if (String(this.formBoundCheckId) !== String(checkId)) return
+            if (this.mergeSavedStockCheck(res && res.data, snapshot, checkId)) {
+              this.getList()
+            }
+          })
+        }).catch(() => {
+          this.applyFormSession(session, () => {
+            this.$modal.msgError("实盘保存失败，请重试")
+          })
         }).finally(() => {
-          this.submitLoading = false
+          this.applyFormSession(session, () => {
+            this.submitLoading = false
+          })
         })
       })
     },
     submitActualQty() {
-      if (!this.canInput(this.form) || !this.ensureWritableCheck(this.form)) return
+      if (!this.canInput(this.form) || !this.ensureWritableCheck(this.form) || !this.isBoundInputForm() ||
+        this.submitLoading || this.submitConfirmPending) return
+      const session = this.formSession
+      const checkId = this.form.checkId
+      const confirmToken = this.submitConfirmToken + 1
+      this.submitConfirmToken = confirmToken
+      this.submitConfirmPending = true
       this.$refs.formRef.validate(valid => {
-        if (!valid || !this.validateDetails(true)) return
+        if (!valid || !this.isCurrentFormSession(session) || confirmToken !== this.submitConfirmToken ||
+          !this.isBoundInputForm() || String(this.form.checkId) !== String(checkId) || !this.validateDetails(true)) {
+          if (confirmToken === this.submitConfirmToken) this.submitConfirmPending = false
+          return
+        }
+        const snapshot = this.cloneStockCheckValue(this.buildInputPayload())
         const summary = this.buildStockCheckSummary(this.form.details)
         this.$modal.confirm(this.getStockCheckSubmitMessage(this.form, summary)).then(() => {
-          this.submitLoading = true
-          return inputStockCheck(this.form.checkId, this.buildInputPayload())
-        }).then(res => {
-          this.form = Object.assign(this.emptyForm(), res.data || this.form)
-          this.form.details = (this.form.details || []).map(item => this.normalizeDetail(item))
-          if (!this.validateSubmitDetails(this.form.details)) {
-            this.$modal.msgWarning("初盘已保存，请完成系统标记的复盘行后再提交")
-            return null
+          if (confirmToken === this.submitConfirmToken) this.submitConfirmPending = false
+          if (!this.isCurrentFormSession(session) || confirmToken !== this.submitConfirmToken ||
+            String(this.form.checkId) !== String(checkId) || this.submitLoading) {
+            return
           }
-          return submitStockCheck(this.form.checkId)
-        }).then(res => {
-          if (!res) return
-          const result = res.data || {}
-          const message = result.status === "completed"
-            ? "无差异，盘点已自动完成"
-            : result.status === "invalidated"
-              ? "库存已变化，请重新盘点"
-              : "盘点已提交审批"
-          this.$modal.msgSuccess(message)
-          this.formOpen = false
-          this.getList()
-        }).finally(() => {
-          this.submitLoading = false
+          this.submitLoading = true
+          return inputStockCheck(checkId, snapshot, { silentError: true }).then(res => {
+            if (!this.isCurrentFormSession(session) || String(this.formBoundCheckId) !== String(checkId)) return null
+            const confirmed = this.mergeSavedStockCheck(res && res.data, snapshot, checkId, { announce: false })
+            if (!confirmed) {
+              this.$modal.msgError("实盘保存结果无法确认，请核对后再提交")
+              return null
+            }
+            if (this.unsavedStockCheckInput) {
+              this.$modal.msgWarning("实盘已保存，还有未保存的修改，请保存后再提交")
+              return null
+            }
+            if (!this.validateSubmitDetails(this.form.details)) {
+              this.$modal.msgWarning("初盘已保存，请完成系统标记的复盘行后再提交")
+              return null
+            }
+            this.formSubmitLocked = true
+            return submitStockCheck(checkId, undefined, { silentError: true })
+          }).then(res => {
+            if (!res) return
+            this.applyFormSession(session, () => {
+              if (String(this.formBoundCheckId) !== String(checkId)) return
+              const result = res.data || {}
+              const message = result.status === "completed"
+                ? "无差异，盘点已自动完成"
+                : result.status === "invalidated"
+                  ? "库存已变化，请重新盘点"
+                  : "盘点已提交审批"
+              this.$modal.msgSuccess(message)
+              this.formOpen = false
+              this.getList()
+            })
+          }).catch(() => {
+            this.applyFormSession(session, () => {
+              this.$modal.msgError("盘点提交失败，请重试")
+            })
+          }).finally(() => {
+            this.applyFormSession(session, () => {
+              this.submitLoading = false
+              this.formSubmitLocked = false
+            })
+          })
+        }).catch(() => {
+          if (confirmToken === this.submitConfirmToken) this.submitConfirmPending = false
         })
+      })
+    },
+    isUsableStockCheckSaveResponse(remoteData, checkId) {
+      if (!remoteData || typeof remoteData !== "object") return false
+      if (remoteData.checkId === undefined || remoteData.checkId === null) return false
+      if (String(remoteData.checkId) !== String(checkId)) return false
+      return Array.isArray(remoteData.details)
+    },
+    mergeSavedStockCheck(remoteData, snapshot, checkId, options) {
+      if (!this.isUsableStockCheckSaveResponse(remoteData, checkId)) {
+        this.unsavedStockCheckInput = true
+        this.stockCheckNeedsReview = true
+        if (!options || options.announce !== false) {
+          this.$modal.msgError("实盘保存结果无法确认，请核对后重试")
+        }
+        return false
+      }
+      const localForm = this.form || this.emptyForm()
+      const saved = Object.assign(this.emptyForm(), remoteData)
+      const remoteDetails = (saved.details || []).map(item => this.normalizeDetail(item))
+      const localById = {}
+      ;(localForm.details || []).forEach(item => {
+        if (item && item.detailId !== undefined && item.detailId !== null) {
+          localById[String(item.detailId)] = item
+        }
+      })
+      const snapById = {}
+      ;((snapshot && snapshot.details) || []).forEach(item => {
+        if (item && item.detailId !== undefined && item.detailId !== null) {
+          snapById[String(item.detailId)] = item
+        }
+      })
+      const keepCheckDate = (localForm.checkDate || "") !== ((snapshot && snapshot.checkDate) || "")
+      const keepRemark = (localForm.remark || "") !== ((snapshot && snapshot.remark) || "")
+      const keepThreshold = Number(localForm.recountThreshold) !== Number(snapshot && snapshot.recountThreshold)
+      let restartedDuringSave = false
+      const mergedDetails = remoteDetails.map(remoteRow => {
+        const row = this.normalizeDetail(remoteRow)
+        const local = localById[String(row.detailId)]
+        const snap = snapById[String(row.detailId)]
+        if (!local || !snap) return row
+        if (String(row.snapshotVersion == null ? "0" : row.snapshotVersion) !== String(snap.snapshotVersion == null ? "0" : snap.snapshotVersion)) {
+          restartedDuringSave = true
+          return row
+        }
+        const actualEdited = !this.sameStockCheckQty(local.actualQty, snap.actualQty)
+        const recountEdited = !this.sameStockCheckQty(local.recountQty, snap.recountQty)
+        if (actualEdited) {
+          row.actualQty = local.actualQty
+          this.handleActualQtyChange(row)
+          if (recountEdited) {
+            row.recountQty = local.recountQty
+            this.refreshDiff(row)
+          }
+        } else if (recountEdited) {
+          row.recountQty = local.recountQty
+          this.refreshDiff(row)
+        }
+        return row
+      })
+      let missingSubmittedRow = false
+      ;((snapshot && snapshot.details) || []).forEach(snap => {
+        if (snap && snap.detailId !== undefined && snap.detailId !== null &&
+          !remoteDetails.some(item => String(item.detailId) === String(snap.detailId))) {
+          missingSubmittedRow = true
+          const local = localById[String(snap.detailId)]
+          if (local) mergedDetails.push(this.normalizeDetail(local))
+        }
+      })
+      this.form = Object.assign(this.emptyForm(), saved)
+      if (keepCheckDate) this.form.checkDate = localForm.checkDate
+      if (keepRemark) this.form.remark = localForm.remark
+      if (keepThreshold) this.form.recountThreshold = localForm.recountThreshold
+      this.form.details = mergedDetails
+      this.formBoundCheckId = checkId
+      this.formTargetCheckId = checkId
+      if (missingSubmittedRow) {
+        this.unsavedStockCheckInput = true
+        this.stockCheckNeedsReview = true
+        if (!options || options.announce !== false) {
+          this.$modal.msgWarning("实盘保存结果不完整，请核对后重试")
+        }
+        return false
+      }
+      if (restartedDuringSave) {
+        this.stockCheckNeedsReview = true
+        this.unsavedStockCheckInput = true
+        if (!options || options.announce !== false) this.$modal.msgWarning("盘点快照已重新建立，旧输入仅供参考，请重新核对变化商品")
+        return false
+      }
+      this.stockCheckNeedsReview = false
+      this.unsavedStockCheckInput = this.hasUnsavedStockCheckInput(saved)
+      if (options && options.announce === false) return true
+      if (this.unsavedStockCheckInput) {
+        this.$modal.msgWarning("实盘数据已保存，当前还有未保存的修改")
+      } else {
+        this.$modal.msgSuccess("实盘数据已保存")
+      }
+      return true
+    },
+    hasUnsavedStockCheckInput(saved) {
+      if (!saved) return false
+      if ((this.form.checkDate || "") !== (saved.checkDate || "")) return true
+      if ((this.form.remark || "") !== (saved.remark || "")) return true
+      if (Number(this.form.recountThreshold) !== Number(saved.recountThreshold)) return true
+      const savedById = {}
+      ;(saved.details || []).forEach(item => {
+        if (item && item.detailId !== undefined && item.detailId !== null) {
+          savedById[String(item.detailId)] = item
+        }
+      })
+      return (this.form.details || []).some(local => {
+        const remote = savedById[String(local.detailId)]
+        if (!remote) return true
+        return !this.sameStockCheckQty(local.actualQty, remote.actualQty) ||
+          !this.sameStockCheckQty(local.recountQty, remote.recountQty)
       })
     },
     buildInputPayload() {
@@ -1108,6 +1453,7 @@ export default {
         remark: this.form.remark,
         details: this.form.details.map(item => ({
           detailId: item.detailId,
+          ...(item.snapshotVersion == null ? {} : { snapshotVersion: item.snapshotVersion }),
           actualQty: item.actualQty,
           recountQty: item.recountQty
         }))
@@ -1178,14 +1524,19 @@ export default {
       })
     },
     handleRestart(row) {
-      if (!this.canRestart(row) || !this.ensureWritableCheck(row)) return
-      this.$modal.confirm("重新盘点将刷新账面库存并清空已录入的实盘数量，是否继续？").then(() => {
-        restartStockCheck(row.checkId).then(() => {
-          this.$modal.msgSuccess("库存快照已刷新，请重新录入实盘数量")
+      if (this.restartLoadingId || !this.canRestart(row) || !this.ensureWritableCheck(row)) return
+      const checkId = row.checkId, scope = JSON.stringify([getSelectedDeptId(), this.$store && this.$store.getters && this.$store.getters.id])
+      return this.$modal.confirm("重新盘点会保留未变化商品的录入；变化商品保留旧数作参考，需重新核对后填写。是否继续？").then(() => {
+        if (this.restartLoadingId || scope !== JSON.stringify([getSelectedDeptId(), this.$store && this.$store.getters && this.$store.getters.id])) return
+        this.restartLoadingId = String(checkId)
+        return restartStockCheck(checkId).then(() => {
+          if (scope !== JSON.stringify([getSelectedDeptId(), this.$store && this.$store.getters && this.$store.getters.id])) return
+          this.$modal.msgSuccess("库存快照已刷新，请核对标记的变化商品")
           this.detailOpen = false
           this.getList()
-        })
-      })
+          return this.openInput(Object.assign({}, row, { status: "draft" }))
+        }).finally(() => { if (this.restartLoadingId === String(checkId)) this.restartLoadingId = null })
+      }).catch(error => ({ failed: true, error }))
     },
     handleWithdraw(row) {
       if (!this.canWithdrawNative(row) || this.withdrawLoadingId) {
@@ -1281,7 +1632,10 @@ export default {
         deadline: this.form.deadline,
         recountThreshold: this.form.recountThreshold,
         remark: this.form.remark,
-        details: productIds.map(productId => ({ productId }))
+        details: productIds.map(key => {
+          const [itemType, itemId] = String(key).includes(":") ? String(key).split(":") : ["product", String(key)]
+          return { itemType, itemId, productId: itemType === "product" ? itemId : undefined }
+        })
       }
     },
     handleCreateScopeChange() {
@@ -1318,15 +1672,14 @@ export default {
       listStock({
         pageNum: 1,
         pageSize: 50,
-        itemType: "product",
         productName: keyword || undefined,
         ownOnly: true
       }).then(res => {
         const optionMap = {}
-        ;(this.checkStockOptions || []).forEach(item => { optionMap[String(item.productId)] = item })
+        ;(this.checkStockOptions || []).forEach(item => { optionMap[this.checkStockItemKey(item)] = item })
         ;(res.rows || []).forEach(item => {
-          if (item.productId !== undefined && item.productId !== null) {
-            optionMap[String(item.productId)] = item
+          if (item.itemId != null || item.productId != null) {
+            optionMap[this.checkStockItemKey(item)] = item
           }
         })
         this.checkStockOptions = Object.values(optionMap)
@@ -1334,12 +1687,15 @@ export default {
         this.checkStockLoading = false
       })
     },
+    checkStockItemKey(item) {
+      return (item.itemType || "product") + ":" + (item.itemId == null ? item.productId : item.itemId)
+    },
     checkStockOptionLabel(item) {
       const code = item.productCode || item.itemCode || "-"
       const name = item.productName || item.itemName || "-"
       const quantity = this.formatQuantity(item.currentQuantity)
       const unit = item.unit || item.itemUnit || ""
-      return code + " / " + name + " / 库存 " + quantity + unit
+      return ({ product: "商品", oe: "OE", gift: "礼盒" }[item.itemType || "product"]) + " / " + code + " / " + name + " / 库存 " + quantity + unit
     },
     loadCategoryOptions() {
       if (this.categoryOptions.length > 0) return
@@ -1353,6 +1709,24 @@ export default {
     flattenCategories,
     categoryLabel(item) {
       return item ? (item.categoryFullPath || item.categoryName || "-") : "-"
+    },
+    isBlindCheck(check) { return check && check.blindCheck === "1" && ["draft", "rejected", "returned"].includes(check.status) },
+    hasStockCheckReference(row) {
+      return !!row && (row.previousActualQty != null || row.previousRecountQty != null || row.previousBookQty != null || row.needsSnapshotReview)
+    },
+    filterStockCheckRows(rows, keyword, state, blind) {
+      const text = String(keyword || "").trim().toLocaleLowerCase()
+      return (rows || []).filter(row => {
+        if (text && ![row.productName, row.itemName, row.productCode, row.itemCode, row.sku].some(value => String(value || "").toLocaleLowerCase().includes(text))) return false
+        if (state === "unentered") return isActualQtyMissing(row)
+        if (state === "review") return row.needsSnapshotReview === true && isActualQtyMissing(row)
+        if (state === "difference") {
+          if (blind || isActualQtyMissing(row) || row.bookQty == null || row.bookQty === "") return false
+          const final = row.recountQty == null || row.recountQty === "" ? Number(row.actualQty) : Number(row.recountQty)
+          return Number.isFinite(final) && Number.isFinite(Number(row.bookQty)) && Math.abs(final - Number(row.bookQty)) > 0.000001
+        }
+        return true
+      })
     },
     filterDetailsByCategory(details, categoryId) {
       return filterStockCheckDetailsByCategory(details, categoryId, this.categoryOptions)
@@ -1445,7 +1819,7 @@ export default {
       return requiresRecount(row, this.form && this.form.recountThreshold)
     },
     needsRecount(row) {
-      return this.requiresRecountByValues(row)
+      return this.requiresRecountByValues(row) || (row && row.recountRequired === "1")
     },
     effectiveActualQty,
     productMeta(row) {

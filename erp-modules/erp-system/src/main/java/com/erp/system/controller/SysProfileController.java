@@ -1,6 +1,7 @@
 package com.erp.system.controller;
 
-import java.util.Arrays;
+import com.erp.common.core.constant.SecurityConstants;
+import com.erp.common.core.exception.ServiceException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
@@ -19,7 +20,6 @@ import com.erp.common.core.utils.DateUtils;
 import com.erp.common.core.utils.ServletUtils;
 import com.erp.common.core.utils.StringUtils;
 import com.erp.common.core.utils.file.FileTypeUtils;
-import com.erp.common.core.utils.file.MimeTypeUtils;
 import com.erp.common.core.web.controller.BaseController;
 import com.erp.common.core.web.domain.AjaxResult;
 import com.erp.common.log.annotation.Log;
@@ -29,7 +29,6 @@ import com.erp.common.security.annotation.AllowPasswordChangeRequired;
 import com.erp.common.security.annotation.AllowsTemporaryCredential;
 import com.erp.common.security.annotation.IdempotentSubmit;
 import com.erp.common.security.service.TokenService;
-import com.erp.system.service.support.UserSessionInvalidationService;
 import com.erp.common.security.utils.SecurityUtils;
 import com.erp.system.api.RemoteFileService;
 import com.erp.system.api.domain.SysFile;
@@ -61,9 +60,6 @@ public class SysProfileController extends BaseController
     @Autowired
     private TokenService tokenService;
 
-    @Autowired
-    private UserSessionInvalidationService userSessionInvalidationService;
-    
     @Autowired
     private RemoteFileService remoteFileService;
 
@@ -192,7 +188,10 @@ public class SysProfileController extends BaseController
             return error("新密码不能与旧密码相同");
         }
         newPassword = SecurityUtils.encryptPassword(newPassword);
-        if (userService.activateUserPassword(userId, newPassword, loginUser.getUsername()) > 0)
+        // This service commits the conditional password write and outbox together.
+        // Only after it returns may this request mutate the current cached session.
+        if (userService.changeOwnPassword(userId, password, newPassword,
+                loginUser.getUsername(), loginUser.getToken()) > 0)
         {
             // 更新缓存用户密码&密码最后更新时间
             loginUser.getSysUser().setPwdUpdateDate(DateUtils.getNowDate());
@@ -202,8 +201,6 @@ public class SysProfileController extends BaseController
             loginUser.getSysUser().setTemporaryPasswordExpiresAt(null);
             loginUser.setCredentialState(SysUser.CREDENTIAL_STATE_ACTIVE);
             loginUser.setTemporaryPasswordExpiresAt(null);
-            userSessionInvalidationService.record(userId,
-                    UserSessionInvalidationService.PASSWORD_CHANGED, loginUser.getToken());
             tokenService.setLoginUser(loginUser);
             return success();
         }
@@ -221,35 +218,33 @@ public class SysProfileController extends BaseController
     public AjaxResult avatar(@RequestParam("avatarfile") MultipartFile file)
     {
         preventProfileResponseCaching();
-        if (!file.isEmpty())
+        if (file != null && !file.isEmpty())
         {
             if (file.getSize() > MAX_AVATAR_BYTES)
             {
-                return error("头像文件不能超过5 MiB");
+                throw new ServiceException("头像文件不能超过5 MB");
             }
             LoginUser loginUser = SecurityUtils.getLoginUser();
             if (StringUtils.isNull(loginUser) || StringUtils.isNull(loginUser.getSysUser()))
             {
-                return error("登录状态已过期，请重新登录");
+                throw new ServiceException("登录状态已过期，请重新登录");
             }
             String extension = FileTypeUtils.getExtension(file);
-            if (!StringUtils.equalsAnyIgnoreCase(extension, MimeTypeUtils.IMAGE_EXTENSION))
+            if (!StringUtils.equalsAnyIgnoreCase(extension, "jpg", "jpeg", "png")
+                    || !StringUtils.equalsAnyIgnoreCase(file.getContentType(), "image/jpeg", "image/jpg", "image/png"))
             {
-                return error("文件格式不正确，请上传" + Arrays.toString(MimeTypeUtils.IMAGE_EXTENSION) + "格式");
+                throw new ServiceException("仅支持 JPG、JPEG、PNG 格式头像");
             }
-            R<SysFile> fileResult = remoteFileService.upload(file);
-            if (StringUtils.isNull(fileResult) || StringUtils.isNull(fileResult.getData()))
+            R<SysFile> fileResult = remoteFileService.uploadInner(file, SecurityConstants.INNER);
+            if (StringUtils.isNull(fileResult) || R.isError(fileResult)
+                    || StringUtils.isNull(fileResult.getData()) || StringUtils.isEmpty(fileResult.getData().getUrl()))
             {
-                return error("文件服务异常，请联系管理员");
+                throw new ServiceException("头像上传失败，请稍后重试");
             }
             String url = fileResult.getData().getUrl();
             if (userService.updateUserAvatar(loginUser.getUserid(), url))
             {
-                String oldAvatarUrl = loginUser.getSysUser().getAvatar();
-                if (StringUtils.isNotEmpty(oldAvatarUrl))
-                {
-                    remoteFileService.delete(oldAvatarUrl);
-                }
+                // 仅更新本人引用；旧文件保留，避免删除被其他记录引用的文件。
                 AjaxResult ajax = AjaxResult.success();
                 ajax.put("imgUrl", url);
                 // 更新缓存用户头像
@@ -258,7 +253,7 @@ public class SysProfileController extends BaseController
                 return ajax;
             }
         }
-        return error("上传图片异常，请联系管理员");
+        throw new ServiceException("上传图片异常，请重试");
     }
 
     public String getSysAccountChrtype()

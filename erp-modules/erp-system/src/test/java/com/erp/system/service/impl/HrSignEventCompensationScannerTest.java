@@ -80,8 +80,9 @@ class HrSignEventCompensationScannerTest
     {
         String xml = resourceText(
                 "mapper/system/SysHrLifecycleActionMapper.xml");
-        String query = xml.substring(xml.indexOf(
-                "<select id=\"selectConfirmedActionsWithoutOutbox\""));
+        int start = xml.indexOf("<select id=\"selectConfirmedActionsWithoutOutbox\"");
+        assertThat(start).isGreaterThanOrEqualTo(0);
+        String query = xml.substring(start, xml.indexOf("</select>", start));
 
         assertThat(query)
                 .contains("selectConfirmedActionsWithoutOutbox")

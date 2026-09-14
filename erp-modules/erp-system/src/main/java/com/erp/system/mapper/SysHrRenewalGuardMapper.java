@@ -6,6 +6,9 @@ import com.erp.oa.api.domain.HrRenewalGuard;
 /** System侧续签任务权威门闩持久化。 */
 public interface SysHrRenewalGuardMapper
 {
+    HrRenewalGuard selectCurrent(@Param("employeeId") Long employeeId,
+            @Param("scenario") String scenario);
+
     int insertIdle(@Param("employeeId") Long employeeId,
             @Param("scenario") String scenario);
 

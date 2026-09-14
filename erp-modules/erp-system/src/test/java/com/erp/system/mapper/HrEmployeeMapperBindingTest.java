@@ -19,6 +19,7 @@ class HrEmployeeMapperBindingTest
     void scopedEmployeeQueryBindsFiltersAndCarriesAspectDataScopeIntoBoundSql()
     {
         Configuration configuration=new Configuration();
+        HealthCertificateMapperFragments.register(configuration);
         configuration.getTypeAliasRegistry().registerAlias("SysUser", com.erp.system.api.domain.SysUser.class);
         configuration.getTypeAliasRegistry().registerAlias("SysDept", com.erp.system.api.domain.SysDept.class);
         configuration.getTypeAliasRegistry().registerAlias("SysRole", com.erp.system.api.domain.SysRole.class);
@@ -45,7 +46,7 @@ class HrEmployeeMapperBindingTest
                 "limit ?")
                 .doesNotContain("${params.dataScope}");
         assertThat(bound.getParameterMappings().stream().map(ParameterMapping::getProperty))
-                .containsExactly("userId", "keyword", "keyword", "keyword", "keyword", "keyword", "keyword", "keyword", "maxRows");
+                .containsExactly("params.healthAsOfDate", "params.healthAsOfDate", "params.healthAsOfDate", "params.healthAsOfDate", "params.healthAsOfDate", "params.healthAsOfDate", "params.healthAsOfDate", "params.healthAsOfDate", "userId", "keyword", "keyword", "keyword", "keyword", "keyword", "keyword", "keyword", "maxRows");
     }
 
     @Test
@@ -116,6 +117,7 @@ class HrEmployeeMapperBindingTest
     void onboardingRiskLinkFilterBindsLinkedUserWithoutWeakeningDataScope()
     {
         Configuration configuration=new Configuration();
+        HealthCertificateMapperFragments.register(configuration);
         try(InputStream stream=getClass().getClassLoader().getResourceAsStream("mapper/system/HrOnboardingMapper.xml"))
         {
             new XMLMapperBuilder(stream,configuration,"mapper/system/HrOnboardingMapper.xml",configuration.getSqlFragments()).parse();
@@ -171,7 +173,7 @@ class HrEmployeeMapperBindingTest
     }
 
     @Test
-    void healthCertificateFiltersUseOnlyTheApprovedCurrentCertificate()
+    void healthCertificateFiltersUseSharedBusinessDateChoiceAndExcludeFutureValidity()
     {
         Configuration configuration=userConfiguration();
         HrEmployeeQuery query=new HrEmployeeQuery();
@@ -185,12 +187,12 @@ class HrEmployeeMapperBindingTest
 
         assertThat(bound.getSql()).contains(
                 "left join hr_employee_health_certificate hc on hc.user_id = u.user_id",
-                "hc.current_flag = 'Y'", "hc.review_status = 'APPROVED'",
-                "hc.del_flag = '0'",
-                "hc.expires_on between current_date() and date_add(current_date(), interval 30 day)",
+                "h.current_flag = 'Y'", "h.review_status = 'APPROVED'",
+                "h.del_flag = '0'", "coalesce(hc.valid_from,hc.issued_date) <= ?",
+                "hc.expires_on between ? and date_add(?, interval 30 day)",
                 "hc.expires_on >= ?", "hc.expires_on <= ?");
         assertThat(bound.getParameterMappings()).extracting(ParameterMapping::getProperty)
-                .containsExactly("healthCertificateExpiresFrom","healthCertificateExpiresTo");
+                .contains("params.healthAsOfDate", "healthCertificateExpiresFrom","healthCertificateExpiresTo");
     }
 
     @Test
@@ -205,6 +207,7 @@ class HrEmployeeMapperBindingTest
                 .doesNotContain("phonenumber =","nick_name =","password =","status =");
 
         Configuration profiles=new Configuration();
+        HealthCertificateMapperFragments.register(profiles);
         try(InputStream stream=getClass().getClassLoader().getResourceAsStream("mapper/system/SysUserProfileMapper.xml"))
         {new XMLMapperBuilder(stream,profiles,"mapper/system/SysUserProfileMapper.xml",profiles.getSqlFragments()).parse();}
         catch(Exception ex){throw new AssertionError(ex);}
@@ -219,6 +222,7 @@ class HrEmployeeMapperBindingTest
     void minimalProfileInitializationUsesAnIdempotentUserKeyUpsert()
     {
         Configuration profiles=new Configuration();
+        HealthCertificateMapperFragments.register(profiles);
         try(InputStream stream=getClass().getClassLoader().getResourceAsStream("mapper/system/SysUserProfileMapper.xml"))
         {new XMLMapperBuilder(stream,profiles,"mapper/system/SysUserProfileMapper.xml",profiles.getSqlFragments()).parse();}
         catch(Exception ex){throw new AssertionError(ex);}
@@ -236,6 +240,7 @@ class HrEmployeeMapperBindingTest
     private Configuration userConfiguration()
     {
         Configuration configuration=new Configuration();
+        HealthCertificateMapperFragments.register(configuration);
         configuration.getTypeAliasRegistry().registerAlias("SysUser", com.erp.system.api.domain.SysUser.class);
         configuration.getTypeAliasRegistry().registerAlias("SysDept", com.erp.system.api.domain.SysDept.class);
         configuration.getTypeAliasRegistry().registerAlias("SysRole", com.erp.system.api.domain.SysRole.class);

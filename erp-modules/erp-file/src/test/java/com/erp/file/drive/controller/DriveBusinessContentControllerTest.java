@@ -15,6 +15,7 @@ import com.erp.file.drive.exception.DriveException;
 import com.erp.file.drive.service.DriveActorResolver;
 import com.erp.file.drive.service.DriveContentService;
 import com.erp.file.drive.service.DriveFeatureGuard;
+import com.erp.file.drive.service.DriveFilePolicy;
 import com.erp.system.api.domain.DriveBusinessFile;
 import org.junit.jupiter.api.Test;
 
@@ -46,7 +47,7 @@ class DriveBusinessContentControllerTest
         when(service.validateBusinessBinding(22L, actor)).thenReturn(pdf);
         DriveBusinessContentController controller = new
                 DriveBusinessContentController(enabledGuard(), resolver,
-                        service);
+                        service, new DriveFilePolicy(new DriveProperties()));
 
         R<DriveBusinessFile> accepted = controller.validateBinding(22L,
                 "HEALTH_CERTIFICATE");
@@ -56,6 +57,30 @@ class DriveBusinessContentControllerTest
                 .isInstanceOf(DriveException.class)
                 .extracting("businessCode")
                 .isEqualTo(DriveErrorCodes.DRIVE_FILE_TYPE_REJECTED);
+    }
+
+    @Test
+    void transferEvidenceUsesExistingSafeFilePolicyAndPreservesActorBinding()
+    {
+        DriveActor actor = mock(DriveActor.class);
+        DriveActorResolver resolver = mock(DriveActorResolver.class);
+        DriveContentService service = mock(DriveContentService.class);
+        when(resolver.resolve()).thenReturn(actor);
+        DriveBusinessFile file = new DriveBusinessFile();
+        file.setNodeId(22L); file.setFileName("receipt.pdf");
+        file.setSize(20L); file.setContentType("application/pdf");
+        when(service.validateBusinessBinding(22L, actor)).thenReturn(file);
+        DriveBusinessContentController controller = new DriveBusinessContentController(
+                enabledGuard(), resolver, service, new DriveFilePolicy(new DriveProperties()));
+        assertThat(controller.validateBinding(22L, "TRANSFER_EVIDENCE").getData()).isSameAs(file);
+        file.setFileName("script.html"); file.setContentType("text/html");
+        assertThatThrownBy(() -> controller.validateBinding(22L, "TRANSFER_EVIDENCE"))
+                .isInstanceOf(DriveException.class);
+        file.setFileName("receipt.pdf"); file.setContentType("application/pdf");
+        when(service.validateBusinessBinding(22L, actor)).thenThrow(new DriveException(
+                DriveErrorCodes.DRIVE_FILE_TYPE_REJECTED, "unavailable or unauthorized"));
+        assertThatThrownBy(() -> controller.validateBinding(22L, "TRANSFER_EVIDENCE"))
+                .hasMessageContaining("unavailable or unauthorized");
     }
 
     private DriveFeatureGuard enabledGuard()

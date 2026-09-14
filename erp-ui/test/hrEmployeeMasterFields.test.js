@@ -100,7 +100,7 @@ assert.ok(edit.includes("getHrEmployeeFormOptions"), "edit options must come fro
 assert.ok(edit.includes("previewHrEmployeeDerived"), "derived organization fields must use backend preview")
 assert.ok(!edit.includes("allow-create"), "HR enums must not accept hardcoded free-form values")
 assert.ok(employeeApi.includes("delete patch.userId"), "employee API must strip the route id from the PATCH body")
-assert.ok(component.includes("updateHrEmployee(payload.userId, payload)"), "employee save must pass the route id separately")
+assert.ok(component.includes("updateHrEmployee(employeeId, frozenPayload)"), "employee save must pass the route id separately")
 assert.ok(employeePage.includes(":initial-employee-id=\"routeEmployeeId\""), "employee route must pass a validated deep-link id")
 assert.ok(employeePage.includes(":initial-filters=\"routeFilters\""), "employee route must pass validated todo queue filters")
 assert.ok(!employeePage.includes("openRouteEmployee"), "only the child prop watcher may own route reloads")
@@ -147,6 +147,8 @@ function loadSfcScript(relativePath, globals = {}) {
     exports: {},
     setTimeout,
     clearTimeout,
+    getSelectedDeptId: () => "10",
+    require(id) { return require(path.resolve(root, "src", id.slice(2))) },
     HrEmployeeTransferDialog: {},
     HrSignDataImportDialog: {},
     process: { env: { VUE_APP_SIGN_EXCEL_IMPORT_ENABLED: "true" } },

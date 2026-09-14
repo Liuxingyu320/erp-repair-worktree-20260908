@@ -479,12 +479,14 @@
                   placeholder="请先在供应商管理维护，再选择供应商"
                   :loading="supplierLoading"
                   @change="handleSupplierChange"
+                  @visible-change="opened => opened && ensureSupplierOptions()"
                 >
                   <el-option
                     v-for="supplier in supplierOptions"
                     :key="supplier.supplierId"
                     :label="formatSupplierLabel(supplier)"
                     :value="supplier.supplierName"
+                    :disabled="supplier._historical === true"
                   >
                     <div class="supplier-option">
                       <span class="supplier-option-name">{{ supplier.supplierName }}</span>
@@ -492,6 +494,7 @@
                     </div>
                   </el-option>
                 </el-select>
+                <div v-if="supplierLoadError" role="alert">{{ supplierLoadError }} <el-button type="text" :disabled="supplierLoading" @click="loadSuppliers">重试</el-button></div>
                 <div class="form-tip">没有选项时，请先到供应商管理新增并启用供应商。</div>
               </el-form-item>
               <el-form-item label="供应商电话">
@@ -553,6 +556,8 @@ import { listSupplier } from "@/api/inventory/supplier"
 import { confirmExportAction, confirmTemplateDownload } from "@/utils/exportConfirm"
 import { getSelectedDeptContext } from "@/utils/shopContext"
 
+const { mergeSelectedSupplier, invalidateSupplierOptions, loadSupplierOptions } = require("@/utils/supplierOptionState")
+
 export default {
   name: "InvProduct",
   data() {
@@ -560,7 +565,7 @@ export default {
       loading: false,
       saveLoading: false,
       importLoading: false,
-      supplierLoading: false,
+      supplierLoading: false, supplierLoaded: false, supplierLoadError: "", supplierRequestSequence: 0,
       categoryCollapsed: false,
       drawerOpen: false,
       detailMode: false,
@@ -664,6 +669,9 @@ export default {
     }
   },
   watch: {
+    "$store.getters.id"() { this.invalidateSupplierCache() },
+    "$store.getters.token"() { this.invalidateSupplierCache() },
+    "$store.getters.permissions": { deep: true, handler() { this.invalidateSupplierCache() } },
     categoryKeyword(value) {
       if (this.$refs.categoryTree) {
         this.$refs.categoryTree.filter(value)
@@ -671,10 +679,22 @@ export default {
     }
   },
   created() {
+    this._supplierDeptChanged = () => this.invalidateSupplierCache()
+    window.addEventListener("erp:dept-changed", this._supplierDeptChanged)
     this.loadCategories()
     this.getList()
   },
+  beforeDestroy() {
+    window.removeEventListener("erp:dept-changed", this._supplierDeptChanged)
+    this.invalidateSupplierCache()
+  },
   methods: {
+    invalidateSupplierCache() { invalidateSupplierOptions(this) },
+    supplierContext() {
+      return { actorId: String((this.$store && this.$store.getters.id) || ""),
+        deptId: String(getSelectedDeptContext().deptId || ""),
+        permissions: (this.$store && this.$store.getters.permissions) || [] }
+    },
     emptyForm() {
       return {
         productId: undefined,
@@ -789,34 +809,16 @@ export default {
         this.supplierOptions = []
         return Promise.resolve([])
       }
-      if (this.supplierOptions.length > 0) {
+      if (this.supplierLoaded) {
         return Promise.resolve(this.supplierOptions)
       }
       return this.loadSuppliers()
     },
     loadSuppliers() {
-      if (!this.canMaintainProduct) {
-        this.supplierOptions = []
-        return Promise.resolve([])
-      }
-      this.supplierLoading = true
-      return listSupplier({
-        pageNum: 1,
-        pageSize: 1000,
-        status: "0",
-        cooperationStatus: "0"
-      }, { silentError: true }).then(res => {
-        this.supplierOptions = res.rows || []
-        return this.supplierOptions
-      }).catch(error => {
-        this.supplierOptions = []
-        if (this.$modal && this.$modal.msgWarning) {
-          this.$modal.msgWarning(this.getRequestErrorMessage(error, "供应商选项加载失败，请检查供应商权限或稍后重试"))
-        }
-        return []
-      }).finally(() => {
-        this.supplierLoading = false
-      })
+      if (!this.canMaintainProduct) { this.invalidateSupplierCache(); return Promise.resolve([]) }
+      return loadSupplierOptions(this, () => listSupplier({
+        pageNum: 1, pageSize: 1000, status: "0", cooperationStatus: "0"
+      }, { silentError: true }), () => this.supplierContext())
     },
     formatSupplierLabel(supplier) {
       if (!supplier) {

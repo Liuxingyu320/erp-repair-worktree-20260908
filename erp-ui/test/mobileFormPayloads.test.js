@@ -261,7 +261,7 @@ assert.deepStrictEqual(
     returnTitle: "销售退货-SO202607050001",
     customerName: "北京柏悦客户",
     shopDeptId: 8,
-    details: [{ productId: 5, quantity: 1, unitPrice: 18, amount: 18, remark: "", reason: "客户退货" }],
+    details: [{ itemType: "product", itemId: 5, productId: 5, quantity: 1, unitPrice: 18, amount: 18, remark: "", reason: "客户退货" }],
     submitAction: "submit"
   },
   "mobile sales-return payload should carry backend-required return title and customer name"
@@ -286,6 +286,9 @@ assert.deepStrictEqual(
     }]
   }, { submitAction: "submit" }).details,
   [{
+    itemType: "product",
+    itemId: 5,
+    itemName: "龙井茶",
     productId: 5,
     quantity: 1,
     unitPrice: 18,

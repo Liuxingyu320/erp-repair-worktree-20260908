@@ -42,6 +42,13 @@
         for update
     </select>
 
+    <select id="selectByOrderIdForUpdate" resultMap="InvReceiptBatchDetailResult">
+        <include refid="selectBatchDetailVo"/>
+        where purchase_order_id = #{orderId}
+        order by batch_detail_id asc
+        for update
+    </select>
+
     <insert id="insertInvReceiptBatchDetail" parameterType="InvReceiptBatchDetail" useGeneratedKeys="true" keyProperty="batchDetailId">
         insert into inv_receipt_batch_detail (
             batch_id, purchase_order_id, purchase_detail_id,

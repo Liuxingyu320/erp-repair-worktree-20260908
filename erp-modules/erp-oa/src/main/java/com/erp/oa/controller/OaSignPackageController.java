@@ -44,6 +44,7 @@ import com.erp.oa.domain.OaCompanySealConfig;
 import com.erp.oa.domain.OaSignPlan;
 import com.erp.oa.domain.OaSignTemplate;
 import com.erp.oa.domain.dto.OaSignBatchCreateDraftsRequest;
+import com.erp.oa.domain.dto.OaSignPlanPublishRequest;
 import com.erp.oa.domain.dto.OaSignBatchPreviewRequest;
 import com.erp.oa.domain.dto.OaSignDocumentReadRequest;
 import com.erp.oa.domain.dto.OaSignPackageSignRequest;
@@ -213,15 +214,26 @@ public class OaSignPackageController extends OaBaseController
     }
 
     @RequiresPermissions("oa:signPackage:template")
+    @GetMapping("/plan/{planId}/publish-preview")
+    public AjaxResult previewPublishPlan(@PathVariable("planId") Long planId)
+    {
+        signHrAccessService.requireCurrentHr();
+        return success(signPlanVersionService.previewPublish(planId, null));
+    }
+
+    @RequiresPermissions("oa:signPackage:template")
     @IdempotentSubmit(timeout = 30)
     @Log(title = "员工签约方案发布", businessType = BusinessType.INSERT,
             isSaveRequestData = false, isSaveResponseData = false)
     @PostMapping("/plan/{planId}/publish")
-    public AjaxResult publishPlan(@PathVariable("planId") Long planId, HttpServletRequest request)
+    public AjaxResult publishPlan(@PathVariable("planId") Long planId,
+            @Validated @RequestBody(required = false) OaSignPlanPublishRequest confirmation,
+            HttpServletRequest request)
     {
         signHrAccessService.requireCurrentHr();
-        return success(OaSignPlanVersionPublishResult.from(
-                signPlanVersionService.publish(planId, null)));
+        return success(confirmation == null
+                ? OaSignPlanVersionPublishResult.from(signPlanVersionService.publish(planId, null))
+                : signPlanVersionService.confirmPublish(planId, confirmation, null));
     }
 
     @RequiresPermissions("oa:signPackage:list")

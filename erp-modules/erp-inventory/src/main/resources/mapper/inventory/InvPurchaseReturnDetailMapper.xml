@@ -72,6 +72,19 @@
         delete from inv_purchase_return_detail where return_id = #{returnId}
     </delete>
 
+    <select id="selectReservedDetailsForUpdate" resultMap="InvPurchaseReturnDetailResult">
+        select d.detail_id, d.return_id, d.purchase_detail_id, d.product_id, d.quantity
+        from inv_purchase_return r force index (idx_ipr_purchase)
+        straight_join inv_purchase_return_detail d force index (idx_iprd_return) on d.return_id = r.return_id
+        where r.purchase_order_id = #{purchaseOrderId}
+          and r.status in ('submitted', 'returned')
+        <if test="excludeReturnId != null">
+          and r.return_id != #{excludeReturnId}
+        </if>
+        order by r.return_id, d.detail_id
+        for update
+    </select>
+
     <select id="sumHistoricalReturnQuantity" resultType="java.math.BigDecimal">
         select coalesce(sum(d.quantity), 0)
         from inv_purchase_return_detail d

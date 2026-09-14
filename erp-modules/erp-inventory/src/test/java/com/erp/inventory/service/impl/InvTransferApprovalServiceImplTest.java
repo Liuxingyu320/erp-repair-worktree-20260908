@@ -2147,6 +2147,17 @@ class InvTransferApprovalServiceImplTest
         }
 
         @Override
+        public List<Long> selectShipmentIdsForDeletionForUpdate(Long transferId) { return List.of(); }
+        @Override
+        public List<Long> selectDiscrepancyIdsForDeletionForUpdate(Long transferId) { return List.of(); }
+        @Override
+        public List<Long> selectReservationIdsForDeletionForUpdate(Long transferId) { return List.of(); }
+
+        @Override
+        public int deleteDraftIfVersionMatches(Long transferId, String expectedStatus, Long expectedVersion)
+        { return deleteInvTransferOrderById(transferId); }
+
+        @Override
         public int deleteInvTransferOrderById(Long transferId)
         {
             stored = null;

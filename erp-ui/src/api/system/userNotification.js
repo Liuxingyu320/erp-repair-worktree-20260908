@@ -1,9 +1,19 @@
 import request from '@/utils/request'
 
-export function listUserNotifications() {
+export function listUserNotifications(params) {
   return request({
-    url: '/system/user-notification/list',
+    url: params ? '/system/user-notification/page' : '/system/user-notification/list',
+    params,
     method: 'get',
+    silentError: true
+  })
+}
+
+export function markAllUserNotificationsRead(snapshotMaxId) {
+  return request({
+    url: '/system/user-notification/read-all',
+    method: 'post',
+    data: { snapshotMaxId },
     silentError: true
   })
 }
@@ -41,6 +51,7 @@ export function registerUserDeviceToken(data, options = {}) {
     url: '/system/user-notification/device-token',
     method: 'post',
     data,
+    silentError: true,
     ...authorizedOptions(options)
   })
 }

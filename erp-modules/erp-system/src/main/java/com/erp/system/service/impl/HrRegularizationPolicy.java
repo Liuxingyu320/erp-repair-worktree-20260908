@@ -45,6 +45,16 @@ final class HrRegularizationPolicy
                 "requestId长度不能超过64个字符");
         requireDate(request.getActualRegularizationDate(),
                 "实际转正日期不能为空");
+        if (request.isPreservePositionSalary())
+        {
+            if (request.getPostId() != null || request.getPostCode() != null || request.getPostName() != null
+                    || request.getJobGradeCode() != null || request.getJobGradeName() != null
+                    || request.getBaseSalary() != null || request.getPostSalary() != null
+                    || request.getFieldAllowance() != null || request.getPerformanceSalary() != null
+                    || request.getSalaryTotal() != null || request.getSalaryVersion() != null)
+                throw new ServiceException("普通转正仅填写实际日期，岗位和工资由系统保留");
+            return;
+        }
         if (request.getPostId() == null || request.getPostId() <= 0)
         {
             throw new ServiceException("岗位ID必须为正数");
@@ -134,6 +144,7 @@ final class HrRegularizationPolicy
         snapshot.setEmployeeStatus("正式");
         snapshot.setActualRegularizationDate(
                 request.getActualRegularizationDate());
+        if (request.isPreservePositionSalary()) return;
         snapshot.setPostId(canonicalPost.getPostId());
         snapshot.setPostCode(trim(canonicalPost.getPostCode()));
         snapshot.setPostName(trim(canonicalPost.getPostName()));

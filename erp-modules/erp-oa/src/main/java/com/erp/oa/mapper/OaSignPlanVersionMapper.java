@@ -12,6 +12,10 @@ public interface OaSignPlanVersionMapper
 {
     OaSignPlan lockPlanById(Long planId);
 
+    List<OaSignPlanVersion> lockPublishedVersionsByPlanId(Long planId);
+
+    int enableForNewMatching(Long versionId);
+
     List<OaSignPlanTemplate> lockPlanTemplateBindings(Long planId);
 
     List<OaSignTemplate> lockTemplatesByIds(@Param("templateIds") List<Long> templateIds);

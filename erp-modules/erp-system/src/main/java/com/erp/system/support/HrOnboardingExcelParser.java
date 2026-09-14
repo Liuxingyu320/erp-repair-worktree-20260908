@@ -183,8 +183,18 @@ public class HrOnboardingExcelParser
             String label = fields.get(i).getLabel();
             header.createCell(i, CellType.STRING).setCellValue(label);
             Cell cell = sample.createCell(i, CellType.BLANK);
-            if ("手机号".equals(label) || "证件号码".equals(label) || "银行卡号".equals(label))
+            if (TEXT_ONLY_FIELDS.contains(fields.get(i).getKey()))
+            {
+                sheet.setDefaultColumnStyle(i, text);
                 cell.setCellStyle(text);
+                // Blank entry cells do not become data rows; styles survive common Excel/WPS entry paths.
+                for (int rowIndex = 2; rowIndex <= MAX_ROWS; rowIndex++)
+                {
+                    Row entry = sheet.getRow(rowIndex);
+                    if (entry == null) entry = sheet.createRow(rowIndex);
+                    entry.createCell(i, CellType.BLANK).setCellStyle(text);
+                }
+            }
             sheet.setColumnWidth(i, 16 * 256);
         }
         return workbook;

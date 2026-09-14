@@ -40,8 +40,13 @@ function loadSfc(source, filename, globals) {
     module: { exports: {} },
     exports: {},
     require(specifier) {
+      if (specifier === "@/utils/uiOperationScope") return require("../src/utils/uiOperationScope")
+      if (specifier === "@/utils/salesWarehouse") return require("../src/utils/salesWarehouse")
       if (specifier === "@/mixins/todoBusinessFocus") {
         return { createTodoBusinessFocusMixin: () => ({}) }
+      }
+      if (specifier === "@/utils/purchaseReceiveRecovery") {
+        return { getPurchaseReceiveRecovery: () => ({ list: () => Promise.resolve([]) }) }
       }
       throw new Error(`unexpected require: ${specifier}`)
     },
@@ -80,7 +85,7 @@ function modal(overrides = {}) {
 function salesDefinition(overrides = {}) {
   const resolved = () => Promise.resolve({ rows: [], total: 0, data: {} })
   return loadSfc(salesSource, "sales/index.vue", {
-    InventoryItemSelect: {},
+    InventoryItemSelect: {}, WarehouseSelect: {},
     listSales: resolved,
     getSalesDetail: resolved,
     saveSales: resolved,

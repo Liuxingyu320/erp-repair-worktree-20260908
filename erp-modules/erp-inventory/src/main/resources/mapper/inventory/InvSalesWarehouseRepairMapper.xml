@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.inventory.mapper.InvSalesWarehouseRepairMapper">
+    <select id="selectOutboundIdsForUpdate" resultType="Long">
+        select outbound_id from inv_outbound_record where sales_order_id = #{orderId}
+        order by outbound_id for update
+    </select>
+    <update id="fillMissingWarehouse">
+        update inv_sales_detail set warehouse_id = #{warehouseId}
+        where order_id = #{orderId} and detail_id = #{detailId}
+          and (warehouse_id is null or warehouse_id = 0)
+          and coalesce(delivered_quantity, 0) = 0
+    </update>
+    <insert id="insertAudit">
+        insert into inv_sales_warehouse_repair_audit
+          (sales_order_id, sales_detail_id, warehouse_id, expected_version, notice_id, actor_id, actor_name, shop_dept_id, create_time)
+        values (#{orderId}, #{detailId}, #{warehouseId}, #{expectedVersion}, #{noticeId}, #{actorId}, #{actorName}, #{shopDeptId}, sysdate())
+    </insert>
+</mapper>

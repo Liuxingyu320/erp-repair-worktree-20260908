@@ -5,6 +5,8 @@ import java.util.Date;
 import java.util.List;
 import jakarta.validation.constraints.NotBlank;
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 import com.erp.common.core.annotation.Excel;
 import com.erp.common.core.web.domain.BaseEntity;
 
@@ -13,6 +15,8 @@ public class InvSalesOrder extends BaseEntity
     private static final long serialVersionUID = 1L;
 
     private Long orderId;
+
+    private Long version = 0L;
 
     @Excel(name = "销售单号")
     private String orderNo;
@@ -66,6 +70,11 @@ public class InvSalesOrder extends BaseEntity
     private String applicantDeptName;
 
     private List<InvSalesDetail> details;
+
+    @tools.jackson.databind.annotation.JsonSerialize(using = tools.jackson.databind.ser.std.ToStringSerializer.class)
+    @JsonSerialize(using = ToStringSerializer.class)
+    public Long getVersion() { return version; }
+    public void setVersion(Long version) { this.version = version; }
 
     public Long getOrderId() { return orderId; }
     public void setOrderId(Long orderId) { this.orderId = orderId; }

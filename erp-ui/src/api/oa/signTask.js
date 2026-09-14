@@ -252,12 +252,18 @@ export function deleteSignTasksBatch(data) {
   })
 }
 
-// Amounts come from the persisted Excel row, never from the browser payload.
-export function archiveOnboardSignSalary(batchId, rows) {
-  return request({
-    url: '/system/hr/employee/onboard-salary/archive',
-    method: 'post',
-    data: { batchId, rows: rows.map(row => ({ rowId: row.rowId, version: row.version })) },
-    silentError: true
-  })
+// Only server-owned rows and preview concurrency tokens cross this boundary.
+export function previewOnboardSignSalary(batchId, rows) {
+  return request({ url: '/system/hr/employee/onboard-salary/preview', method: 'post',
+    data: { batchId, rows: rows.map(row => ({ rowId: row.rowId, version: row.version })) }, silentError: true })
+}
+function salaryConfirmationPayload(data) {
+  return { batchId: data.batchId, requestId: data.requestId, effectiveDate: data.effectiveDate, reason: data.reason, confirmed: data.confirmed,
+    rows: data.rows.map(row => ({ rowId: row.rowId, version: row.version, expectedSourceId: row.expectedSourceId, expectedProfileHash: row.expectedProfileHash })) }
+}
+export function archiveOnboardSignSalary(data) {
+  return request({ url: '/system/hr/employee/onboard-salary/archive', method: 'post', data: salaryConfirmationPayload(data), silentError: true })
+}
+export function getOnboardSignSalaryStatus(data) {
+  return request({ url: '/system/hr/employee/onboard-salary/status', method: 'post', data: salaryConfirmationPayload(data), silentError: true })
 }

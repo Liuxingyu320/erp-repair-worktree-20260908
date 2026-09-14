@@ -25,18 +25,21 @@
         <button type="button" :aria-label="`去补资料：${employeeAriaName(row)}`" @click.stop="openEmployee(row)">去补资料</button>
       </article>
     </section>
-    <div v-if="!loading && !rows.length" class="empty">{{ $route.query.todoType ? '事项已处理' : '暂无待补资料' }}</div>
+    <p v-if="loadError" role="alert">{{ loadError }}<button type="button" :disabled="loading" @click="load(failedPage)">重试第{{ failedPage }}页</button></p>
+    <div v-if="!loading && !loadError && !rows.length" class="empty">{{ $route.query.todoType ? '事项已处理' : '暂无待补资料' }}</div>
     <button v-if="hasMore" type="button" class="load-more" :disabled="loading" @click="loadMore">{{ loading ? '加载中…' : '加载更多' }}</button>
   </main>
 </template>
 
 <script>
 import { getHrMasterDataSummary, listHrCompletenessEmployees } from "@/api/hr/completeness"
+import { getSelectedDeptId } from "@/utils/shopContext"
+const { createUiOperationScope } = require("@/utils/uiOperationScope")
 import { profileFieldLabel } from "@/views/hr/components/hrFieldConfig"
 
 export default {
   name: "MobileHrCompleteness",
-  data() { return { rows: [], total: 0, pageNum: 1, pageSize: 20, loading: false, expandedRows: {}, missingPreviewLimit: 3, masterDataSummary: null } },
+  data() { return { rows: [], total: 0, pageNum: 1, pageSize: 20, loading: false, loadError: "", failedPage: 1, pageInactive: false, expandedQueryKey: "", expandedRows: {}, missingPreviewLimit: 3, masterDataSummary: null } },
   computed: {
     hasMore() { return this.rows.length < this.total },
     canViewMasterData() {
@@ -44,8 +47,21 @@ export default {
       return Array.isArray(permissions) && (permissions.includes("*:*:*") || permissions.includes("hr:masterData:list"))
     }
   },
-  created() { this.reload() },
-  watch: { "$route.fullPath"() { this.reload() } },
+  created() {
+    if (typeof window !== "undefined") window.addEventListener("erp:dept-changed", this.handleDeptChanged)
+    this.reload()
+  },
+  beforeDestroy() {
+    if (typeof window !== "undefined") window.removeEventListener("erp:dept-changed", this.handleDeptChanged)
+    this.pageInactive = true
+    this.readScope().deactivate()
+  },
+  deactivated() { this.pageInactive = true; this.readScope().deactivate() },
+  activated() { if (this.pageInactive) { this.pageInactive = false; this.readScope().activate(); this.reload() } },
+  watch: {
+    "$route.fullPath"() { this.reload() },
+    "$store.state.user.sessionRevision"() { this.reload() }
+  },
   methods: {
     profile(row) { return (row && row.profile) || row || {} },
     employeeAriaName(row) { return String(row && row.employeeName || "").trim() || "该员工" },
@@ -83,30 +99,59 @@ export default {
       const coverage = Number(row && (row.coveragePercent ?? row.profileCompletionPercent)) || 0
       return `业务必填 ${complete}/${applicable} · 资料覆盖 ${Math.max(0, Math.min(100, Math.round(coverage)))}%`
     },
+    queryIdentity() {
+      const user = this.$store && this.$store.state && this.$store.state.user || {}
+      return { actorId: String(user.id || ""), sessionRevision: user.sessionRevision || 0,
+        selectedDeptId: String(getSelectedDeptId() || ""), route: this.$route.fullPath,
+        deptId: this.$route.query.deptId || this.$route.query.contextDeptId || undefined,
+        pageSize: this.pageSize }
+    },
+    readScope() {
+      if (!this._readScope) this._readScope = createUiOperationScope(() => this.queryIdentity())
+      return this._readScope
+    },
+    handleDeptChanged() { this.readScope().invalidate(); return this.reload() },
     reload() {
-      this.pageNum = 1; this.rows = []; this.expandedRows = {}
-      return Promise.all([this.load(), this.loadMasterDataSummary()])
+      this.readScope().invalidate()
+      if (this.pageInactive) return Promise.resolve()
+      const key = JSON.stringify(this.queryIdentity())
+      if (key !== this.expandedQueryKey) { this.expandedRows = {}; this.expandedQueryKey = key }
+      this.pageNum = 1; this.rows = []; this.total = 0; this.loadError = ""
+      return Promise.all([this.load(1), this.loadMasterDataSummary()])
     },
     loadMasterDataSummary() {
+      const scope = this.readScope(), operation = scope.begin("summary")
       if (!this.canViewMasterData) { this.masterDataSummary = null; return Promise.resolve() }
-      return getHrMasterDataSummary({}).then(response => { this.masterDataSummary = response.data || {} })
-        .catch(() => { this.masterDataSummary = null })
+      return getHrMasterDataSummary({}).then(response => {
+        if (scope.isCurrent(operation)) this.masterDataSummary = response.data || {}
+      }).catch(() => { if (scope.isCurrent(operation)) this.masterDataSummary = null })
     },
-    loadMore() { if (!this.loading && this.hasMore) { this.pageNum += 1; return this.load() } },
-    load() {
+    loadMore() { if (!this.loading && this.hasMore) return this.load(this.pageNum + 1) },
+    load(requestedPage = this.pageNum) {
+      if (this.pageInactive) return Promise.resolve()
+      const scope = this.readScope(), operation = scope.begin("list")
+      const query = this.queryIdentity()
       this.loading = true
+      this.loadError = ""
       return listHrCompletenessEmployees({
-        pageNum: this.pageNum,
-        pageSize: this.pageSize,
+        pageNum: requestedPage,
+        pageSize: query.pageSize,
         completenessStatus: "INCOMPLETE",
         completenessMetric: "REQUIRED",
-        deptId: this.$route.query.deptId || this.$route.query.contextDeptId || undefined
+        deptId: query.deptId
       }).then(response => {
-        const next = response.rows || []
-        this.rows = this.pageNum === 1 ? next : this.rows.concat(next)
-        this.total = Number(response.total || this.rows.length)
+        if (!scope.isCurrent(operation)) return
+        if (!response || !Array.isArray(response.rows)) throw new Error("资料列表结果暂未确认")
+        const next = response.rows
+        this.rows = requestedPage === 1 ? next : this.rows.concat(next)
+        this.total = Number(response.total == null ? this.rows.length : response.total)
+        this.pageNum = requestedPage
         if (!this.rows.length && this.$route.query.todoType) this.$store.dispatch("todo/refreshSummaries").catch(() => {})
-      }).finally(() => { this.loading = false })
+      }).catch(error => {
+        if (!scope.isCurrent(operation)) return
+        this.failedPage = requestedPage
+        this.loadError = `第${requestedPage}页加载失败，已显示的资料仍保留。`
+      }).finally(() => { if (scope.isCurrent(operation)) this.loading = false })
     },
     openEmployee(row) {
       this.$router.push({

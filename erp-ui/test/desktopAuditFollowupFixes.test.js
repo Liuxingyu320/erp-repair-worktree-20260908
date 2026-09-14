@@ -114,7 +114,7 @@ assertIncludes(fixedAssetRepair, "请先切换到门店并维护固定资产配�
 
 const fileLocalConfig = readRepo("erp-modules/erp-file/src/main/resources/application-local.yml")
 assertIncludes(fileLocalConfig, "prefix: /file", "file service local profile should define file.prefix")
-assertIncludes(fileLocalConfig, "domain: http://localhost:8080", "file service local profile should return gateway file URLs")
+assertIncludes(fileLocalConfig, "domain: ${FILE_DOMAIN:http://localhost:8080}", "local file URLs should retain gateway default while allowing an explicit device-accessible FILE_DOMAIN")
 
 const fileBootstrap = readRepo("erp-modules/erp-file/src/main/resources/bootstrap.yml")
 assertIncludes(fileBootstrap, "on-profile: local", "file service bootstrap should have a local profile block")

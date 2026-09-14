@@ -192,16 +192,10 @@
       </main>
     </div>
 
-    <el-dialog title="OE详情" :visible.sync="detailOpen" width="760px" append-to-body>
+    <el-dialog title="OE详情" :visible.sync="detailOpen" width="760px" append-to-body @close="handleDetailClose">
       <div v-if="detailOe" class="catalog-detail">
         <div class="catalog-detail-image">
-          <el-image
-            v-if="imageUrl(detailOe)"
-            :src="imageUrl(detailOe)"
-            fit="cover"
-            :preview-src-list="[imageUrl(detailOe)]"
-          />
-          <div v-else class="catalog-image-empty">暂无图片</div>
+          <image-gallery :value="detailOe" />
         </div>
         <el-descriptions :column="2" border size="small" class="catalog-detail-info">
           <el-descriptions-item label="产品编号">{{ displayText(detailOe.oeItemCode) }}</el-descriptions-item>
@@ -234,9 +228,14 @@
       </div>
     </el-dialog>
 
-    <el-drawer :title="drawerTitle" :visible.sync="drawerOpen" size="min(560px, 100vw)" append-to-body :close-on-click-modal="false">
+    <el-drawer :title="drawerTitle" :visible.sync="drawerOpen" size="min(560px, 100vw)" append-to-body :close-on-click-modal="false" @close="handleEditorClose">
       <div class="drawer-body">
-        <el-form ref="formRef" :model="form" :rules="rules" label-width="112px" size="small">
+        <div v-if="formLoading" class="editor-status" role="status">资料加载中</div>
+        <div v-else-if="formLoadError" class="editor-status" role="alert">
+          <div>{{ formLoadError }}</div>
+          <el-button type="primary" size="mini" @click="retryEditorLoad">重新加载</el-button>
+        </div>
+        <el-form v-else-if="formReady" ref="formRef" :model="form" :rules="rules" label-width="112px" size="small">
           <el-form-item label="上线分类" prop="categoryId">
             <el-select v-model="form.categoryId" filterable class="full-width" placeholder="请选择OE分类">
               <el-option v-for="item in categoryOptions" :key="item.categoryId" :label="item.categoryFullPath" :value="item.categoryId" :disabled="item.status !== '0'" />
@@ -262,17 +261,18 @@
           </el-form-item>
           <el-form-item label="供应商名称" prop="supplierName">
             <el-select v-model="form.supplierName" clearable filterable class="full-width" placeholder="选择供应商" :loading="supplierLoading" @change="handleSupplierChange" @visible-change="loadSuppliersOnOpen">
-              <el-option v-for="item in supplierOptions" :key="item.supplierId" :label="supplierLabel(item)" :value="item.supplierName">
+              <el-option v-for="item in supplierOptions" :key="item.supplierId" :label="supplierLabel(item)" :value="item.supplierName" :disabled="item._historical === true">
                 <span>{{ item.supplierName }}</span>
                 <span class="option-meta">{{ item.contactPhone || "无电话" }}</span>
               </el-option>
             </el-select>
+            <div v-if="supplierLoadError" role="alert">{{ supplierLoadError }} <el-button type="text" :disabled="supplierLoading" @click="loadSuppliers">重试</el-button></div>
           </el-form-item>
           <el-form-item label="供应商电话">
             <el-input v-model="form.supplierPhone" disabled placeholder="选择供应商后自动带出" />
           </el-form-item>
           <el-form-item label="图片">
-            <image-upload v-model="form.imageUrl" action="/inventory/image/upload" accept=".jpg,.jpeg,.png,image/jpeg,image/png" :limit="1" :file-size="5" :drag="false" :delete-on-remove="false" />
+            <image-upload v-if="drawerOpen" v-model="form.imageUrls" action="/inventory/image/upload" accept=".jpg,.jpeg,.png,image/jpeg,image/png" :limit="5" :file-size="5" :drag="true" :delete-on-remove="false" />
           </el-form-item>
           <div class="drawer-section-heading">
             <div>
@@ -339,8 +339,9 @@
           </el-form-item>
         </el-form>
         <div class="drawer-footer">
-          <el-button size="small" @click="drawerOpen = false">取消</el-button>
-          <el-button v-if="!readonlyMode" v-hasPermi="['inv:oe:add','inv:oe:edit']" type="primary" size="small" :loading="saving" @click="doSave">保存</el-button>
+          <el-button size="small" @click="closeEditor">取消</el-button>
+          <el-button v-if="formLoadError" size="small" type="primary" @click="retryEditorLoad">重新加载</el-button>
+          <el-button v-if="!readonlyMode && formReady" v-hasPermi="['inv:oe:add','inv:oe:edit']" type="primary" size="small" :loading="saving" @click="doSave">保存</el-button>
         </div>
       </div>
     </el-drawer>
@@ -366,10 +367,16 @@
 </template>
 
 <script>
+import ImageGallery from "@/components/ImageGallery"
+const { imageUrls } = require("@/utils/imageGallery")
 import { listOe, getOe, getOePurchaseReferencePolicy, addOe, updateOe, delOe, importOeData, oeCategoryTree } from "@/api/inventory/oe"
 import { listSupplier } from "@/api/inventory/supplier"
+import { getSelectedDeptContext } from "@/utils/shopContext"
+
+const { mergeSelectedSupplier, invalidateSupplierOptions, loadSupplierOptions } = require("@/utils/supplierOptionState")
 
 export default {
+  components: { ImageGallery },
   name: "InvOe",
   data() {
     const validatePurchaseReferenceUrl = (rule, value, callback) => {
@@ -391,8 +398,18 @@ export default {
     return {
       loading: false,
       saving: false,
+      formLoading: false,
+      formReady: false,
+      formLoadError: "",
+      editorSourceRow: null,
+      editorFocusReference: false,
+      editorSession: 0,
+      editorMode: "idle",
+      editorTargetId: undefined,
+      detailSession: 0,
+      detailTargetId: undefined,
       importing: false,
-      supplierLoading: false,
+      supplierLoading: false, supplierLoaded: false, supplierLoadError: "", supplierRequestSequence: 0,
       drawerOpen: false,
       importOpen: false,
       detailOpen: false,
@@ -435,7 +452,7 @@ export default {
       return this.$route.query.mode === "readonly" || this.$route.query.readonly === "true"
     },
     drawerTitle() {
-      return this.form.oeItemId ? "编辑OE" : "新增OE"
+      return this.editorMode === "edit" || this.form.oeItemId ? "编辑OE" : "新增OE"
     },
     selectedCategoryName() {
       return this.selectedCategory && this.selectedCategory.categoryId ? this.selectedCategory.categoryFullPath : "全部OE"
@@ -462,7 +479,7 @@ export default {
         this.form.oeItemName,
         this.form.itemDescription,
         this.form.orderUnit,
-        this.form.imageUrl,
+        imageUrls(this.form).join(","),
         this.form.purchaseReferenceNote
       ]
       return requiredValues.every(value => String(value || "").trim()) &&
@@ -479,6 +496,9 @@ export default {
     }
   },
   watch: {
+    "$store.getters.id"() { this.invalidateSupplierCache() },
+    "$store.getters.token"() { this.invalidateSupplierCache() },
+    "$store.getters.permissions": { deep: true, handler() { this.invalidateSupplierCache() } },
     categoryKeyword(value) {
       if (this.$refs.categoryTree) {
         this.$refs.categoryTree.filter(value)
@@ -486,11 +506,23 @@ export default {
     }
   },
   created() {
+    this._supplierDeptChanged = () => this.invalidateSupplierCache()
+    window.addEventListener("erp:dept-changed", this._supplierDeptChanged)
     this.loadCategories()
     this.loadPurchaseReferencePolicy()
     this.getList()
   },
+  beforeDestroy() {
+    window.removeEventListener("erp:dept-changed", this._supplierDeptChanged)
+    this.invalidateSupplierCache()
+  },
   methods: {
+    invalidateSupplierCache() { invalidateSupplierOptions(this) },
+    supplierContext() {
+      return { actorId: String((this.$store && this.$store.getters.id) || ""),
+        deptId: String(getSelectedDeptContext().deptId || ""),
+        permissions: (this.$store && this.$store.getters.permissions) || [] }
+    },
     emptyForm() {
       return {
         oeItemId: undefined,
@@ -505,6 +537,7 @@ export default {
         supplierName: "",
         supplierPhone: "",
         imageUrl: "",
+        imageUrls: [],
         purchaseReferenceUrl: "",
         purchaseReferenceNote: "",
         purchaseReferenceUpdatedBy: "",
@@ -514,6 +547,62 @@ export default {
         status: "0",
         remark: ""
       }
+    },
+    beginEditorSession(mode, targetId) {
+      this.editorSession += 1
+      this.editorMode = mode
+      this.editorTargetId = targetId
+      this.formReady = mode === "create"
+      this.formLoading = mode === "edit"
+      this.formLoadError = ""
+      this.saving = false
+      this.drawerOpen = true
+      return this.editorSession
+    },
+    isEditorSession(session, targetId, mode) {
+      return this.editorSession === session && this.editorMode === mode && this.editorTargetId === targetId
+    },
+    invalidateEditor() {
+      this.editorSession += 1
+      this.editorMode = "idle"
+      this.editorTargetId = undefined
+      this.editorSourceRow = null
+      this.editorFocusReference = false
+      this.formLoading = false
+      this.formReady = false
+      this.formLoadError = ""
+    },
+    closeEditor() {
+      this.drawerOpen = false
+      if (this.editorMode !== "idle") this.invalidateEditor()
+    },
+    handleEditorClose() {
+      if (this.drawerOpen) return
+      if (this.editorMode === "idle") return
+      this.invalidateEditor()
+    },
+    retryEditorLoad() {
+      if (this.editorMode !== "edit" || this.editorTargetId == null) return
+      this.openForm(this.editorSourceRow || { oeItemId: this.editorTargetId }, this.editorFocusReference)
+    },
+    canSaveEditor() {
+      if (this.readonlyMode || this.saving) return false
+      if (this.formLoading || this.formLoadError || !this.formReady) return false
+      if (this.editorMode === "edit") {
+        return this.editorTargetId != null && this.form.oeItemId === this.editorTargetId
+      }
+      if (this.editorMode === "create") {
+        return !this.form.oeItemId && this.editorTargetId == null
+      }
+      return false
+    },
+    isDetailSession(session, targetId) {
+      return this.detailSession === session && this.detailTargetId === targetId
+    },
+    handleDetailClose() {
+      if (this.detailOpen) return
+      this.detailSession += 1
+      this.detailTargetId = undefined
     },
     loadCategories() {
       this.categoryLoading = true
@@ -612,33 +701,57 @@ export default {
     },
     openForm(row, focusReference) {
       if (this.readonlyMode) return
-      if (row && row.oeItemId) {
-        getOe(row.oeItemId).then(res => {
-          this.form = Object.assign(this.emptyForm(), res.data || row, { purchaseReferenceTouched: false })
-          this.ensureSelectedSupplier()
-          this.drawerOpen = true
-          if (focusReference) this.focusPurchaseReference()
-        })
-      } else {
+      const targetId = row && row.oeItemId ? row.oeItemId : undefined
+      const mode = targetId ? "edit" : "create"
+      const session = this.beginEditorSession(mode, targetId)
+      this.editorSourceRow = row || null
+      this.editorFocusReference = !!focusReference
+      const shouldFocus = this.editorFocusReference
+      if (mode === "create") {
         this.form = this.emptyForm()
         this.ensureSelectedSupplier()
-        this.drawerOpen = true
-        if (focusReference) this.focusPurchaseReference()
+        if (shouldFocus) this.focusPurchaseReference(session)
+        return
       }
+      this.form = Object.assign(this.emptyForm(), { oeItemId: targetId })
+      getOe(targetId).then(res => {
+        if (!this.isEditorSession(session, targetId, mode)) return
+        this.form = Object.assign(this.emptyForm(), res.data || row, {
+          imageUrls: imageUrls(res.data || row),
+          purchaseReferenceTouched: false
+        })
+        this.formReady = true
+        this.formLoading = false
+        this.formLoadError = ""
+        this.ensureSelectedSupplier()
+        if (shouldFocus) this.focusPurchaseReference(session)
+      }).catch(() => {
+        if (!this.isEditorSession(session, targetId, mode)) return
+        this.formLoading = false
+        this.formReady = false
+        this.formLoadError = "资料加载失败，请重试"
+      })
     },
     openDetail(row) {
-      this.detailOe = Object.assign(this.emptyForm(), row || {})
+      const targetId = row && row.oeItemId ? row.oeItemId : undefined
+      this.detailSession += 1
+      const session = this.detailSession
+      this.detailTargetId = targetId
+      this.detailOe = Object.assign(this.emptyForm(), row || {}, { imageUrls: imageUrls(row) })
       this.detailOpen = true
-      getOe(row.oeItemId).then(res => {
-        this.detailOe = Object.assign(this.emptyForm(), res.data || row)
+      if (!targetId) return
+      getOe(targetId).then(res => {
+        if (!this.isDetailSession(session, targetId)) return
+        this.detailOe = Object.assign(this.emptyForm(), res.data || row, { imageUrls: imageUrls(res.data || row) })
       })
     },
     handleStatusTabChange(status) {
       this.queryParams.status = status || undefined
       this.handleQuery()
     },
-    focusPurchaseReference() {
+    focusPurchaseReference(session) {
       this.$nextTick(() => {
+        if (session !== undefined && this.editorSession !== session) return
         const input = this.$refs.purchaseReferenceUrlInput
         if (input && typeof input.focus === "function") input.focus()
       })
@@ -647,15 +760,26 @@ export default {
       this.form.purchaseReferenceTouched = true
     },
     doSave() {
-      this.$refs.formRef.validate(valid => {
+      const session = this.editorSession
+      const targetId = this.editorTargetId
+      const mode = this.editorMode
+      if (!this.canSaveEditor()) return
+      const formRef = this.$refs.formRef
+      if (!formRef || typeof formRef.validate !== "function") return
+      formRef.validate(valid => {
+        if (!this.isEditorSession(session, targetId, mode)) return
         if (!valid) return
+        if (!this.canSaveEditor()) return
         this.saving = true
-        const request = this.form.oeItemId ? updateOe(this.form) : addOe(this.form)
+        const payload = Object.assign({}, this.form)
+        const request = mode === "edit" ? updateOe(payload) : addOe(payload)
         request.then(() => {
+          if (!this.isEditorSession(session, targetId, mode)) return
           this.$modal.msgSuccess("保存成功")
-          this.drawerOpen = false
+          this.closeEditor()
           this.getList()
-        }).finally(() => {
+        }).catch(() => undefined).finally(() => {
+          if (!this.isEditorSession(session, targetId, mode)) return
           this.saving = false
         })
       })
@@ -670,20 +794,11 @@ export default {
       if (open) this.loadSuppliers()
     },
     loadSuppliers() {
-      if (this.supplierOptions.length > 0) return Promise.resolve(this.supplierOptions)
-      this.supplierLoading = true
-      return listSupplier({ pageNum: 1, pageSize: 1000, status: "0", cooperationStatus: "0" }).then(res => {
-        this.supplierOptions = res.rows || []
-        return this.supplierOptions
-      }).finally(() => {
-        this.supplierLoading = false
-      })
+      return loadSupplierOptions(this, () => listSupplier({
+        pageNum: 1, pageSize: 1000, status: "0", cooperationStatus: "0"
+      }, { silentError: true }), () => this.supplierContext())
     },
-    ensureSelectedSupplier() {
-      if (this.form.supplierName && !this.supplierOptions.some(item => item.supplierName === this.form.supplierName)) {
-        this.supplierOptions = [{ supplierId: "selected-" + this.form.supplierName, supplierName: this.form.supplierName, contactPhone: this.form.supplierPhone }].concat(this.supplierOptions)
-      }
-    },
+    ensureSelectedSupplier() { this.supplierOptions = mergeSelectedSupplier(this.supplierOptions, this.form) },
     handleSupplierChange(supplierName) {
       const supplier = this.supplierOptions.find(item => item.supplierName === supplierName)
       this.form.supplierPhone = supplier ? supplier.contactPhone || "" : ""
@@ -731,7 +846,7 @@ export default {
       return value === undefined || value === null || value === "" ? "-" : value
     },
     imageUrl(row) {
-      return row && row.imageUrl ? row.imageUrl : ""
+      return imageUrls(row)[0] || ""
     },
     statusLabel(status) {
       return status === "0" ? "正常" : "停用"
@@ -1087,6 +1202,22 @@ export default {
 
   .drawer-body {
     padding: 0 20px 20px;
+  }
+
+  .editor-status {
+    padding: 24px 8px 12px;
+    color: #64748b;
+    font-size: 13px;
+    line-height: 20px;
+  }
+
+  .editor-status[role="alert"] {
+    color: #d14b45;
+    font-weight: 600;
+  }
+
+  .editor-status .el-button {
+    margin-top: 10px;
   }
 
   .drawer-section-heading {

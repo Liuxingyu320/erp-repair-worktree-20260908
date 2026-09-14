@@ -8,14 +8,18 @@ import com.erp.inventory.domain.InvProduct;
 import com.erp.inventory.domain.InvPurchaseOrder;
 import com.erp.inventory.domain.InvReceiptBatch;
 import com.erp.inventory.domain.InvSupplier;
+import com.erp.inventory.domain.dto.InvPurchaseReceiveResult;
 import com.erp.inventory.domain.dto.InvQualityCheckRequest;
 import com.erp.inventory.domain.dto.InvReceiveRequest;
 
 public interface IInvPurchaseService
 {
+    com.erp.inventory.domain.vo.InvSpecialistActionContext getActionContext(Long orderId, Long selectedShopDeptId);
     InvPurchaseOrder saveDraft(InvPurchaseOrder order, List<InvPurchaseDetail> details, Long selectedShopDeptId);
     InvPurchaseOrder submitPurchase(InvPurchaseOrder order, List<InvPurchaseDetail> details, Long selectedShopDeptId);
     InvPurchaseOrder submitSavedPurchase(Long orderId, Long selectedShopDeptId);
+    InvPurchaseOrder getPurchaseDraft(Long orderId, Long selectedShopDeptId);
+    InvPurchaseOrder getReceiveContext(Long orderId, Long selectedShopDeptId);
     InvPurchaseOrder getPurchaseDetail(Long orderId, Long selectedShopDeptId);
     List<InvPurchaseOrder> selectPurchaseList(InvPurchaseOrder order, Long selectedShopDeptId);
     List<InvPurchaseOrder> selectMyPurchases(InvPurchaseOrder order, Long selectedShopDeptId);
@@ -23,10 +27,12 @@ public interface IInvPurchaseService
     List<InvProduct> selectPurchaseProducts(InvProduct product, Long selectedShopDeptId);
     List<InvOeItem> selectPurchaseOeItems(InvOeItem item, Long selectedShopDeptId);
     List<InvGiftBox> selectPurchaseGifts(InvGiftBox gift, Long selectedShopDeptId);
-    void receivePurchase(Long orderId, InvReceiveRequest receiveRequest, Long selectedShopDeptId);
+    InvPurchaseReceiveResult receivePurchase(Long orderId, InvReceiveRequest receiveRequest,
+            Long selectedShopDeptId, String requestId);
     List<InvReceiptBatch> selectReceiptBatches(Long orderId, Long selectedShopDeptId);
     List<InvReceiptBatch> selectPendingReceiptBatches(Long orderId, Long selectedShopDeptId);
     void qualityCheckBatch(Long orderId, InvQualityCheckRequest qualityCheckRequest, Long selectedShopDeptId);
+    void qualityCheckWithRequest(Long orderId, String qcResult, String qcRemark, Long selectedShopDeptId, String requestId);
     void qualityCheck(Long orderId, String qcResult, String qcRemark, Long selectedShopDeptId);
     void cancelPurchase(Long orderId, Long selectedShopDeptId);
     void deletePurchase(Long orderId, Long selectedShopDeptId);

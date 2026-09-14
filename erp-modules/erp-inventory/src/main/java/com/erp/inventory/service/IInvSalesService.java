@@ -12,4 +12,5 @@ public interface IInvSalesService
     List<InvSalesOrder> selectSalesList(InvSalesOrder order, Long selectedShopDeptId);
     List<InvSalesOrder> selectMySales(InvSalesOrder order, Long selectedShopDeptId);
     void cancelSales(Long orderId, Long selectedShopDeptId);
+    void cancelSales(Long orderId, Long selectedShopDeptId, Long expectedVersion);
 }

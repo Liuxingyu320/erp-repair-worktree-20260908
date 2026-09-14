@@ -5,7 +5,7 @@ import {
   disableUserDeviceToken,
   registerUserDeviceToken
 } from '@/api/system/userNotification'
-import { resolvePushRoute } from './pushRoute'
+import { resolvePushRoute, normalizePushId } from './pushRoute'
 
 const APP_ID = 'com.erp.mobile'
 const NUMERIC_ID_PATTERN = /^[1-9]\d{0,18}$/
@@ -40,6 +40,76 @@ export function createPushRegistrationService(dependencies = {}) {
   let listenerHandles = []
   let activeBinding = null
   let permissionDenied = false
+  let actionListenerPromise = null
+  let navigationReadyUserId = null
+  let pendingAction = null
+  let lastActionKey = null
+  const statusSubscribers = new Set()
+  let status = { phase: 'idle', reason: null }
+
+  function setStatus(phase, reason = null) {
+    status = { phase, reason }
+    statusSubscribers.forEach(listener => {
+      try { listener({ ...status }) } catch (e) { /* UI observers cannot block registration. */ }
+    })
+  }
+
+  function flushPendingAction() {
+    if (!pendingAction || !desiredUserId || navigationReadyUserId !== desiredUserId ||
+        !router || typeof router.push !== 'function') return Promise.resolve()
+    const data = pendingAction
+    pendingAction = null
+    const recipient = normalizePushId(data.recipientUserId)
+    if (recipient && recipient !== desiredUserId) return Promise.resolve()
+    // An old notification without an owner can only open the authenticated inbox.
+    const route = recipient && resolvePushRoute(data, { mobile: true }) || { path: '/mobile/messages' }
+    if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+      window.dispatchEvent(new Event('user-notification-opened'))
+    }
+    try {
+      return Promise.resolve(router.push(route)).catch(() => {})
+    } catch (error) {
+      return Promise.resolve()
+    }
+  }
+
+  function receiveAction(action) {
+    const notification = action && action.notification
+    const data = notification && notification.data
+    if (!data || typeof data !== 'object' || Array.isArray(data)) return Promise.resolve()
+    const key = notification.id && String(notification.id)
+    if (key && key === lastActionKey) return Promise.resolve()
+    lastActionKey = key || null
+    // Keep a single bounded, in-memory destination; never retain titles, body, or tokens.
+    pendingAction = {
+      recipientUserId: data.recipientUserId,
+      routeType: data.routeType,
+      packageId: data.packageId,
+      taskId: data.taskId,
+      employeeId: data.employeeId || data.userId,
+      certificateId: data.certificateId
+    }
+    return flushPendingAction()
+  }
+
+  function bootstrap() {
+    if (!capacitor.isNativePlatform()) return Promise.resolve({ listening: false, reason: 'web' })
+    if (!actionListenerPromise) {
+      actionListenerPromise = bounded(
+        () => pushNotifications.addListener('pushNotificationActionPerformed', receiveAction),
+        STEP_TIMEOUT_MS,
+        handle => removeHandle(handle)
+      ).then(outcome => {
+        const handle = outcome.value
+        if (outcome.status !== 'fulfilled' || !handle || typeof handle.remove !== 'function') {
+          actionListenerPromise = null
+          return { listening: false, reason: 'listener-unavailable' }
+        }
+        return { listening: true }
+      })
+    }
+    return actionListenerPromise
+  }
   let uploadSequence = 0
   const pendingUploads = new Map()
   const pendingCompensations = new Set()
@@ -163,8 +233,10 @@ export function createPushRegistrationService(dependencies = {}) {
       authToken = null
     }
     if (!authToken) {
+      setStatus('error', 'missing-auth-token')
       return Promise.resolve({ uploaded: false, reason: 'missing-auth-token' })
     }
+    setStatus('registering')
     const binding = {
       platform: platformCode(),
       token: registration.value,
@@ -211,6 +283,7 @@ export function createPushRegistrationService(dependencies = {}) {
         if (attempt.invalidated || !isCurrent(owner)) {
           cleanupInvalidatedSettlement()
         } else {
+          setStatus('ready')
           activeBinding = {
             ...binding,
             userId: owner.userId,
@@ -228,6 +301,7 @@ export function createPushRegistrationService(dependencies = {}) {
 
     const upload = bounded(() => rawUpload, STEP_TIMEOUT_MS).then(outcome => {
       if (outcome.status === 'timeout') {
+        if (isCurrent(owner)) setStatus('error', 'upload-timeout')
         attempt.invalidated = true
         pendingUploads.delete(key)
         try {
@@ -238,6 +312,7 @@ export function createPushRegistrationService(dependencies = {}) {
         return { uploaded: false, reason: 'upload-timeout' }
       }
       if (outcome.status !== 'fulfilled') {
+        if (isCurrent(owner)) setStatus('error', 'upload-unavailable')
         return { uploaded: false, reason: 'upload-unavailable' }
       }
       return { uploaded: !(outcome.value && outcome.value.skipped) }
@@ -251,12 +326,8 @@ export function createPushRegistrationService(dependencies = {}) {
     const registration = await installListener(owner, 'registration',
       value => uploadRegistration(owner, value), localHandles)
     if (!registration) return false
-    const registrationError = await installListener(owner, 'registrationError', () => {}, localHandles)
-    if (!registrationError) return false
-    return installListener(owner, 'pushNotificationActionPerformed', action => {
-      if (!isCurrent(owner) || !router || typeof router.push !== 'function') return Promise.resolve()
-      const route = resolvePushRoute(action && action.notification && action.notification.data)
-      return route ? Promise.resolve(router.push(route)).catch(() => {}) : Promise.resolve()
+    return installListener(owner, 'registrationError', () => {
+      if (isCurrent(owner)) setStatus('error', 'register-unavailable')
     }, localHandles)
   }
 
@@ -270,7 +341,9 @@ export function createPushRegistrationService(dependencies = {}) {
     if (!owner.userId) return { registered: false, reason: 'missing-user' }
     if (!capacitor.isNativePlatform()) return { registered: false, reason: 'web' }
 
-    if (!await addListeners(owner)) {
+    const navigation = await bootstrap()
+    if (!isCurrent(owner)) return { registered: false, reason: 'superseded' }
+    if (!navigation.listening || !await addListeners(owner)) {
       if (isCurrent(owner)) {
         await bounded(() => removeHandles(takeListenerHandles()), HANDOFF_TIMEOUT_MS)
         return { registered: false, reason: 'listener-unavailable' }
@@ -306,12 +379,30 @@ export function createPushRegistrationService(dependencies = {}) {
       return { registered: false, reason: 'permission-denied' }
     }
 
+    if (platformCode() === 'ANDROID') {
+      const channel = await bounded(() => pushNotifications.createChannel({
+        id: 'erp_messages',
+        name: '工作消息',
+        description: '审批、签约和个人业务消息提醒',
+        importance: 4,
+        visibility: 0,
+        vibration: true
+        // Omitting a custom sound preserves Android's default notification sound.
+      }), STEP_TIMEOUT_MS)
+      if (!isCurrent(owner)) return { registered: false, reason: 'superseded' }
+      if (channel.status !== 'fulfilled') {
+        await bounded(() => removeHandles(takeListenerHandles()), HANDOFF_TIMEOUT_MS)
+        return { registered: false, reason: 'channel-unavailable' }
+      }
+    }
+
     const registered = await performNativeTransition('register', owner)
     if (!isCurrent(owner)) return { registered: false, reason: 'superseded' }
     if (registered.status !== 'fulfilled') {
       await bounded(() => removeHandles(takeListenerHandles()), HANDOFF_TIMEOUT_MS)
       return { registered: false, reason: 'register-unavailable' }
     }
+    if (status.phase === 'checking') setStatus('waiting-token')
     return { registered: true }
   }
 
@@ -334,6 +425,7 @@ export function createPushRegistrationService(dependencies = {}) {
     return bounded(() => rawOperation, timeoutMs).then(outcome => {
       if (outcome.status === 'fulfilled') return outcome.value
       if (outcome.status === 'timeout' && isCurrent(owner)) {
+        if (timeoutResult.reason) setStatus('error', timeoutResult.reason)
         ++generation
         takeListenerHandles().forEach(handle => removeHandle(handle))
       }
@@ -345,17 +437,41 @@ export function createPushRegistrationService(dependencies = {}) {
     setRouter(nextRouter) {
       router = nextRouter
     },
-    initialize(userId) {
+    bootstrap,
+    getStatus() {
+      return { ...status }
+    },
+    subscribeStatus(listener) {
+      statusSubscribers.add(listener)
+      listener({ ...status })
+      return () => statusSubscribers.delete(listener)
+    },
+    resumeNavigation(userId) {
+      const normalized = normalizeNumericId(userId)
+      navigationReadyUserId = normalized && normalized === desiredUserId ? normalized : null
+      return flushPendingAction()
+    },
+    initialize(userId, options = {}) {
+      if (options.retry === true) permissionDenied = false
       const normalizedUserId = normalizeNumericId(userId)
       const owner = {
         generation: ++generation,
         userId: normalizedUserId,
         previousHandles: takeListenerHandles()
       }
+      if (desiredUserId && desiredUserId !== normalizedUserId) {
+        pendingAction = null
+        navigationReadyUserId = null
+        lastActionKey = null
+      }
       desiredUserId = normalizedUserId
+      setStatus('checking')
       return finishBoundedOperation(initializeOwned(owner), INITIALIZE_TIMEOUT_MS, owner, {
         registered: false,
         reason: 'initialize-timeout'
+      }).then(result => {
+        if (isCurrent(owner) && !result.registered) setStatus('error', result.reason)
+        return result
       })
     },
     disable(authToken) {
@@ -382,6 +498,10 @@ export function createPushRegistrationService(dependencies = {}) {
         cleanupSkipped: false
       }
       desiredUserId = null
+      navigationReadyUserId = null
+      pendingAction = null
+      lastActionKey = null
+      setStatus('disabled')
       activeBinding = null
       uploads.forEach(attempt => {
         pendingUploads.delete(attempt.key)

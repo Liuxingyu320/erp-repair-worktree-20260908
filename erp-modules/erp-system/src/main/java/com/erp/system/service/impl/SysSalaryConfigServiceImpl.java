@@ -47,6 +47,10 @@ import com.erp.system.service.ISysSalaryConfigService;
 @Service
 public class SysSalaryConfigServiceImpl implements ISysSalaryConfigService
 {
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.erp.common.security.service.LegacySalaryWriteGuard legacySalaryWrites =
+            new com.erp.common.security.service.LegacySalaryWriteGuard();
+
     private static final BigDecimal ZERO = BigDecimal.ZERO;
     private static final ZoneId BUSINESS_ZONE = ZoneId.of("Asia/Shanghai");
 
@@ -124,6 +128,7 @@ public class SysSalaryConfigServiceImpl implements ISysSalaryConfigService
     @Transactional(rollbackFor = Exception.class)
     public int insertSalaryScheme(SysSalaryScheme scheme)
     {
+        legacySalaryWrites.reject();
         if (StringUtils.isEmpty(scheme.getStatus()))
         {
             scheme.setStatus("0");
@@ -143,6 +148,7 @@ public class SysSalaryConfigServiceImpl implements ISysSalaryConfigService
     @Transactional(rollbackFor = Exception.class)
     public int updateSalaryScheme(SysSalaryScheme scheme)
     {
+        legacySalaryWrites.reject();
         SysSalaryScheme existing = requireScheme(scheme.getSchemeId());
         assertExpectedVersion(existing, scheme.getVersion());
         assertEffectiveSchemeMutationAllowed(existing, scheme.getEffectiveDate(),
@@ -174,6 +180,7 @@ public class SysSalaryConfigServiceImpl implements ISysSalaryConfigService
     public int deleteSalarySchemeByIds(Long[] schemeIds, Integer expectedVersion,
             String changeReason, boolean emergencyCorrection)
     {
+        legacySalaryWrites.reject();
         if (schemeIds == null || schemeIds.length != 1)
         {
             throw new ServiceException("薪资方案必须逐条预览后删除");
@@ -218,6 +225,7 @@ public class SysSalaryConfigServiceImpl implements ISysSalaryConfigService
     @Transactional(rollbackFor = Exception.class)
     public int insertSalarySchemeItem(SysSalarySchemeItem item)
     {
+        legacySalaryWrites.reject();
         SysSalaryScheme scheme = requireScheme(item.getSchemeId());
         Integer expectedVersion = expectedItemVersion(item, scheme);
         assertEffectiveSchemeMutationAllowed(scheme, scheme.getEffectiveDate(),
@@ -236,6 +244,7 @@ public class SysSalaryConfigServiceImpl implements ISysSalaryConfigService
     @Transactional(rollbackFor = Exception.class)
     public int updateSalarySchemeItem(SysSalarySchemeItem item)
     {
+        legacySalaryWrites.reject();
         SysSalarySchemeItem existing = itemMapper.selectSalarySchemeItemById(item.getItemId());
         if (existing == null)
         {
@@ -265,6 +274,7 @@ public class SysSalaryConfigServiceImpl implements ISysSalaryConfigService
     public int deleteSalarySchemeItemById(Long itemId, Integer expectedVersion, String changeReason,
             boolean emergencyCorrection)
     {
+        legacySalaryWrites.reject();
         SysSalarySchemeItem item = itemMapper.selectSalarySchemeItemById(itemId);
         if (item == null)
         {
@@ -402,6 +412,7 @@ public class SysSalaryConfigServiceImpl implements ISysSalaryConfigService
     @Transactional(rollbackFor = Exception.class)
     public int rollbackSalarySchemeRevision(Long revisionId, SysSalaryRevisionRollbackRequest request)
     {
+        legacySalaryWrites.reject();
         SysSalarySchemeRevision revision = revisionMapper.selectRevisionById(revisionId);
         if (revision == null)
         {
@@ -462,6 +473,7 @@ public class SysSalaryConfigServiceImpl implements ISysSalaryConfigService
     @Transactional(rollbackFor = Exception.class)
     public int saveRoleSalarySchemes(Long roleId, List<SysRoleSalaryScheme> bindings)
     {
+        legacySalaryWrites.reject();
         roleSalarySchemeMapper.deleteRoleSalarySchemeByRoleId(roleId);
         List<SysRoleSalaryScheme> safeBindings = bindings == null ? Collections.emptyList() : bindings;
         if (safeBindings.isEmpty())
@@ -513,6 +525,7 @@ public class SysSalaryConfigServiceImpl implements ISysSalaryConfigService
     @Transactional(rollbackFor = Exception.class)
     public int saveUserSalarySchemes(Long userId, List<SysUserSalaryScheme> bindings)
     {
+        legacySalaryWrites.reject();
         userSalarySchemeMapper.deleteUserSalarySchemeByUserId(userId);
         List<SysUserSalaryScheme> safeBindings = bindings == null ? Collections.emptyList() : bindings;
         if (safeBindings.isEmpty())

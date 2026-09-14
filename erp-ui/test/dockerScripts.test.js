@@ -139,8 +139,8 @@ assert.ok(!/MYSQL_(?:USERNAME|PASSWORD)|MINIO_(?:ACCESS_KEY|SECRET_KEY)/.test(fr
 
 for (const nginxFile of ['nginx.conf', 'nginx.host.conf']) {
   const nginx = fs.readFileSync(path.join(rootDir, 'docker/nginx/conf', nginxFile), 'utf8')
-  const prodApiLocation = nginx.match(/location\s+\/prod-api\/\s*\{([\s\S]*?)\n\s{8}\}/)
-  assert.ok(prodApiLocation, `${nginxFile} should contain the /prod-api/ proxy location`)
+  const prodApiLocation = nginx.match(/location\s+\^~\s+\/prod-api\/\s*\{([\s\S]*?)\n\s{8}\}/)
+  assert.ok(prodApiLocation, `${nginxFile} must prioritize the /prod-api/ proxy over image-extension caching`)
   for (const directive of [
     'client_max_body_size 110m;',
     'proxy_request_buffering off;',

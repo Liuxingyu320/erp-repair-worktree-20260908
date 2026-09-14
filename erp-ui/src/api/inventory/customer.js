@@ -97,3 +97,8 @@ export function addCustomerServiceRecord(customerId, data) {
 export function archiveCustomerServiceCard(customerId, data) {
   return request({ url: '/inventory/customer/service-card/' + customerId + '/archive', method: 'post', data, silentError: true })
 }
+
+// Append-only service history, cursor-bound to the first page snapshot.
+export function listCustomerServiceRecords(customerId, params) {
+  return request({ url: '/inventory/customer/service-card/' + customerId + '/records', method: 'get', params, silentError: true })
+}

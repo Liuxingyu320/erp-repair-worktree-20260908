@@ -111,6 +111,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <resultMap id="ExportBatchResult" type="OaReimbursementExportBatch">
         <id property="batchId" column="batch_id"/>
+        <result property="requestId" column="request_id"/>
         <result property="batchNo" column="batch_no"/>
         <result property="reimbursementCount" column="reimbursement_count"/>
         <result property="itemCount" column="item_count"/>
@@ -499,6 +500,31 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         where invoice_id = #{invoiceId}
           and reimbursement_id = #{reimbursementId}
     </delete>
+
+    <insert id="claimExportCommand">
+        insert into oa_reimbursement_export_command(actor_id, request_id, payload_hash)
+        values(#{actorId}, #{requestId}, #{payloadHash})
+        on duplicate key update request_id = request_id
+    </insert>
+    <select id="lockExportCommand" resultType="com.erp.oa.domain.OaReimbursementExportCommand">
+        select actor_id as actorId, request_id as requestId, payload_hash as payloadHash, batch_id as batchId
+        from oa_reimbursement_export_command where actor_id = #{actorId} and request_id = #{requestId} for update
+    </select>
+    <update id="completeExportCommand">
+        update oa_reimbursement_export_command set batch_id = #{batchId}
+        where actor_id = #{actorId} and request_id = #{requestId} and payload_hash = #{payloadHash} and batch_id is null
+    </update>
+    <select id="selectExportByCommand" resultMap="ExportBatchResult">
+        select b.*, c.request_id from oa_reimbursement_export_command c
+        inner join oa_reimbursement_export_batch b on b.batch_id = c.batch_id
+        where c.actor_id = #{actorId} and c.request_id = #{requestId} and b.created_by_user_id = #{actorId}
+    </select>
+    <select id="selectExportHistory" resultMap="ExportBatchResult">
+        select b.*, c.request_id from oa_reimbursement_export_batch b
+        left join oa_reimbursement_export_command c on c.batch_id = b.batch_id and c.actor_id = b.created_by_user_id
+        <where><if test="actorId != null">b.created_by_user_id = #{actorId}</if></where>
+        order by b.create_time desc, b.batch_id desc
+    </select>
 
     <insert id="insertExportBatch" parameterType="OaReimbursementExportBatch"
             useGeneratedKeys="true" keyProperty="batchId">

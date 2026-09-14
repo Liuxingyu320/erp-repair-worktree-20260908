@@ -212,11 +212,13 @@ class SysUserServiceImplTest
                 .contains("configMapper");
         List<String> events = new java.util.ArrayList<>();
         SysUserRoleMapper userRoleMapper = mapper(SysUserRoleMapper.class, (method, args) -> {
-            if ("deleteUserRoleByUserId".equals(method) || "batchUserRole".equals(method))
+            if ("batchUserRole".equals(method))
             {
                 events.add(method);
                 return 1;
             }
+            if ("lockUserForRoleAssignment".equals(method)) return args[0];
+            if ("selectRoleIdsByUserId".equals(method)) return Collections.emptyList();
             throw unexpected(method);
         });
         SysConfigMapper configMapper = mapper(SysConfigMapper.class, (method, args) -> {
@@ -239,6 +241,12 @@ class SysUserServiceImplTest
             {
                 return Collections.emptyList();
             }
+            if ("selectRoleByIdForUpdate".equals(method))
+            {
+                SysRole role = new SysRole((Long) args[0]);
+                role.setStatus("0"); role.setDelFlag("0");
+                return role;
+            }
             throw unexpected(method);
         }));
         ReflectionTestUtils.setField(service, "configMapper", configMapper);
@@ -255,8 +263,7 @@ class SysUserServiceImplTest
             SecurityContextHolder.remove();
         }
 
-        assertThat(events).containsExactly("lockSignHrState", "deleteUserRoleByUserId",
-                "batchUserRole", "syncSignHrPermissions");
+        assertThat(events).containsExactly("lockSignHrState", "batchUserRole", "syncSignHrPermissions");
     }
 
     @Test

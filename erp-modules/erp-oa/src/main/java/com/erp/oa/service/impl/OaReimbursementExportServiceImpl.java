@@ -74,12 +74,28 @@ public class OaReimbursementExportServiceImpl
         requireExportPermission();
         List<Long> ids = normalizedIds(request);
         List<Long> scopeDeptIds = resolveScope(selectedShopDeptId);
+        String requestId = normalizedRequestId(request.getRequestId(), true);
+        String payloadHash = commandHash(ids, selectedShopDeptId);
+        Long actorId = SecurityUtils.getUserId();
+        if (requestId != null)
+        {
+            mapper.claimExportCommand(actorId, requestId, payloadHash);
+            com.erp.oa.domain.OaReimbursementExportCommand claim = mapper.lockExportCommand(actorId, requestId);
+            if (claim == null || !Objects.equals(payloadHash, claim.getPayloadHash()))
+                throw new ServiceException("导出请求号已用于不同的报销集合或组织，请核对原批次");
+            if (claim.getBatchId() != null)
+            {
+                OaReimbursementExportBatch existing = mapper.selectExportByCommand(actorId, requestId);
+                if (existing == null) throw new ServiceException("原导出回执与批次不一致，请联系管理员核对");
+                return withArchiveStatus(existing);
+            }
+        }
         List<OaReimbursement> reimbursements =
                 mapper.selectFinanceListByIds(ids, scopeDeptIds);
         if (reimbursements.size() != ids.size())
         {
             throw new ServiceException(
-                    "所选报销单中包含未审批通过、已删除或无权访问的数据，请刷新后重试");
+                    "所选报销单中包含未审批通过、已删除或无权访问的数据，请刷新后重试", 409);
         }
         hydrate(reimbursements);
 
@@ -110,12 +126,60 @@ public class OaReimbursementExportServiceImpl
             {
                 throw new ServiceException("更新报销单导出状态失败");
             }
+            if (requestId != null && mapper.completeExportCommand(actorId, requestId, payloadHash, batch.getBatchId()) != 1)
+                throw new ServiceException("保存导出命令回执失败");
+            batch.setRequestId(requestId);
+            batch.setArchiveStatus("AVAILABLE");
             return batch;
         }
         finally
         {
             deleteTemporaryQuietly(temporary);
         }
+    }
+
+    @Override
+    public List<OaReimbursementExportBatch> exportHistory(boolean allCreators)
+    {
+        requireExportPermission();
+        if (allCreators && !SecurityUtils.isAdmin()) throw new ServiceException("仅管理员可查看所有创建人的导出批次");
+        List<OaReimbursementExportBatch> result = mapper.selectExportHistory(allCreators ? null : SecurityUtils.getUserId());
+        result.forEach(this::withArchiveStatus);
+        return result;
+    }
+
+    @Override
+    public OaReimbursementExportBatch exportByRequestId(String requestId)
+    {
+        requireExportPermission();
+        return withArchiveStatus(mapper.selectExportByCommand(SecurityUtils.getUserId(), normalizedRequestId(requestId, true)));
+    }
+
+    private OaReimbursementExportBatch withArchiveStatus(OaReimbursementExportBatch batch)
+    {
+        if (batch == null) return null;
+        try { batch.setArchiveStatus(Files.isRegularFile(fileStorage.resolve(batch.getArchivePath())) ? "AVAILABLE" : "UNAVAILABLE"); }
+        catch (RuntimeException failure) { batch.setArchiveStatus("UNAVAILABLE"); }
+        return batch;
+    }
+
+    private String normalizedRequestId(String value, boolean required)
+    {
+        if (value == null || value.trim().isEmpty())
+        {
+            if (required) throw new ServiceException("导出请求号不能为空", 409);
+            return null;
+        }
+        String result = value.trim();
+        if (!result.matches("[A-Za-z0-9:_-]{1,64}")) throw new ServiceException("导出请求号格式无效", 409);
+        return result;
+    }
+
+    private String commandHash(List<Long> ids, Long selectedShopDeptId)
+    {
+        String payload = String.valueOf(selectedShopDeptId) + "|" + ids.stream().sorted().map(String::valueOf).collect(java.util.stream.Collectors.joining(","));
+        try { return java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(payload.getBytes(java.nio.charset.StandardCharsets.UTF_8))); }
+        catch (java.security.NoSuchAlgorithmException failure) { throw new IllegalStateException(failure); }
     }
 
     @Override
@@ -134,7 +198,10 @@ public class OaReimbursementExportServiceImpl
         {
             throw new ServiceException("只能下载本人创建的会计导出资料包");
         }
-        Path path = fileStorage.resolve(batch.getArchivePath());
+        Path path;
+        try { path = fileStorage.resolve(batch.getArchivePath()); }
+        catch (RuntimeException failure) { throw new ServiceException("原会计导出资料包不可用，请核对历史批次；如需重新生成，请显式创建新批次"); }
+        if (!Files.isRegularFile(path)) throw new ServiceException("原会计导出资料包不可用，请核对历史批次；如需重新生成，请显式创建新批次");
         try
         {
             return new ExportContent(path, batch.getArchiveName(),
@@ -152,7 +219,7 @@ public class OaReimbursementExportServiceImpl
         if (request == null || request.getReimbursementIds() == null
                 || request.getReimbursementIds().isEmpty())
         {
-            throw new ServiceException("请选择需要导出的报销单");
+            throw new ServiceException("请选择需要导出的报销单", 409);
         }
         Set<Long> distinct = new HashSet<>();
         List<Long> ids = new ArrayList<>();
@@ -160,18 +227,18 @@ public class OaReimbursementExportServiceImpl
         {
             if (id == null || id <= 0)
             {
-                throw new ServiceException("报销单编号不合法");
+                throw new ServiceException("报销单编号不合法", 409);
             }
             if (!distinct.add(id))
             {
-                throw new ServiceException("不能重复选择同一张报销单");
+                throw new ServiceException("不能重复选择同一张报销单", 409);
             }
             ids.add(id);
         }
         if (ids.size() > maxClaimsPerExport)
         {
             throw new ServiceException("单次最多导出"
-                    + maxClaimsPerExport + "张报销单");
+                    + maxClaimsPerExport + "张报销单", 409);
         }
         return ids;
     }
@@ -183,7 +250,7 @@ public class OaReimbursementExportServiceImpl
         if (!SecurityUtils.isAdmin()
                 && (scopeDeptIds == null || scopeDeptIds.isEmpty()))
         {
-            throw new ServiceException("当前用户没有可导出的店铺数据范围");
+            throw new ServiceException("当前用户没有可导出的店铺数据范围", 403);
         }
         return scopeDeptIds;
     }
@@ -522,7 +589,7 @@ public class OaReimbursementExportServiceImpl
                 && !AuthUtil.hasPermi(
                         OaReimbursementServiceImpl.PERMISSION_FINANCE_EXPORT))
         {
-            throw new ServiceException("无权导出报销会计资料");
+            throw new ServiceException("无权导出报销会计资料", 403);
         }
     }
 
@@ -538,7 +605,9 @@ public class OaReimbursementExportServiceImpl
                     @Override
                     public void afterCompletion(int status)
                     {
-                        if (status != TransactionSynchronization.STATUS_COMMITTED)
+                        // STATUS_UNKNOWN may mean commit succeeded but its acknowledgement was lost.
+                        // Keep the archive until its durable batch/command can be reconciled.
+                        if (status == TransactionSynchronization.STATUS_ROLLED_BACK)
                         {
                             fileStorage.deleteQuietly(relativePath);
                         }

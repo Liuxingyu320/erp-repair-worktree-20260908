@@ -4,6 +4,7 @@ import java.util.Map;
 import com.erp.common.core.web.domain.AjaxResult;
 import com.erp.file.drive.constant.DriveErrorCodes;
 import com.erp.file.drive.exception.DriveException;
+import com.erp.file.drive.exception.DriveUploadPreClaimRejectedException;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpStatus;
@@ -48,6 +49,11 @@ public class DriveExceptionHandler
     {
         AjaxResult body = AjaxResult.error(exception.getMessage())
                 .put("businessCode", exception.getBusinessCode());
+        if (exception instanceof DriveUploadPreClaimRejectedException rejected)
+        {
+            body.put("uploadAttempt", Map.of("operationId", rejected.getOperationId(),
+                    "state", "REJECTED_BEFORE_CLAIM"));
+        }
         return ResponseEntity.status(statusFor(exception.getBusinessCode()))
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(body);

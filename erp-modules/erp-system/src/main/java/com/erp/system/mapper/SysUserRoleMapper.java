@@ -53,6 +53,9 @@ public interface SysUserRoleMapper
 
     public List<Long> selectRoleIdsByUserId(Long userId);
 
+    /** Serialize association edits after role locks and before relation locks. */
+    public Long lockUserForRoleAssignment(Long userId);
+
     public int insertUserRoleIfAbsent(@Param("userId") Long userId, @Param("roleId") Long roleId);
 
     /**

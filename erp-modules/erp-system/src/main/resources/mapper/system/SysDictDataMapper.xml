@@ -25,6 +25,10 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 		from sys_dict_data
     </sql>
 
+    <select id="lockDictDataIdsByType" parameterType="String" resultType="java.lang.Long">select dict_code from sys_dict_data where dict_type = #{dictType} order by dict_code for update</select>
+    <select id="lockDictDataById" parameterType="Long" resultMap="SysDictDataResult">
+        <include refid="selectDictDataVo"/> where dict_code = #{dictCode} for update
+    </select>
 	<select id="selectDictDataList" parameterType="SysDictData" resultMap="SysDictDataResult">
 	    <include refid="selectDictDataVo"/>
 		<where>

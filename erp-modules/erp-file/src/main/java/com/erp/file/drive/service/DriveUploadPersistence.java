@@ -36,6 +36,14 @@ public class DriveUploadPersistence
         this.properties = properties;
     }
 
+    private DriveUploadOperationService operations;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public void setUploadOperations(DriveUploadOperationService operations)
+    {
+        this.operations = operations;
+    }
+
     @Transactional
     public DriveNode persist(DriveNode node, long bytes)
     {
@@ -45,6 +53,14 @@ public class DriveUploadPersistence
     @Transactional
     public DriveNode persist(DriveNode node, long bytes, String reservationId)
     {
+        return persist(node, bytes, reservationId, null);
+    }
+
+    @Transactional
+    public DriveNode persist(DriveNode node, long bytes, String reservationId,
+            DriveUploadOperationService.Claim claim)
+    {
+        if (claim != null) operations.lockWriter(claim);
         DriveUploadReservation reservation = null;
         if (reservationId != null)
         {
@@ -79,6 +95,7 @@ public class DriveUploadPersistence
         {
             throw unavailable("上传容量预占未能提交，请重新上传");
         }
+        if (claim != null) operations.succeed(claim, node.getNodeId());
         return node;
     }
 

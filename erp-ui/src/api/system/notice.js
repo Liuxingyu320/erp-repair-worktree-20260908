@@ -1,8 +1,9 @@
 import request from '@/utils/request'
 
 // 查询公告列表
-export function listNotice(query) {
+export function listNotice(query, config) {
   return request({
+    silentError: !!(config && config.silentError),
     url: '/system/notice/list',
     method: 'get',
     params: query
@@ -10,8 +11,9 @@ export function listNotice(query) {
 }
 
 // 查询公告详细
-export function getNotice(noticeId) {
+export function getNotice(noticeId, config) {
   return request({
+    silentError: !!(config && config.silentError),
     url: '/system/notice/' + noticeId,
     method: 'get'
   })
@@ -26,8 +28,9 @@ export function getInboxNotice(noticeId) {
 }
 
 // 新增公告
-export function addNotice(data) {
+export function addNotice(data, config) {
   return request({
+    silentError: !!(config && config.silentError),
     url: '/system/notice',
     method: 'post',
     data: data
@@ -35,8 +38,9 @@ export function addNotice(data) {
 }
 
 // 修改公告
-export function updateNotice(data) {
+export function updateNotice(data, config) {
   return request({
+    silentError: !!(config && config.silentError),
     url: '/system/notice',
     method: 'put',
     data: data
@@ -44,8 +48,9 @@ export function updateNotice(data) {
 }
 
 // 预览公告受众去重人数
-export function previewNoticeAudience(data) {
+export function previewNoticeAudience(data, config) {
   return request({
+    silentError: !!(config && config.silentError),
     url: '/system/notice/audience-preview',
     method: 'post',
     data
@@ -53,8 +58,9 @@ export function previewNoticeAudience(data) {
 }
 
 // 公告受众选择器选项
-export function getNoticeAudienceOptions(keyword) {
+export function getNoticeAudienceOptions(keyword, config) {
   return request({
+    silentError: !!(config && config.silentError),
     url: '/system/notice/audience-options',
     method: 'get',
     params: { keyword }
@@ -132,10 +138,11 @@ export function markNoticeReadAll() {
 }
 
 // 查询公告已读用户列表
-export function listNoticeReadUsers(query) {
+export function listNoticeReadUsers(query, config) {
   return request({
     url: '/system/notice/readUsers/list',
     method: 'get',
-    params: query
+    params: query,
+    silentError: !!(config && config.silentError)
   })
 }

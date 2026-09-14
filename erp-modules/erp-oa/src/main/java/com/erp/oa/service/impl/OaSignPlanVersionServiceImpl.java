@@ -14,8 +14,15 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.HashSet;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import com.erp.oa.domain.dto.OaSignPlanPublishRequest;
+import com.erp.oa.domain.vo.OaSignPlanPublishPreview;
+import com.erp.oa.domain.vo.OaSignPlanVersionPublishResult;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -40,6 +47,9 @@ import com.erp.oa.service.IOaSignPlanVersionService;
 @Service
 public class OaSignPlanVersionServiceImpl implements IOaSignPlanVersionService
 {
+    private static final Logger log = LoggerFactory.getLogger(OaSignPlanVersionServiceImpl.class);
+    @Autowired private OaSignPlanPublishPreviewStore previewStore;
+
     private static final String ENABLED_SOURCE_STATUS = "0";
     private static final String PUBLISHED = "PUBLISHED";
     private static final String MATCHING_ENABLED = "ENABLED";
@@ -80,35 +90,125 @@ public class OaSignPlanVersionServiceImpl implements IOaSignPlanVersionService
     @Autowired
     private OaSignPlanVersionFingerprint versionFingerprint;
 
+    private record Prepared(OaSignPlan source, OaSignPlanVersion candidate,
+            List<OaSignPlanVersion> versions, OaSignPlanVersion existing) {}
+    private record Publication(OaSignPlanVersion version, String action, List<Long> previousActiveIds) {}
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public OaSignPlanPublishPreview previewPublish(Long planId, Long selectedShopDeptId)
+    {
+        Prepared prepared = preparePublication(planId);
+        OaSignPlanVersion existing = prepared.existing();
+        boolean restore = existing != null && MATCHING_DISABLED.equals(existing.getMatchingStatus());
+        if (existing != null && !restore && !MATCHING_ENABLED.equals(existing.getMatchingStatus()))
+            throw new ServiceException("历史方案匹配状态无效，请先核对");
+        String action = existing == null ? "PUBLISHED" : restore ? "RESTORED" : "UNCHANGED";
+        List<Long> active = activeVersionIds(prepared.versions());
+        var issued = previewStore.issue(SecurityUtils.getUserId(), planId,
+                prepared.candidate().getVersionHash(), active,
+                existing == null ? null : existing.getVersionId(), restore);
+        Integer versionNo = existing == null ? versionMapper.selectNextVersionNo(planId) : existing.getVersionNo();
+        String message = restore
+                ? "恢复历史版本V" + versionNo + "用于新任务，并停用本方案其他启用版本；已有签包保持原版本。"
+                : existing == null ? "发布新版本用于新任务，并停用本方案其他启用版本；已有签包保持原版本。"
+                : "内容与已启用版本V" + versionNo + "一致，无需重复发布。";
+        return new OaSignPlanPublishPreview(issued.token(), planId, action,
+                existing == null ? null : existing.getVersionId(), versionNo,
+                restore ? existing.getVersionId() : null,
+                prepared.versions().stream().filter(v -> MATCHING_ENABLED.equals(v.getMatchingStatus()))
+                        .map(v -> new OaSignPlanPublishPreview.ActiveVersion(v.getVersionId(), v.getVersionNo())).toList(),
+                message, new Date(issued.expiresAt()));
+    }
+
+    /** Legacy clients may publish new content, but cannot silently restore a disabled version. */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public OaSignPlanVersion publish(Long planId, Long selectedShopDeptId)
     {
+        return publishPrepared(preparePublication(planId), null).version();
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public OaSignPlanVersionPublishResult confirmPublish(Long planId,
+            OaSignPlanPublishRequest request, Long selectedShopDeptId)
+    {
+        if (request == null) throw new ServiceException("请先预览并确认本次方案发布");
+        var ticket = previewStore.require(request.previewToken(), SecurityUtils.getUserId());
+        Prepared prepared = preparePublication(planId);
+        OaSignPlanVersion existing = prepared.existing();
+        if (!Objects.equals(ticket.planId(), planId)
+                || !Objects.equals(ticket.versionHash(), prepared.candidate().getVersionHash())
+                || !Objects.equals(ticket.activeVersionIds(), activeVersionIds(prepared.versions()))
+                || !Objects.equals(ticket.targetVersionId(), existing == null ? null : existing.getVersionId())
+                || !Objects.equals(request.restoreVersionId(), ticket.restore() ? ticket.targetVersionId() : null)
+                || ticket.restore() != (existing != null && MATCHING_DISABLED.equals(existing.getMatchingStatus())))
+            throw new ServiceException("方案内容或启用版本已变化，请重新预览后确认；请求结果不明时先查看当前版本");
+        Publication publication = publishPrepared(prepared, request);
+        OaSignPlanVersionPublishResult result = OaSignPlanVersionPublishResult.from(publication.version());
+        result.setAction(publication.action());
+        result.setPreviousActiveVersionIds(publication.previousActiveIds());
+        return result;
+    }
+
+    private Prepared preparePublication(Long planId)
+    {
         OaSignPlan source = versionMapper.lockPlanById(planId);
         assertGlobalSourcePlan(source);
         validateSourcePlan(source);
-
+        // All matching mutations share plan -> published versions (ascending ID) ordering.
+        List<OaSignPlanVersion> versions = versionMapper.lockPublishedVersionsByPlanId(planId);
+        if (versions == null) versions = List.of();
         List<OaSignPlanTemplate> bindings = versionMapper.lockPlanTemplateBindings(planId);
         attachGloballyLockedTemplates(bindings);
-        List<OaSignPlanVersionTemplate> templateSnapshots =
-                buildTemplateSnapshots(bindings, source.getScenario(), null);
-        if (templateSnapshots.stream().noneMatch(this::hasSigningStrategy))
-        {
+        List<OaSignPlanVersionTemplate> templates = buildTemplateSnapshots(bindings, source.getScenario(), null);
+        if (templates.stream().noneMatch(this::hasSigningStrategy))
             throw new ServiceException("签约方案未配置签名策略");
-        }
-        validateOnboardRequiredTemplates(source, templateSnapshots);
-
-        OaSignPlanVersion candidate = buildVersionSnapshot(source, templateSnapshots);
+        validateOnboardRequiredTemplates(source, templates);
+        OaSignPlanVersion candidate = buildVersionSnapshot(source, templates);
         candidate.setVersionHash(versionFingerprint.calculate(candidate));
-        OaSignPlanVersion existing = versionMapper.selectByPlanIdAndVersionHash(
-                candidate.getPlanId(), candidate.getVersionHash());
+        OaSignPlanVersion existing = versionMapper.selectByPlanIdAndVersionHash(planId, candidate.getVersionHash());
+        return new Prepared(source, candidate, versions, existing);
+    }
+
+    private List<Long> activeVersionIds(List<OaSignPlanVersion> versions)
+    {
+        return versions.stream().filter(v -> MATCHING_ENABLED.equals(v.getMatchingStatus()))
+                .map(OaSignPlanVersion::getVersionId).sorted().toList();
+    }
+
+    private Publication publishPrepared(Prepared prepared, OaSignPlanPublishRequest request)
+    {
+        OaSignPlanVersion candidate = prepared.candidate();
+        OaSignPlanVersion existing = prepared.existing();
+        List<Long> previousActive = activeVersionIds(prepared.versions());
         if (existing != null)
         {
-            existing.setTemplates(nonNullTemplates(versionMapper.selectTemplatesByVersionId(existing.getVersionId())));
-            return existing;
+            if (MATCHING_ENABLED.equals(existing.getMatchingStatus()))
+            {
+                if (!previousActive.equals(List.of(existing.getVersionId())))
+                    throw new ServiceException("当前方案启用版本不一致，请先核对");
+                existing.setTemplates(nonNullTemplates(versionMapper.selectTemplatesByVersionId(existing.getVersionId())));
+                return new Publication(existing, "UNCHANGED", previousActive);
+            }
+            if (!MATCHING_DISABLED.equals(existing.getMatchingStatus()) || request == null
+                    || !Objects.equals(existing.getVersionId(), request.restoreVersionId()))
+                throw new ServiceException("相同内容的历史版本已停用，请预览并明确确认恢复该版本");
+            if (versionMapper.enableForNewMatching(existing.getVersionId()) != 1)
+                throw new ServiceException("历史方案恢复状态已变化，请重新预览");
+            disableOtherVersions(candidate.getPlanId(), existing.getVersionId(), previousActive.size());
+            OaSignPlanVersion actual = versionMapper.selectPlanVersionById(existing.getVersionId());
+            if (actual == null || !MATCHING_ENABLED.equals(actual.getMatchingStatus())
+                    || !PUBLISHED.equals(actual.getPublishStatus())
+                    || !Objects.equals(actual.getPlanId(), candidate.getPlanId())
+                    || !Objects.equals(actual.getVersionHash(), candidate.getVersionHash()))
+                throw new ServiceException("历史方案恢复结果不一致，本次操作已回滚");
+            actual.setTemplates(nonNullTemplates(versionMapper.selectTemplatesByVersionId(actual.getVersionId())));
+            auditActivation(actual, "RESTORED", previousActive);
+            return new Publication(actual, "RESTORED", previousActive);
         }
-
-        Integer nextVersionNo = versionMapper.selectNextVersionNo(source.getPlanId());
+        Integer nextVersionNo = versionMapper.selectNextVersionNo(candidate.getPlanId());
         candidate.setVersionNo(nextVersionNo == null || nextVersionNo < 1 ? 1 : nextVersionNo);
         candidate.setPublishStatus(PUBLISHED);
         candidate.setMatchingStatus(MATCHING_ENABLED);
@@ -116,32 +216,54 @@ public class OaSignPlanVersionServiceImpl implements IOaSignPlanVersionService
         candidate.setPublishedBy(SecurityUtils.getUsername());
         candidate.setPublishedTime(new Date());
         if (candidate.getPublishedByUserId() == null || StringUtils.isBlank(candidate.getPublishedBy()))
-        {
             throw new ServiceException("无法记录签约方案发布人");
-        }
         if (versionMapper.insertPlanVersion(candidate) != 1 || candidate.getVersionId() == null)
-        {
             throw new ServiceException("签约方案版本发布失败");
-        }
-        for (OaSignPlanVersionTemplate template : templateSnapshots)
-        {
-            template.setPlanVersionId(candidate.getVersionId());
-        }
-        if (versionMapper.batchInsertPlanVersionTemplates(templateSnapshots) != templateSnapshots.size())
-        {
+        List<OaSignPlanVersionTemplate> templates = candidate.getTemplates();
+        for (OaSignPlanVersionTemplate template : templates) template.setPlanVersionId(candidate.getVersionId());
+        if (versionMapper.batchInsertPlanVersionTemplates(templates) != templates.size())
             throw new ServiceException("签约方案模板快照发布失败");
+        disableOtherVersions(candidate.getPlanId(), candidate.getVersionId(), previousActive.size());
+        auditActivation(candidate, "PUBLISHED", previousActive);
+        return new Publication(candidate, "PUBLISHED", previousActive);
+    }
+
+    private void disableOtherVersions(Long planId, Long keepId, int expectedCount)
+    {
+        if (versionMapper.disableOtherPublishedMatchingVersions(planId, keepId) != expectedCount)
+            throw new ServiceException("方案启用状态已变化，本次发布已回滚，请重新预览");
+    }
+
+    private void auditActivation(OaSignPlanVersion version, String action, List<Long> previousActive)
+    {
+        Long actorId = SecurityUtils.getUserId(), planId = version.getPlanId(), targetId = version.getVersionId();
+        String hash = version.getVersionHash();
+        List<Long> previous = List.copyOf(previousActive);
+        Runnable record = () -> log.info("SIGN_PLAN_ACTIVATION action={} actor={} plan={} targetVersion={} previousActive={} contentHash={}",
+                action, actorId, planId, targetId, previous, hash);
+        if (TransactionSynchronizationManager.isSynchronizationActive())
+        {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization()
+            {
+                @Override public void afterCommit() { record.run(); }
+            });
         }
-        versionMapper.disableOtherPublishedMatchingVersions(
-                candidate.getPlanId(), candidate.getVersionId());
-        candidate.setTemplates(templateSnapshots);
-        return candidate;
+        else
+        {
+            // Direct non-Spring calls have no commit event; never label these as a committed activation.
+            log.debug("SIGN_PLAN_ACTIVATION_NO_TRANSACTION action={} plan={} targetVersion={}", action, planId, targetId);
+        }
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
     public OaSignPlanVersion disableForNewMatching(Long versionId, Long selectedShopDeptId)
     {
-        OaSignPlanVersion version = requireScopedVersion(versionId, selectedShopDeptId);
+        OaSignPlanVersion observed = requireScopedVersion(versionId, selectedShopDeptId);
+        assertGlobalSourcePlan(versionMapper.lockPlanById(observed.getPlanId()));
+        List<OaSignPlanVersion> locked = versionMapper.lockPublishedVersionsByPlanId(observed.getPlanId());
+        OaSignPlanVersion version = requireScopedLockedVersion(versionId, selectedShopDeptId);
+        List<Long> previousActive = activeVersionIds(locked == null ? List.of() : locked);
         if (!PUBLISHED.equals(version.getPublishStatus()) && version.getPublishStatus() != null)
         {
             throw new ServiceException("仅已发布方案版本可停用新匹配");
@@ -153,6 +275,7 @@ public class OaSignPlanVersionServiceImpl implements IOaSignPlanVersionService
                 throw new ServiceException("签约方案版本停用失败");
             }
             version.setMatchingStatus(MATCHING_DISABLED);
+            auditActivation(version, "DISABLED", previousActive);
         }
         version.setTemplates(nonNullTemplates(versionMapper.selectTemplatesByVersionId(versionId)));
         return version;

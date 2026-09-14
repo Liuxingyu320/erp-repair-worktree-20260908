@@ -37,15 +37,15 @@
           </p>
           <label>
             <span>采购标题</span>
-            <input v-model.trim="editForm.title" maxlength="120" type="text" placeholder="请输入采购标题">
+            <input v-model.trim="editForm.title" :disabled="actionLoading" maxlength="120" type="text" placeholder="请输入采购标题">
           </label>
           <label>
             <span>采购金额</span>
-            <input v-model.trim="editForm.amount" type="text" inputmode="decimal" placeholder="请输入采购金额">
+            <input v-model.trim="editForm.amount" :disabled="actionLoading" type="text" inputmode="decimal" placeholder="请输入采购金额">
           </label>
           <label>
             <span>采购说明</span>
-            <textarea v-model.trim="editForm.reason" maxlength="500" rows="4" placeholder="请输入采购说明"></textarea>
+            <textarea v-model.trim="editForm.reason" :disabled="actionLoading" maxlength="500" rows="4" placeholder="请输入采购说明"></textarea>
           </label>
           <div class="edit-actions">
             <button type="button" class="save" :disabled="actionLoading" @click="saveEditable(false)">保存草稿</button>
@@ -111,6 +111,7 @@
       </template>
     </main>
 
+    <approval-command-recovery :message="approvalError" :reason="approvalReason" :unknown="approvalUnknown" :busy="actionLoading || checkingApproval" :checking="checkingApproval" :checked="approvalChecked" @check="checkApprovalCommand" @retry="retryApprovalCommand" />
     <footer v-if="purchase && canAct" class="action-bar">
       <button type="button" class="return" :disabled="actionLoading" @click="executeAction('return')">退回修改</button>
       <button type="button" class="reject" :disabled="actionLoading" @click="executeAction('reject')">拒绝</button>
@@ -122,10 +123,15 @@
 </template>
 
 <script>
+import { createApprovalCommandRecovery } from "@/mixins/approvalCommandRecovery"
+import ApprovalCommandRecovery from "@/components/ApprovalCommandRecovery"
 import { getPurchaseAvailability, getPurchaseDetail, savePurchase, submitPurchase } from "@/api/oa/purchase"
 import { getApprovalInstance } from "@/api/approval/monitor"
 import { approveApprovalTask, rejectApprovalTask, returnApprovalTask } from "@/api/approval/task"
 import { statusLabel as approvalStatusLabel } from "@/views/approval/manage/components/approvalUi"
+import { getSelectedDeptId } from "@/utils/shopContext"
+const { createUiOperationScope } = require("@/utils/uiOperationScope")
+const { normalizePurchaseId, purchaseRouteTarget, resolvePurchaseInstanceId, validatePurchaseApproval, canActOnPurchase } = require("@/utils/oaPurchaseContext")
 const { mobileErrorMessage } = require("../../mobileErrorMessage")
 
 function scalar(value) {
@@ -147,6 +153,12 @@ function normalizeAmount(value) {
 }
 
 export default {
+  components: { ApprovalCommandRecovery },
+  mixins: [createApprovalCommandRecovery({
+    target: vm => vm.loadedTarget && ({ businessCode: 'OA_PURCHASE', businessId: vm.loadedTarget.purchaseId, taskId: vm.loadedTarget.taskId, instanceId: vm.loadedTarget.instanceId }),
+    visible: vm => !vm.pageInactive && !!vm.purchase, canAct: vm => vm.canAct, loading: 'actionLoading',
+    success: vm => { vm.$store.dispatch('todo/invalidateAfterMutation').catch(() => {}); return vm.load() }
+  })],
   name: "MobileOaPurchaseApproval",
   data() {
     return {
@@ -155,6 +167,8 @@ export default {
       error: "",
       purchase: null,
       approvalDetail: null,
+      loadedTarget: null,
+      editSnapshot: "",
       purchaseSubmissionAvailable: false,
       purchaseAvailabilityResolved: false,
       editForm: { purchaseId: undefined, title: "", amount: undefined, reason: "", rowVersion: undefined }
@@ -163,9 +177,15 @@ export default {
   computed: {
     routeQuery() { return this.$route && this.$route.query || {} },
     purchaseId() { return scalar(this.routeQuery.purchaseId || this.routeQuery.businessId) },
+    routeTarget() { return purchaseRouteTarget(this.routeQuery) },
+    routeTargetKey() { return JSON.stringify(this.routeTarget) },
+    actorContextKey() {
+      const store = this.$store || {}, user = store.state && store.state.user || {}
+      return JSON.stringify([store.getters && store.getters.id, user.sessionRevision])
+    },
     approvalTaskId() { return scalar(this.routeQuery.approvalTaskId) },
     hasValidPurchaseId() {
-      return /^\d+$/.test(this.purchaseId) && Number(this.purchaseId) > 0
+      return Boolean(normalizePurchaseId(this.purchaseId))
     },
     approvalInstanceId() {
       return scalar(this.routeQuery.approvalInstanceId || this.purchase && this.purchase.approvalInstanceId)
@@ -174,28 +194,70 @@ export default {
     tasks() { return this.approvalDetail && Array.isArray(this.approvalDetail.tasks) ? this.approvalDetail.tasks : [] },
     actions() { return this.approvalDetail && Array.isArray(this.approvalDetail.actions) ? this.approvalDetail.actions : [] },
     currentTask() {
-      return this.tasks.find(item => String(item.taskId) === String(this.approvalTaskId)) || null
+      return this.tasks.find(item => this.loadedTarget && String(item.taskId) === this.loadedTarget.taskId) || null
     },
     canAct() {
-      return !!this.approvalTaskId && !!this.currentTask &&
-        String(this.currentTask.taskStatus || "").toUpperCase() === "PENDING" &&
-        String(this.instance.status || "").toUpperCase() === "RUNNING"
+      return !this.loading && this.isPurchaseTargetCurrent() && canActOnPurchase(this.purchase, this.approvalDetail, this.loadedTarget)
     },
     canEdit() {
-      return !!this.purchase && ["draft", "returned", "withdrawn"].includes(String(this.purchase.status || "").toLowerCase())
+      return !this.loading && this.isPurchaseTargetCurrent() && !!this.purchase && ["draft", "returned", "withdrawn"].includes(String(this.purchase.status || "").toLowerCase())
     },
     amountText() {
       return normalizeAmount(this.purchase && this.purchase.amount) || "0.00"
     }
   },
   watch: {
-    "$route.query": { deep: true, handler() { this.load() } }
+    routeTargetKey() { this.purchaseScope().invalidate(); this.actionLoading = false; this.load() },
+    actorContextKey() { this.handlePurchaseContextChanged() }
   },
   created() {
+    if (typeof window !== "undefined") window.addEventListener("erp:dept-changed", this.handlePurchaseContextChanged)
     this.load()
+  },
+  activated() {
+    this.purchaseScope().activate()
+    if (this._needsPurchaseRefresh) { this._needsPurchaseRefresh = false; this.load() }
+  },
+  deactivated() {
+    this.purchaseScope().deactivate()
+    this._needsPurchaseRefresh = true
+    this.loading = false
+    this.actionLoading = false
+  },
+  beforeDestroy() {
+    if (typeof window !== "undefined") window.removeEventListener("erp:dept-changed", this.handlePurchaseContextChanged)
+    this.purchaseScope().deactivate()
+  },
+  beforeRouteLeave(to, from, next) { this.confirmPurchaseNavigation().then(() => next()).catch(() => next(false)) },
+  beforeRouteUpdate(to, from, next) {
+    if (JSON.stringify(purchaseRouteTarget(to.query)) === JSON.stringify(purchaseRouteTarget(from.query))) { next(); return }
+    this.confirmPurchaseNavigation().then(() => next()).catch(() => next(false))
   },
   methods: {
     approvalStatusLabel,
+    purchaseScope() {
+      if (!this._purchaseScope) this._purchaseScope = createUiOperationScope(() => ({ actor: this.actorContextKey,
+        deptId: getSelectedDeptId(), path: this.$route && this.$route.path }))
+      return this._purchaseScope
+    },
+    isPurchaseTargetCurrent() {
+      return Boolean(this.loadedTarget) && this.purchaseScope().isCurrent(this._purchaseReadToken, this.routeTarget)
+    },
+    confirmPurchaseNavigation() {
+      if (!this.editSnapshot || JSON.stringify(this.editForm) === this.editSnapshot) return Promise.resolve()
+      return this.$modal.confirm("当前采购申请有未保存内容，确定放弃修改吗？", "未保存提醒")
+    },
+    handlePurchaseContextChanged() {
+      this.purchaseScope().invalidate()
+      this.loadedTarget = null
+      this.purchase = null
+      this.approvalDetail = null
+      this.editSnapshot = ""
+      this.actionLoading = false
+      this.loading = false
+      const id = this.$store && this.$store.getters && this.$store.getters.id
+      if (id) this.load()
+    },
     purchaseStatusLabel(status) {
       return { draft: "草稿", submitting: "提交中", pending: "审批中", approved: "已通过", returned: "已退回", rejected: "已拒绝", withdrawn: "已撤回", terminated: "已终止", cancelled: "已关闭" }[status] || (status ? "未知采购状态" : "-")
     },
@@ -207,31 +269,43 @@ export default {
       return "info"
     },
     load() {
-      if (this.loading) return
-      if (!this.hasValidPurchaseId) {
+      const target = this.routeTarget
+      const scope = this.purchaseScope(), token = scope.begin("load", target)
+      this._purchaseReadToken = token
+      this.loadedTarget = null
+      this.editSnapshot = ""
+      if (!target.purchaseId) {
         this.purchase = null
         this.approvalDetail = null
+        this.loading = false
         this.error = "该入口需要从工作台携带采购申请上下文打开"
-        return
+        return Promise.resolve()
       }
       this.loading = true
       this.loadPurchaseAvailability()
       this.error = ""
       this.purchase = null
       this.approvalDetail = null
-      return getPurchaseDetail(this.purchaseId).then(response => {
-        this.purchase = response.data || {}
-        this.syncEditForm()
-        if (!this.approvalInstanceId) return undefined
-        return getApprovalInstance(this.approvalInstanceId)
+      const current = () => scope.isCurrent(token, this.routeTarget)
+      let purchase
+      return getPurchaseDetail(target.purchaseId, { silentError: true }).then(response => {
+        if (!current()) return
+        purchase = response.data || {}
+        const instanceId = resolvePurchaseInstanceId(purchase, target)
+        if (!instanceId) return null
+        return getApprovalInstance(instanceId, { silentError: true })
       }).then(response => {
-        if (!response) return
-        this.approvalDetail = response.data && response.data.data !== undefined
-          ? response.data.data : response.data || {}
+        if (!current() || !purchase) return
+        const approval = response && (response.data && response.data.data !== undefined ? response.data.data : response.data || {})
+        validatePurchaseApproval(purchase, approval, target)
+        this.purchase = purchase
+        this.approvalDetail = approval
+        this.loadedTarget = target
+        this.syncEditForm()
       }).catch(error => {
-        this.error = errorMessage(error)
+        if (current()) this.error = errorMessage(error)
       }).finally(() => {
-        this.loading = false
+        if (current()) this.loading = false
       })
     },
     syncEditForm() {
@@ -244,16 +318,19 @@ export default {
         reason: source.reason || "",
         rowVersion: source.rowVersion
       }
+      this.editSnapshot = JSON.stringify(this.editForm)
     },
     loadPurchaseAvailability() {
+      const scope = this.purchaseScope(), token = scope.begin("availability")
       this.purchaseSubmissionAvailable = false
       this.purchaseAvailabilityResolved = false
       return getPurchaseAvailability().then(response => {
+        if (!scope.isCurrent(token)) return
         this.purchaseSubmissionAvailable = !!(response.data && response.data.enabled === true)
       }).catch(() => {
-        this.purchaseSubmissionAvailable = false
+        if (scope.isCurrent(token)) this.purchaseSubmissionAvailable = false
       }).finally(() => {
-        this.purchaseAvailabilityResolved = true
+        if (scope.isCurrent(token)) this.purchaseAvailabilityResolved = true
       })
     },
     validateEditForm() {
@@ -275,6 +352,9 @@ export default {
         this.$modal.msgWarning(validationMessage)
         return
       }
+      const scope = this.purchaseScope(), token = scope.begin("save", this.loadedTarget)
+      const readToken = this._purchaseReadToken
+      const current = () => scope.isCurrent(token, this.routeTarget) && scope.isCurrent(readToken, this.routeTarget)
       this.actionLoading = true
       const payload = {
         ...this.editForm,
@@ -283,44 +363,26 @@ export default {
         reason: String(this.editForm.reason).trim()
       }
       return savePurchase(payload).then(response => {
+        if (!current()) return
         const saved = response.data || payload
+        if (normalizePurchaseId(saved.purchaseId) !== this.loadedTarget.purchaseId) throw new Error("保存结果与采购申请不一致，请重新核对")
+        this.editSnapshot = JSON.stringify(this.editForm)
         if (!submitAfterSave) {
           this.$modal.msgSuccess("已保存草稿")
           return saved
         }
         return submitPurchase(saved).then(() => {
+          if (!current()) return
           this.$modal.msgSuccess("采购申请已重新提交")
           return this.$store.dispatch("todo/invalidateAfterMutation").catch(() => {})
         })
-      }).then(() => this.load()).finally(() => {
-        this.actionLoading = false
-      }).catch(() => {})
-    },
-    executeAction(action) {
-      if (!this.canAct || this.actionLoading) return
-      const ask = action === "approve"
-        ? this.$modal.confirm("确认同意这条采购申请？", "审批确认").then(() => "")
-        : this.$prompt(action === "return" ? "请输入退回原因" : "请输入拒绝原因",
-          action === "return" ? "退回修改" : "拒绝申请",
-          { inputValidator: value => String(value || "").trim() ? true : "原因不能为空" })
-          .then(({ value }) => String(value).trim())
-      return ask.then(reason => {
-        this.actionLoading = true
-        const payload = {
-          requestId: `OA_PURCHASE:${this.approvalTaskId}:${action}:v1`,
-          reason
-        }
-        if (action === "approve") return approveApprovalTask(this.approvalTaskId, payload)
-        if (action === "return") return returnApprovalTask(this.approvalTaskId, payload)
-        return rejectApprovalTask(this.approvalTaskId, payload)
-      }).then(() => {
-        this.$modal.msgSuccess("审批动作已提交")
-        this.$store.dispatch("todo/invalidateAfterMutation").catch(() => {})
-        return this.load()
+      }).then(() => { if (current()) return this.load() }).catch(error => {
+        if (current() && !(error && error.notified)) this.$modal.msgError(errorMessage(error))
       }).finally(() => {
-        this.actionLoading = false
-      }).catch(() => {})
+        if (scope.isCurrent(token, this.routeTarget)) this.actionLoading = false
+      })
     },
+    executeAction(action) { return this.runApprovalCommand(action) },
     handleErrorAction() {
       if (!this.hasValidPurchaseId) {
         return this.$router.replace("/mobile/todo").catch(() => {})

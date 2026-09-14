@@ -35,6 +35,12 @@ public abstract class AbstractQuartzJob implements Job
         BeanUtils.copyBeanProp(sysJob, context.getMergedJobDataMap().get(ScheduleConstants.TASK_PROPERTIES));
         try
         {
+            if (!SpringUtils.getBean(com.erp.job.service.SysJobExecutionGuard.class).isCurrent(sysJob,
+                    Boolean.TRUE.equals(context.getMergedJobDataMap().get("ERP_MANUAL_RUN"))))
+            {
+                log.info("job_execution_skipped_stale_definition jobId={}",sysJob.getJobId());
+                return;
+            }
             before(context, sysJob);
             if (sysJob != null)
             {
@@ -69,6 +75,7 @@ public abstract class AbstractQuartzJob implements Job
     protected void after(JobExecutionContext context, SysJob sysJob, Exception e)
     {
         Date startTime = threadLocal.get();
+        if (startTime == null) startTime = new Date();
         threadLocal.remove();
 
         final SysJobLog sysJobLog = new SysJobLog();

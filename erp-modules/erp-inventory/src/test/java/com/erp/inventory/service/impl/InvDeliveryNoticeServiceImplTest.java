@@ -105,6 +105,8 @@ class InvDeliveryNoticeServiceImplTest
         notice.setShopDeptId(201L);
 
         InvSalesOrder salesOrder = new InvSalesOrder();
+        salesOrder.setOrderId(10L);
+        salesOrder.setStatus("noticed");
         salesOrder.setTargetDeptId(202L);
         salesOrder.setTargetDeptName("福田店");
 
@@ -172,6 +174,8 @@ class InvDeliveryNoticeServiceImplTest
         notice.setShopDeptId(201L);
 
         InvSalesOrder salesOrder = new InvSalesOrder();
+        salesOrder.setOrderId(10L);
+        salesOrder.setStatus("noticed");
         salesOrder.setTargetDeptId(202L);
         salesOrder.setTargetDeptName("福田店");
 
@@ -214,6 +218,8 @@ class InvDeliveryNoticeServiceImplTest
         notice.setNoticeId(101L);
         notice.setShopDeptId(201L);
         InvSalesOrder salesOrder = new InvSalesOrder();
+        salesOrder.setOrderId(10L);
+        salesOrder.setStatus("noticed");
         salesOrder.setTargetDeptId(202L);
         InvDeliveryNoticeDetail detail = frozenNoticeDetail(401L, 301L,
                 "1.00", null);
@@ -272,20 +278,26 @@ class InvDeliveryNoticeServiceImplTest
         assertThat(InvDeliveryNoticeServiceImpl.resolveNoticeWarehouseId(List.of(first, second))).isNull();
     }
 
-    @Test
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.CsvSource({ "1.00, 8.00, 8.00, 4.00", "0.50, 0.01, 0.01, 4.50" })
     @DisplayName("仓库上下文可以按通用物料键发出礼盒")
-    void shouldDeliverStoreNoticeFromWarehouseContext()
+    void shouldDeliverStoreNoticeFromWarehouseContext(String quantity, String unitCost, String exactCost, String afterQuantity)
     {
         SecurityContextHolder.setUserId("2");
         SecurityContextHolder.setUserName("operator");
         InvDeliveryNoticeServiceImpl service = new InvDeliveryNoticeServiceImpl();
         InvDeliveryNoticeMapper noticeMapper = mock(InvDeliveryNoticeMapper.class);
         InvDeliveryNoticeDetailMapper noticeDetailMapper = mock(InvDeliveryNoticeDetailMapper.class);
+        when(noticeDetailMapper.selectInvDeliveryNoticeDetailByNoticeId(1L))
+                .thenAnswer(invocation -> noticeDetailMapper.selectInvDeliveryNoticeDetailByNoticeIdForUpdate(1L));
         InvSalesDetailMapper salesDetailMapper = mock(InvSalesDetailMapper.class);
         InvSalesOrderMapper salesOrderMapper = mock(InvSalesOrderMapper.class);
+        when(salesOrderMapper.updateInvSalesOrder(any())).thenReturn(1);
         InvStockMapper stockMapper = mock(InvStockMapper.class);
         InvStockLogMapper stockLogMapper = mock(InvStockLogMapper.class);
+        when(stockLogMapper.insertInvStockLog(any())).thenReturn(1);
         InvOutboundRecordMapper outboundRecordMapper = mock(InvOutboundRecordMapper.class);
+        when(outboundRecordMapper.insertInvOutboundRecord(any())).thenReturn(1);
 
         InvDeliveryNotice notice = new InvDeliveryNotice();
         notice.setNoticeId(1L);
@@ -303,7 +315,7 @@ class InvDeliveryNoticeServiceImplTest
         detail.setItemId(501L);
         detail.setItemName("测试礼盒");
         detail.setProductName("测试礼盒");
-        detail.setNoticeQty(new BigDecimal("1.00"));
+        detail.setNoticeQty(new BigDecimal(quantity));
         detail.setDeliveredQty(BigDecimal.ZERO);
         detail.setDeliveredCostAmount(BigDecimal.ZERO);
         detail.setWarehouseId(200L);
@@ -315,11 +327,11 @@ class InvDeliveryNoticeServiceImplTest
         deliveredDetail.setItemId(501L);
         deliveredDetail.setItemName("测试礼盒");
         deliveredDetail.setProductName("测试礼盒");
-        deliveredDetail.setNoticeQty(new BigDecimal("1.00"));
-        deliveredDetail.setDeliveredQty(new BigDecimal("1.00"));
-        deliveredDetail.setDeliveredCostAmount(new BigDecimal("8.00"));
+        deliveredDetail.setNoticeQty(new BigDecimal(quantity));
+        deliveredDetail.setDeliveredQty(new BigDecimal(quantity));
+        deliveredDetail.setDeliveredCostAmount(new BigDecimal(exactCost));
         deliveredDetail.setWarehouseId(200L);
-        when(noticeDetailMapper.selectInvDeliveryNoticeDetailByNoticeId(1L))
+        when(noticeDetailMapper.selectInvDeliveryNoticeDetailByNoticeIdForUpdate(1L))
                 .thenReturn(List.of(detail))
                 .thenReturn(List.of(detail))
                 .thenReturn(List.of(detail))
@@ -332,37 +344,40 @@ class InvDeliveryNoticeServiceImplTest
         salesDetail.setItemName("测试礼盒");
         // 销售明细后来被改仓，也不能覆盖通知创建时冻结的仓库。
         salesDetail.setWarehouseId(999L);
-        salesDetail.setQuantity(new BigDecimal("1.00"));
+        salesDetail.setQuantity(new BigDecimal(quantity));
         salesDetail.setDeliveredQuantity(BigDecimal.ZERO);
-        when(salesDetailMapper.selectInvSalesDetailByOrderId(10L)).thenReturn(List.of(salesDetail));
+        when(salesDetailMapper.selectInvSalesDetailByOrderIdForUpdate(10L)).thenReturn(List.of(salesDetail));
 
         InvSalesOrder salesOrder = new InvSalesOrder();
         salesOrder.setOrderId(10L);
+        salesOrder.setStatus("noticed");
+        salesOrder.setOrderId(10L);
         salesOrder.setShopDeptId(100L);
         salesOrder.setTargetDeptId(100L);
-        when(salesOrderMapper.selectInvSalesOrderById(10L)).thenReturn(salesOrder);
+        when(salesOrderMapper.selectInvSalesOrderByIdForUpdate(10L)).thenReturn(salesOrder);
 
         InvStock stock = new InvStock();
         stock.setStockId(31L);
         stock.setVersion(0L);
         stock.setCurrentQuantity(new BigDecimal("5.00"));
         stock.setAvailableQuantity(new BigDecimal("5.00"));
-        stock.setCostPrice(new BigDecimal("8.00"));
+        stock.setCostPrice(new BigDecimal(unitCost));
+        stock.setTotalCost(stock.getCurrentQuantity().multiply(stock.getCostPrice()).setScale(2, java.math.RoundingMode.HALF_UP));
         when(stockMapper.selectInvStockByItemShopWarehouseForUpdate("gift", 501L, 200L, 200L)).thenReturn(stock);
 
         InvStock updatedStock = new InvStock();
         updatedStock.setStockId(31L);
-        updatedStock.setCurrentQuantity(new BigDecimal("4.00"));
+        updatedStock.setCurrentQuantity(new BigDecimal(afterQuantity));
         when(stockMapper.deductInvStockWithCost(eq(31L), eq(0L), any(BigDecimal.class),
                 any(BigDecimal.class), eq("operator"))).thenReturn(1);
         when(stockMapper.selectInvStockById(31L)).thenReturn(updatedStock);
         when(noticeDetailMapper.accumulateDelivery(11L, BigDecimal.ZERO,
-                new BigDecimal("1.00"), new BigDecimal("8.00")))
+                new BigDecimal(quantity), new BigDecimal(exactCost)))
                 .thenReturn(1);
 
         InvDeliverItem item = new InvDeliverItem();
         item.setDetailId(11L);
-        item.setDeliverQuantity(new BigDecimal("1.00"));
+        item.setDeliverQuantity(new BigDecimal(quantity));
         InvDeliverRequest request = new InvDeliverRequest();
         request.setWarehouseId(200L);
         request.setItems(List.of(item));
@@ -378,20 +393,24 @@ class InvDeliveryNoticeServiceImplTest
 
         assertThat(service.deliverNotice(1L, request, 200L)).isEqualTo("发货成功");
 
+        verify(stockMapper).deductInvStockWithCost(eq(31L), eq(0L), eq(new BigDecimal(quantity)),
+                eq(new BigDecimal(exactCost)), eq("operator"));
         verify(outboundRecordMapper).insertInvOutboundRecord(argThat(record ->
                 "gift".equals(record.getItemType())
                         && Long.valueOf(501L).equals(record.getItemId())
                         && record.getProductId() == null
                         && Long.valueOf(1L).equals(record.getNoticeId())
                         && Long.valueOf(11L).equals(record.getNoticeDetailId())
-                        && record.getCostPrice().compareTo(new BigDecimal("8.00")) == 0
-                        && record.getCostAmount().compareTo(new BigDecimal("8.00")) == 0));
+                        && record.getCostPrice().compareTo(new BigDecimal(unitCost)) == 0
+                        && record.getCostAmount().compareTo(new BigDecimal(exactCost)) == 0));
         verify(stockLogMapper).insertInvStockLog(argThat(log ->
                 "gift".equals(log.getItemType())
                         && Long.valueOf(501L).equals(log.getItemId())
                         && log.getProductId() == null
+                        && log.getCostAmount().compareTo(new BigDecimal(exactCost)) == 0
+                        && log.getChangeQuantity().compareTo(new BigDecimal(quantity).negate()) == 0
                         && log.getBeforeQuantity().compareTo(new BigDecimal("5.00")) == 0
-                        && log.getAfterQuantity().compareTo(new BigDecimal("4.00")) == 0));
+                        && log.getAfterQuantity().compareTo(new BigDecimal(afterQuantity)) == 0));
         verify(noticeMapper).updateInvDeliveryNotice(argThat(update ->
                 Long.valueOf(1L).equals(update.getNoticeId())
                         && "completed".equals(update.getStatus())));
@@ -412,11 +431,16 @@ class InvDeliveryNoticeServiceImplTest
         InvDeliveryNoticeServiceImpl service = new InvDeliveryNoticeServiceImpl();
         InvDeliveryNoticeMapper noticeMapper = mock(InvDeliveryNoticeMapper.class);
         InvDeliveryNoticeDetailMapper noticeDetailMapper = mock(InvDeliveryNoticeDetailMapper.class);
+        when(noticeDetailMapper.selectInvDeliveryNoticeDetailByNoticeId(1L))
+                .thenAnswer(invocation -> noticeDetailMapper.selectInvDeliveryNoticeDetailByNoticeIdForUpdate(1L));
         InvSalesDetailMapper salesDetailMapper = mock(InvSalesDetailMapper.class);
         InvSalesOrderMapper salesOrderMapper = mock(InvSalesOrderMapper.class);
+        when(salesOrderMapper.updateInvSalesOrder(any())).thenReturn(1);
         InvStockMapper stockMapper = mock(InvStockMapper.class);
         InvStockLogMapper stockLogMapper = mock(InvStockLogMapper.class);
+        when(stockLogMapper.insertInvStockLog(any())).thenReturn(1);
         InvOutboundRecordMapper outboundRecordMapper = mock(InvOutboundRecordMapper.class);
+        when(outboundRecordMapper.insertInvOutboundRecord(any())).thenReturn(1);
 
         InvDeliveryNotice notice = new InvDeliveryNotice();
         notice.setNoticeId(1L);
@@ -435,7 +459,7 @@ class InvDeliveryNoticeServiceImplTest
         detail.setItemId(501L);
         detail.setItemName("测试礼盒");
         detail.setProductName("测试礼盒");
-        when(noticeDetailMapper.selectInvDeliveryNoticeDetailByNoticeId(1L))
+        when(noticeDetailMapper.selectInvDeliveryNoticeDetailByNoticeIdForUpdate(1L))
                 .thenReturn(List.of(detail));
 
         InvSalesDetail salesDetail = new InvSalesDetail();
@@ -444,12 +468,14 @@ class InvDeliveryNoticeServiceImplTest
         salesDetail.setItemId(501L);
         salesDetail.setQuantity(BigDecimal.ONE);
         salesDetail.setDeliveredQuantity(BigDecimal.ZERO);
-        when(salesDetailMapper.selectInvSalesDetailByOrderId(10L))
+        when(salesDetailMapper.selectInvSalesDetailByOrderIdForUpdate(10L))
                 .thenReturn(List.of(salesDetail));
 
         InvSalesOrder salesOrder = new InvSalesOrder();
+        salesOrder.setOrderId(10L);
+        salesOrder.setStatus("noticed");
         salesOrder.setTargetDeptId(100L);
-        when(salesOrderMapper.selectInvSalesOrderById(10L))
+        when(salesOrderMapper.selectInvSalesOrderByIdForUpdate(10L))
                 .thenReturn(salesOrder);
 
         InvStock stock = new InvStock();
@@ -497,8 +523,11 @@ class InvDeliveryNoticeServiceImplTest
         InvDeliveryNoticeServiceImpl service = new InvDeliveryNoticeServiceImpl();
         InvDeliveryNoticeMapper noticeMapper = mock(InvDeliveryNoticeMapper.class);
         InvDeliveryNoticeDetailMapper noticeDetailMapper = mock(InvDeliveryNoticeDetailMapper.class);
+        when(noticeDetailMapper.selectInvDeliveryNoticeDetailByNoticeId(1L))
+                .thenAnswer(invocation -> noticeDetailMapper.selectInvDeliveryNoticeDetailByNoticeIdForUpdate(1L));
         InvSalesDetailMapper salesDetailMapper = mock(InvSalesDetailMapper.class);
         InvSalesOrderMapper salesOrderMapper = mock(InvSalesOrderMapper.class);
+        when(salesOrderMapper.updateInvSalesOrder(any())).thenReturn(1);
 
         InvDeliveryNotice notice = new InvDeliveryNotice();
         notice.setNoticeId(1L);
@@ -515,9 +544,10 @@ class InvDeliveryNoticeServiceImplTest
         detail.setProductName("测试商品");
         detail.setNoticeQty(new BigDecimal("1.00"));
         detail.setDeliveredQty(BigDecimal.ZERO);
-        when(noticeDetailMapper.selectInvDeliveryNoticeDetailByNoticeId(1L)).thenReturn(List.of(detail));
-        when(salesDetailMapper.selectInvSalesDetailByOrderId(10L)).thenReturn(Collections.emptyList());
-        when(salesOrderMapper.selectInvSalesOrderById(10L)).thenReturn(new InvSalesOrder());
+        when(noticeDetailMapper.selectInvDeliveryNoticeDetailByNoticeIdForUpdate(1L)).thenReturn(List.of(detail));
+        when(salesDetailMapper.selectInvSalesDetailByOrderIdForUpdate(10L)).thenReturn(Collections.emptyList());
+        InvSalesOrder original = new InvSalesOrder(); original.setOrderId(10L); original.setStatus("noticed");
+        when(salesOrderMapper.selectInvSalesOrderByIdForUpdate(10L)).thenReturn(original);
 
         InvDeliverItem item = new InvDeliverItem();
         item.setDetailId(11L);
@@ -547,6 +577,7 @@ class InvDeliveryNoticeServiceImplTest
         InvDeliveryNoticeMapper noticeMapper = mock(InvDeliveryNoticeMapper.class);
         InvSalesDetailMapper salesDetailMapper = mock(InvSalesDetailMapper.class);
         InvSalesOrderMapper salesOrderMapper = mock(InvSalesOrderMapper.class);
+        when(salesOrderMapper.updateInvSalesOrder(any())).thenReturn(1);
 
         InvDeliveryNotice notice = new InvDeliveryNotice();
         notice.setNoticeId(1L);
@@ -554,20 +585,22 @@ class InvDeliveryNoticeServiceImplTest
         notice.setStatus("pending");
         notice.setShopDeptId(100L);
         notice.setWarehouseId(200L);
+        when(noticeMapper.selectInvDeliveryNoticeById(1L)).thenReturn(notice);
         when(noticeMapper.selectInvDeliveryNoticeByIdForUpdate(1L)).thenReturn(notice);
 
         InvSalesOrder lockedSalesOrder = new InvSalesOrder();
         lockedSalesOrder.setOrderId(10L);
+        lockedSalesOrder.setStatus("noticed");
         when(salesOrderMapper.selectInvSalesOrderByIdForUpdate(10L)).thenReturn(lockedSalesOrder);
 
         InvSalesDetail salesDetail = new InvSalesDetail();
         salesDetail.setQuantity(new BigDecimal("2.00"));
         salesDetail.setDeliveredQuantity(BigDecimal.ZERO);
-        when(salesDetailMapper.selectInvSalesDetailByOrderId(10L)).thenReturn(List.of(salesDetail));
+        when(salesDetailMapper.selectInvSalesDetailByOrderIdForUpdate(10L)).thenReturn(List.of(salesDetail));
 
         InvDeliveryNotice cancelledNotice = new InvDeliveryNotice();
         cancelledNotice.setStatus("cancelled");
-        when(noticeMapper.selectInvDeliveryNoticeBySalesOrderId(10L)).thenReturn(List.of(cancelledNotice));
+        when(noticeMapper.selectInvDeliveryNoticeBySalesOrderIdForUpdate(10L)).thenReturn(List.of(cancelledNotice));
 
         ReflectionTestUtils.setField(service, "noticeMapper", noticeMapper);
         ReflectionTestUtils.setField(service, "salesDetailMapper", salesDetailMapper);
@@ -575,6 +608,9 @@ class InvDeliveryNoticeServiceImplTest
         ReflectionTestUtils.setField(service, "deptScopeMapper", new DeliveryDeptScopeMapper());
 
         service.cancelNotice(1L, 200L);
+        org.mockito.InOrder locks = org.mockito.Mockito.inOrder(salesOrderMapper, noticeMapper);
+        locks.verify(salesOrderMapper).selectInvSalesOrderByIdForUpdate(10L);
+        locks.verify(noticeMapper).selectInvDeliveryNoticeByIdForUpdate(1L);
 
         verify(noticeMapper).updateInvDeliveryNotice(argThat(update ->
                 Long.valueOf(1L).equals(update.getNoticeId())

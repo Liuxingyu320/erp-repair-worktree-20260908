@@ -6,6 +6,8 @@
         <id property="detailId" column="detail_id"/>
         <result property="checkId" column="check_id"/>
         <result property="productId" column="product_id"/>
+        <result property="itemType" column="item_type"/>
+        <result property="itemId" column="item_id"/>
         <result property="productName" column="product_name"/>
         <result property="productCode" column="product_code"/>
         <result property="categoryId" column="category_id"/>
@@ -25,7 +27,7 @@
     </resultMap>
 
     <sql id="selectInvStockCheckDetailVo">
-        select d.detail_id, d.check_id, d.product_id, d.product_name, d.product_code,
+        select d.detail_id, d.check_id, coalesce(d.item_type, 'product') as item_type, coalesce(d.item_id, d.product_id) as item_id, d.product_id, d.product_name, d.product_code,
                p.category_id as category_id,
                c.category_name as category_name,
                (
@@ -38,7 +40,7 @@
                d.recount_required, d.recount_qty, d.recount_by, d.recount_time,
                d.diff_qty, d.diff_type, d.cost_price
         from inv_stock_check_detail d
-        left join inv_product p on p.product_id = d.product_id
+        left join inv_product p on p.product_id = d.product_id and coalesce(d.item_type, 'product') = 'product'
         left join inv_product_category c on c.category_id = p.category_id and c.del_flag = '0'
     </sql>
 
@@ -49,7 +51,7 @@
     </select>
 
     <select id="selectInvStockCheckDetailByCheckIdForUpdate" parameterType="Long" resultMap="InvStockCheckDetailResult">
-        select detail_id, check_id, product_id, product_name, product_code,
+        select detail_id, check_id, item_type, item_id, product_id, product_name, product_code,
                unit, spec, book_qty, actual_qty,
                recount_required, recount_qty, recount_by, recount_time,
                diff_qty, diff_type, cost_price
@@ -61,13 +63,13 @@
 
     <insert id="batchInsertInvStockCheckDetail">
         insert into inv_stock_check_detail (
-            check_id, product_id, product_name, product_code, unit, spec,
+            check_id, item_type, item_id, product_id, product_name, product_code, unit, spec,
             book_qty, actual_qty, recount_required, recount_qty,
             diff_qty, diff_type, cost_price
         ) values
         <foreach collection="list" item="item" separator=",">
             (
-                #{item.checkId}, #{item.productId}, #{item.productName}, #{item.productCode},
+                #{item.checkId}, #{item.itemType}, #{item.itemId}, #{item.productId}, #{item.productName}, #{item.productCode},
                 #{item.unit}, #{item.spec}, #{item.bookQty}, #{item.actualQty},
                 #{item.recountRequired}, #{item.recountQty},
                 #{item.diffQty}, #{item.diffType}, #{item.costPrice}
@@ -85,6 +87,10 @@
             diff_qty = #{diffQty},
             diff_type = #{diffType}
         where detail_id = #{detailId}
+    </update>
+
+    <update id="refreshSnapshotCost">
+        update inv_stock_check_detail set cost_price = #{costPrice} where detail_id = #{detailId}
     </update>
 
     <update id="resetSnapshot">
@@ -106,25 +112,33 @@
     </delete>
 
     <select id="selectStockForCheck" resultType="map">
-        select s.product_id as productId,
-               p.product_name as productName,
-               p.product_code as productCode,
+        select coalesce(s.item_type, 'product') as itemType,
+               coalesce(s.item_id, s.product_id) as itemId,
+               case when coalesce(s.item_type, 'product') = 'product' then s.product_id end as productId,
+               case coalesce(s.item_type, 'product') when 'oe' then oe.oe_item_name
+                    when 'gift' then gift.gift_name else p.product_name end as productName,
+               case coalesce(s.item_type, 'product') when 'oe' then oe.oe_item_code
+                    when 'gift' then gift.gift_code else p.product_code end as productCode,
                p.category_id as categoryId,
                c.ancestors as categoryAncestors,
-               p.unit as unit,
-               p.spec as spec,
+               case coalesce(s.item_type, 'product') when 'oe' then oe.order_unit
+                    when 'gift' then gift.replenishment_unit else p.unit end as unit,
+               case coalesce(s.item_type, 'product') when 'oe' then oe.item_description
+                    when 'gift' then gift.spec else p.spec end as spec,
                s.current_quantity as currentQuantity,
                s.cost_price as costPrice
         from inv_stock s
-        left join inv_product p on p.product_id = s.product_id
+        left join inv_product p on coalesce(s.item_type, 'product') = 'product' and p.product_id = coalesce(s.item_id, s.product_id)
         left join inv_product_category c on c.category_id = p.category_id and c.del_flag = '0'
+        left join inv_oe_item oe on s.item_type = 'oe' and oe.oe_item_id = s.item_id
+        left join inv_gift_box gift on s.item_type = 'gift' and gift.gift_id = s.item_id
         where s.shop_dept_id = #{shopDeptId}
           and s.current_quantity &lt;&gt; 0
         <choose>
             <when test="warehouseId != null">and s.warehouse_id = #{warehouseId}</when>
             <otherwise>and s.warehouse_id is null</otherwise>
         </choose>
-        order by p.product_name asc, s.product_id asc
+        order by coalesce(s.item_type, 'product') asc, coalesce(s.item_id, s.product_id) asc
     </select>
 
 </mapper>

@@ -1,6 +1,10 @@
 package com.erp.system.controller;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import com.erp.common.core.exception.ServiceException;
+import com.erp.system.domain.dto.SysUserNotificationPageQuery;
+import com.erp.system.domain.dto.SysUserNotificationReadAllRequest;
+
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -41,6 +45,24 @@ public class SysUserNotificationController extends BaseController
     public AjaxResult list()
     {
         return success(notificationService.selectUserNotifications(SecurityUtils.getUserId()));
+    }
+
+    @RequiresLogin
+    @GetMapping("/page")
+    public AjaxResult page(SysUserNotificationPageQuery query)
+    {
+        if (query == null) throw new ServiceException("消息查询参数不能为空");
+        query.validate();
+        return success(notificationService.page(SecurityUtils.getUserId(), query));
+    }
+
+    @RequiresLogin
+    @PostMapping("/read-all")
+    public AjaxResult readAll(@RequestBody SysUserNotificationReadAllRequest request)
+    {
+        if (request == null) throw new ServiceException("消息快照上限不能为空");
+        request.validate();
+        return success(notificationService.markAllRead(SecurityUtils.getUserId(), request));
     }
 
     @RequiresLogin

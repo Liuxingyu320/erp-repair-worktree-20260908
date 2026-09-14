@@ -79,6 +79,7 @@ class StockCheckApprovalMapperBindingTest
         assertMapped(configuration, CHECK_MAPPER, "selectCounterCandidates");
         assertMapped(configuration, CHECK_MAPPER, "selectCounterCandidate");
         assertMapped(configuration, DETAIL_MAPPER, "resetSnapshot");
+        assertMapped(configuration, DETAIL_MAPPER, "refreshSnapshotCost");
     }
 
     @Test

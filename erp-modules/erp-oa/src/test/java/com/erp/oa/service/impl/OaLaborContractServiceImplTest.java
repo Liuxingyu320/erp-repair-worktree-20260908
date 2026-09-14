@@ -358,6 +358,121 @@ class OaLaborContractServiceImplTest
                 .hasMessageContaining("无权下载该合同文件");
     }
 
+    @Test
+    void shouldRejectIdentityFromAnotherEmployeeProfile()
+    {
+        loginAsAdmin();
+        FakeContractMapper mapper = new FakeContractMapper(draftContract());
+        mapper.identityIdCard = "11010519491231002X";
+        OaLaborContract input = draftContract();
+        OaLaborContractServiceImpl service = contractService(mapper, new FakeEventMapper());
+        assertThatThrownBy(() -> service.saveContract(input, 201L))
+                .isInstanceOf(ServiceException.class).hasMessageContaining("档案不一致");
+    }
+
+    @Test
+    void shouldRequireAndAuditManualIdentityVerificationWhenProfileMissing()
+    {
+        loginAsAdmin();
+        FakeContractMapper mapper = new FakeContractMapper(draftContract());
+        mapper.identityIdCard = null;
+        FakeEventMapper events = new FakeEventMapper();
+        OaLaborContractServiceImpl service = contractService(mapper, events);
+        OaLaborContract input = draftContract();
+        assertThatThrownBy(() -> service.saveContract(input, 201L)).hasMessageContaining("身份核对说明");
+        assertThatThrownBy(() -> service.sendContract(100L, 201L)).hasMessageContaining("返回草稿");
+        input.setIdentityManuallyVerified(true);
+        input.setEmployeeName("错误员工姓名");
+        input.setIdentityVerificationNote("现场核对本人证件33010019900101001X");
+        service.saveContract(input, 201L);
+        assertThat(mapper.stored.getEmployeeName()).isEqualTo("张三");
+        assertThat(events.events).extracting(OaLaborContractEvent::getEventType)
+                .containsExactly("update", "identity_verify");
+        assertThat(events.events.get(1).getFileHash()).hasSize(64);
+        assertThat(events.events.get(1).getEventSummary()).doesNotContain(input.getEmployeeIdCard());
+        assertThat(service.sendContract(100L, 201L).getStatus()).isEqualTo("pending_sign");
+    }
+
+    @Test
+    void shouldRejectEmployeeOutsideSelectedOrganizationEvenWithSpoofedDept()
+    {
+        loginAsAdmin();
+        FakeContractMapper mapper = new FakeContractMapper(draftContract());
+        mapper.identityAvailable = false;
+        OaLaborContract input = draftContract();
+        input.setEmployeeDeptId(201L);
+        OaLaborContractServiceImpl service = contractService(mapper, new FakeEventMapper());
+        assertThatThrownBy(() -> service.saveContract(input, 201L)).hasMessageContaining("组织范围");
+    }
+
+    @Test
+    void shouldGenerateExplicitDateClearOnlyWhenInputContainsDate() throws Exception
+    {
+        com.fasterxml.jackson.databind.ObjectMapper json = new com.fasterxml.jackson.databind.ObjectMapper();
+        OaLaborContract clear = json.readValue("{\"contractId\":100,\"probationStartDate\":null,\"probationEndDate\":null}", OaLaborContract.class);
+        OaLaborContract lifecycle = json.readValue("{\"contractId\":100,\"status\":\"signed\"}", OaLaborContract.class);
+        org.apache.ibatis.session.Configuration config = new org.apache.ibatis.session.Configuration();
+        config.getTypeAliasRegistry().registerAlias("OaLaborContract", OaLaborContract.class);
+        try (java.io.InputStream xml = Files.newInputStream(Paths.get("src/main/resources/mapper/oa/OaLaborContractMapper.xml")))
+        {
+            new org.apache.ibatis.builder.xml.XMLMapperBuilder(xml, config, "labor-contract", config.getSqlFragments()).parse();
+        }
+        org.apache.ibatis.mapping.MappedStatement statement = config.getMappedStatement(
+                "com.erp.oa.mapper.OaLaborContractMapper.updateOaLaborContract");
+        assertThat(statement.getBoundSql(clear).getSql()).contains("probation_start_date = ?", "probation_end_date = ?");
+        assertThat(statement.getBoundSql(lifecycle).getSql()).doesNotContain("probation_start_date", "probation_end_date");
+        assertThat(json.writeValueAsString(clear)).doesNotContain("probationStartDateSpecified");
+    }
+
+    @Test
+    void conditionalSignFailureEmitsNoSuccessEvent()
+    {
+        loginAsEmployee(88L, "employee");
+        FakeContractMapper mapper = new FakeContractMapper(pendingContract()) {
+            @Override public int markSigned(OaLaborContract update, String version, String hash) { return 0; }
+        };
+        FakeEventMapper events = new FakeEventMapper();
+        assertThatThrownBy(() -> contractService(mapper, events).signContract(100L, signRequest()))
+                .hasMessageContaining("状态或文档版本已变化");
+        assertThat(events.events).isEmpty();
+    }
+
+    @Test
+    void conditionalVoidFailureEmitsNoSuccessEvent()
+    {
+        loginAsAdmin();
+        FakeContractMapper mapper = new FakeContractMapper(pendingContract()) {
+            @Override public int markVoided(OaLaborContract update, String status) { return 0; }
+        };
+        FakeEventMapper events = new FakeEventMapper();
+        assertThatThrownBy(() -> contractService(mapper, events).voidContract(100L, 201L))
+                .hasMessageContaining("状态或文档版本已变化");
+        assertThat(events.events).isEmpty();
+    }
+
+    @Test
+    void lockingReadWinsOverStaleUnlockedContractForBothTransitions()
+    {
+        loginAsEmployee(88L, "employee");
+        FakeContractMapper mapper = new FakeContractMapper(pendingContract()) {
+            @Override public OaLaborContract selectOaLaborContractByIdForUpdate(Long id) {
+                OaLaborContract current = pendingContract(); current.setStatus("voided"); return current;
+            }
+        };
+        FakeEventMapper events = new FakeEventMapper();
+        assertThatThrownBy(() -> contractService(mapper, events).signContract(100L, signRequest())).hasMessageContaining("不在待签署");
+        loginAsAdmin();assertThat(contractService(mapper, events).voidContract(100L, 201L).getStatus()).isEqualTo("voided");
+        assertThat(events.events).isEmpty();
+    }
+
+    @Test
+    void unknownLegacyStateCannotBeVoided()
+    {
+        loginAsAdmin();OaLaborContract contract=pendingContract();contract.setStatus("expired");
+        assertThatThrownBy(() -> contractService(new FakeContractMapper(contract), new FakeEventMapper()).voidContract(100L,201L))
+                .hasMessageContaining("不允许作废");
+    }
+
     private OaLaborContractServiceImpl contractService(FakeContractMapper contractMapper, FakeEventMapper eventMapper)
     {
         return contractService(contractMapper, eventMapper, new FakeDocumentService());
@@ -367,6 +482,9 @@ class OaLaborContractServiceImplTest
             OaLaborContractDocumentService documentService)
     {
         OaLaborContractServiceImpl service = new OaLaborContractServiceImpl();
+        // Isolate the retained legacy implementation; real write rejection is covered separately.
+        ReflectionTestUtils.setField(service, "legacySalaryWrites",
+                org.mockito.Mockito.mock(com.erp.common.security.service.LegacySalaryWriteGuard.class));
         FakeDeptScopeMapper deptScopeMapper = new FakeDeptScopeMapper();
         ReflectionTestUtils.setField(service, "contractMapper", contractMapper);
         ReflectionTestUtils.setField(service, "templateMapper", new FakeTemplateMapper());
@@ -495,6 +613,21 @@ class OaLaborContractServiceImplTest
     private static class FakeContractMapper implements OaLaborContractMapper
     {
         private OaLaborContract stored;
+        private String identityIdCard = "33010019900101001X";
+        private boolean identityAvailable = true;
+
+        @Override
+        public OaLaborContract selectScopedEmployeeIdentity(Long employeeId, Long shopDeptId)
+        {
+            if (!identityAvailable) return null;
+            OaLaborContract identity = new OaLaborContract();
+            identity.setEmployeeId(employeeId);
+            identity.setEmployeeDeptId(shopDeptId);
+            identity.setEmployeeName("张三");
+            identity.setEmployeeIdCard(identityIdCard);
+            return identity;
+        }
+
 
         private FakeContractMapper(OaLaborContract stored)
         {
@@ -537,6 +670,27 @@ class OaLaborContractServiceImplTest
         public OaLaborContract selectOaLaborContractById(Long contractId)
         {
             return stored;
+        }
+
+        @Override
+        public OaLaborContract selectOaLaborContractByIdForUpdate(Long contractId) { return stored; }
+
+        @Override
+        public int markSigned(OaLaborContract update, String expectedVersion, String expectedHash)
+        {
+            if (stored == null || !"pending_sign".equals(stored.getStatus())
+                    || !java.util.Objects.equals(expectedVersion, stored.getDocumentVersion())
+                    || !java.util.Objects.equals(expectedHash, stored.getPreviewFileHash())) return 0;
+            return updateOaLaborContract(update);
+        }
+
+        @Override
+        public int markVoided(OaLaborContract update, String expectedStatus)
+        {
+            if (stored == null || !java.util.Objects.equals(expectedStatus, stored.getStatus())
+                    || !("pending_sign".equals(expectedStatus) || "draft".equals(expectedStatus))) return 0;
+            stored.setVoidedTime(update.getVoidedTime());
+            return updateOaLaborContract(update);
         }
 
         @Override
@@ -744,6 +898,13 @@ class OaLaborContractServiceImplTest
 
     private static class FakeDocumentService extends OaLaborContractDocumentService
     {
+        @Override
+        public <T> T withSignedArchiveAttempt(OaLaborContract contract, java.util.function.Supplier<T> work)
+        {
+            // This fake has no filesystem. Ownership/rollback uses real temp files in its dedicated tests.
+            return work.get();
+        }
+
         private boolean templateHasRequiredPlaceholders = true;
         private String expectedArchiveTemplateUrl;
         private String expectedArchiveSealUrl;

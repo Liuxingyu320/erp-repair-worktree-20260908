@@ -28,7 +28,7 @@ class OaAttendanceApprovalCallbackServiceTest
     {
         mapper = mock(OaAttendanceApprovalCallbackMapper.class);
         service = new OaAttendanceApprovalCallbackService(mapper,
-                new ObjectMapper());
+                new ObjectMapper(), legacyQuota());
     }
 
     @Test
@@ -336,5 +336,14 @@ class OaAttendanceApprovalCallbackServiceTest
                 + attachmentCount + ",\"attachmentRequired\":"
                 + attachmentRequired + "}");
         return value;
+    }
+
+    private static com.erp.oa.attendance.leave.balance.AttendanceLeaveQuotaService legacyQuota()
+    {
+        return org.mockito.Mockito.mock(com.erp.oa.attendance.leave.balance.AttendanceLeaveQuotaService.class, invocation -> {
+            String method=invocation.getMethod().getName();
+            if("hydrate".equals(method) || "copyPolicy".equals(method))return invocation.getArgument(0);
+            return org.mockito.Answers.RETURNS_DEFAULTS.answer(invocation);
+        });
     }
 }

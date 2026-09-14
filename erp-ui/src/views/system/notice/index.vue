@@ -117,7 +117,9 @@
       @opened="focusNoticeTitle"
       @closed="handleDialogClosed"
     >
-      <el-form ref="form" :model="form" :rules="rules" label-width="96px">
+      <el-alert v-if="editorError" :title="editorError" :type="saveUnknown ? 'warning' : 'error'" :closable="false" />
+      <el-button v-if="saveUnknown && form.noticeId" size="mini" :loading="saving" @click="verifyDraftSave">核对保存结果</el-button>
+      <el-form ref="form" :model="form" :rules="rules" label-width="96px" :disabled="saving || editorLoading">
         <el-row :gutter="16">
           <el-col :span="16">
             <el-form-item label="公告标题" prop="noticeTitle">
@@ -186,7 +188,7 @@
         </el-form-item>
 
         <el-form-item label="公告内容" prop="noticeContent">
-          <editor v-model="form.noticeContent" :min-height="220" aria-label="公告内容" />
+          <editor v-model="form.noticeContent" :read-only="saving || editorLoading" :min-height="220" aria-label="公告内容" />
         </el-form-item>
 
         <el-form-item label="效果预览">
@@ -204,7 +206,7 @@
       <div slot="footer" class="dialog-footer notice-editor-footer">
         <span>保存只会生成草稿，不会向任何人广播。</span>
         <el-button @click="open = false">取 消</el-button>
-        <el-button type="primary" :loading="saving" @click="submitDraft">保存草稿</el-button>
+        <el-button type="primary" :loading="saving" :disabled="editorLoading || saveUnknown" @click="submitDraft">保存草稿</el-button>
       </div>
     </el-dialog>
 
@@ -242,12 +244,17 @@
       </div>
     </el-dialog>
 
+    <el-alert v-for="receipt in saveReceipts" :key="receipt.key" :title="receipt.title + '：' + receipt.message" type="info" :closable="false" />
+    <el-alert v-if="listError" :title="listError" type="error" :closable="false" />
     <notice-detail-view ref="noticeViewRef" />
     <read-users-dialog ref="readUsersRef" />
   </div>
 </template>
 
 <script>
+import { getSelectedDeptId } from "@/utils/shopContext"
+const { createUiOperationScope } = require("@/utils/uiOperationScope")
+const { matchesSavedDraft, unknownDraftResult } = require("@/utils/noticeDraftRecovery")
 import NoticeDetailView from "@/layout/components/HeaderNotice/DetailView"
 import ReadUsersDialog from "./ReadUsers"
 import { sanitizeNoticeHtml } from "@/utils/sanitizeNoticeHtml"
@@ -280,6 +287,11 @@ export default {
     return {
       loading: true,
       saving: false,
+      editorLoading: false,
+      editorError: "",
+      saveUnknown: false,
+      saveReceipts: [],
+      listError: "",
       publishing: false,
       previewLoading: false,
       showSearch: true,
@@ -319,6 +331,10 @@ export default {
     }
   },
   computed: {
+    actorContextKey() {
+      const store = this.$store || {}
+      return String((store.getters || {}).id || "") + ":" + String(((store.state || {}).user || {}).sessionRevision || 0)
+    },
     workflowEnabled() {
       return Boolean(this.$store.getters.businessFeatures && this.$store.getters.businessFeatures.noticeWorkflow)
     },
@@ -335,16 +351,54 @@ export default {
       return sanitizeNoticeHtml(this.form.noticeContent)
     }
   },
-  created() {
-    this.getList()
+  watch: {
+    open(value) { if (!value) this.invalidateEditor() },
+    actorContextKey() { this.resetNoticeContext() }
   },
+  created() { window.addEventListener("erp:dept-changed", this.resetNoticeContext); this.getList() },
+  activated() { this.noticeScope().activate(); if (this._refreshNoticeOnActivate) { this._refreshNoticeOnActivate = false; this.getList() } },
+  deactivated() { this.noticeScope().deactivate(); this.open = false; this.publishOpen = false; this.loading = false; this._refreshNoticeOnActivate = true },
+  beforeDestroy() { window.removeEventListener("erp:dept-changed", this.resetNoticeContext); this.noticeScope().deactivate() },
   methods: {
+    noticeScope() {
+      if (!this._noticeScope) this._noticeScope = createUiOperationScope(() => ({ actor: this.actorContextKey, dept: getSelectedDeptId(), route: this.$route && this.$route.path }))
+      return this._noticeScope
+    },
+    invalidateEditor() {
+      const scope = this.noticeScope()
+      ;["editor", "editor-load", "new-version", "save", "audience-options", "audience-preview", "save-check"].forEach(lane => scope.invalidate(lane))
+      this.saving = false
+      this.editorLoading = false
+      this.previewLoading = false
+      this.saveUnknown = false
+      this.editorError = ""
+      this._pendingDraft = null
+    },
+    resetNoticeContext() {
+      this.noticeScope().invalidate()
+      this.open = false
+      this.publishOpen = false
+      this.saveReceipts = []
+      this.noticeList = []
+      this.handleSelectionChange([])
+      this.invalidateEditor()
+      if ((this.$store.getters || {}).id) this.getList()
+    },
+    recordSaveReceipt(token, key, message) {
+      if (!this.noticeScope().isCurrent(token)) return
+      const receipt = this.saveReceipts.find(row => row.key === key)
+      if (receipt) this.$set(receipt, "message", message)
+    },
     getList() {
+      const scope = this.noticeScope(), token = scope.begin("list"), params = { ...this.queryParams }
       this.loading = true
-      return listNotice(this.queryParams).then(response => {
+      this.listError = ""
+      return listNotice(params, { silentError: true }).then(response => {
+        if (!scope.isCurrent(token)) return
         this.noticeList = response.rows || []
         this.total = response.total || 0
-      }).finally(() => { this.loading = false })
+      }).catch(error => { if (scope.isCurrent(token)) this.listError = error && error.message || "公告列表读取失败" })
+        .finally(() => { if (scope.isCurrent(token)) this.loading = false })
     },
     handleQuery() {
       this.queryParams.pageNum = 1
@@ -375,19 +429,24 @@ export default {
     },
     handleUpdate(row, event) {
       this.captureTrigger(event)
-      const noticeId = row && row.noticeId ? row.noticeId : this.ids[0]
-      if (!noticeId) return
-      getNotice(noticeId).then(response => {
-        if (response.data.lifecycleStatus !== "DRAFT") {
-          this.$modal.msgWarning("已发布内容不能原地修改，请创建新版本")
-          return
-        }
+      const noticeId = row && row.noticeId ? String(row.noticeId) : String(this.ids[0] || "")
+      if (!noticeId) return Promise.resolve()
+      this.resetEditor()
+      this.open = true
+      const scope = this.noticeScope(), token = scope.begin("editor-load", noticeId)
+      this.editorLoading = true
+      return getNotice(noticeId, { silentError: true }).then(response => {
+        if (!this.open || !scope.isCurrent(token)) return
+        if (!response.data || String(response.data.noticeId) !== noticeId) throw new Error("公告归属已变化，请重新选择")
+        if (response.data.lifecycleStatus !== "DRAFT") { this.editorError = "已发布内容不能原地修改，请创建新版本"; return }
         this.setEditorForm(response.data)
-        this.open = true
-        this.loadAudienceOptions("")
-      })
+        return this.loadAudienceOptions("")
+      }).catch(error => { if (this.open && scope.isCurrent(token)) this.editorError = error && error.message || "公告读取失败" })
+        .finally(() => { if (scope.isCurrent(token)) this.editorLoading = false })
     },
     resetEditor() {
+      this.invalidateEditor()
+      this._editorToken = this.noticeScope().begin("editor")
       this.form = defaultForm()
       this.selectedDeptIds = []
       this.selectedRoleIds = []
@@ -395,7 +454,8 @@ export default {
       this.includeDeptChildren = true
       this.audiencePreview = null
       this.previewDevice = "desktop"
-      this.$nextTick(() => this.$refs.form && this.$refs.form.clearValidate())
+      const token = this._editorToken
+      this.$nextTick(() => this.noticeScope().isCurrent(token) && this.$refs.form && this.$refs.form.clearValidate())
     },
     setEditorForm(data) {
       this.resetEditor()
@@ -425,44 +485,86 @@ export default {
       return rules
     },
     loadAudienceOptions(keyword) {
-      return getNoticeAudienceOptions(keyword || undefined).then(response => {
+      const scope = this.noticeScope(), editor = this._editorToken, token = scope.begin("audience-options")
+      return getNoticeAudienceOptions(keyword || undefined, { silentError: true }).then(response => {
+        if (!this.open || !scope.isCurrent(editor) || !scope.isCurrent(token)) return
         const selectedUsers = this.audienceOptions.users.filter(item => this.selectedUserIds.includes(item.id))
         const next = response.data || {}
         next.users = [...selectedUsers, ...(next.users || [])].filter((item, index, values) => values.findIndex(v => v.id === item.id) === index)
         this.audienceOptions = Object.assign({ departments: [], roles: [], users: [] }, next)
-      })
+      }).catch(error => { if (this.open && scope.isCurrent(editor) && scope.isCurrent(token)) this.editorError = error && error.message || "受众选项读取失败" })
     },
     previewAudience() {
       const audiences = this.buildAudienceRules()
-      if (audiences.length === 0) {
-        this.$modal.msgWarning("请至少选择一项接收范围")
-        return Promise.reject(new Error("empty audience"))
-      }
+      if (audiences.length === 0) { this.$modal.msgWarning("请至少选择一项接收范围"); return Promise.resolve(null) }
+      const payload = { audienceType: this.form.audienceType, audiences }
+      const scope = this.noticeScope(), editor = this._editorToken, token = scope.begin("audience-preview", payload)
+      const current = () => this.open && scope.isCurrent(editor) && scope.isCurrent(token, { audienceType: this.form.audienceType, audiences: this.buildAudienceRules() })
       this.previewLoading = true
-      return previewNoticeAudience({ audienceType: this.form.audienceType, audiences }).then(response => {
+      return previewNoticeAudience(payload, { silentError: true }).then(response => {
+        if (!current()) return null
         this.audiencePreview = response.data
         return response.data
-      }).finally(() => { this.previewLoading = false })
+      }).catch(error => { if (current()) this.editorError = error && error.message || "受众预览失败"; return null })
+        .finally(() => { if (scope.isCurrent(editor) && scope.isCurrent(token)) this.previewLoading = false })
     },
     submitDraft() {
+      if (this.saving || this.editorLoading || this.saveUnknown || !this.open) return
+      const scope = this.noticeScope(), editor = this._editorToken, token = scope.begin("save")
+      const audiences = this.buildAudienceRules()
+      if (audiences.length === 0) { this.$modal.msgWarning("请至少选择一项接收范围"); return }
+      const payload = JSON.parse(JSON.stringify(Object.assign({}, this.form, { noticeContent: sanitizeNoticeHtml(this.form.noticeContent), status: "1", lifecycleStatus: "DRAFT", audiences })))
+      const current = () => this.open && scope.isCurrent(editor) && scope.isCurrent(token)
+      this.saving = true
+      this.editorError = ""
       this.$refs.form.validate(valid => {
-        if (!valid) return
-        const audiences = this.buildAudienceRules()
-        if (audiences.length === 0) {
-          this.$modal.msgWarning("请至少选择一项接收范围")
-          return
-        }
-        const payload = Object.assign({}, this.form, { status: "1", lifecycleStatus: "DRAFT", audiences })
-        this.saving = true
-        const request = payload.noticeId ? updateNotice(payload) : addNotice(payload)
+        if (!current()) return
+        if (!valid) { this.saving = false; return }
+        const key = String((this._receiptSequence || 0) + 1)
+        this._receiptSequence = Number(key)
+        const receiptToken = scope.begin("receipt-" + key)
+        this.saveReceipts = [...this.saveReceipts.slice(-9), { key, title: payload.noticeTitle, message: "草稿保存请求处理中" }]
+        this._pendingDraft = { payload, key, receiptToken }
+        const request = payload.noticeId ? updateNotice(payload, { silentError: true }) : addNotice(payload, { silentError: true })
         request.then(response => {
-          this.form = response.data || payload
-          this.$modal.msgSuccess("草稿保存成功，尚未发布")
-          this.open = false
+          const saved = response.data
+          const validReceipt = !!(saved && saved.noticeId && (!payload.noticeId || String(saved.noticeId) === String(payload.noticeId)))
+          this.recordSaveReceipt(receiptToken, key, validReceipt ? "草稿保存成功，尚未发布" : "保存回执不完整，结果待核对")
+          if (!current()) return
+          if (!validReceipt) {
+            this.saveUnknown = true; this.editorError = "保存回执不完整，请核对公告列表，不会自动重新提交"; return
+          }
+          this.form = { ...saved }
+          this._pendingDraft = null
+          this.$modal.msgSuccess("草稿保存成功，尚未发布；可继续编辑")
           this.getList()
-          this.restoreTriggerFocus()
-        }).catch(this.handleWorkflowError).finally(() => { this.saving = false })
+        }).catch(error => {
+          const unknown = unknownDraftResult(error)
+          this.recordSaveReceipt(receiptToken, key, unknown ? "保存结果待核对，请先查看公告列表" : "草稿保存失败，可在原草稿重试")
+          if (!current()) return
+          this.saveUnknown = unknown
+          this.editorError = unknown ? "保存结果暂时无法确认，草稿已保留；请核对原公告，新增草稿请关闭后在公告列表核对，不会自动重新提交" : (error && error.response && error.response.data && error.response.data.msg) || error && error.message || "草稿保存失败，请重试"
+        }).finally(() => { if (current()) this.saving = false })
       })
+    },
+    verifyDraftSave() {
+      const pending = this._pendingDraft
+      if (!pending || !pending.payload.noticeId || this.saving) return Promise.resolve()
+      const scope = this.noticeScope(), editor = this._editorToken, token = scope.begin("save-check")
+      const current = () => this.open && scope.isCurrent(editor) && scope.isCurrent(token)
+      this.saving = true
+      return getNotice(pending.payload.noticeId, { silentError: true }).then(response => {
+        if (!current()) return
+        if (matchesSavedDraft(pending.payload, response.data)) {
+          this.form = { ...response.data }
+          this.saveUnknown = false
+          this.editorError = ""
+          this._pendingDraft = null
+          this.recordSaveReceipt(pending.receiptToken, pending.key, "已核对：当前草稿内容及版本与本次保存相符")
+          this.$modal.msgSuccess("当前草稿内容及版本与本次保存相符")
+        } else this.editorError = "当前公告尚不能与本次保存对应，请在列表核对后重新进入；不会自动重放保存"
+      }).catch(error => { if (current()) this.editorError = error && error.message || "结果仍无法核对，请稍后再试" })
+        .finally(() => { if (current()) this.saving = false })
     },
     openPublish(row, event) {
       this.captureTrigger(event)
@@ -514,7 +616,12 @@ export default {
     },
     handleNewVersion(row, event) {
       this.captureTrigger(event)
-      this.$modal.confirm(`基于「${row.noticeTitle}」创建新草稿版本吗？原版本不会被修改。`).then(() => createNoticeVersion(row.noticeId, row.version)).then(response => {
+      const target = { noticeId: row.noticeId, version: row.version }, scope = this.noticeScope(), token = scope.begin("new-version")
+      return this.$modal.confirm(`基于「${row.noticeTitle}」创建新草稿版本吗？原版本不会被修改。`).then(() => {
+        if (!scope.isCurrent(token)) return null
+        return createNoticeVersion(target.noticeId, target.version)
+      }).then(response => {
+        if (!response || !scope.isCurrent(token)) return
         this.setEditorForm(response.data)
         this.open = true
         this.loadAudienceOptions("")
@@ -563,19 +670,21 @@ export default {
       return document.activeElement === target
     },
     handleDialogClosed() {
+      if (this.open || this.publishOpen) return
       // Element UI emits `closed` only after the leave transition. Restore focus
       // synchronously here so keyboard users never remain on a hidden footer button.
       this.focusTriggerNow()
       this.$nextTick(() => this.focusTriggerNow())
     },
     restoreTriggerFocus() {
+      if (this.open || this.publishOpen) return
       // The request can finish before the dialog transition does. Focus once now
       // and again after common transition/list-render timings; `closed` remains
       // the authoritative synchronous restoration point.
       this.focusTriggerNow()
       const retryDelays = [0, 100, 350]
       retryDelays.forEach(delay => {
-        setTimeout(() => this.$nextTick(() => this.focusTriggerNow()), delay)
+        setTimeout(() => this.$nextTick(() => { if (!this.open && !this.publishOpen) this.focusTriggerNow() }), delay)
       })
     },
     lifecycleLabel(value) {

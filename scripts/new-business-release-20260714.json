@@ -19,8 +19,14 @@
     {
       "file": "erp_hr_health_certificate_20260713.sql",
       "sha256": "28e4245da13d5fca87b69248d98ea7b198349328bda9ce658b82ae87b75903f1",
-      "creates": ["hr_employee_health_certificate"],
-      "backupTables": ["sys_config", "sys_menu", "sys_role_menu"]
+      "creates": [
+        "hr_employee_health_certificate"
+      ],
+      "backupTables": [
+        "sys_config",
+        "sys_menu",
+        "sys_role_menu"
+      ]
     },
     {
       "file": "erp_hr_health_certificate_unified_approval_20260714.sql",
@@ -50,7 +56,9 @@
       "file": "erp_inventory_oe_purchase_reference_20260713.sql",
       "sha256": "e6479d93e4031a1523c0903c8df7fdc6849422f13209303dbd87c693036978b4",
       "creates": [],
-      "backupTables": ["inv_oe_item"]
+      "backupTables": [
+        "inv_oe_item"
+      ]
     },
     {
       "file": "erp_inventory_store_return_20260713.sql",
@@ -70,8 +78,15 @@
     {
       "file": "erp_inventory_transfer_discrepancy_20260713.sql",
       "sha256": "52d9a03e83923b4ed131e9b53c3e8d94a1adf3934f1cde79d13db3b0e2250b17",
-      "creates": ["inv_transfer_discrepancy", "inv_transfer_discrepancy_detail"],
-      "backupTables": ["sys_config", "sys_menu", "sys_role_menu"]
+      "creates": [
+        "inv_transfer_discrepancy",
+        "inv_transfer_discrepancy_detail"
+      ],
+      "backupTables": [
+        "sys_config",
+        "sys_menu",
+        "sys_role_menu"
+      ]
     },
     {
       "file": "erp_inventory_customer_service_card_20260713.sql",
@@ -81,19 +96,30 @@
         "inv_customer_service_record",
         "inv_customer_service_change_log"
       ],
-      "backupTables": ["inv_customer", "sys_config", "sys_menu", "sys_role_menu"]
+      "backupTables": [
+        "inv_customer",
+        "sys_config",
+        "sys_menu",
+        "sys_role_menu"
+      ]
     },
     {
       "file": "erp_inventory_unified_approval_expand_20260716.sql",
       "sha256": "ae31acf885a8b97a42ada23b6cae12e29f4ba79e4bbf92fb0ef50ab0345681da",
       "creates": [],
-      "backupTables": ["inv_stock_check", "inv_transfer_order", "sys_config"]
+      "backupTables": [
+        "inv_stock_check",
+        "inv_transfer_order",
+        "sys_config"
+      ]
     },
     {
       "file": "erp_oa_purchase_unified_approval_expand_20260716.sql",
       "sha256": "5b7166cc2a593618a13572da40a90237b3cc3e849265f84adde8dc845120673d",
       "creates": [],
-      "backupTables": ["oa_purchase"]
+      "backupTables": [
+        "oa_purchase"
+      ]
     },
     {
       "file": "erp_unified_approval_schema_20260716.sql",
@@ -118,30 +144,42 @@
       "file": "erp_unified_approval_seed_20260716.sql",
       "sha256": "f9d79ee2a37df816a63ddd5c1b705fa9a593ea12df198e040405f3e93ac6e5a8",
       "creates": [],
-      "backupTables": ["sys_config", "sys_menu", "sys_role_menu"]
+      "backupTables": [
+        "sys_config",
+        "sys_menu",
+        "sys_role_menu"
+      ]
     },
     {
       "file": "erp_inventory_transfer_approval_start_outbox_20260716.sql",
       "sha256": "1009b65572dcecad5522713fb26c49ae4702cf99a064c53c1798f7dae46d1de7",
-      "creates": ["inv_transfer_approval_start_outbox"],
+      "creates": [
+        "inv_transfer_approval_start_outbox"
+      ],
       "backupTables": []
     },
     {
       "file": "erp_inventory_stock_check_approval_start_outbox_20260716.sql",
       "sha256": "96beee6e1fb72ca6b2c7b913a7ddda8d3e677ecc8b013c644dd0dc0e419f95d6",
-      "creates": ["inv_stock_check_approval_start_outbox"],
+      "creates": [
+        "inv_stock_check_approval_start_outbox"
+      ],
       "backupTables": []
     },
     {
       "file": "erp_oa_purchase_approval_start_outbox_20260716.sql",
       "sha256": "4d079cb86f9693e44adcc279b8866c779f05a2400d8006b6dde0f9fea76a0256",
-      "creates": ["oa_purchase_approval_start_outbox"],
+      "creates": [
+        "oa_purchase_approval_start_outbox"
+      ],
       "backupTables": []
     },
     {
       "file": "erp_hr_health_certificate_approval_start_outbox_20260716.sql",
       "sha256": "7e4f31cb535dd1357e3f55cae094a4ecb29ec3aa5745c8d4e457453d64e34abf",
-      "creates": ["hr_health_certificate_approval_start_outbox"],
+      "creates": [
+        "hr_health_certificate_approval_start_outbox"
+      ],
       "backupTables": []
     }
   ],
@@ -151,7 +189,10 @@
     "erp-modules/erp-system/src/test/java/com/erp/system/service/impl/HrOnboardingTransactionIT.java",
     "erp-modules/erp-system/src/test/java/com/erp/system/service/impl/HrSignEventOutboxMySql57IT.java",
     "erp-modules/erp-system/src/test/java/com/erp/system/service/impl/HrHealthCertificateMySqlIT.java",
-    "erp-modules/erp-inventory/src/test/java/com/erp/inventory/integration/NewBusinessMigrationsMySqlIT.java"
+    "erp-modules/erp-inventory/src/test/java/com/erp/inventory/integration/NewBusinessMigrationsMySqlIT.java",
+    "erp-modules/erp-oa/src/test/java/com/erp/oa/attendance/leave/balance/AttendanceLeaveBalanceMySqlIT.java",
+    "erp-modules/erp-oa/src/test/java/com/erp/oa/attendance/leave/balance/AttendanceOvertimeTransferMySqlIT.java",
+    "erp-modules/erp-oa/src/test/java/com/erp/oa/attendance/leave/balance/AttendanceLeaveQuotaMySqlIT.java"
   ],
   "artifactSha256Required": true
 }

@@ -31,6 +31,18 @@
         order by d.detail_id asc
     </select>
 
+    <select id="selectInvDeliveryNoticeDetailByNoticeIdForUpdate" parameterType="Long" resultMap="InvDeliveryNoticeDetailResult">
+        select d.detail_id, d.notice_id, d.sales_detail_id,
+               d.warehouse_id,
+               d.item_type, d.item_id, d.item_code, d.item_name,
+               d.product_id, d.product_name, d.notice_qty, d.delivered_qty,
+               d.delivered_cost_amount
+        from inv_delivery_notice_detail d
+        where d.notice_id = #{noticeId}
+        order by d.detail_id asc
+        for update
+    </select>
+
     <insert id="batchInsertInvDeliveryNoticeDetail" parameterType="list">
         insert into inv_delivery_notice_detail (
             notice_id, sales_detail_id, item_type, item_id, item_code, item_name,

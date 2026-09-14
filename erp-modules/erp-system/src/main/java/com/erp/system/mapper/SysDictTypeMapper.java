@@ -10,6 +10,8 @@ import com.erp.system.api.domain.SysDictType;
  */
 public interface SysDictTypeMapper
 {
+    SysDictType lockDictTypeById(Long dictId);
+    SysDictType lockDictTypeByType(String dictType);
     /**
      * 根据条件分页查询字典类型
      * 

@@ -48,9 +48,12 @@ assert.deepStrictEqual(
     "erp-modules/erp-system/src/test/java/com/erp/system/service/impl/HrOnboardingTransactionIT.java",
     "erp-modules/erp-system/src/test/java/com/erp/system/service/impl/HrSignEventOutboxMySql57IT.java",
     "erp-modules/erp-system/src/test/java/com/erp/system/service/impl/HrHealthCertificateMySqlIT.java",
-    "erp-modules/erp-inventory/src/test/java/com/erp/inventory/integration/NewBusinessMigrationsMySqlIT.java"
+    "erp-modules/erp-inventory/src/test/java/com/erp/inventory/integration/NewBusinessMigrationsMySqlIT.java",
+    "erp-modules/erp-oa/src/test/java/com/erp/oa/attendance/leave/balance/AttendanceLeaveBalanceMySqlIT.java",
+    "erp-modules/erp-oa/src/test/java/com/erp/oa/attendance/leave/balance/AttendanceOvertimeTransferMySqlIT.java",
+    "erp-modules/erp-oa/src/test/java/com/erp/oa/attendance/leave/balance/AttendanceLeaveQuotaMySqlIT.java"
   ],
-  "release manifest must match the six executable fail-closed integration-test classes"
+  "release manifest must match the nine executable fail-closed integration-test classes"
 )
 for (const [name, gate] of [["CI", ciVerify], ["release", releaseVerify]]) {
   assert.ok(

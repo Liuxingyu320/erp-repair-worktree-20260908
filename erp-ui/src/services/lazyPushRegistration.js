@@ -28,11 +28,30 @@ export default {
     }
   },
 
-  initialize(userId) {
+  isNativePlatform() {
+    return Capacitor.isNativePlatform()
+  },
+
+  bootstrap() {
+    if (!Capacitor.isNativePlatform()) return Promise.resolve({ listening: false, reason: 'web' })
+    return loadService().then(service => service.bootstrap())
+  },
+
+  resumeNavigation(userId) {
+    if (!Capacitor.isNativePlatform()) return Promise.resolve()
+    return loadService().then(service => service.resumeNavigation(userId))
+  },
+
+  subscribeStatus(listener) {
+    if (!Capacitor.isNativePlatform()) return Promise.resolve(() => {})
+    return loadService().then(service => service.subscribeStatus(listener))
+  },
+
+  initialize(userId, options) {
     if (!Capacitor.isNativePlatform()) {
       return Promise.resolve({ registered: false, reason: 'web' })
     }
-    return loadService().then(service => service.initialize(userId))
+    return loadService().then(service => service.initialize(userId, options))
   },
 
   disable(authToken) {

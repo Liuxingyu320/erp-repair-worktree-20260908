@@ -28,9 +28,15 @@
       </button>
       <small v-if="!canOpenStockPicker">{{ missingDependencyText }}</small>
     </div>
+    <div v-if="usesReturnSelection" class="return-selection-actions">
+      <p>勾选要退的商品，未勾选商品不参与退货。</p>
+      <button type="button" @click="fillAllReturnable">退全部可退数量</button>
+      <button type="button" @click="clearReturnQuantities">清空</button>
+    </div>
     <article v-for="(row, index) in rows" :key="index" class="line-item" :data-row-index="index">
       <header>
-        <strong>{{ label }} {{ index + 1 }}</strong>
+        <label v-if="usesReturnSelection" class="return-row-selection"><input type="checkbox" :checked="isReturnSelected(row)" @change="setReturnSelected(index, $event.target.checked)" />选择退货 {{ index + 1 }}</label>
+        <strong v-else>{{ label }} {{ index + 1 }}</strong>
         <button type="button" @click="removeRow(index)">删除</button>
       </header>
       <div
@@ -70,7 +76,7 @@
           :invalid="isItemInvalid(index, itemField)"
           :described-by="itemDescribedBy(index, itemField)"
           @field-edit="emitRows"
-          @selection-cleared="handleItemSelectionCleared(index)"
+          @selection-cleared="handleItemSelectionCleared(index, itemField)"
           @select="option => handleSelect(index, itemField, option)"
         />
         <select
@@ -113,6 +119,7 @@
           v-else
           :id="itemControlId(index, itemField)"
           v-model.trim="row[itemField.key]"
+          :disabled="usesReturnSelection && !isReturnSelected(row)"
           :type="itemField.type === 'number' ? 'number' : 'text'"
           :step="itemField.type === 'number' ? '0.01' : null"
           :required="itemFieldIsRequired(itemField, row)"
@@ -249,6 +256,7 @@
 </template>
 
 <script>
+const { isReturnSelected, selectAllReturnRows } = require("@/utils/returnSelection")
 import MobileEntityPicker from "./MobileEntityPicker.vue"
 import { fetchMobileEntityOptions } from "../mobileEntityService"
 import { mountMobileOverlay, releaseMobileOverlay } from "./mobileOverlayStack"
@@ -328,6 +336,7 @@ export default {
     }
   },
   computed: {
+    usesReturnSelection() { return this.field && this.field.selectionScoped === true },
     usesStockPicker() {
       return this.field && this.field.selectionMode === "stock-picker"
     },
@@ -392,7 +401,7 @@ export default {
       return Object.keys(this.pickerSelected || {}).length
     },
     referenceTotalAmount() {
-      return this.calculateReferenceTotal(this.rows.map(row => ({ row, quantity: row.quantity })))
+      return this.calculateReferenceTotal(this.rows.filter(row => !this.usesReturnSelection || isReturnSelected(row)).map(row => ({ row, quantity: row.quantity })))
     },
     selectedPickerTotalAmount() {
       const entries = Object.keys(this.pickerSelected || {}).map(key => {
@@ -447,10 +456,21 @@ export default {
     this.restoreStockPickerMount()
   },
   methods: {
+    isReturnSelected,
+    setReturnSelected(index, selected) {
+      this.$set(this.rows[index], 'returnSelected', selected)
+      this.emitRows()
+    },
+    fillAllReturnable() { this.rows = selectAllReturnRows(this.rows); this.emitRows() },
+    clearReturnQuantities() {
+      this.rows = this.rows.map(row => ({ ...row, returnSelected: false, quantity: 0 }))
+      this.emitRows()
+    },
     ariaBoolean(value) {
       return value ? "true" : "false"
     },
     itemFieldIsRequired(itemField, row) {
+      if (this.usesReturnSelection && !isReturnSelected(row)) return false
       return isFieldRequired(itemField, row)
     },
     itemIdPart(value) {
@@ -499,7 +519,7 @@ export default {
     },
     createEmptyRow() {
       return (this.visibleItemFields || []).reduce((row, field) => {
-        row[field.key] = field.defaultValue !== undefined ? field.defaultValue : ""
+        row[field.key] = field.inheritFormField && this.formData ? this.formData[field.inheritFormField] || "" : field.defaultValue !== undefined ? field.defaultValue : ""
         return row
       }, {})
     },
@@ -511,7 +531,13 @@ export default {
       this.rows = this.rows.filter((_, rowIndex) => rowIndex !== index)
       this.emitRows()
     },
-    handleItemSelectionCleared(index) {
+    handleItemSelectionCleared(index, field) {
+      if (field && field.key === "warehouseId") {
+        this.$set(this.rows[index], "warehouseId", "")
+        this.$set(this.rows[index], "warehouseName", "")
+        this.emitRows()
+        return
+      }
       const rows = this.rows.slice()
       const row = Object.assign({}, rows[index], {
         itemId: "",
@@ -532,6 +558,12 @@ export default {
       this.emitRows()
     },
     handleSelect(index, field, option) {
+      if (field && field.key === "warehouseId") {
+        this.$set(this.rows[index], "warehouseId", option.value)
+        this.$set(this.rows[index], "warehouseName", option.label || "")
+        this.emitRows()
+        return
+      }
       const rows = this.rows.slice()
       const optionRow = (option && option.row) || {}
       const itemType = this.normalizeItemType(optionRow.itemType || this.resolveItemPickerEntity(rows[index], field))
@@ -602,6 +634,7 @@ export default {
       return value === undefined || value === null || value === "" ? "" : value
     },
     lineAmount(row) {
+      if (this.usesReturnSelection && !isReturnSelected(row)) return ""
       const quantity = Number(row.quantity)
       const price = Number(row.price || row.estimatedPrice || (this.showsReferenceCost ? this.referenceCost(row) : undefined))
       if (!Number.isFinite(quantity) || !Number.isFinite(price)) return ""

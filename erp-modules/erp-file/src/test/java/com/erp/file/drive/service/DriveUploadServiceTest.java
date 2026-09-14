@@ -99,6 +99,52 @@ class DriveUploadServiceTest
     }
 
     @Test
+    void durableSuccessReceiptNeverStoresASecondFile() throws Exception
+    {
+        var operations = mock(DriveUploadOperationService.class);
+        service.setUploadOperations(operations);
+        String id = "upload_12345678901234567890123456789012";
+        when(operations.claim(eq(id),eq(actor),eq(4L),eq(0L),eq("报告.pdf"),eq(12L),any()))
+                .thenReturn(new DriveUploadOperationService.Claim(id,"other",false));
+        when(operations.receipt(id,actor)).thenReturn(new DriveUploadOperationService.Receipt(id,"SUCCEEDED","77"));
+        assertThat(service.uploadWithReceipt(pdf(),4L,0L,actor,id).nodeId()).isEqualTo("77");
+        verifyNoInteractions(storage,persistence,quotaService,reservationService);
+    }
+
+    @Test
+    void ambiguousCommitResolvesSuccessBeforeAnyCompensation() throws Exception
+    {
+        var operations = mock(DriveUploadOperationService.class);
+        service.setUploadOperations(operations);
+        String id = "upload_12345678901234567890123456789012";
+        var claim = new DriveUploadOperationService.Claim(id,"owner",true);
+        when(operations.claim(eq(id),eq(actor),eq(4L),eq(0L),eq("报告.pdf"),eq(12L),any())).thenReturn(claim);
+        when(persistence.persist(any(),eq(12L),eq("reservation-1"),eq(claim))).thenThrow(new IllegalStateException("lost commit reply"));
+        when(operations.fenceForCleanup(claim)).thenReturn(new DriveUploadOperationService.Receipt(id,"SUCCEEDED","77"));
+        when(operations.receipt(id,actor)).thenReturn(new DriveUploadOperationService.Receipt(id,"SUCCEEDED","77"));
+        when(nodeService.detail(77L,actor)).thenReturn(nodeVo());
+        assertThat(service.uploadWithReceipt(pdf(),4L,0L,actor,id).nodeId()).isEqualTo("77");
+        verify(storage,never()).delete(any());
+        verify(reservationService,never()).settleAfterCompensation(any(),org.mockito.ArgumentMatchers.anyBoolean(),any());
+    }
+
+    @Test
+    void uncertainPutRetainsCapacityAndCannotBeMarkedSafeForRetry() throws Exception
+    {
+        var operations = mock(DriveUploadOperationService.class);
+        service.setUploadOperations(operations);
+        String id = "upload_12345678901234567890123456789012";
+        var claim = new DriveUploadOperationService.Claim(id,"owner",true);
+        when(operations.claim(eq(id),eq(actor),eq(4L),eq(0L),eq("报告.pdf"),eq(12L),any())).thenReturn(claim);
+        doThrow(new IOException("connection lost after remote write began")).when(storage).put(any(),any());
+        when(operations.fenceForCleanup(claim)).thenReturn(new DriveUploadOperationService.Receipt(id,"CLEANING",null));
+        assertThatThrownBy(() -> service.uploadWithReceipt(pdf(),4L,0L,actor,id)).isInstanceOf(DriveException.class);
+        verify(reservationService).settleAfterCompensation("reservation-1",false,actor);
+        verify(operations).finishCleanup(claim,false);
+        verifyNoInteractions(persistence);
+    }
+
+    @Test
     @DisplayName("快照额度已不足时不写存储也不进持久化事务")
     void shouldFailPreflightBeforeStorage() throws Exception
     {

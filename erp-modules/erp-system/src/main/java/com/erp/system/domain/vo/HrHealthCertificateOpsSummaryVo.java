@@ -5,6 +5,18 @@ import java.util.Date;
 /** 健康证运维摘要，仅包含低基数计数和时间。 */
 public class HrHealthCertificateOpsSummaryVo
 {
+    private long approvalStartFailedCount;
+    public long getApprovalStartFailedCount() { return approvalStartFailedCount; }
+    public void setApprovalStartFailedCount(long value) { approvalStartFailedCount = value; }
+    private long legacyPendingCount;
+    private long approvalPendingCount;
+    private long approvalSubmittingCount;
+    public long getLegacyPendingCount() { return legacyPendingCount; }
+    public void setLegacyPendingCount(long value) { legacyPendingCount = value; }
+    public long getApprovalPendingCount() { return approvalPendingCount; }
+    public void setApprovalPendingCount(long value) { approvalPendingCount = value; }
+    public long getApprovalSubmittingCount() { return approvalSubmittingCount; }
+    public void setApprovalSubmittingCount(long value) { approvalSubmittingCount = value; }
     private long pendingReviewCount;
     private long validCount;
     private long expiringCount;

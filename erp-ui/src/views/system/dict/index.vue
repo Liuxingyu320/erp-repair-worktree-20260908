@@ -6,6 +6,7 @@
       icon="el-icon-collection"
       tip="修改公共字典前请确认其影响范围。"
     />
+    <el-alert v-if="mutationError" :title="mutationError" type="warning" :closable="false"><el-button v-if="deleteUnknownIds.length" type="text" :loading="checkingDelete" @click="checkDeletedDictionaries">核对原编号</el-button></el-alert>
     <div v-show="showSearch" class="search-card dict-search-card">
     <el-form :model="queryParams" ref="queryForm" size="small" :inline="true" label-width="88px">
       <el-form-item label="字典名称" prop="dictName">
@@ -118,6 +119,7 @@
     </div>
 
     <div class="table-card dict-table-card">
+    <div v-if="loadError" role="alert" class="system-list-error"><span>加载失败：{{ loadError }}</span> <el-button type="text" :disabled="loading" @click="getList">重新加载</el-button></div>
     <el-table v-loading="loading" :data="typeList" @selection-change="handleSelectionChange">
       <el-table-column type="selection" width="55" align="center" />
       <el-table-column label="字典编号" align="center" prop="dictId" />
@@ -175,8 +177,9 @@
     </div>
 
     <!-- 添加或修改参数配置对话框 -->
-    <el-dialog :title="title" :visible.sync="open" width="500px" append-to-body>
-      <el-form ref="form" :model="form" :rules="rules" label-width="100px">
+    <el-dialog :title="title" :visible.sync="open" :close-on-click-modal="!saving" :close-on-press-escape="!saving" :show-close="!saving" width="500px" append-to-body>
+      <el-alert v-if="mutationError" :title="mutationError" type="warning" :closable="false"><el-button v-if="form.dictId &amp;&amp; !saving" type="text" @click="openDictEditor({ dictId: form.dictId })">重新读取当前字典</el-button><el-button v-else-if="dictSaveUnknown" type="text" @click="getList">核对当前列表</el-button></el-alert>
+      <el-form v-loading="editorLoading" :disabled="saving || editorLoading" ref="form" :model="form" :rules="rules" label-width="100px">
         <el-form-item label="字典名称" prop="dictName">
           <el-input v-model="form.dictName" placeholder="请输入字典名称" />
         </el-form-item>
@@ -203,8 +206,8 @@
         </el-form-item>
       </el-form>
       <div slot="footer" class="dialog-footer">
-        <el-button type="primary" @click="submitForm">确 定</el-button>
-        <el-button @click="cancel">取 消</el-button>
+        <el-button type="primary" :loading="saving" :disabled="editorLoading || !editorReady || dictSaveUnknown" @click="submitForm">确 定</el-button>
+        <el-button :disabled="saving" @click="cancel">取 消</el-button>
       </div>
     </el-dialog>
 
@@ -213,11 +216,14 @@
 </template>
 
 <script>
+import dictMutationRecovery from "@/mixins/dictMutationRecovery"
+import systemListRecovery from "@/mixins/systemListRecovery"
 import DictDataDrawer from './detail'
 import { listType, getType, delType, addType, updateType, refreshCache } from "@/api/system/dict/type"
 import { confirmExportAction } from "@/utils/exportConfirm"
 
 export default {
+  mixins: [systemListRecovery, dictMutationRecovery],
   name: "Dict",
   components: { DictDataDrawer },
   dicts: ['sys_normal_disable'],
@@ -274,16 +280,16 @@ export default {
   methods: {
     /** 查询字典类型列表 */
     getList() {
-      this.loading = true
-      listType(this.addDateRange(this.queryParams, this.dateRange)).then(response => {
-          this.typeList = response.rows
-          this.total = response.total
-          this.loading = false
-        }
-      )
+      const query = this.addDateRange({ ...this.queryParams }, this.dateRange.slice())
+      return this.runSystemListRequest(() => listType(query, { silentError: true }), response => {
+        if (!response || !Array.isArray(response.rows)) throw new Error("列表响应无效，请重试")
+        this.typeList = response.rows
+        this.total = Number(response.total) || 0
+      })
     },
     // 取消按钮
     cancel() {
+      if (this.saving) return
       this.open = false
       this.reset()
     },
@@ -311,6 +317,9 @@ export default {
     },
     /** 新增按钮操作 */
     handleAdd() {
+      if (this.saving || this.deleting) return
+      this.dictMutationScope().invalidate('edit')
+      this.mutationError = ''; this.originalDictType = ''; this.editorReady = true; this.dictSaveUnknown = false
       this.reset()
       this.open = true
       this.title = "添加字典类型"
@@ -331,45 +340,9 @@ export default {
       this.$tab.openPage("字典数据", '/system/dict-data/index/' + row.dictId)
     },
     /** 修改按钮操作 */
-    handleUpdate(row) {
-      this.reset()
-      const dictId = row.dictId || this.ids
-      getType(dictId).then(response => {
-        this.form = response.data
-        this.open = true
-        this.title = "修改字典类型"
-      })
-    },
-    /** 提交按钮 */
-    submitForm() {
-      this.$refs["form"].validate(valid => {
-        if (valid) {
-          if (this.form.dictId != undefined) {
-            updateType(this.form).then(() => {
-              this.$modal.msgSuccess("修改成功")
-              this.open = false
-              this.getList()
-            })
-          } else {
-            addType(this.form).then(() => {
-              this.$modal.msgSuccess("新增成功")
-              this.open = false
-              this.getList()
-            })
-          }
-        }
-      })
-    },
-    /** 删除按钮操作 */
-    handleDelete(row) {
-      const dictIds = row.dictId || this.ids
-      this.$modal.confirm('是否确认删除字典编号为"' + dictIds + '"的数据项？').then(function() {
-        return delType(dictIds)
-      }).then(() => {
-        this.getList()
-        this.$modal.msgSuccess("删除成功")
-      }).catch(() => {})
-    },
+    handleUpdate(row) { return this.openDictEditor(row) },
+    submitForm() { return this.saveDictEditor() },
+    handleDelete(row) { return this.deleteDictSelection(row) },
     /** 导出按钮操作 */
     handleExport() {
       confirmExportAction(this, {
@@ -393,6 +366,7 @@ export default {
       refreshCache().then(() => {
         this.$modal.msgSuccess("刷新成功")
         this.$store.dispatch('dict/cleanDict')
+        this.cacheRefreshPending = false; this.mutationError = ''
       })
     }
   }

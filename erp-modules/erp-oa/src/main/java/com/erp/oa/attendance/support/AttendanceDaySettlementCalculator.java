@@ -257,6 +257,41 @@ public class AttendanceDaySettlementCalculator
                 segmentSnapshots, confirmations, now, issues);
     }
 
+    /** The same effective evidence used by settlement, without requiring a closed day. */
+    public PunchCoverage punchCoverage(Schedule schedule, List<PunchEvent> punches,
+            List<CorrectionSource> corrections, List<ScheduleSegmentSnapshot> segments)
+    {
+        Set<String> issues = new LinkedHashSet<>();
+        List<CorrectionSource> supported = supportedCorrectionSources(corrections, issues);
+        WrongTypeResolution resolved = resolveWrongTypeReplacements(schedule,
+                punches, supported, segments, issues);
+        Map<String, EffectivePunchSource> sources = new LinkedHashMap<>();
+        if ("PER_WORK_SEGMENT".equals(schedule.punchModeSnapshot))
+        {
+            List<WorkInterval> work = scheduledWorkIntervals(schedule, segments, bounds(schedule), issues);
+            validateSegmentPunches(schedule, resolved.punches(), work, issues);
+            validateSegmentCorrections(schedule, resolved.corrections(), work, issues);
+            for (WorkInterval interval : work)
+                for (String type : List.of("IN", "OUT"))
+                    addCoverage(sources, slotKey(interval, type), segmentSource(schedule,
+                            resolved.punches(), resolved.corrections(), work, interval, type, issues));
+        }
+        else
+        {
+            for (String type : List.of("IN", "OUT"))
+                addCoverage(sources, type, source(type,
+                        boundaryPunch(resolved.punches(), type, "IN".equals(type)),
+                        approvedCorrection(schedule, resolved.corrections(), type, issues), schedule, issues));
+        }
+        return new PunchCoverage(Map.copyOf(sources), List.copyOf(issues));
+    }
+
+    private void addCoverage(Map<String, EffectivePunchSource> sources, String key, PunchSource source)
+    {
+        if (source != null)
+            sources.put(key, new EffectivePunchSource(source.eventId(), source.correctionRequestId()));
+    }
+
     private List<CorrectionSource> supportedCorrectionSources(
             List<CorrectionSource> corrections, Set<String> issues)
     {
@@ -1066,6 +1101,17 @@ public class AttendanceDaySettlementCalculator
         return List.copyOf(values);
     }
 
+    /** Reuses settlement validation without requiring the entire day to close. */
+    public List<String> remainingWorkIssueCodes(Schedule schedule,
+            List<TimeInterval> intervals,
+            List<RemainingWorkConfirmationSource> confirmations)
+    {
+        Set<String> issues = new LinkedHashSet<>();
+        for (TimeInterval interval : intervals)
+            confirmedWorkedMinutes(schedule, interval, confirmations, issues);
+        return List.copyOf(issues);
+    }
+
     private int confirmedWorkedMinutes(Schedule schedule,
             TimeInterval interval,
             List<RemainingWorkConfirmationSource> confirmations,
@@ -1152,6 +1198,8 @@ public class AttendanceDaySettlementCalculator
     { return left.isBefore(right) ? left : right; }
 
     public record Bounds(LocalDateTime start, LocalDateTime end) { }
+    public record EffectivePunchSource(Long eventId, Long correctionRequestId) { }
+    public record PunchCoverage(Map<String, EffectivePunchSource> sources, List<String> issueCodes) { }
     public record Evaluation(DayResult result, List<String> issueCodes)
     { public boolean ready() { return issueCodes.isEmpty(); } }
     private record WrongTypeResolution(List<PunchEvent> punches,

@@ -5,6 +5,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
@@ -45,6 +46,8 @@ public final class AttendanceRequests
     {
         @NotNull @Positive public Long shopId;
         @NotEmpty public List<Long> scheduleIds = new ArrayList<>();
+        /** Optional for legacy clients; new weekly publishing freezes each draft version. */
+        public Map<Long, Long> scheduleVersions;
     }
 
     public static class DaySettlementCommand
@@ -67,6 +70,7 @@ public final class AttendanceRequests
     {
         public String challengeToken;
         public LocalDateTime expiresAt;
+        public String expiresAtUtc;
         public Long scheduleId;
         public String punchType;
         public String punchSlotKey;
@@ -98,6 +102,8 @@ public final class AttendanceRequests
         public BigDecimal accuracyMeters;
         public String clientCoordinateSystem;
         public LocalDateTime clientCaptureTime;
+        public java.time.Instant clientCaptureInstant;
+        public String clientCaptureTimestamp;
         public String clientRequestId;
         public String deviceId;
         public String appVersion;

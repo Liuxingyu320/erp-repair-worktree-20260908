@@ -14,6 +14,8 @@ import com.google.auth.oauth2.GoogleCredentials;
 import com.google.firebase.FirebaseApp;
 import com.google.firebase.FirebaseOptions;
 import com.google.firebase.messaging.FirebaseMessaging;
+import com.google.firebase.messaging.AndroidConfig;
+import com.google.firebase.messaging.AndroidNotification;
 import com.google.firebase.messaging.FirebaseMessagingException;
 import com.google.firebase.messaging.Message;
 import com.google.firebase.messaging.MessagingErrorCode;
@@ -167,17 +169,9 @@ public class FirebasePushDeliveryClient implements PushDeliveryClient
     private static String sendWithFirebase(FirebaseMessaging messaging, FirebaseEnvelope envelope)
             throws DeliveryException
     {
-        Message message = Message.builder()
-                .setToken(envelope.getToken())
-                .setNotification(Notification.builder()
-                        .setTitle(envelope.getTitle())
-                        .setBody(envelope.getBody())
-                        .build())
-                .putAllData(envelope.getData())
-                .build();
         try
         {
-            return messaging.send(message);
+            return messaging.send(buildMessage(envelope));
         }
         catch (FirebaseMessagingException exception)
         {
@@ -196,6 +190,25 @@ public class FirebasePushDeliveryClient implements PushDeliveryClient
             }
             throw DeliveryException.retryable(providerCode, exception);
         }
+    }
+
+    static Message buildMessage(FirebaseEnvelope envelope)
+    {
+        return Message.builder()
+                .setToken(envelope.getToken())
+                .setNotification(Notification.builder()
+                        .setTitle(envelope.getTitle())
+                        .setBody(envelope.getBody())
+                        .build())
+                .setAndroidConfig(AndroidConfig.builder()
+                        .setPriority(AndroidConfig.Priority.HIGH)
+                        .setNotification(AndroidNotification.builder()
+                                .setChannelId("erp_messages")
+                                .setSound("default")
+                                .build())
+                        .build())
+                .putAllData(envelope.getData())
+                .build();
     }
 
     private static DeliveryResult fromException(DeliveryException exception)

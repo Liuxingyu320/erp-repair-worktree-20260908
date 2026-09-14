@@ -26,7 +26,7 @@
       <br />
       <el-row>
         <el-col :lg="2" :sm="3" :xs="3">
-          <el-upload action="#" :http-request="requestUpload" :show-file-list="false" :before-upload="beforeUpload">
+          <el-upload accept=".jpg,.jpeg,.png,image/jpeg,image/png" :disabled="uploading" action="#" :http-request="requestUpload" :show-file-list="false" :before-upload="beforeUpload">
             <el-button size="small">
               选择
               <i class="el-icon-upload el-icon--right"></i>
@@ -46,7 +46,7 @@
           <el-button icon="el-icon-refresh-right" size="small" @click="rotateRight()"></el-button>
         </el-col>
         <el-col :lg="{span: 2, offset: 6}" :sm="2" :xs="2">
-          <el-button type="primary" size="small" @click="uploadImg()">提 交</el-button>
+          <el-button type="primary" size="small" @click="uploadImg()" :loading="uploading">提 交</el-button>
         </el-col>
       </el-row>
     </el-dialog>
@@ -79,7 +79,8 @@ export default {
         filename: 'avatar'          // 文件名称
       },
       previews: {},
-      resizeHandler: null
+      resizeHandler: null,
+      uploading: false
     }
   },
   methods: {
@@ -119,29 +120,43 @@ export default {
     },
     // 上传预处理
     beforeUpload(file) {
-      if (file.type.indexOf("image/") == -1) {
-        this.$modal.msgError("文件格式错误，请上传图片类型,如：JPG，PNG后缀的文件。")
-      } else {
-        const reader = new FileReader()
-        reader.readAsDataURL(file)
-        reader.onload = () => {
-          this.options.img = reader.result
-          this.options.filename = file.name
-        }
+      if (!/\.(jpe?g|png)$/i.test(file.name) || !/^image\/(jpeg|jpg|png)$/i.test(file.type || "")) {
+        this.$modal.msgError("仅支持 JPG、JPEG、PNG 格式头像，请先转换其他相册格式")
+        return false
       }
+      if (file.size > 5 * 1024 * 1024) {
+        this.$modal.msgError("头像文件不能超过 5MB")
+        return false
+      }
+      const reader = new FileReader()
+      reader.onload = () => {
+        if (!this.open) return
+        this.options.img = reader.result
+        this.options.filename = file.name.replace(/\.[^.]+$/, "") + ".png"
+      }
+      reader.onerror = () => this.$modal.msgError("图片读取失败，请重新选择")
+      reader.readAsDataURL(file)
+      return false
     },
-    // 上传图片
+    // 裁剪器输出PNG时同步文件名，防止后端按原扩展名误判。
     uploadImg() {
+      if (this.uploading) return
+      this.uploading = true
       this.$refs.cropper.getCropBlob(data => {
-        let formData = new FormData()
-        formData.append("avatarfile", data, this.options.filename)
+        if (!data || data.size > 5 * 1024 * 1024) {
+          this.uploading = false
+          this.$modal.msgError("裁剪后的头像不能超过 5MB")
+          return
+        }
+        const formData = new FormData()
+        formData.append("avatarfile", data, this.options.filename.replace(/\.[^.]+$/, "") + ".png")
         uploadAvatar(formData).then(response => {
           this.open = false
           this.options.img = response.imgUrl
           store.commit('SET_AVATAR', this.options.img)
           this.$modal.msgSuccess("修改成功")
           this.visible = false
-        })
+        }).finally(() => { this.uploading = false })
       })
     },
     // 实时预览

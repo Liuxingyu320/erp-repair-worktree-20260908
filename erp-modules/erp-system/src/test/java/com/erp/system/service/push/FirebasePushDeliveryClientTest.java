@@ -19,6 +19,17 @@ import com.erp.system.service.push.PushDeliveryClient.DeliveryStatus;
 class FirebasePushDeliveryClientTest
 {
     @Test
+    void androidMessageUsesVisibleNotificationHighPriorityAndCreatedChannel() throws Exception
+    {
+        FirebasePushDeliveryClient.FirebaseEnvelope envelope = new FirebasePushDeliveryClient.FirebaseEnvelope(
+                "synthetic-token", "新消息", "请打开查看", Map.of("recipientUserId", "42"));
+        String json = com.google.api.client.json.gson.GsonFactory.getDefaultInstance()
+                .toString(FirebasePushDeliveryClient.buildMessage(envelope));
+        assertThat(json).contains("\"priority\":\"high\"", "\"channel_id\":\"erp_messages\"",
+                "\"sound\":\"default\"", "\"title\":\"新消息\"", "\"body\":\"请打开查看\"");
+    }
+
+    @Test
     void disabledOrIncompleteConfigurationMustNotInitializeFirebase()
     {
         PushNotificationProperties properties = properties();
@@ -62,6 +73,7 @@ class FirebasePushDeliveryClientTest
         assertThat(sent.get().getBody()).isEqualTo("请进入系统处理合同任务");
         assertThat(sent.get().getData()).containsExactlyInAnyOrderEntriesOf(Map.of(
                 "routeType", "OA_SIGN_HR_TASK",
+                "recipientUserId", "42",
                 "taskId", "9",
                 "businessKey", "SIGN_WAITING_HR:9:3"));
         assertThat(sent.get().getData().toString())

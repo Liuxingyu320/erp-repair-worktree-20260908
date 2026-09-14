@@ -405,12 +405,15 @@
         update inv_stock
         set current_quantity = coalesce(current_quantity, 0) - #{quantity},
             available_quantity = coalesce(available_quantity, 0) - #{quantity},
-            total_cost = coalesce(total_cost, 0) - #{deductCost},
+            total_cost = total_cost - #{deductCost},
             last_out_time = sysdate(),
             version = version + 1,
             update_by = #{updateBy},
             update_time = sysdate()
-        where stock_id = #{stockId} and version = #{version} and coalesce(available_quantity, 0) >= #{quantity}
+        where stock_id = #{stockId} and version = #{version} and available_quantity >= #{quantity}
+          and #{quantity} > 0 and current_quantity >= #{quantity}
+          and cost_price >= 0 and total_cost >= #{deductCost} and #{deductCost} >= 0
+          and (current_quantity != #{quantity} or total_cost = #{deductCost})
     </update>
 
 </mapper>

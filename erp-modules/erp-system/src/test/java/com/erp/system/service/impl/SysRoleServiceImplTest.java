@@ -135,7 +135,7 @@ class SysRoleServiceImplTest
         service.insertAuthUsers(20L, new Long[] { 88L });
 
         assertThat(events).containsExactly("role:20", "user:88", "lock:signHrState",
-                "write:batchUserRole", "write:syncSignHrPermissions");
+                "lock:role:20", "lock:user:88", "write:batchUserRole", "write:syncSignHrPermissions");
     }
 
     @Test
@@ -549,6 +549,13 @@ class SysRoleServiceImplTest
                 role.setRoleKey(Long.valueOf(1L).equals(args[0]) ? "admin" : "common-role");
                 return role;
             }
+            if ("selectRoleByIdForUpdate".equals(method))
+            {
+                events.add("lock:role:" + args[0]);
+                SysRole role = new SysRole((Long) args[0]);
+                role.setStatus("0"); role.setDelFlag("0");
+                return role;
+            }
             throw unexpected(method);
         });
     }
@@ -636,6 +643,11 @@ class SysRoleServiceImplTest
             {
                 return Collections.emptyList();
             }
+            if ("lockUserForRoleAssignment".equals(method))
+            {
+                events.add("lock:user:" + args[0]); return args[0];
+            }
+            if ("selectRoleIdsByUserId".equals(method)) return Collections.emptyList();
             throw unexpected(method);
         });
     }

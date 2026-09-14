@@ -102,6 +102,7 @@
     </div>
 
     <div class="table-card dict-data-table-card">
+    <div v-if="loadError" role="alert"><span>加载失败：{{ loadError }}</span> <el-button type="text" :disabled="loading" @click="retryList">重新加载</el-button></div>
     <el-table v-loading="loading" :data="dataList" @selection-change="handleSelectionChange">
       <el-table-column type="selection" width="55" align="center" />
       <el-table-column label="字典项编号" align="center" prop="dictCode" />
@@ -203,11 +204,13 @@
 </template>
 
 <script>
+import systemListRecovery from "@/mixins/systemListRecovery"
 import { listData, getData, delData, addData, updateData } from "@/api/system/dict/data"
 import { optionselect as getDictOptionselect, getType } from "@/api/system/dict/type"
 import { confirmExportAction } from "@/utils/exportConfirm"
 
 export default {
+  mixins: [systemListRecovery],
   name: "Data",
   dicts: ['sys_normal_disable'],
   data() {
@@ -285,33 +288,40 @@ export default {
       }
     }
   },
-  created() {
-    const dictId = this.$route.params && this.$route.params.dictId
-    this.getType(dictId)
-    this.getTypeList()
+  watch: {
+    "$route.params.dictId": { immediate: true, handler() {
+      this.queryParams.dictType = undefined
+      this.defaultDictType = undefined
+      this.retryList()
+    } }
   },
   methods: {
-    /** 查询字典类型详细 */
-    getType(dictId) {
-      getType(dictId).then(response => {
-        this.queryParams.dictType = response.data.dictType
-        this.defaultDictType = response.data.dictType
-        this.getList()
+    retryList() {
+      if (this.queryParams.dictType) return this.getList()
+      const dictId = this.$route.params && this.$route.params.dictId
+      const query = { ...this.queryParams }
+      return this.runSystemListRequest(async isCurrent => {
+        const [type, options] = await Promise.all([getType(dictId, { silentError: true }), getDictOptionselect({ silentError: true })])
+        if (!type || !type.data || !type.data.dictType || !options || !Array.isArray(options.data)) throw new Error("字典信息无效，请重试")
+        if (!isCurrent()) return null
+        const result = await listData({ ...query, dictType: type.data.dictType }, { silentError: true })
+        return { type: type.data, options: options.data, result }
+      }, response => {
+        if (!response.result || !Array.isArray(response.result.rows)) throw new Error("列表响应无效，请重试")
+        this.queryParams.dictType = response.type.dictType
+        this.defaultDictType = response.type.dictType
+        this.typeOptions = response.options
+        this.dataList = response.result.rows
+        this.total = Number(response.result.total) || 0
       })
     },
-    /** 查询字典类型列表 */
-    getTypeList() {
-      getDictOptionselect().then(response => {
-        this.typeOptions = response.data
-      })
-    },
-    /** 查询字典数据列表 */
     getList() {
-      this.loading = true
-      listData(this.queryParams).then(response => {
+      if (!this.queryParams.dictType) return this.retryList()
+      const query = { ...this.queryParams }
+      return this.runSystemListRequest(() => listData(query, { silentError: true }), response => {
+        if (!response || !Array.isArray(response.rows)) throw new Error("列表响应无效，请重试")
         this.dataList = response.rows
-        this.total = response.total
-        this.loading = false
+        this.total = Number(response.total) || 0
       })
     },
     // 取消按钮

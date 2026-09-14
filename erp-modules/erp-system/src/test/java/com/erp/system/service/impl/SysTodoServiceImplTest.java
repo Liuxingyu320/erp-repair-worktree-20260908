@@ -57,7 +57,7 @@ class SysTodoServiceImplTest
         when(evaluator.evaluate(any())).thenReturn(new HrEmployeeCompletenessSnapshot(
                 98,58,59,8,67,List.of("bankAccount")));
         when(shopService.selectShopDeptIdsByUserId(7L)).thenReturn(List.of(10L, 20L));
-        when(mapper.selectScopedTodoCandidates(any(), anySet(), anyList(), anyList()))
+        when(mapper.selectScopedTodoCandidates(any(), anySet(), anyList(), anyList(), any()))
                 .thenReturn(new ArrayList<>());
         when(mapper.selectHealthCertificateTodoCandidates(any(), anySet(), anyList(), anyList(), any()))
                 .thenReturn(new ArrayList<>());
@@ -185,7 +185,7 @@ class SysTodoServiceImplTest
         service.permissions.addAll(Set.of("hr:completeness:list", "hr:employee:list", "hr:employee:edit"));
         List<SysTodoCandidateRow> rows = List.of(
                 candidate(1L, 10L, "门店A"), candidate(2L, 10L, "门店A"), candidate(3L, 20L, "门店B"));
-        when(mapper.selectScopedTodoCandidates(any(), anySet(), anyList(), anyList())).thenReturn(rows);
+        when(mapper.selectScopedTodoCandidates(any(), anySet(), anyList(), anyList(), any())).thenReturn(rows);
         TodoSummary summary = service.selectSummary(new TodoQuery(), 10L);
 
         assertThat(summary.getTotal()).isEqualTo(2);
@@ -196,7 +196,7 @@ class SysTodoServiceImplTest
         verify(evaluator, org.mockito.Mockito.times(3)).evaluate(any());
         verify(mapper).selectScopedTodoCandidates(any(), anySet(),
                 org.mockito.ArgumentMatchers.eq(List.of()),
-                org.mockito.ArgumentMatchers.eq(List.of(10L, 20L)));
+                org.mockito.ArgumentMatchers.eq(List.of(10L, 20L)), any());
     }
 
     @Test
@@ -206,7 +206,7 @@ class SysTodoServiceImplTest
         SysTodoCandidateRow incomplete=candidate(1L,10L,"门店A");
         SysTodoCandidateRow complete=candidate(2L,10L,"门店A");
         complete.setBankAccount("6222000000000000");
-        when(mapper.selectScopedTodoCandidates(any(),anySet(),anyList(),anyList()))
+        when(mapper.selectScopedTodoCandidates(any(),anySet(),anyList(),anyList(),any()))
                 .thenReturn(List.of(incomplete,complete));
         when(evaluator.evaluate(any())).thenAnswer(invocation->{
             SysUser user=invocation.getArgument(0);
@@ -231,7 +231,7 @@ class SysTodoServiceImplTest
         urgent.setContractEndDate(date(7));
         SysTodoCandidateRow warning = candidate(2L, 20L, "门店B");
         warning.setContractEndDate(date(30));
-        when(mapper.selectScopedTodoCandidates(any(), anySet(), anyList(), anyList()))
+        when(mapper.selectScopedTodoCandidates(any(), anySet(), anyList(), anyList(), any()))
                 .thenReturn(List.of(urgent, warning));
         TodoQuery query = new TodoQuery();
         query.setPageNum(2);
@@ -257,7 +257,7 @@ class SysTodoServiceImplTest
         Date sameCreatedTime = new Date(service.now);
         profile.setCreateTime(sameCreatedTime);
         onboarding.setCreateTime(sameCreatedTime);
-        when(mapper.selectScopedTodoCandidates(any(), anySet(), anyList(), anyList()))
+        when(mapper.selectScopedTodoCandidates(any(), anySet(), anyList(), anyList(), any()))
                 .thenReturn(List.of(profile, onboarding));
         when(evaluator.evaluate(any())).thenAnswer(invocation -> {
             SysUser user = invocation.getArgument(0);
@@ -293,7 +293,7 @@ class SysTodoServiceImplTest
 
         verify(shopService, never()).checkUserShopScope(any(), any(), anyBoolean());
         verify(mapper).selectScopedTodoCandidates(any(), anySet(),
-                eq(List.of()), eq(List.of(10L, 20L)));
+                eq(List.of()), eq(List.of(10L, 20L)), any());
     }
 
     @Test
@@ -304,7 +304,7 @@ class SysTodoServiceImplTest
         SysTodoCandidateRow row = candidate(1L, 10L, "门店A");
         row.setEmployeeName("张三");
         row.setEmployeeNo("E1001");
-        when(mapper.selectScopedTodoCandidates(any(), anySet(), anyList(), anyList()))
+        when(mapper.selectScopedTodoCandidates(any(), anySet(), anyList(), anyList(), any()))
                 .thenReturn(List.of(row));
 
         TodoQuery byEmployee = new TodoQuery();
@@ -328,7 +328,7 @@ class SysTodoServiceImplTest
         SysTodoCandidateRow row = candidate(1L, 10L, "门店A");
         row.setHealthCertificateId(81L);
         row.setHealthCertificateExpiresOn(date(40));
-        when(mapper.selectScopedTodoCandidates(any(), anySet(), anyList(), anyList()))
+        when(mapper.selectScopedTodoCandidates(any(), anySet(), anyList(), anyList(), any()))
                 .thenReturn(List.of(row));
 
         SysTodoPage page = service.selectTodoPage(new TodoQuery(), 10L);
@@ -348,7 +348,7 @@ class SysTodoServiceImplTest
         when(configService.selectConfigByKey("todo.contract.warning.days")).thenReturn("30");
         SysTodoCandidateRow row = candidate(1L, 10L, "门店A");
         row.setContractEndDate(date(5));
-        when(mapper.selectScopedTodoCandidates(any(), anySet(), anyList(), anyList()))
+        when(mapper.selectScopedTodoCandidates(any(), anySet(), anyList(), anyList(), any()))
                 .thenReturn(List.of(row));
         TodoQuery query = new TodoQuery();
         query.setType(SysTodoTypes.HR_CONTRACT_DUE);
@@ -376,7 +376,7 @@ class SysTodoServiceImplTest
         offboard.setEmployeeStatus("离职");
         offboard.setLinkedAccountStatus("0");
         offboard.setLinkedAccountDelFlag("0");
-        when(mapper.selectScopedTodoCandidates(any(), anySet(), anyList(), anyList()))
+        when(mapper.selectScopedTodoCandidates(any(), anySet(), anyList(), anyList(), any()))
                 .thenReturn(List.of(profile, onboarding, contract, offboard));
         TodoQuery query = new TodoQuery();
         query.setPageSize(100);

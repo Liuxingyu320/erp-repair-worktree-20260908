@@ -36,11 +36,23 @@ const pushRegistration = {
       servicePromise.then(service => service.setRouter(nextRouter)).catch(() => {})
     }
   },
-  initialize(userId) {
+  bootstrap() {
+    if (!isNativeRuntime()) return Promise.resolve({ listening: false, reason: 'web' })
+    return loadService().then(service => service.bootstrap())
+  },
+  resumeNavigation(userId) {
+    if (!isNativeRuntime()) return Promise.resolve()
+    return loadService().then(service => service.resumeNavigation(userId))
+  },
+  subscribeStatus(listener) {
+    if (!isNativeRuntime()) return Promise.resolve(() => {})
+    return loadService().then(service => service.subscribeStatus(listener))
+  },
+  initialize(userId, options) {
     if (!servicePromise && !isNativeRuntime()) {
       return Promise.resolve({ registered: false, reason: 'web' })
     }
-    return loadService().then(service => service.initialize(userId))
+    return loadService().then(service => service.initialize(userId, options))
   },
   disable(authToken) {
     if (!servicePromise && !isNativeRuntime()) {

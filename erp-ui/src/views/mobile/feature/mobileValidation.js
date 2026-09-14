@@ -1,3 +1,5 @@
+const { isReturnSelected } = require("../../../utils/returnSelection")
+
 function getMobileFormValidationError(config, data) {
   const source = data || {}
   const fields = (config && config.fields) || []
@@ -27,8 +29,16 @@ function validateLineItems(field, value, required) {
   if (required && rows.length === 0) {
     return createValidationError("请添加" + field.label, field.key)
   }
+  if (field.selectionScoped && required && !rows.some(isReturnSelected)) {
+    return createValidationError("请至少勾选一条" + field.label, field.key)
+  }
   for (let i = 0; i < rows.length; i += 1) {
     const row = rows[i] || {}
+    if (field.selectionScoped && !isReturnSelected(row)) continue
+    if (field.selectionScoped && (!Number.isFinite(Number(row.quantity)) || Number(row.quantity) <= 0 ||
+        (hasValue(row.maxReturnQuantity) && (!Number.isFinite(Number(row.maxReturnQuantity)) || Number(row.quantity) > Number(row.maxReturnQuantity))))) {
+      return createValidationError(field.label + "第" + (i + 1) + "行数量须大于0且不超过可退数量", field.key, i, "quantity")
+    }
     const lineNo = i + 1
     if (field.payloadMode === "stock-check-products" && !hasValue(row.productId)) {
       return createValidationError(field.label + "第" + lineNo + "行请填写商品", field.key, i, "productId")

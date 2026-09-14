@@ -1,9 +1,7 @@
-const SUMMARY_METRIC_KEYS = {
-  "待入库": "pendingReceiveCount",
-  "待发货": "pendingDeliverCount",
-  "待出库": "pendingDeliverCount",
-  "低库存": "lowStockCount"
-}
+const SUMMARY_METRIC_KEYS = new Set([
+  "todaySalesCount", "pendingReceiveCount", "pendingDeliverCount", "lowStockCount",
+  "pendingStockCheckCount", "pendingReturnCount", "transferReceiveCount"
+])
 
 const ACTION_DETAILS = {
   STORE: {
@@ -62,10 +60,10 @@ const FALLBACK_PROFILES = {
       { label: "我的", icon: "user", path: "/mobile/mine" }
     ],
     metrics: [
-      { label: "今日开单", value: "0", unit: "单", icon: "sales", tone: "blue" },
-      { label: "待退货", value: "0", unit: "单", icon: "return", tone: "red" },
-      { label: "低库存", value: "0", unit: "款", icon: "warning", tone: "amber" },
-      { label: "补货中", value: "0", unit: "单", icon: "inbound", tone: "teal" }
+      { key: "todaySalesCount", label: "今日销售", value: "—", unit: "单", icon: "sales", tone: "blue" },
+      { key: "pendingReturnCount", label: "待退货", value: "—", unit: "单", icon: "return", tone: "red" },
+      { key: "lowStockCount", label: "低库存", value: "—", unit: "款", icon: "warning", tone: "amber" },
+      { key: "transferReceiveCount", label: "补货中", value: "—", unit: "单", icon: "inbound", tone: "teal" }
     ],
     flow: [
       { label: "开单", text: "门店销售单进入待发货或直接完成", tone: "blue" },
@@ -102,10 +100,10 @@ const FALLBACK_PROFILES = {
       { label: "我的", icon: "user", path: "/mobile/mine" }
     ],
     metrics: [
-      { label: "待入库", value: "0", unit: "单", icon: "purchase", tone: "amber" },
-      { label: "待发货", value: "0", unit: "单", icon: "truck", tone: "blue" },
-      { label: "待退货", value: "0", unit: "单", icon: "return", tone: "red" },
-      { label: "调拨单", value: "0", unit: "张", icon: "transfer", tone: "violet" }
+      { key: "pendingReceiveCount", label: "待入库", value: "—", unit: "单", icon: "purchase", tone: "amber" },
+      { key: "pendingDeliverCount", label: "待发货", value: "—", unit: "单", icon: "truck", tone: "blue" },
+      { key: "pendingReturnCount", label: "待退货", value: "—", unit: "单", icon: "return", tone: "red" },
+      { key: "pendingStockCheckCount", label: "待盘点", value: "—", unit: "张", icon: "transfer", tone: "violet" }
     ],
     flow: [
       { label: "收货", text: "供应商到货后确认入库", tone: "amber" },
@@ -141,10 +139,18 @@ function createWorkbenchSummaryQuery(context) {
 function applyWorkbenchSummaryToMetrics(metrics, summary) {
   const source = summary && typeof summary === "object" ? summary : {}
   return (metrics || []).map(metric => {
-    const key = SUMMARY_METRIC_KEYS[metric.label]
-    const value = key ? Number(source[key]) : NaN
-    if (!Number.isFinite(value)) return Object.assign({}, metric)
-    return Object.assign({}, metric, { value: String(Math.max(0, value)) })
+    const key = SUMMARY_METRIC_KEYS.has(metric.key) ? metric.key : null
+    const raw = key ? source[key] : null
+    const value = raw === null || raw === undefined || raw === "" ? NaN : Number(raw)
+    const hint = key === "todaySalesCount"
+      ? source.todaySalesStatus === "forbidden" ? "无报表查看权限"
+        : "按销售单经营日期统计已有发货明细的单数；与经营报表口径一致"
+      : metric.hint
+    return Object.assign({}, metric, {
+      value: Number.isFinite(value) ? String(Math.max(0, value)) : "—",
+      hint,
+      unknown: !Number.isFinite(value)
+    })
   })
 }
 

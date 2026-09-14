@@ -33,6 +33,7 @@ public class HrEmployeeAccessService
     public List<SysUser> listScoped(HrEmployeeQuery query)
     {
         query=HrEmployeePopulationPolicy.applyArchiveAccess(query);
+        healthDate(query);
         List<SysUser> rows = userMapper.selectHrEmployeeList(query);
         return rows == null ? Collections.emptyList() : rows;
     }
@@ -42,6 +43,7 @@ public class HrEmployeeAccessService
     public List<SysUser> listActiveScoped(HrEmployeeQuery query)
     {
         query=HrEmployeePopulationPolicy.applyActiveGovernance(query);
+        healthDate(query);
         List<SysUser> rows=userMapper.selectHrEmployeeList(query);
         return rows==null?Collections.emptyList():rows;
     }
@@ -51,6 +53,7 @@ public class HrEmployeeAccessService
     {
         if (query == null || query.getUserId() == null) throw denied();
         HrEmployeePopulationPolicy.applyArchiveAccess(query);
+        healthDate(query);
         List<SysUser> rows = userMapper.selectHrEmployeeList(query);
         if (rows == null || rows.isEmpty()) throw denied();
         return rows.get(0);
@@ -61,6 +64,7 @@ public class HrEmployeeAccessService
     {
         if(query==null||query.getUserId()==null)throw denied();
         HrEmployeePopulationPolicy.applyActiveGovernance(query);
+        healthDate(query);
         List<SysUser> rows=userMapper.selectHrEmployeeList(query);
         if(rows==null||rows.isEmpty())throw denied();
         return rows.get(0);
@@ -72,6 +76,7 @@ public class HrEmployeeAccessService
     {
         if(query==null||query.getUserId()==null)throw denied();
         HrEmployeePopulationPolicy.applyArchiveAccess(query);
+        healthDate(query);
         SysUser row=userMapper.selectHrEmployeeForUpdate(query);
         if(row==null)throw denied();
         return row;
@@ -83,6 +88,7 @@ public class HrEmployeeAccessService
     {
         if(query==null||query.getUserId()==null)throw denied();
         HrEmployeePopulationPolicy.applyActiveGovernance(query);
+        healthDate(query);
         SysUser row=userMapper.selectHrEmployeeForUpdate(query);
         if(row==null)throw denied();
         return row;
@@ -116,6 +122,11 @@ public class HrEmployeeAccessService
         if(rows==null||rows.isEmpty())throw new ServiceException(
                 "目标组织不存在、已停用或无权访问", HttpStatus.FORBIDDEN);
         return rows.get(0);
+    }
+
+    private void healthDate(HrEmployeeQuery query)
+    {
+        query.getParams().put("healthAsOfDate", java.time.LocalDate.now(java.time.ZoneId.of("Asia/Shanghai")));
     }
 
     private ServiceException denied() { return new ServiceException("无权访问该员工或记录不存在"); }

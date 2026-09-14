@@ -117,6 +117,13 @@
         order by n.create_time desc
     </select>
 
+    <select id="selectInvDeliveryNoticeBySalesOrderIdForUpdate" parameterType="Long" resultMap="InvDeliveryNoticeResult">
+        select notice_id, notice_no, sales_order_id, sales_order_no, customer_name,
+               status, shop_dept_id, warehouse_id, create_by, create_time, update_by, update_time, remark
+        from inv_delivery_notice where sales_order_id = #{salesOrderId}
+        order by notice_id asc for update
+    </select>
+
     <insert id="insertInvDeliveryNotice" parameterType="InvDeliveryNotice" useGeneratedKeys="true" keyProperty="noticeId">
         insert into inv_delivery_notice (
             notice_no, sales_order_id, sales_order_no, customer_name, status,

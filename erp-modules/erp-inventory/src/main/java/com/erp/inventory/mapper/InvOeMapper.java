@@ -8,6 +8,7 @@ public interface InvOeMapper
 {
     List<InvOeItem> selectInvOeList(InvOeItem item);
     InvOeItem selectInvOeById(Long oeItemId);
+    InvOeItem selectInvOeByIdForUpdate(Long oeItemId);
     InvOeItem selectInvOeByCode(@Param("oeItemCode") String oeItemCode);
     InvOeItem selectInvOeByNaturalKey(@Param("categoryId") Long categoryId,
                                       @Param("oeTypeName") String oeTypeName,

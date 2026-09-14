@@ -22,7 +22,7 @@ const migration = repoSource("sql/erp_inventory_order_party_reference_20260713.s
 
 assert.ok(
   reportMapper.includes("sales_amount - report_amounts.sales_cost") &&
-    reportMapper.includes("received_quantity") &&
+    reportMapper.includes("qevent.quantity") && reportMapper.includes("inv_quality_inspection") &&
     reportMapper.includes("delivered_quantity") &&
     reportMapper.includes("sales_return_cost") &&
     reportMapper.includes("business_type in ('sales', 'outbound')"),
@@ -30,9 +30,10 @@ assert.ok(
 )
 
 assert.ok(
-  salesReturnService.includes("resolveOriginalOutboundCost") &&
-    salesReturnService.includes('"sales".equals(businessType)') &&
-    salesReturnService.includes('"outbound".equals(businessType)') &&
+  salesReturnService.includes("selectInvOutboundRecordBySalesDetailId") &&
+    salesReturnService.includes("deliveredLines != 1") &&
+    salesReturnService.includes("quantity.compareTo(delivered) != 0") &&
+    !salesReturnService.includes("resolveReturnStockCost") &&
     reportMapper.includes("sales_return_cost"),
   "sales returns should reverse the original outbound cost while report cost remains traceable to stock logs"
 )
@@ -49,9 +50,9 @@ assert.ok(
 
 assert.ok(
   purchase.includes('v-model="form.supplierId"') &&
-    purchase.includes("listSupplier") &&
+    purchase.includes("listPurchaseSuppliers") &&
     purchase.includes('prop="orderDate"') &&
-    purchase.includes(':disabled="!selectedItemType || !productSelection.length"') &&
+    purchase.includes(':disabled="productLoading || !productSelection.length"') && purchase.includes(':disabled="!form.supplierId"') &&
     purchase.includes("请先选择供应商"),
   "purchase entry should select a supplier master before enabling product selection"
 )

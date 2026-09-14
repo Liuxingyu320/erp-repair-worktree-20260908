@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import com.erp.common.core.utils.poi.ExcelUtil;
@@ -19,6 +20,8 @@ import com.erp.common.log.annotation.Log;
 import com.erp.common.log.enums.BusinessType;
 import com.erp.common.security.annotation.IdempotentSubmit;
 import com.erp.common.security.annotation.RequiresPermissions;
+import com.erp.common.security.annotation.Logical;
+import com.erp.inventory.annotation.PersistentCommand;
 import com.erp.inventory.domain.InvPurchaseOrder;
 import com.erp.inventory.domain.InvGiftBox;
 import com.erp.inventory.domain.InvOeItem;
@@ -35,6 +38,15 @@ public class InvPurchaseController extends InvBaseController
 {
     @Autowired
     private IInvPurchaseService purchaseService;
+
+    @RequiresPermissions(value = { "inv:purchase:add", "inv:purchase:submit", "inv:purchase:receive", "inv:purchase:qc", "inv:purchase:remove" }, logical = Logical.OR)
+    @GetMapping("/action-context/{orderId}")
+    public AjaxResult actionContext(@PathVariable("orderId") Long orderId, HttpServletRequest request,
+            HttpServletResponse response)
+    {
+        response.setHeader("Cache-Control", "no-store, max-age=0");
+        return success(purchaseService.getActionContext(orderId, resolveShopDeptId(request)));
+    }
 
     @RequiresPermissions("inv:purchase:add")
     @IdempotentSubmit(timeout = 30)
@@ -91,6 +103,15 @@ public class InvPurchaseController extends InvBaseController
         return getDataTable(list);
     }
 
+    @RequiresPermissions("inv:purchase:add")
+    @GetMapping("/draft/{orderId}")
+    public AjaxResult draft(@PathVariable("orderId") Long orderId, HttpServletRequest request,
+            HttpServletResponse response)
+    {
+        response.setHeader("Cache-Control", "no-store, max-age=0");
+        return success(purchaseService.getPurchaseDraft(orderId, resolveShopDeptId(request)));
+    }
+
     @RequiresPermissions("inv:purchase:query")
     @GetMapping("/{orderId}")
     public AjaxResult detail(@PathVariable("orderId") Long orderId, HttpServletRequest request,
@@ -141,16 +162,26 @@ public class InvPurchaseController extends InvBaseController
     }
 
     @RequiresPermissions("inv:purchase:receive")
-    @IdempotentSubmit(timeout = 30)
-    @Log(title = "采购收货", businessType = BusinessType.UPDATE)
-    @PostMapping("/receive/{orderId}")
-    public AjaxResult receive(@PathVariable("orderId") Long orderId,
-            @Validated @RequestBody InvReceiveRequest receiveRequest, HttpServletRequest request,
+    @GetMapping("/receive-context/{orderId}")
+    public AjaxResult receiveContext(@PathVariable("orderId") Long orderId, HttpServletRequest request,
             HttpServletResponse response)
     {
         disableCaching(response);
-        purchaseService.receivePurchase(orderId, receiveRequest, resolveShopDeptId(request));
-        return success();
+        return success(purchaseService.getReceiveContext(orderId, resolveShopDeptId(request)));
+    }
+
+    @RequiresPermissions("inv:purchase:receive")
+    @PersistentCommand
+    @Log(title = "采购收货", businessType = BusinessType.UPDATE)
+    @PostMapping("/receive/{orderId}")
+    public AjaxResult receive(@PathVariable("orderId") Long orderId,
+            @Validated @RequestBody InvReceiveRequest receiveRequest,
+            @RequestHeader(name = "X-Request-Id") String requestId, HttpServletRequest request,
+            HttpServletResponse response)
+    {
+        disableCaching(response);
+        return success(purchaseService.receivePurchase(orderId, receiveRequest,
+                resolveShopDeptId(request), requestId));
     }
 
     @RequiresPermissions("inv:purchase:query")
@@ -172,7 +203,7 @@ public class InvPurchaseController extends InvBaseController
     }
 
     @RequiresPermissions("inv:purchase:qc")
-    @IdempotentSubmit(timeout = 30)
+    @com.erp.inventory.annotation.PersistentCommand
     @Log(title = "采购逐行质检", businessType = BusinessType.UPDATE)
     @PostMapping("/qc/batch/{orderId}")
     public AjaxResult qualityCheckBatch(@PathVariable("orderId") Long orderId,
@@ -180,12 +211,22 @@ public class InvPurchaseController extends InvBaseController
             HttpServletRequest request, HttpServletResponse response)
     {
         disableCaching(response);
-        purchaseService.qualityCheckBatch(orderId, qualityCheckRequest, resolveShopDeptId(request));
-        return success();
+        try
+        {
+            purchaseService.qualityCheckBatch(orderId, qualityCheckRequest, resolveShopDeptId(request));
+            return success();
+        }
+        catch (com.erp.common.core.exception.ServiceException failure)
+        {
+            // The proxied service transaction has rolled back before this response is sent.
+            AjaxResult rejected = AjaxResult.error(failure.getMessage());
+            rejected.put("qualityCheckOutcome", "REJECTED");
+            return rejected;
+        }
     }
 
     @RequiresPermissions("inv:purchase:qc")
-    @IdempotentSubmit(timeout = 30)
+    @com.erp.inventory.annotation.PersistentCommand
     @Log(title = "采购质检", businessType = BusinessType.UPDATE)
     @PostMapping("/qc/{orderId}")
     public AjaxResult qualityCheck(@PathVariable("orderId") Long orderId,
@@ -199,8 +240,17 @@ public class InvPurchaseController extends InvBaseController
         {
             return error("质检结果不能为空");
         }
-        purchaseService.qualityCheck(orderId, qcResult, qcRemark, resolveShopDeptId(request));
-        return success();
+        try
+        {
+            purchaseService.qualityCheckWithRequest(orderId, qcResult, qcRemark, resolveShopDeptId(request), body.get("requestId"));
+            return success();
+        }
+        catch (com.erp.common.core.exception.ServiceException failure)
+        {
+            AjaxResult rejected = AjaxResult.error(failure.getMessage());
+            rejected.put("qualityCheckOutcome", "REJECTED");
+            return rejected;
+        }
     }
 
     @RequiresPermissions("inv:purchase:remove")

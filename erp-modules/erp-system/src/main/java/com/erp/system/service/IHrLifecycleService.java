@@ -10,6 +10,9 @@ import com.erp.system.domain.dto.HrOffboardingConfirmRequest;
 /** HR生命周期业务动作入口。 */
 public interface IHrLifecycleService
 {
+    com.erp.system.domain.vo.HrEmployeeLifecycleContextVo lifecycleContext(Long employeeId,
+            String scenario, Long operatorUserId);
+
     Long confirmOnboarding(Long employeeId, HrLifecycleOnboardingConfirmRequest request,
             Long operatorUserId, String operatorName, boolean operatorAdmin,
             String operatorIp, String operatorUserAgent);

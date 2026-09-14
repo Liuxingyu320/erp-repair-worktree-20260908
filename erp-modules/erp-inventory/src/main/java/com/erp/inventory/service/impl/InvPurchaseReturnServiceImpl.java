@@ -10,21 +10,26 @@ import java.util.HashSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.erp.common.core.exception.ServiceException;
+import com.erp.inventory.domain.vo.InvSpecialistReadVo;
+import com.erp.inventory.domain.vo.InvSpecialistActionContext;
 import com.erp.common.security.utils.SecurityUtils;
 import com.erp.inventory.constant.InvStatusConstants;
 import com.erp.inventory.constant.InvItemTypes;
 import com.erp.inventory.domain.InvPurchaseDetail;
+import com.erp.inventory.domain.InvInboundRecord;
 import com.erp.inventory.domain.InvPurchaseOrder;
 import com.erp.inventory.domain.InvPurchaseReturn;
 import com.erp.inventory.domain.InvPurchaseReturnDetail;
 import com.erp.inventory.domain.InvStock;
 import com.erp.inventory.domain.InvStockLog;
 import com.erp.inventory.mapper.InvNumberSequenceMapper;
+import com.erp.inventory.mapper.InvInboundRecordMapper;
 import com.erp.inventory.mapper.InvPurchaseDetailMapper;
 import com.erp.inventory.mapper.InvPurchaseOrderMapper;
 import com.erp.inventory.mapper.InvPurchaseReturnDetailMapper;
@@ -58,10 +63,22 @@ public class InvPurchaseReturnServiceImpl extends InvBaseService implements IInv
     private InvStockMapper stockMapper;
 
     @Autowired
+    private InvInboundRecordMapper inboundRecordMapper;
+
+    @Autowired
     private InvStockLogMapper stockLogMapper;
 
     @Autowired
     private InvNumberSequenceMapper numberSequenceMapper;
+
+    @Override
+    public InvSpecialistActionContext getActionContext(Long returnId, Long selectedShopDeptId)
+    {
+        Long warehouseId = requireWarehouseContext(selectedShopDeptId, PURCHASE_RETURN_WAREHOUSE_CONTEXT_MESSAGE);
+        InvPurchaseReturn order = assertAndGetScopedReturn(returnId, selectedShopDeptId);
+        assertReturnBelongsToSelectedWarehouse(order, warehouseId);
+        return InvSpecialistActionContext.purchaseReturn(order);
+    }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -94,11 +111,7 @@ public class InvPurchaseReturnServiceImpl extends InvBaseService implements IInv
         }
         else
         {
-            InvPurchaseReturn visible = assertAndGetScopedReturn(
-                    purchaseReturn.getReturnId(), selectedShopDeptId);
-            assertReturnBelongsToSelectedWarehouse(visible, shopDeptId);
-            InvPurchaseReturn db = requireLockedReturn(purchaseReturn.getReturnId());
-            assertReturnBelongsToSelectedWarehouse(db, shopDeptId);
+            InvPurchaseReturn db = requireLockedScopedReturn(purchaseReturn.getReturnId(), shopDeptId);
             InvStateGuard.requireDraftForEdit(db.getStatus());
             if (purchaseReturn.getPurchaseOrderId() == null)
             {
@@ -143,10 +156,7 @@ public class InvPurchaseReturnServiceImpl extends InvBaseService implements IInv
     {
         Long selectedWarehouseId = requireWarehouseContext(selectedShopDeptId,
                 PURCHASE_RETURN_WAREHOUSE_CONTEXT_MESSAGE);
-        InvPurchaseReturn visible = assertAndGetScopedReturn(returnId, selectedShopDeptId);
-        assertReturnBelongsToSelectedWarehouse(visible, selectedWarehouseId);
-        InvPurchaseReturn locked = requireLockedReturn(returnId);
-        assertReturnBelongsToSelectedWarehouse(locked, selectedWarehouseId);
+        InvPurchaseReturn locked = requireLockedScopedReturn(returnId, selectedWarehouseId);
         InvStateGuard.requireDraftForEdit(locked.getStatus());
         validateAndNormalizeReturnHeader(locked);
         requireReturnDetails(purchaseReturnDetailMapper
@@ -155,6 +165,14 @@ public class InvPurchaseReturnServiceImpl extends InvBaseService implements IInv
         updateReturnStatus(returnId, InvStatusConstants.SUBMITTED,
                 "采购退货草稿已变化，请刷新后重试");
         return getReturnDetail(returnId, selectedWarehouseId);
+    }
+
+    @Override
+    public InvPurchaseReturn getReturnDraft(Long returnId, Long selectedShopDeptId)
+    {
+        InvPurchaseReturn draft = getReturnDetail(returnId, selectedShopDeptId);
+        InvStateGuard.requireDraftForEdit(draft.getStatus());
+        return InvSpecialistReadVo.purchaseReturn(draft);
     }
 
     @Override
@@ -232,12 +250,7 @@ public class InvPurchaseReturnServiceImpl extends InvBaseService implements IInv
     public void confirmReturn(Long returnId, Long selectedShopDeptId)
     {
         Long selectedWarehouseId = requireWarehouseContext(selectedShopDeptId, PURCHASE_RETURN_WAREHOUSE_CONTEXT_MESSAGE);
-        InvPurchaseReturn purchaseReturn = assertAndGetScopedReturn(returnId, selectedShopDeptId);
-        assertReturnBelongsToSelectedWarehouse(purchaseReturn, selectedWarehouseId);
-        InvStateGuard.requireSubmittedForReturnConfirm(purchaseReturn.getStatus());
-        // 状态锁校验
-        InvPurchaseReturn locked = requireLockedReturn(returnId);
-        assertReturnBelongsToSelectedWarehouse(locked, selectedWarehouseId);
+        InvPurchaseReturn locked = requireLockedScopedReturn(returnId, selectedWarehouseId);
         InvStateGuard.requireSubmittedForReturnConfirm(locked.getStatus());
         validateReturnQuantity(locked, returnId);
         List<InvPurchaseReturnDetail> details = purchaseReturnDetailMapper.selectInvPurchaseReturnDetailByReturnIdForUpdate(returnId);
@@ -269,8 +282,9 @@ public class InvPurchaseReturnServiceImpl extends InvBaseService implements IInv
             }
             // 扣减库存（按移动加权平均成本扣减）
             BigDecimal beforeQty = stock.getCurrentQuantity();
-            BigDecimal currentCostPrice = stock.getCostPrice() != null ? stock.getCostPrice() : BigDecimal.ZERO;
-            BigDecimal deductCost = toReturn.multiply(currentCostPrice);
+            InvStockCostAllocator.Allocation allocation = InvStockCostAllocator.allocate(stock, toReturn);
+            BigDecimal currentCostPrice = allocation.unitCost();
+            BigDecimal deductCost = allocation.amount();
             int rows = stockMapper.deductInvStockWithCost(stock.getStockId(), stock.getVersion(), toReturn, deductCost, SecurityUtils.getUsername());
             if (rows == 0)
             {
@@ -293,6 +307,7 @@ public class InvPurchaseReturnServiceImpl extends InvBaseService implements IInv
             log.setBeforeQuantity(beforeQty);
             log.setAfterQuantity(stock.getCurrentQuantity());
             log.setCostPrice(currentCostPrice);
+            log.setCostAmount(deductCost);
             log.setCreateBy(SecurityUtils.getUsername());
             log.setCreateTime(new Date());
             log.setRemark("采购退货出库");
@@ -319,10 +334,7 @@ public class InvPurchaseReturnServiceImpl extends InvBaseService implements IInv
     public void cancelReturn(Long returnId, Long selectedShopDeptId)
     {
         Long selectedWarehouseId = requireWarehouseContext(selectedShopDeptId, PURCHASE_RETURN_WAREHOUSE_CONTEXT_MESSAGE);
-        InvPurchaseReturn visible = assertAndGetScopedReturn(returnId, selectedShopDeptId);
-        assertReturnBelongsToSelectedWarehouse(visible, selectedWarehouseId);
-        InvPurchaseReturn locked = requireLockedReturn(returnId);
-        assertReturnBelongsToSelectedWarehouse(locked, selectedWarehouseId);
+        InvPurchaseReturn locked = requireLockedScopedReturn(returnId, selectedWarehouseId);
         InvStateGuard.requireCancelableDocument(locked.getStatus());
         updateReturnStatus(returnId, InvStatusConstants.CANCELLED,
                 "采购退货单已变化，请刷新后重试");
@@ -482,6 +494,29 @@ public class InvPurchaseReturnServiceImpl extends InvBaseService implements IInv
         }
     }
 
+    private InvPurchaseOrder requireLockedSourceOrder(Long orderId, Long warehouseId)
+    {
+        if (orderId == null) throw new ServiceException("采购退货单未关联采购单");
+        InvPurchaseOrder source = purchaseOrderMapper.selectInvPurchaseOrderByIdForUpdate(orderId);
+        if (source == null) throw new ServiceException("原采购单不存在");
+        if (!warehouseId.equals(source.getShopDeptId()))
+            throw new ServiceException("原采购单不属于当前仓库");
+        return source;
+    }
+
+    /** Every return mutation locks the original order before any return or detail row. */
+    private InvPurchaseReturn requireLockedScopedReturn(Long returnId, Long warehouseId)
+    {
+        InvPurchaseReturn visible = assertAndGetScopedReturn(returnId, warehouseId);
+        assertReturnBelongsToSelectedWarehouse(visible, warehouseId);
+        InvPurchaseOrder source = requireLockedSourceOrder(visible.getPurchaseOrderId(), warehouseId);
+        InvPurchaseReturn locked = requireLockedReturn(returnId);
+        assertReturnBelongsToSelectedWarehouse(locked, warehouseId);
+        if (!Objects.equals(source.getOrderId(), locked.getPurchaseOrderId()))
+            throw new ServiceException("退货单原采购单已变化，请刷新后重试");
+        return locked;
+    }
+
     private InvPurchaseReturn requireLockedReturn(Long returnId)
     {
         InvPurchaseReturn locked = purchaseReturnMapper
@@ -512,8 +547,8 @@ public class InvPurchaseReturnServiceImpl extends InvBaseService implements IInv
         boolean hasReturnable = false;
         for (InvPurchaseDetail detail : sourceOrder.getDetails())
         {
-            BigDecimal received = detail.getReceivedQuantity() == null
-                    ? BigDecimal.ZERO : detail.getReceivedQuantity();
+            BigDecimal received = detail.getStockedQuantity() == null
+                    ? BigDecimal.ZERO : detail.getStockedQuantity();
             BigDecimal historical = detail.getDetailId() == null
                     ? BigDecimal.ZERO
                     : purchaseReturnDetailMapper
@@ -535,15 +570,29 @@ public class InvPurchaseReturnServiceImpl extends InvBaseService implements IInv
         {
             throw new ServiceException("采购退货单未关联采购单");
         }
-        List<InvPurchaseDetail> purchaseDetails = purchaseDetailMapper.selectInvPurchaseDetailByOrderId(purchaseReturn.getPurchaseOrderId());
+        List<InvPurchaseDetail> purchaseDetails = purchaseDetailMapper.selectInvPurchaseDetailByOrderIdForUpdate(purchaseReturn.getPurchaseOrderId());
         if (purchaseDetails.isEmpty())
         {
             throw new ServiceException("原采购单无明细");
         }
-        List<InvPurchaseReturnDetail> returnDetails = purchaseReturnDetailMapper.selectInvPurchaseReturnDetailByReturnId(excludeReturnId);
+        List<InvPurchaseReturnDetail> returnDetails = purchaseReturnDetailMapper.selectInvPurchaseReturnDetailByReturnIdForUpdate(excludeReturnId);
         if (returnDetails == null || returnDetails.isEmpty())
         {
             throw new ServiceException("退货单无明细");
+        }
+        // The purchase detail query contains non-locking subqueries; recompute accepted facts from current rows.
+        applyCurrentStockedQuantities(purchaseDetails, inboundRecordMapper
+                .selectByOrderIdForUpdate(purchaseReturn.getPurchaseOrderId()));
+        Map<Long, BigDecimal> reservedByDetail = new HashMap<>();
+        Map<Long, BigDecimal> reservedByProduct = new HashMap<>();
+        for (InvPurchaseReturnDetail reserved : purchaseReturnDetailMapper.selectReservedDetailsForUpdate(
+                purchaseReturn.getPurchaseOrderId(), excludeReturnId))
+        {
+            BigDecimal quantity = reserved.getQuantity() == null ? BigDecimal.ZERO : reserved.getQuantity();
+            if (reserved.getPurchaseDetailId() != null)
+                reservedByDetail.merge(reserved.getPurchaseDetailId(), quantity, BigDecimal::add);
+            if (reserved.getProductId() != null)
+                reservedByProduct.merge(reserved.getProductId(), quantity, BigDecimal::add);
         }
         Map<Long, InvPurchaseDetail> originalDetailById = new HashMap<>();
         Map<Long, InvPurchaseDetail> uniqueDetailByProduct = new HashMap<>();
@@ -563,7 +612,7 @@ public class InvPurchaseReturnServiceImpl extends InvBaseService implements IInv
             uniqueDetailByProduct.putIfAbsent(pd.getProductId(), pd);
             detailCountByProduct.merge(pd.getProductId(), 1, Integer::sum);
             receivedQtyByProduct.merge(pd.getProductId(),
-                    pd.getReceivedQuantity() != null ? pd.getReceivedQuantity() : BigDecimal.ZERO,
+                    pd.getStockedQuantity() != null ? pd.getStockedQuantity() : BigDecimal.ZERO,
                     BigDecimal::add);
             originalNameByProduct.putIfAbsent(pd.getProductId(), pd.getProductName());
         }
@@ -594,10 +643,9 @@ public class InvPurchaseReturnServiceImpl extends InvBaseService implements IInv
         {
             Long purchaseDetailId = entry.getKey();
             InvPurchaseDetail originalDetail = currentOriginalByDetail.get(purchaseDetailId);
-            BigDecimal receivedQty = originalDetail.getReceivedQuantity() != null
-                    ? originalDetail.getReceivedQuantity() : BigDecimal.ZERO;
-            BigDecimal historicalReturned = purchaseReturnDetailMapper.sumHistoricalReturnQuantityByPurchaseDetailId(
-                    purchaseReturn.getPurchaseOrderId(), purchaseDetailId, excludeReturnId);
+            BigDecimal receivedQty = originalDetail.getStockedQuantity() != null
+                    ? originalDetail.getStockedQuantity() : BigDecimal.ZERO;
+            BigDecimal historicalReturned = reservedByDetail.getOrDefault(purchaseDetailId, BigDecimal.ZERO);
             if (historicalReturned == null)
             {
                 historicalReturned = BigDecimal.ZERO;
@@ -606,15 +654,14 @@ public class InvPurchaseReturnServiceImpl extends InvBaseService implements IInv
             if (totalReturned.compareTo(receivedQty) > 0)
             {
                 throw new ServiceException("商品 [" + originalDetail.getProductName() + "] 退货数量(" + totalReturned
-                        + ")超过原采购明细已收货数量(" + receivedQty + ")，历史已退(" + historicalReturned + ")");
+                        + ")超过原采购明细已合格或让步入库数量(" + receivedQty + ")，历史已退(" + historicalReturned + ")");
             }
         }
         for (Map.Entry<Long, BigDecimal> entry : currentQtyByProduct.entrySet())
         {
             Long productId = entry.getKey();
             BigDecimal receivedQty = receivedQtyByProduct.getOrDefault(productId, BigDecimal.ZERO);
-            BigDecimal historicalReturned = purchaseReturnDetailMapper.sumHistoricalReturnQuantity(
-                    purchaseReturn.getPurchaseOrderId(), productId, excludeReturnId);
+            BigDecimal historicalReturned = reservedByProduct.getOrDefault(productId, BigDecimal.ZERO);
             if (historicalReturned == null)
             {
                 historicalReturned = BigDecimal.ZERO;
@@ -624,8 +671,38 @@ public class InvPurchaseReturnServiceImpl extends InvBaseService implements IInv
             {
                 String productName = returnNameByProduct.getOrDefault(productId, originalNameByProduct.get(productId));
                 throw new ServiceException("商品 [" + productName + "] 退货数量(" + totalReturned
-                        + ")超过原采购已收货数量(" + receivedQty + ")，历史已退(" + historicalReturned + ")");
+                        + ")超过原采购已合格或让步入库数量(" + receivedQty + ")，历史已退(" + historicalReturned + ")");
             }
+        }
+    }
+
+    private void applyCurrentStockedQuantities(List<InvPurchaseDetail> details, List<InvInboundRecord> inbounds)
+    {
+        Map<Long, Integer> productCounts = new HashMap<>();
+        for (InvPurchaseDetail detail : details)
+            if (detail.getProductId() != null) productCounts.merge(detail.getProductId(), 1, Integer::sum);
+        for (InvPurchaseDetail detail : details)
+        {
+            BigDecimal stocked = BigDecimal.ZERO;
+            for (InvInboundRecord inbound : inbounds)
+            {
+                boolean matches = inbound.getPurchaseDetailId() != null
+                        ? Objects.equals(inbound.getPurchaseDetailId(), detail.getDetailId())
+                        : detail.getProductId() != null
+                            && Objects.equals(inbound.getProductId(), detail.getProductId())
+                            && productCounts.getOrDefault(detail.getProductId(), 0) == 1;
+                if (!matches) continue;
+                if (inbound.getReceiptBatchDetailId() != null)
+                {
+                    stocked = stocked.add(inbound.getAcceptedQuantity() == null ? BigDecimal.ZERO : inbound.getAcceptedQuantity())
+                            .add(inbound.getConcessionQuantity() == null ? BigDecimal.ZERO : inbound.getConcessionQuantity());
+                }
+                else if ("passed".equals(inbound.getQcResult()) || "concession".equals(inbound.getQcResult()))
+                {
+                    stocked = stocked.add(inbound.getQuantity() == null ? BigDecimal.ZERO : inbound.getQuantity());
+                }
+            }
+            detail.setStockedQuantity(stocked);
         }
     }
 
@@ -640,7 +717,7 @@ public class InvPurchaseReturnServiceImpl extends InvBaseService implements IInv
             throw new ServiceException("采购退货单未关联采购单");
         }
 
-        List<InvPurchaseDetail> purchaseDetails = purchaseDetailMapper.selectInvPurchaseDetailByOrderId(purchaseReturn.getPurchaseOrderId());
+        List<InvPurchaseDetail> purchaseDetails = purchaseDetailMapper.selectInvPurchaseDetailByOrderIdForUpdate(purchaseReturn.getPurchaseOrderId());
         if (purchaseDetails.isEmpty())
         {
             throw new ServiceException("原采购单无明细");
@@ -700,15 +777,7 @@ public class InvPurchaseReturnServiceImpl extends InvBaseService implements IInv
         {
             throw new ServiceException("采购退货单未关联采购单");
         }
-        InvPurchaseOrder sourceOrder = purchaseOrderMapper.selectInvPurchaseOrderById(purchaseReturn.getPurchaseOrderId());
-        if (sourceOrder == null)
-        {
-            throw new ServiceException("原采购单不存在");
-        }
-        if (!warehouseId.equals(sourceOrder.getShopDeptId()))
-        {
-            throw new ServiceException("原采购单不属于当前仓库");
-        }
+        InvPurchaseOrder sourceOrder = requireLockedSourceOrder(purchaseReturn.getPurchaseOrderId(), warehouseId);
         purchaseReturn.setPurchaseOrderNo(sourceOrder.getOrderNo());
         purchaseReturn.setSupplierName(sourceOrder.getSupplierName());
     }
@@ -737,8 +806,8 @@ public class InvPurchaseReturnServiceImpl extends InvBaseService implements IInv
                 detail.setReturnableQuantity(BigDecimal.ZERO);
                 continue;
             }
-            BigDecimal received = original.getReceivedQuantity() == null
-                    ? BigDecimal.ZERO : original.getReceivedQuantity();
+            BigDecimal received = original.getStockedQuantity() == null
+                    ? BigDecimal.ZERO : original.getStockedQuantity();
             BigDecimal historical = purchaseReturnDetailMapper
                     .sumHistoricalReturnQuantityByPurchaseDetailId(
                             purchaseReturn.getPurchaseOrderId(), original.getDetailId(),

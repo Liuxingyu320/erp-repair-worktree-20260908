@@ -19,6 +19,9 @@ const { getMobileFeatureActions } = require("../src/views/mobile/feature/feature
 
 const apiSource = read(uiRoot, "src/api/oa/fixedAsset.js")
 const configPage = read(uiRoot, "src/views/oa/fixedAsset/config/index.vue")
+const configBatchRecovery = read(uiRoot, "src/mixins/fixedAssetConfigBatch.js")
+const configService = read(repoRoot, "erp-modules/erp-oa/src/main/java/com/erp/oa/service/impl/OaFixedAssetServiceImpl.java")
+const atomicConfigMethod = configService.slice(configService.indexOf("public OaFixedAssetConfigSnapshot saveConfigBatch"), configService.indexOf("public List<OaFixedAssetConfig> selectConfigList"))
 const repairPage = read(uiRoot, "src/views/oa/fixedAsset/repair/index.vue")
 const mobileRoutes = read(uiRoot, "src/views/mobile/mobileRouteDefinitions.js")
 const mobileService = read(uiRoot, "src/views/mobile/feature/featureService.js")
@@ -113,7 +116,7 @@ assert.ok(
 assert.ok(
   configPage.includes("@input=\"handleConfigShopChange\"") &&
     configPage.includes("applyStoreConfigToForm") &&
-    configPage.includes("findStoreConfigByShop(shopDeptId)"),
+    configPage.includes("return this.changeConfigShop(shopDeptId)") && configBatchRecovery.includes("getFixedAssetConfigSnapshot(shop)"),
   "config page add dialog should load an existing store config when the shop is selected inside the dialog"
 )
 assert.ok(
@@ -128,10 +131,14 @@ assert.ok(
   "asset unit price and amount should be derived from OE price and quantity, not manually filled"
 )
 assert.ok(
-  configPage.includes("saveAssetRows") &&
-    configPage.includes("runAssetRowRequestsSequentially") &&
-    configPage.includes("assetAmount: row.assetAmount"),
-  "config page should save each selected asset detail row with computed amount and rebuild quota sequentially"
+  configPage.includes("return this.saveConfigBatch()") &&
+    configBatchRecovery.includes("saveFixedAssetConfigBatch(command.payload)") &&
+    apiSource.includes("/oa/fixedAsset/config/batch-save") &&
+    configPage.includes("row.assetAmount = Number((qty * price).toFixed(2))") &&
+    atomicConfigMethod.includes("row.setAssetAmount(resolveAssetAmount(row))") &&
+    countIncludes(atomicConfigMethod, "rebuildQuota(shop,currentYear(),ratio)") === 1 &&
+    !configPage.includes("runAssetRowRequestsSequentially"),
+  "config page must retain calculated amounts while one atomic batch computes the authoritative amount and rebuilds quota once"
 )
 assert.strictEqual(
   countIncludes(configPage, ":append-to-body=\"true\""),
@@ -191,8 +198,8 @@ assert.strictEqual(
 )
 assert.ok(
   repairPage.includes("import ImageUpload") &&
-    repairPage.includes("components: { ImageUpload }") &&
-    repairPage.includes("<image-upload v-model=\"form.imageUrls\"") &&
+    repairPage.includes("components: { ImageUpload, ImageGallery }") &&
+    (/<image-upload\s[^>]*v-model="form.imageUrls"/.test(repairPage)) &&
     !repairPage.includes("<el-input v-model=\"form.imageUrls\""),
   "repair page should use the shared image upload component for repair attachments"
 )
@@ -247,6 +254,7 @@ assert.deepStrictEqual(
   [{
     title: "收银机",
     code: "FA-8",
+    imageUrls: [],
     detail: "茶杯裂开 · 数量 2 · 测试门店",
     status: "历史待确认（只读）"
   }],

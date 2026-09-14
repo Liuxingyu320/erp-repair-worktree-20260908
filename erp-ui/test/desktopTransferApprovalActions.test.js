@@ -1,7 +1,12 @@
 const assert = require("assert")
 const fs = require("fs")
 const path = require("path")
-const { buildTransferApprovalPayload } = require("../src/views/mobile/feature/mobileActionPayloads")
+const { buildTransferApprovalPayload } = require("../src/utils/transferApprovalPayload")
+assert.strictEqual(
+  require("../src/views/mobile/feature/mobileActionPayloads").buildTransferApprovalPayload,
+  buildTransferApprovalPayload,
+  "desktop and mobile must retain the same approval payload contract"
+)
 
 const source = fs.readFileSync(
   path.resolve(__dirname, "../src/views/inventory/transfer/index.vue"),

@@ -51,7 +51,11 @@ public class SecuritySessionInvalidationOutboxDispatcher
     {
         try
         {
-            tokenService.invalidateUserSessions(item.getUserId());
+            if (UserSessionInvalidationService.PASSWORD_CHANGED.equals(item.getReasonCode())
+                    && item.getRetainedSessionDigest() != null)
+                tokenService.invalidateUserSessionsExceptDigest(item.getUserId(), item.getRetainedSessionDigest());
+            else
+                tokenService.invalidateUserSessions(item.getUserId());
             mapper.markDone(item.getEventId());
         }
         catch (RuntimeException ex)

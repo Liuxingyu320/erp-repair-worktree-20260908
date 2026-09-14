@@ -75,12 +75,26 @@ final class InvTransferDiscrepancyProcessor extends InvTransferWorkflowSupport
             Long selectedShopDeptId)
     {
         validateRequestHeader(request);
-        InvTransferDiscrepancy discrepancy = resources.transferDiscrepancyMapper
-                .selectByIdForUpdate(discrepancyId);
-        if (discrepancy == null)
+        // The locator is not authority: lock the transfer root, then reread the child.
+        InvTransferDiscrepancy locator = resources.transferDiscrepancyMapper.selectById(discrepancyId);
+        if (locator == null)
         {
             throw new ServiceException("调拨差异单不存在");
         }
+        InvTransferOrder locked = resources.transferOrderMapper
+                .selectInvTransferOrderByIdForUpdate(locator.getTransferId());
+        if (locked == null)
+        {
+            throw new ServiceException("调拨单不存在");
+        }
+        InvTransferDiscrepancy discrepancy = resources.transferDiscrepancyMapper
+                .selectByIdForUpdate(discrepancyId);
+        if (discrepancy == null || !Objects.equals(discrepancy.getTransferId(), locked.getTransferId()))
+        {
+            throw concurrentResolution();
+        }
+        assertTransferReceiveScope(locked, selectedShopDeptId);
+        directionPolicy.validateReceipt(locked, selectedShopDeptId);
 
         List<InvTransferDiscrepancyDetail> discrepancyDetails =
                 resources.transferDiscrepancyMapper.selectDetails(
@@ -93,14 +107,14 @@ final class InvTransferDiscrepancyProcessor extends InvTransferWorkflowSupport
         List<InvTransferDiscrepancyResolutionItem> items = normalizeItems(
                 request, discrepancy, discrepancyDetails);
 
-        InvTransferOrder scoped = assertAndGetScopedTransfer(
-                discrepancy.getTransferId(), selectedShopDeptId);
-        assertTransferReceiveScope(scoped, selectedShopDeptId);
-        directionPolicy.validateReceipt(scoped, selectedShopDeptId);
-
-        List<InvTransferDiscrepancyDisposition> replayRows =
-                resources.dispositionMapper.selectByRequestId(
-                        discrepancyId, request.getRequestId());
+        boolean staleVersion = !request.getVersion().equals(discrepancy.getVersion());
+        boolean writableStatus = Set.of(InvTransferDiscrepancyDecisions.OPEN,
+                InvTransferDiscrepancyDecisions.PENDING_QC).contains(discrepancy.getStatus());
+        // Current reads are confined to replay/rejection: that branch cannot insert a new receipt.
+        // Locking an absent receipt for fresh requests could deadlock different transfer roots on one gap.
+        List<InvTransferDiscrepancyDisposition> replayRows = staleVersion || !writableStatus
+                ? resources.dispositionMapper.selectByRequestIdForUpdate(discrepancyId, request.getRequestId())
+                : resources.dispositionMapper.selectByRequestId(discrepancyId, request.getRequestId());
         if (replayRows != null && !replayRows.isEmpty())
         {
             assertExactReplay(request, items, discrepancyDetails,
@@ -108,22 +122,16 @@ final class InvTransferDiscrepancyProcessor extends InvTransferWorkflowSupport
             return;
         }
 
-        if (!request.getVersion().equals(discrepancy.getVersion()))
+        if (staleVersion)
         {
             throw concurrentResolution();
         }
-        if (!Set.of(InvTransferDiscrepancyDecisions.OPEN,
-                InvTransferDiscrepancyDecisions.PENDING_QC)
-                .contains(discrepancy.getStatus()))
+        if (!writableStatus)
         {
             throw new ServiceException("差异单已处理，请刷新后查看台账");
         }
 
-        InvTransferOrder locked = resources.transferOrderMapper
-                .selectInvTransferOrderByIdForUpdate(
-                        discrepancy.getTransferId());
-        if (locked == null || !InvStatusConstants.DISCREPANCY.equals(
-                locked.getStatus()))
+        if (!InvStatusConstants.DISCREPANCY.equals(locked.getStatus()))
         {
             throw new ServiceException("调拨单当前不在差异处理状态");
         }
@@ -148,6 +156,8 @@ final class InvTransferDiscrepancyProcessor extends InvTransferWorkflowSupport
 
         ResolutionPlan plan = buildResolutionPlan(discrepancy, request,
                 items, detailById, shipmentById, latestRows, locked);
+
+        reserveReshipmentQuantities(locked, discrepancy, plan);
 
         int updated = resources.transferDiscrepancyMapper.resolve(
                 discrepancyId, request.getVersion(), plan.targetStatus(),
@@ -374,6 +384,12 @@ final class InvTransferDiscrepancyProcessor extends InvTransferWorkflowSupport
                     category, item.getDecision(), pendingQc,
                     explicitEvidence);
 
+            boolean requiresControlledEvidence = "DAMAGED".equals(category) && !pendingQc
+                    && Set.of("RETURN_SOURCE", "WRITE_OFF").contains(decision);
+            resources.evidenceService.validateResolution(attachmentRefs,
+                    detail.getAttachmentRefs(), previous == null ? null : previous.getAttachmentRefs(),
+                    requiresControlledEvidence);
+
             InvTransferShipmentDetail shipmentDetail = shipmentById.get(
                     detail.getShipmentDetailId());
             if (shipmentDetail == null
@@ -535,6 +551,36 @@ final class InvTransferDiscrepancyProcessor extends InvTransferWorkflowSupport
         if (!replayKeys.equals(rows.keySet()))
         {
             throw requestConflict();
+        }
+    }
+
+    private void reserveReshipmentQuantities(InvTransferOrder order,
+            InvTransferDiscrepancy discrepancy, ResolutionPlan plan)
+    {
+        Map<Long, InvTransferShipmentDetail> shipmentDetails = resources.transferShipmentDetailMapper
+                .selectByShipmentId(discrepancy.getShipmentId()).stream()
+                .collect(Collectors.toMap(InvTransferShipmentDetail::getShipmentDetailId, detail -> detail));
+        Map<Long, BigDecimal> quantities = new LinkedHashMap<>();
+        for (InvTransferDiscrepancyDisposition row : plan.newRows())
+        {
+            if (!InvTransferDiscrepancyDecisions.RESHIP.equals(row.getDecision()))
+            {
+                continue;
+            }
+            InvTransferShipmentDetail shipment = shipmentDetails.get(row.getShipmentDetailId());
+            if (!InvTransferDiscrepancyDecisions.SHORTAGE.equals(row.getCategory())
+                    || shipment == null || shipment.getTransferDetailId() == null)
+            {
+                throw new ServiceException("补发处置未匹配到原调拨明细");
+            }
+            quantities.merge(shipment.getTransferDetailId(), row.getQuantity(), BigDecimal::add);
+        }
+        if (!quantities.isEmpty())
+        {
+            List<InvTransferDetail> details = resources.transferDetailMapper
+                    .selectByTransferIdForUpdate(order.getTransferId());
+            resources.transferReservationService.reserveForReshipments(order, details,
+                    quantities, SecurityUtils.getUsername());
         }
     }
 

@@ -1,18 +1,31 @@
 import request from '@/utils/request'
 
+function stockCheckSilentError(config) {
+  return !!(config && config.silentError === true)
+}
+
 // 查询盘点单列表
 export function listStockCheck(query) {
   return request({ url: '/inventory/stockCheck/list', method: 'get', params: query })
 }
 
 // 查询盘点单详情
-export function getStockCheck(checkId) {
-  return request({ url: '/inventory/stockCheck/' + checkId, method: 'get' })
+export function getStockCheck(checkId, config) {
+  return request({
+    url: '/inventory/stockCheck/' + checkId,
+    method: 'get',
+    silentError: stockCheckSilentError(config)
+  })
 }
 
 // 新增盘点草稿
-export function createStockCheck(data) {
-  return request({ url: '/inventory/stockCheck/create', method: 'post', data: data })
+export function createStockCheck(data, config) {
+  return request({
+    url: '/inventory/stockCheck/create',
+    method: 'post',
+    data: data,
+    silentError: stockCheckSilentError(config)
+  })
 }
 
 // 查询当前库存组织可执行盘点的人员
@@ -26,13 +39,23 @@ export function assignStockCheck(checkId, data) {
 }
 
 // 录入实盘数量
-export function inputStockCheck(checkId, data) {
-  return request({ url: '/inventory/stockCheck/input/' + checkId, method: 'post', data: data })
+export function inputStockCheck(checkId, data, config) {
+  return request({
+    url: '/inventory/stockCheck/input/' + checkId,
+    method: 'post',
+    data: data,
+    silentError: stockCheckSilentError(config)
+  })
 }
 
 // 提交盘点
-export function submitStockCheck(checkId, data) {
-  return request({ url: '/inventory/stockCheck/submit/' + checkId, method: 'post', data: data })
+export function submitStockCheck(checkId, data, config) {
+  return request({
+    url: '/inventory/stockCheck/submit/' + checkId,
+    method: 'post',
+    data: data,
+    silentError: stockCheckSilentError(config)
+  })
 }
 
 // 库存快照失效后重新盘点

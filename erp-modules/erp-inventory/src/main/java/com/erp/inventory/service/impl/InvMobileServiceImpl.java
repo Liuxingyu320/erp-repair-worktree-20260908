@@ -1,5 +1,6 @@
 package com.erp.inventory.service.impl;
 
+import java.time.LocalDate;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -7,6 +8,11 @@ import java.util.Locale;
 import java.util.Map;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import com.erp.inventory.domain.InvStock;
+import com.erp.inventory.domain.vo.InvReportSummary;
+import com.erp.inventory.service.IInvReportService;
 import com.erp.common.core.domain.todo.TodoConstants;
 import com.erp.common.core.domain.todo.TodoQuery;
 import com.erp.common.core.domain.todo.TodoSummary;
@@ -24,6 +30,7 @@ import com.erp.inventory.service.IInvTodoService;
 @Service
 public class InvMobileServiceImpl extends InvBaseService implements IInvMobileService
 {
+    private static final Logger log = LoggerFactory.getLogger(InvMobileServiceImpl.class);
     private static final int DEFAULT_LIMIT = 20;
     private static final int MAX_LIMIT = 50;
     private static final Map<String, String> TYPE_PERMISSION_MAP = new HashMap<>();
@@ -41,6 +48,9 @@ public class InvMobileServiceImpl extends InvBaseService implements IInvMobileSe
 
     @Autowired
     private IInvTodoService todoService;
+
+    @Autowired
+    private IInvReportService reportService;
 
     @Override
     public List<MobileOption> selectOptions(String type, String keyword, Integer limit, Long selectedShopDeptId)
@@ -102,7 +112,42 @@ public class InvMobileServiceImpl extends InvBaseService implements IInvMobileSe
         summary.setPendingReceiveCount(pendingReceiveCount);
         summary.setPendingDeliverCount(pendingDeliverCount);
         summary.setTodoCount(todoSummary.getTotal());
+        summary.setPendingStockCheckCount(typeCount(todoSummary, InvTodoTypes.INV_STOCK_CHECK_EXECUTE));
+        summary.setPendingReturnCount(typeCount(todoSummary, DEPT_TYPE_STORE.equals(summary.getSelectedDeptType())
+                ? InvTodoTypes.INV_SALES_RETURN_CONFIRM : InvTodoTypes.INV_PURCHASE_RETURN_CONFIRM));
+        if (DEPT_TYPE_STORE.equals(summary.getSelectedDeptType()))
+        {
+            populateTodaySales(summary, selectedDeptId);
+        }
         return summary;
+    }
+
+    private void populateTodaySales(MobileWorkbenchSummary summary, Long selectedDeptId)
+    {
+        // Keep the existing report definition, including delivered quantity > 0,
+        // business order date, organization scope and report permission.
+        summary.setTodaySalesStatus("forbidden");
+        if (!AuthUtil.hasPermi("inv:report:list"))
+        {
+            return;
+        }
+        String today = LocalDate.now().toString();
+        summary.setTodaySalesDate(today);
+        InvStock query = new InvStock();
+        query.getParams().put("beginTime", today);
+        query.getParams().put("endTime", today);
+        try
+        {
+            InvReportSummary report = reportService.selectReportSummary(query, selectedDeptId);
+            summary.setTodaySalesCount(report == null ? null : report.getSalesOrderCount());
+            summary.setTodaySalesStatus(summary.getTodaySalesCount() == null ? "unavailable" : "ready");
+        }
+        catch (RuntimeException error)
+        {
+            // A failed sales metric must not hide otherwise available warehouse/todo facts.
+            summary.setTodaySalesStatus("unavailable");
+            log.warn("Mobile sales count unavailable for selected department {}", selectedDeptId, error);
+        }
     }
 
     @Override

@@ -116,8 +116,8 @@ assert.strictEqual(
 
 assert.strictEqual(
   mobileRouteDefinitions.length,
-  58,
-  "the active mobile matrix should contain 58 routes after the two retired business routes were removed"
+  59,
+  "the active mobile matrix should include the personal message center and exclude retired business routes"
 )
 mobileRouteDefinitions.forEach(route => {
   const policy = getMobileRoutePolicy(route.path)

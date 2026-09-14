@@ -147,7 +147,10 @@ public class AttendanceRemainingWorkService
         value.setCreateBy(SecurityUtils.getUsername());
         if (mapper.insertRemainingWorkConfirmation(value) != 1)
             throw new ServiceException("REMAINING_WORK_CONFIRMATION_FAILED");
-        mapper.invalidateUnsettledDayResultForRemainingWork(
+        // A newer decision supersedes the evidence used by any previous
+        // settlement. Retire that daily source in the same transaction so
+        // normal settlement and payroll preflight cannot reuse stale minutes.
+        mapper.invalidateDayResultForRemainingWork(
                 schedule.scheduleId, SecurityUtils.getUsername());
         return mapper.selectRemainingWorkConfirmationById(
                 value.confirmationId);

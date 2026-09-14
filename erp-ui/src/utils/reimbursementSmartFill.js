@@ -272,6 +272,133 @@ function ensureDraftForInvoiceUpload(form, persistDraft) {
   }
 }
 
+// Capture values separately from row references: references identify local rows,
+// but only the frozen payload determines the server's sortNo mapping.
+function cloneReimbursementDraft(value) {
+  return JSON.parse(JSON.stringify(value || {}))
+}
+
+const EXPENSE_FIELDS = ['expenseType', 'expenseDate', 'merchantName', 'description', 'claimedAmount', 'sourceInvoiceId']
+function expenseSnapshot(row) {
+  const value = row || {}
+  return JSON.stringify(EXPENSE_FIELDS.map(key => key === 'claimedAmount'
+    ? (amount(value[key]) == null ? null : Number(amount(value[key]).toFixed(2)))
+    : text(value[key])))
+}
+function expenseListSnapshot(rows) {
+  return JSON.stringify((rows || []).map(expenseSnapshot))
+}
+function captureReimbursementSave(form) {
+  const payload = cloneReimbursementDraft(form)
+  const rows = (form.items || []).map((source, index) => ({ source,
+    before: cloneReimbursementDraft(source), sortNo: index + 1 }))
+  payload.items = rows.map(row => ({ ...row.before, sortNo: row.sortNo }))
+  return { payload, rows }
+}
+function mergeReimbursementSavedDraft(latest, remote, capture) {
+  const payload = capture && capture.payload
+  if (!payload || !remote || remote.reimbursementId == null || remote.rowVersion == null ||
+      (payload.reimbursementId != null && String(payload.reimbursementId) !== String(remote.reimbursementId))) {
+    throw new Error('无法确认保存记录身份，请核对最新记录')
+  }
+  const serverRows = remote.items || []
+  if (serverRows.length !== capture.rows.length) throw new Error('保存后的费用数量不一致，请核对最新记录')
+  const mapped = new Map(), ids = new Set()
+  for (const row of capture.rows) {
+    const candidates = serverRows.filter(value => Number(value.sortNo) === row.sortNo)
+    const saved = candidates.length === 1 && candidates[0]
+    if (!saved || saved.itemId == null || ids.has(String(saved.itemId)) || expenseSnapshot(saved) !== expenseSnapshot(row.before)) {
+      throw new Error('无法确认保存后的费用对应关系，请核对最新记录')
+    }
+    ids.add(String(saved.itemId))
+    if (saved.sourceInvoiceId != null && !(remote.invoices || []).some(invoice =>
+      String(invoice.invoiceId) === String(saved.sourceInvoiceId) && String(invoice.itemId) === String(saved.itemId))) {
+      throw new Error('保存后的发票与费用关联不一致，请核对最新记录')
+    }
+    mapped.set(row, saved)
+  }
+  const used = new Set()
+  const items = (latest.items || []).map(current => {
+    const matches = capture.rows.filter(row => row.source === current ||
+      (row.before.itemId != null && current.itemId != null && String(row.before.itemId) === String(current.itemId)))
+    if (matches.length > 1 || (matches.length && used.has(matches[0]))) throw new Error('本地费用身份重复，请核对最新记录')
+    if (!matches.length) {
+      if (current.itemId != null) throw new Error('本地费用来源无法确认，请核对最新记录')
+      return cloneReimbursementDraft(current)
+    }
+    const row = matches[0], saved = mapped.get(row)
+    used.add(row)
+    const merged = { ...saved }
+    for (const key of EXPENSE_FIELDS) {
+      if (JSON.stringify(current[key]) !== JSON.stringify(row.before[key])) merged[key] = current[key]
+    }
+    return merged
+  })
+  return { ...remote, title: latest.title, purpose: latest.purpose, items }
+}
+
+// Refreshes may follow uploads/recognition without rebuilding expenses. A
+// changed remote expense set must not grant a dirty old draft a new version.
+function mergeReimbursementReadDraft(latest, remote, baseline, preserve) {
+  if (!preserve) return remote
+  if (!baseline || expenseListSnapshot(baseline.items) !== expenseListSnapshot(remote.items)) {
+    throw new Error('最新记录的费用已变化，本地草稿已保留，请先核对')
+  }
+  if (text(baseline.title) !== text(remote.title) || text(baseline.purpose) !== text(remote.purpose)) {
+    throw new Error('最新记录的标题或事由已变化，本地草稿已保留，请先核对')
+  }
+  const mapped = new Map()
+  for (const before of baseline.items || []) {
+    let matches = (remote.items || []).filter(row => before.itemId != null && String(row.itemId) === String(before.itemId))
+    if (!matches.length && before.sourceInvoiceId != null) matches = (remote.items || []).filter(row => String(row.sourceInvoiceId) === String(before.sourceInvoiceId))
+    if (!matches.length && before.sortNo != null) matches = (remote.items || []).filter(row => Number(row.sortNo) === Number(before.sortNo))
+    if (matches.length !== 1 || expenseSnapshot(matches[0]) !== expenseSnapshot(before)) throw new Error('最新费用身份无法对应，请先核对')
+    mapped.set(String(before.itemId), matches[0])
+  }
+  const items = (latest.items || []).map(current => {
+    if (current.itemId == null) return current
+    const saved = mapped.get(String(current.itemId))
+    if (!saved) throw new Error('本地费用身份无法对应，请先核对')
+    return { ...current, itemId: saved.itemId, sortNo: saved.sortNo, reimbursementId: saved.reimbursementId }
+  })
+  return { ...remote, title: latest.title, purpose: latest.purpose, items }
+}
+
+function isReimbursementVersionConflict(error) {
+  return /已变化|版本|VERSION|CONFLICT/i.test(String(error && (error.businessCode || error.code) || '') + ' ' + String(error && error.message || ''))
+}
+function reimbursementDeleteMatches(baseline, remote, invoice) {
+  if (!baseline || !remote || String(baseline.reimbursementId) !== String(remote.reimbursementId) ||
+      Number(remote.rowVersion) !== Number(baseline.rowVersion) + 1 ||
+      (remote.invoices || []).some(row => String(row.invoiceId) === String(invoice.invoiceId))) return false
+  const expectedItems = (baseline.items || []).filter(row => invoice.itemId == null || String(row.itemId) !== String(invoice.itemId))
+  const expectedInvoices = (baseline.invoices || []).filter(row => String(row.invoiceId) !== String(invoice.invoiceId))
+  return text(baseline.title) === text(remote.title) && text(baseline.purpose) === text(remote.purpose) &&
+    expenseListSnapshot(expectedItems) === expenseListSnapshot(remote.items) &&
+    JSON.stringify(expectedItems.map(row => String(row.itemId))) === JSON.stringify((remote.items || []).map(row => String(row.itemId))) &&
+    JSON.stringify(expectedInvoices.map(row => String(row.invoiceId))) === JSON.stringify((remote.invoices || []).map(row => String(row.invoiceId)))
+}
+
+// 删除结果只合并发票及其确定已删除的持久明细，不覆盖其他本地草稿字段。
+function mergeReimbursementInvoiceDeletion(latest, remote, invoice) {
+  if (!remote || String(remote.reimbursementId) !== String(latest.reimbursementId)) {
+    throw new Error('报销记录已切换，请重新打开后核对删除结果')
+  }
+  const invoices = Array.isArray(remote.invoices) ? remote.invoices : []
+  const deleted = !invoices.some(row => String(row.invoiceId) === String(invoice.invoiceId))
+  const linkedItemRemoved = deleted && invoice.itemId != null &&
+    !(remote.items || []).some(row => row.itemId != null && String(row.itemId) === String(invoice.itemId))
+  return {
+    ...latest,
+    rowVersion: remote.rowVersion,
+    invoices,
+    items: (latest.items || []).filter(row => !linkedItemRemoved || row.itemId == null ||
+      String(row.itemId) !== String(invoice.itemId)).map(row => deleted &&
+        row.sourceInvoiceId != null && String(row.sourceInvoiceId) === String(invoice.invoiceId)
+        ? { ...row, sourceInvoiceId: null } : row)
+  }
+}
+
 function recoverReimbursementDeleteFailure(error, showError, refresh) {
   if (typeof showError === 'function') showError(error)
   if (typeof refresh !== 'function') return Promise.resolve()
@@ -284,9 +411,16 @@ function recoverReimbursementDeleteFailure(error, showError, refresh) {
 
 module.exports = {
   READY_RECOGNITION_STATUSES,
+  cloneReimbursementDraft,
+  captureReimbursementSave,
+  mergeReimbursementSavedDraft,
+  mergeReimbursementReadDraft,
+  isReimbursementVersionConflict,
+  reimbursementDeleteMatches,
   applyInvoiceToForm,
   ensureDraftForInvoiceUpload,
   hasRecognitionContent,
+  mergeReimbursementInvoiceDeletion,
   inferExpenseType,
   isBlankExpenseItem,
   recoverReimbursementDeleteFailure,

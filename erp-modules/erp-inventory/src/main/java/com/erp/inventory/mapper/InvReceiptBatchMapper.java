@@ -9,6 +9,7 @@ public interface InvReceiptBatchMapper
 {
     InvReceiptBatch selectByIdForUpdate(@Param("batchId") Long batchId);
     List<InvReceiptBatch> selectByOrderId(@Param("orderId") Long orderId);
+    List<InvReceiptBatch> selectByOrderIdForUpdate(@Param("orderId") Long orderId);
     List<InvReceiptBatch> selectPendingByOrderId(@Param("orderId") Long orderId);
     int countPendingByOrderId(@Param("orderId") Long orderId);
     int insertInvReceiptBatch(InvReceiptBatch batch);

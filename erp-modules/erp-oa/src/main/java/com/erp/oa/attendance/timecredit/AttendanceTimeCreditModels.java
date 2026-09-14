@@ -52,6 +52,7 @@ public final class AttendanceTimeCreditModels
         public Integer workedMinutes;
         public Integer rawOvertimeMinutes;
         public Integer usedMinutes;
+        public Integer transferredMinutes;
         public Integer availableMinutes;
     }
 

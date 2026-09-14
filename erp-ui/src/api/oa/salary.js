@@ -4,12 +4,12 @@ export function getSalary(salaryId) {
   return request({ url: '/oa/salary/' + salaryId, method: 'get' })
 }
 
-export function listMySalary(params) {
-  return request({ url: '/oa/salary/my', method: 'get', params })
+export function listMySalary(params, config) {
+  return request({ url: '/oa/salary/my', method: 'get', params, silentError: !!(config && config.silentError) })
 }
 
-export function listAllSalary(params) {
-  return request({ url: '/oa/salary/list', method: 'get', params })
+export function listAllSalary(params, config) {
+  return request({ url: '/oa/salary/list', method: 'get', params, silentError: !!(config && config.silentError) })
 }
 
 export function calculateSalary(data) {

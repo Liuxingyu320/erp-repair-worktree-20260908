@@ -69,11 +69,11 @@ public class InvSupplierServiceImpl extends InvBaseService implements IInvSuppli
         }
         else
         {
-            InvSupplier current = assertAndGetScopedSupplier(supplier.getSupplierId(), selectedShopDeptId);
+            InvSupplier current = lockScopedSupplier(supplier.getSupplierId(), selectedShopDeptId);
             if (!current.getSupplierName().equals(supplier.getSupplierName())
                     && countReferences(current, selectedShopDeptId) > 0)
             {
-                throw new ServiceException("供应商已被商品或采购历史引用，不能修改名称，请停用供应商或先治理引用");
+                throw new ServiceException("供应商已被商品或采购历史引用，或仍被OE引用，不能修改名称，请停用供应商或先治理引用");
             }
             assertUniqueSupplier(supplier, current.getShopDeptId(), supplier.getSupplierId());
             supplier.setShopDeptId(current.getShopDeptId());
@@ -99,19 +99,33 @@ public class InvSupplierServiceImpl extends InvBaseService implements IInvSuppli
         {
             throw new ServiceException("请选择要删除的供应商");
         }
+        java.util.SortedSet<Long> orderedIds = new java.util.TreeSet<>();
         for (Long supplierId : supplierIds)
         {
             if (supplierId == null || supplierId <= 0)
             {
                 throw new ServiceException("供应商标识无效");
             }
-            InvSupplier supplier = assertAndGetScopedSupplier(supplierId, selectedShopDeptId);
+            orderedIds.add(supplierId);
+        }
+        for (Long supplierId : orderedIds)
+        {
+            InvSupplier supplier = lockScopedSupplier(supplierId, selectedShopDeptId);
             if (countReferences(supplier, selectedShopDeptId) > 0)
             {
-                throw new ServiceException("供应商已被商品或采购历史引用，不能删除，请停用供应商");
+                throw new ServiceException("供应商已被商品或采购历史引用，或仍被OE引用，不能删除，请停用供应商");
             }
         }
         supplierMapper.deleteInvSupplierByIds(supplierIds);
+    }
+
+    private InvSupplier lockScopedSupplier(Long supplierId, Long selectedShopDeptId)
+    {
+        InvSupplier supplier = supplierMapper.selectInvSupplierByIdForUpdate(supplierId);
+        if (supplier == null) throw new ServiceException("供应商不存在");
+        if (!resolveRequiredScopeDeptIds(selectedShopDeptId).contains(supplier.getShopDeptId()))
+            throw new ServiceException("无权访问该店铺供应商");
+        return supplier;
     }
 
     private InvSupplier assertAndGetScopedSupplier(Long supplierId, Long selectedShopDeptId)
@@ -141,7 +155,9 @@ public class InvSupplierServiceImpl extends InvBaseService implements IInvSuppli
 
     private int countReferences(InvSupplier supplier, Long selectedShopDeptId)
     {
-        return supplierMapper.countSupplierReferences(supplier.getSupplierId(),
+        // A locking read sees OE commits that completed while we waited for the supplier lock.
+        int oeReferences = supplierMapper.selectReferencingOeIdsForUpdate(supplier.getSupplierName()).size();
+        return oeReferences + supplierMapper.countSupplierReferences(supplier.getSupplierId(),
                 supplier.getSupplierName(), resolveRequiredScopeDeptIds(selectedShopDeptId));
     }
 

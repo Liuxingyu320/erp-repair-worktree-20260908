@@ -1,0 +1,207 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.oa.attendance.leave.balance.AttendanceLeaveBalanceMapper">
+<resultMap id="rule" type="com.erp.oa.attendance.leave.balance.AttendanceLeaveBalanceModels$Rule">
+ <result property="configJson" column="config_json"/>
+ <result property="ruleId" column="rule_id"/>
+ <result property="familyId" column="family_id"/>
+ <result property="version" column="version"/>
+ <result property="ownerDeptId" column="owner_dept_id"/>
+ <result property="legalEntityId" column="legal_entity_id"/>
+ <result property="leaveTypeId" column="leave_type_id"/>
+ <result property="locationCode" column="location_code"/>
+ <result property="name" column="name"/>
+ <result property="priority" column="priority"/>
+ <result property="status" column="status"/>
+ <result property="effectiveFrom" column="effective_from"/>
+ <result property="effectiveTo" column="effective_to"/>
+ <result property="rowVersion" column="row_version"/>
+ <result property="createdBy" column="created_by"/>
+ <result property="createdAt" column="created_at"/>
+ <result property="publishedBy" column="published_by"/>
+ <result property="publishedAt" column="published_at"/>
+</resultMap>
+<resultMap id="tier" type="com.erp.oa.attendance.leave.balance.AttendanceLeaveBalanceModels$Tier">
+ <result property="ruleId" column="rule_id"/>
+ <result property="minYears" column="min_years"/>
+ <result property="maxYearsExclusive" column="max_years_exclusive"/>
+ <result property="amount" column="amount"/>
+</resultMap>
+<resultMap id="account" type="com.erp.oa.attendance.leave.balance.AttendanceLeaveBalanceModels$Account">
+ <result property="accountId" column="account_id"/>
+ <result property="userId" column="user_id"/>
+ <result property="leaveTypeId" column="leave_type_id"/>
+ <result property="rowVersion" column="row_version"/>
+</resultMap>
+<resultMap id="bucket" type="com.erp.oa.attendance.leave.balance.AttendanceLeaveBalanceModels$Bucket">
+ <result property="bucketId" column="bucket_id"/>
+ <result property="accountId" column="account_id"/>
+ <result property="userId" column="user_id"/>
+ <result property="leaveTypeId" column="leave_type_id"/>
+ <result property="sourceKey" column="source_key"/>
+ <result property="sourceType" column="source_type"/>
+ <result property="periodYear" column="period_year"/>
+ <result property="ruleId" column="rule_id"/>
+ <result property="mappingId" column="mapping_id"/>
+ <result property="mappingVersion" column="mapping_version"/>
+ <result property="ownerDeptId" column="owner_dept_id"/>
+ <result property="legalEntityId" column="legal_entity_id"/>
+ <result property="contextFingerprint" column="context_fingerprint"/>
+ <result property="expiresOn" column="expires_on"/>
+ <result property="expiryState" column="expiry_state"/>
+ <result property="grantedUnits" column="granted_units"/>
+ <result property="ruleGrantedUnits" column="rule_granted_units"/>
+ <result property="reservedUnits" column="reserved_units"/>
+ <result property="consumedUnits" column="consumed_units"/>
+ <result property="expiredUnits" column="expired_units"/>
+ <result property="carriedUnits" column="carried_units"/>
+ <result property="displayUnit" column="display_unit"/>
+ <result property="minutesPerDay" column="minutes_per_day"/>
+ <result property="rowVersion" column="row_version"/>
+ <result property="createdAt" column="created_at"/>
+</resultMap>
+<resultMap id="ledger" type="com.erp.oa.attendance.leave.balance.AttendanceLeaveBalanceModels$Ledger">
+ <result property="ledgerId" column="ledger_id"/>
+ <result property="accountId" column="account_id"/>
+ <result property="bucketId" column="bucket_id"/>
+ <result property="contextJson" column="context_json"/>
+ <result property="eventKey" column="event_key"/>
+ <result property="action" column="action"/>
+ <result property="units" column="units"/>
+ <result property="ruleId" column="rule_id"/>
+ <result property="sourceKey" column="source_key"/>
+ <result property="contextFingerprint" column="context_fingerprint"/>
+ <result property="operatorUserId" column="operator_user_id"/>
+ <result property="reason" column="reason"/>
+ <result property="createdAt" column="created_at"/>
+</resultMap>
+<resultMap id="command" type="com.erp.oa.attendance.leave.balance.AttendanceLeaveBalanceModels$Command">
+ <result property="commandId" column="command_id"/>
+ <result property="accountId" column="account_id"/>
+ <result property="commandKey" column="command_key"/>
+ <result property="fingerprint" column="fingerprint"/>
+ <result property="bucketId" column="bucket_id"/>
+ <result property="resultUnits" column="result_units"/>
+</resultMap>
+<resultMap id="location" type="com.erp.oa.attendance.leave.balance.AttendanceLeaveBalanceModels$LocationMapping">
+ <result property="mappingId" column="mapping_id"/>
+ <result property="ownerDeptId" column="owner_dept_id"/>
+ <result property="legalEntityId" column="legal_entity_id"/>
+ <result property="workLocation" column="work_location"/>
+ <result property="locationCode" column="location_code"/>
+ <result property="rowVersion" column="row_version"/>
+ <result property="reason" column="reason"/>
+ <result property="updatedBy" column="updated_by"/>
+ <result property="updatedAt" column="updated_at"/>
+</resultMap>
+<resultMap id="context" type="com.erp.oa.attendance.leave.balance.AttendanceLeaveBalanceModels$EmployeeContext">
+ <result property="userId" column="user_id"/><result property="deptId" column="dept_id"/>
+ <result property="profileId" column="profile_id"/><result property="legalEntityId" column="legal_entity_id"/>
+ <result property="workLocation" column="work_location"/><result property="workStartDate" column="work_start_date"/>
+ <result property="entryDate" column="entry_date"/><result property="employeeStatus" column="employee_status"/>
+ <result property="userStatus" column="user_status"/><result property="delFlag" column="del_flag"/>
+ <result property="profileUpdatedAt" column="profile_updated_at"/>
+</resultMap>
+<sql id="authorizedOwner">
+ EXISTS(SELECT 1 FROM sys_user_shop us JOIN sys_dept scope ON scope.dept_id=us.dept_id
+ JOIN sys_dept target ON 1=1
+ WHERE target.dept_id=owned.owner_dept_id AND us.user_id=#{actor} AND scope.status='0' AND scope.del_flag='0'
+ AND scope.dept_type IN ('GROUP','COMPANY','STORE','WAREHOUSE')
+ AND target.status='0' AND target.del_flag='0'
+ AND (target.dept_id=scope.dept_id OR FIND_IN_SET(scope.dept_id,target.ancestors)))
+</sql>
+<select id="selectContext" resultMap="context">
+ SELECT u.user_id,u.dept_id,u.status AS user_status,u.del_flag,p.profile_id,p.legal_entity_id,
+ p.work_location,p.work_start_date,p.entry_date,p.employee_status,p.update_time AS profile_updated_at
+ FROM sys_user u LEFT JOIN sys_user_profile p ON p.user_id=u.user_id WHERE u.user_id=#{userId}
+</select>
+<select id="lockUser" resultType="long">SELECT user_id FROM sys_user WHERE user_id=#{userId} FOR UPDATE</select>
+<select id="lockProfile" resultType="long">SELECT profile_id FROM sys_user_profile WHERE user_id=#{userId} FOR UPDATE</select>
+<select id="countActiveType" resultType="int">SELECT COUNT(*) FROM oa_attendance_leave_type WHERE leave_type_id=#{leaveTypeId} AND status='ENABLED'</select>
+<select id="countDeptPermission" resultType="int">
+ SELECT COUNT(*) FROM sys_user_shop us JOIN sys_dept scope ON scope.dept_id=us.dept_id
+ JOIN sys_dept target ON target.dept_id=#{deptId}
+ WHERE us.user_id=#{actor} AND scope.status='0' AND scope.del_flag='0'
+ AND scope.dept_type IN ('GROUP','COMPANY','STORE','WAREHOUSE')
+ AND target.status='0' AND target.del_flag='0'
+ AND (target.dept_id=scope.dept_id OR FIND_IN_SET(scope.dept_id,target.ancestors))
+</select>
+<select id="countDeptEntity" resultType="int">
+ SELECT COUNT(*) FROM sys_dept d JOIN sys_dept owner ON owner.dept_id=d.dept_id OR FIND_IN_SET(owner.dept_id,d.ancestors)
+ JOIN sys_legal_entity le ON le.legal_entity_id=owner.legal_entity_id
+ WHERE d.dept_id=#{deptId} AND le.legal_entity_id=#{legalEntityId} AND le.status='0'
+ AND d.status='0' AND d.del_flag='0' AND owner.status='0' AND owner.del_flag='0'
+</select>
+<select id="selectAccrualUsers" resultType="long">
+ SELECT u.user_id FROM sys_user u JOIN sys_user_profile p ON p.user_id=u.user_id
+ WHERE u.user_id &gt; #{afterId} AND u.status='0' AND u.del_flag='0'
+ ORDER BY u.user_id LIMIT #{limit}
+</select>
+<select id="selectConfiguredTypes" resultType="long">
+ SELECT DISTINCT r.leave_type_id FROM oa_attendance_leave_balance_rule r
+ JOIN oa_attendance_leave_type t ON t.leave_type_id=r.leave_type_id AND t.status='ENABLED'
+ WHERE r.status='PUBLISHED' ORDER BY r.leave_type_id
+</select>
+<select id="selectRules" resultMap="rule">
+ SELECT owned.* FROM oa_attendance_leave_balance_rule owned WHERE 1=1
+ <if test="!admin">AND <include refid="authorizedOwner"/></if> ORDER BY family_id,version DESC LIMIT 1000
+</select>
+<select id="selectRule" resultMap="rule">SELECT * FROM oa_attendance_leave_balance_rule WHERE rule_id=#{ruleId} <if test="lock">FOR UPDATE</if></select>
+<select id="selectTiers" resultMap="tier">SELECT * FROM oa_attendance_leave_balance_tier WHERE rule_id=#{ruleId} ORDER BY min_years</select>
+<select id="selectLastFamilyVersion" resultType="int">SELECT MAX(version) FROM oa_attendance_leave_balance_rule WHERE family_id=#{familyId}</select>
+<update id="initializeFamily">UPDATE oa_attendance_leave_balance_rule SET family_id=rule_id WHERE rule_id=#{ruleId} AND family_id IS NULL</update>
+<update id="publishRule">UPDATE oa_attendance_leave_balance_rule SET status='PUBLISHED',row_version=row_version+1,published_by=#{actor},published_at=NOW() WHERE rule_id=#{ruleId} AND row_version=#{version} AND status='DRAFT'</update>
+<delete id="deleteTiers">DELETE FROM oa_attendance_leave_balance_tier WHERE rule_id=#{ruleId}</delete>
+<select id="selectLocations" resultMap="location">
+ SELECT owned.* FROM oa_attendance_leave_work_location owned WHERE 1=1
+ <if test="!admin">AND <include refid="authorizedOwner"/></if> ORDER BY mapping_id LIMIT 1000
+</select>
+<select id="selectLocation" resultMap="location">SELECT * FROM oa_attendance_leave_work_location WHERE mapping_id=#{mappingId} <if test="lock">FOR UPDATE</if></select>
+<select id="matchLocations" resultMap="location">
+ SELECT m.* FROM oa_attendance_leave_work_location m JOIN sys_dept d ON d.dept_id=#{context.deptId} AND d.status='0' AND d.del_flag='0'
+ WHERE m.legal_entity_id=#{context.legalEntityId} AND BINARY m.work_location=BINARY TRIM(#{context.workLocation})
+ AND (m.owner_dept_id=d.dept_id OR FIND_IN_SET(m.owner_dept_id,d.ancestors)) ORDER BY m.mapping_id
+ <if test="lock">FOR UPDATE</if>
+</select>
+<select id="matchRules" resultMap="rule">
+ SELECT r.* FROM oa_attendance_leave_balance_rule r JOIN sys_dept d ON d.dept_id=#{context.deptId} AND d.status='0' AND d.del_flag='0'
+ JOIN sys_legal_entity le ON le.legal_entity_id=r.legal_entity_id AND le.status='0'
+ WHERE r.legal_entity_id=#{context.legalEntityId} AND r.leave_type_id=#{leaveTypeId}
+ AND BINARY r.location_code=BINARY #{locationCode} AND r.status='PUBLISHED'
+ AND r.effective_from &lt;= #{asOf} AND r.effective_to &gt;= #{asOf}
+ AND (r.owner_dept_id=d.dept_id OR FIND_IN_SET(r.owner_dept_id,d.ancestors))
+ AND NOT EXISTS(SELECT 1 FROM oa_attendance_leave_balance_rule n WHERE n.family_id=r.family_id
+ AND n.version&gt;r.version AND n.status='PUBLISHED' AND n.effective_from&lt;=#{asOf} AND n.effective_to&gt;=#{asOf})
+ ORDER BY r.priority DESC,r.rule_id <if test="lock">FOR UPDATE</if>
+</select>
+<insert id="ensureAccount" useGeneratedKeys="true" keyProperty="accountId">
+ INSERT INTO oa_attendance_leave_balance_account(user_id,leave_type_id) VALUES(#{userId},#{leaveTypeId})
+ ON DUPLICATE KEY UPDATE account_id=LAST_INSERT_ID(account_id)
+</insert>
+<select id="selectAccount" resultMap="account">SELECT * FROM oa_attendance_leave_balance_account WHERE user_id=#{userId} AND leave_type_id=#{leaveTypeId} <if test="lock">FOR UPDATE</if></select>
+<update id="bumpAccount">UPDATE oa_attendance_leave_balance_account SET row_version=row_version+1 WHERE account_id=#{accountId}</update>
+<select id="selectBuckets" resultMap="bucket">SELECT * FROM oa_attendance_leave_balance_bucket WHERE account_id=#{accountId} ORDER BY expires_on,bucket_id <if test="lock">FOR UPDATE</if></select>
+<select id="selectCommand" resultMap="command">SELECT * FROM oa_attendance_leave_balance_command WHERE account_id=#{accountId} AND BINARY command_key=BINARY #{commandKey}</select>
+<select id="selectLedger" resultMap="ledger">SELECT * FROM oa_attendance_leave_balance_ledger WHERE account_id=#{accountId} <if test="beforeId != null">AND ledger_id&lt;#{beforeId}</if> ORDER BY ledger_id DESC LIMIT #{limit}</select>
+<insert id="insertRule" useGeneratedKeys="true" keyProperty="ruleId">
+INSERT INTO oa_attendance_leave_balance_rule (family_id,version,owner_dept_id,legal_entity_id,leave_type_id,location_code,name,priority,status,effective_from,effective_to,config_json,row_version,created_by,published_by) VALUES(#{familyId},#{version},#{ownerDeptId},#{legalEntityId},#{leaveTypeId},#{locationCode},#{name},#{priority},#{status},#{effectiveFrom},#{effectiveTo},#{configJson},#{rowVersion},#{createdBy},#{publishedBy})
+</insert>
+<insert id="insertTier">
+INSERT INTO oa_attendance_leave_balance_tier (rule_id,min_years,max_years_exclusive,amount) VALUES(#{ruleId},#{minYears},#{maxYearsExclusive},#{amount})
+</insert>
+<insert id="insertBucket" useGeneratedKeys="true" keyProperty="bucketId">
+INSERT INTO oa_attendance_leave_balance_bucket (account_id,user_id,leave_type_id,source_key,source_type,period_year,rule_id,mapping_id,mapping_version,owner_dept_id,legal_entity_id,context_fingerprint,expires_on,expiry_state,granted_units,rule_granted_units,reserved_units,consumed_units,expired_units,carried_units,display_unit,minutes_per_day,row_version) VALUES(#{accountId},#{userId},#{leaveTypeId},#{sourceKey},#{sourceType},#{periodYear},#{ruleId},#{mappingId},#{mappingVersion},#{ownerDeptId},#{legalEntityId},#{contextFingerprint},#{expiresOn},#{expiryState},#{grantedUnits},#{ruleGrantedUnits},#{reservedUnits},#{consumedUnits},#{expiredUnits},#{carriedUnits},#{displayUnit},#{minutesPerDay},#{rowVersion})
+</insert>
+<insert id="insertLedger" useGeneratedKeys="true" keyProperty="ledgerId">
+INSERT INTO oa_attendance_leave_balance_ledger (account_id,bucket_id,event_key,action,units,rule_id,source_key,context_fingerprint,operator_user_id,reason,context_json) VALUES(#{accountId},#{bucketId},#{eventKey},#{action},#{units},#{ruleId},#{sourceKey},#{contextFingerprint},#{operatorUserId},#{reason},#{contextJson})
+</insert>
+<insert id="insertCommand" useGeneratedKeys="true" keyProperty="commandId">
+INSERT INTO oa_attendance_leave_balance_command (account_id,command_key,fingerprint,bucket_id,result_units) VALUES(#{accountId},#{commandKey},#{fingerprint},#{bucketId},#{resultUnits})
+</insert>
+<insert id="insertLocation" useGeneratedKeys="true" keyProperty="mappingId">
+INSERT INTO oa_attendance_leave_work_location (owner_dept_id,legal_entity_id,work_location,location_code,row_version,reason,updated_by) VALUES(#{ownerDeptId},#{legalEntityId},#{workLocation},#{locationCode},#{rowVersion},#{reason},#{updatedBy})
+</insert>
+<update id="updateRule">UPDATE oa_attendance_leave_balance_rule SET name=#{name},location_code=#{locationCode},priority=#{priority},effective_from=#{effectiveFrom},effective_to=#{effectiveTo},config_json=#{configJson},row_version=row_version+1 WHERE rule_id=#{ruleId} AND row_version=#{rowVersion} AND status='DRAFT'</update>
+<update id="updateLocation">UPDATE oa_attendance_leave_work_location SET work_location=#{workLocation},location_code=#{locationCode},reason=#{reason},updated_by=#{updatedBy},row_version=row_version+1,updated_at=NOW() WHERE mapping_id=#{mappingId} AND row_version=#{rowVersion}</update>
+<update id="updateBucket">UPDATE oa_attendance_leave_balance_bucket SET rule_id=#{ruleId},mapping_id=#{mappingId},mapping_version=#{mappingVersion},owner_dept_id=#{ownerDeptId},legal_entity_id=#{legalEntityId},context_fingerprint=#{contextFingerprint},expires_on=#{expiresOn},expiry_state=#{expiryState},granted_units=#{grantedUnits},rule_granted_units=#{ruleGrantedUnits},reserved_units=#{reservedUnits},consumed_units=#{consumedUnits},expired_units=#{expiredUnits},carried_units=#{carriedUnits},display_unit=#{displayUnit},minutes_per_day=#{minutesPerDay},row_version=row_version+1 WHERE bucket_id=#{bucketId} AND row_version=#{rowVersion}</update>
+</mapper>

@@ -1,0 +1,141 @@
+{
+  "updatedAt": "2026-09-12T00:18:45.623829+08:00",
+  "scope": "local implementation and regression; no production connection or deployment",
+  "baseCommit": "76b69e3dd808e4f9c526474e2ddaab84e12bd5d1",
+  "uncommitted": true,
+  "workflow": "Generate contract automatically synchronizes server-owned Excel salary; no separate salary form",
+  "backendFullRegression": {
+    "run": 2816,
+    "passed": 2804,
+    "failed": 0,
+    "errors": 0,
+    "skipped": 12,
+    "log": "/tmp/erp-salary-final-backend.log"
+  },
+  "latestOaTargetRegression": {
+    "result": "BUILD SUCCESS",
+    "log": "/tmp/erp-salary-final-oa-target.log"
+  },
+  "mysql": {
+    "HrOnboardSalaryArchiveMySqlIT": {
+      "passed": 7,
+      "failed": 0,
+      "skipped": 0,
+      "note": "includes one preexisting attendance cutover check"
+    },
+    "OaSignSalarySourceMySqlIT": {
+      "passed": 5,
+      "failed": 0,
+      "skipped": 0
+    }
+  },
+  "frontend": {
+    "nodeTestGroups": 308,
+    "failed": 0,
+    "productionModeBuild": "passed",
+    "signExcelImportEnabled": true,
+    "logs": [
+      "/tmp/erp-salary-ui-tests.log",
+      "/tmp/erp-salary-ui-build.log"
+    ]
+  },
+  "historyClassifier": {
+    "syntheticTests": 6,
+    "failed": 0,
+    "productionAuditExecuted": false
+  },
+  "preexistingWork": {
+    "baselineFiles": 31,
+    "unchanged": 30,
+    "onlyChanged": [
+      "docs/superpowers/plans/2026-09-11-contract-salary-source-governance.md"
+    ]
+  },
+  "pending": [
+    "authenticated desktop and mobile flow acceptance",
+    "production version and permission preflight",
+    "historical evidence review",
+    "production migrations and deployment"
+  ],
+  "migrationMirrors": {
+    "erp_employee_salary_source_20260911.sql": "899bb5d03adcf42a32c55acbf76af6b9699e89b95bf6ad2e7b79ef807b30ee61",
+    "erp_legacy_salary_readonly_menu_20260911.sql": "82e3996353f43ecc11fa048bf381e7a1fd7aa221237f56b774fe62c8fbf0592c"
+  },
+  "files": {
+    "docker/mysql/bootstrap-files.list": "cb2d4c7195641b84420939f6772733293885a0c3d9346d9690560a630469a4ae",
+    "erp-api/erp-api-system/src/main/java/com/erp/system/api/domain/EmployeeSalaryValues.java": "55748d2469d7c2f7ab6ffe5ddab8e749cd975ddbc97ddc63114602724b9fc792",
+    "erp-modules/erp-oa/src/main/java/com/erp/oa/service/impl/OaLaborContractServiceImpl.java": "2b4d82f8b1d653e34f9a2c8cc39a27030e02e9133170c9699251994779361bdf",
+    "erp-modules/erp-oa/src/main/java/com/erp/oa/service/impl/OaSalaryServiceImpl.java": "c84aa67b85228cf1d6eb1c4e5b44499b11164d7204e213016be0d61029441733",
+    "erp-modules/erp-oa/src/main/java/com/erp/oa/service/impl/OaSignOnboardGenerationService.java": "63217ab5fe65411424d3bbc2633d963f495b45591d32f0bfdcb330b4679eae01",
+    "erp-modules/erp-oa/src/main/java/com/erp/oa/service/impl/OaSignPackageServiceImpl.java": "fe801f43ee2a1f7352715a2cdfbaaf63fa5ab59b8c8bf53df42ef5b6e5ce1a8b",
+    "erp-modules/erp-oa/src/test/java/com/erp/oa/service/impl/OaLaborContractServiceImplTest.java": "627f2bd2bfe4a91a45c2870b3424e2b1c6dd162fbc6962988f6f1d2950ceebc2",
+    "erp-modules/erp-oa/src/test/java/com/erp/oa/service/impl/OaSalaryServiceImplTest.java": "05b85bcc803ec50b5e0319e1f5d3d95e58583438fc8c0de271683bf2bed9e243",
+    "erp-modules/erp-oa/src/test/java/com/erp/oa/service/impl/OaSignOnboardGenerationServiceTest.java": "d5a1990e78533635fcd3858a1e82307951eca28e2af6332ab2170eb21e89c420",
+    "erp-modules/erp-oa/src/test/java/com/erp/oa/service/impl/OaSignPackageServiceImplTest.java": "ffc5cc1c4382bb598d1a04bcfd55840912ba30feed26ba71a0731e1c52417a3b",
+    "erp-modules/erp-system/src/main/java/com/erp/system/controller/HrOnboardSalaryArchiveController.java": "2f6fa41094f8c6743f30a9b9dc4a1840c183a40f3ac5b0ce48ced1a37682197d",
+    "erp-modules/erp-system/src/main/java/com/erp/system/domain/dto/HrOnboardSalaryArchiveRequest.java": "a1588e371f62f9a3e3674c61898a4e6cbad5d7ba6cbd925cd435bc5c9df1362f",
+    "erp-modules/erp-system/src/main/java/com/erp/system/mapper/HrOnboardSalaryArchiveMapper.java": "2dd03b1e254f2d9a53ccabf71cf62da1e2cf834dc32ce980445902be787c2926",
+    "erp-modules/erp-system/src/main/java/com/erp/system/mapper/SysUserProfileMapper.java": "fb6a303a709caaa62e69d68883e1a6232e269b12e87fc0223079b7e7606004c7",
+    "erp-modules/erp-system/src/main/java/com/erp/system/service/impl/HrLifecycleServiceImpl.java": "34cc5c88f626ee9955ce82362da3215184cd2a2dda7ad34d0d66f5396a94ae64",
+    "erp-modules/erp-system/src/main/java/com/erp/system/service/impl/HrOnboardSalaryArchiveService.java": "94d46767f2f707ce537360d0ffc24640c03bf71ea08d1d3e64060dcfa0329a99",
+    "erp-modules/erp-system/src/main/java/com/erp/system/service/impl/SysSalaryConfigServiceImpl.java": "4f9205ac7d4ce8352022de918719e7663c6563495e65351ca791839c3cb3b391",
+    "erp-modules/erp-system/src/main/java/com/erp/system/service/impl/SysUserServiceImpl.java": "ef4900d2f59b8319c3d800928949de10d6389fd8207ee46f69c28e7d36c55bb8",
+    "erp-modules/erp-system/src/main/resources/mapper/system/HrOnboardSalaryArchiveMapper.xml": "6a2de164d4c1a393c637b78e4f99f1a7a2511a3b4923c2a0eadc01fe14979eb9",
+    "erp-modules/erp-system/src/main/resources/mapper/system/SysUserProfileMapper.xml": "05986897177a1c25bb777082459a0e59423308403bdd3a83c778dbd90aa70e2d",
+    "erp-modules/erp-system/src/test/java/com/erp/system/service/impl/HrEmployeeTransferLifecycleTest.java": "bc32c8c24dcc6fd0f2f323cde24bb769a0289a98bd504642fb4afb231748aaf9",
+    "erp-modules/erp-system/src/test/java/com/erp/system/service/impl/HrEmployeeTransferTransactionIT.java": "17a45b74a959b68023e23549f6fc589baf0538355a85681fb2715e763c7a700c",
+    "erp-modules/erp-system/src/test/java/com/erp/system/service/impl/HrOffboardingLifecycleTest.java": "532eafe3dec3b35b2551d14eaa2b35b618aa3969f230f490cf47871088aaa250",
+    "erp-modules/erp-system/src/test/java/com/erp/system/service/impl/HrOffboardingTransactionIT.java": "7810976a9d93f9cd0d955457c759cbd715fcd28d9bf3faf7ee57c37d656a372e",
+    "erp-modules/erp-system/src/test/java/com/erp/system/service/impl/HrOnboardSalaryArchiveMySqlIT.java": "328541b4676983a2cad9d386d26a27f65b5513c28805b9957a70593eeef48bec",
+    "erp-modules/erp-system/src/test/java/com/erp/system/service/impl/HrOnboardSalaryArchiveServiceTest.java": "3225819223dbc293683c37b9d65b342e4fdb9c3733fd1890d462d77d6bb480d6",
+    "erp-modules/erp-system/src/test/java/com/erp/system/service/impl/HrOnboardingLifecycleTest.java": "4830997c011f8cbde8465b880fcd1685b17afeecec15e0476abf32c5df765fd6",
+    "erp-modules/erp-system/src/test/java/com/erp/system/service/impl/HrRegularizationLifecycleTest.java": "fc7815ed19c5dcc34bd993d335f78c1346c6c4d894b05986b3f8fa7bd2d441b9",
+    "erp-modules/erp-system/src/test/java/com/erp/system/service/impl/HrRenewalLifecycleTest.java": "c07be42ab0e5657afc8e75589e4ce563efc8f9bcc11dcd8449d2aeff9496692b",
+    "erp-modules/erp-system/src/test/java/com/erp/system/service/impl/SysSalaryConfigServiceImplTest.java": "eb9a74cc9ffd2652951d3b4cf2ec0639a6181bf9a0f6b7cf554c3b7e9edca861",
+    "erp-ui/src/api/oa/signTask.js": "b0b1c89890c0fc6598319303d82c5a5c4cde61775e15018c082aec529861229b",
+    "erp-ui/src/views/hr/components/HrProfileDetailDrawer.vue": "8789af49e5856c4fb9d10e7d69382dd2938d2bb599948112bb2180b441ca7331",
+    "erp-ui/src/views/hr/components/HrSignDataImportDialog.vue": "11068a73a3a5118575aa4d49f61d07e45f69bcd66bcee5763cb8756cf6248ebe",
+    "erp-ui/src/views/oa/laborContract/index.vue": "01426fce85f14ce13ee2e756669121ae7dbf3facb28b7e999c8ca77e5a3306e8",
+    "erp-ui/src/views/oa/salary/index.vue": "f20f27b1672ea3cf581e97e960d3c28ead3e3f7dd690d38220b6dd32c2ee4cb3",
+    "erp-ui/src/views/oa/signTask/SignOnboardCompanyWorkDialog.vue": "12e901ea02dcf331b947ac3b15faa1101a681b93a3fea7d33f6ea17758daf9d3",
+    "erp-ui/src/views/system/role/index.vue": "68302d11c79001cd75596da52b16e1da4f80d5a691946ffb9ec40c51f6b12011",
+    "erp-ui/src/views/system/salary/index.vue": "8863d50e85a27aee773c0567a28fccf8ce42d4dffcff617c0de9eaade6a0dfca",
+    "erp-ui/test/attendancePayrollGuard.test.js": "af2586a0db3cfb8e730ea1ec71e441f0d12535a63dc9ea923bb56f288051345f",
+    "erp-ui/test/desktopAuditRemediation.test.js": "aa82b85208251e60dfa0a564f17451a925b58314cf0b5c32f17d555c2ff44bb3",
+    "erp-ui/test/hrExistingEmployeeOnboardContract.test.js": "9982e7a2e8e2ffdde5cfa99af2015b4b831005b93bd9ccb8c158a607c7a2c33e",
+    "erp-ui/test/onboardSalaryArchive.test.js": "17f1b2f24a687ab57f0e991613158dd9f85cc123b51fc347d0654fe853d30eff",
+    "docker/mysql/db/erp_employee_salary_source_20260911.sql": "899bb5d03adcf42a32c55acbf76af6b9699e89b95bf6ad2e7b79ef807b30ee61",
+    "docker/mysql/db/erp_legacy_salary_readonly_menu_20260911.sql": "82e3996353f43ecc11fa048bf381e7a1fd7aa221237f56b774fe62c8fbf0592c",
+    "docs/reports/合同工资来源调整-20260912.md": "46f63d348f8e21b8c3e0bceec6f5b499b8036ffbf79d32508d150e3ad06fb2ed",
+    "docs/superpowers/plans/2026-09-11-contract-salary-source-governance.md": "dbea9c2d3fb80bbbfb44332d361b77f7495e4c29e5323427b1c7a7be90484116",
+    "erp-api/erp-api-system/src/main/java/com/erp/system/api/domain/EmployeeSalarySource.java": "350f7344cd501b5f0f2798732308693507b571a6a5b561494a63e1855bcc6946",
+    "erp-common/erp-common-security/src/main/java/com/erp/common/security/service/LegacySalaryWriteGuard.java": "e703abe41841755b583a8d3910aa701352930b8b877c0582cda49ba7f20f0589",
+    "erp-modules/erp-oa/src/main/java/com/erp/oa/mapper/OaSignSalarySourceMapper.java": "0a1a4f8b03b2c75618a3f48283683adce94c779022eff0afc194762c0415ac1c",
+    "erp-modules/erp-oa/src/main/java/com/erp/oa/service/impl/OaSignSalarySourceService.java": "463de4f18d4a4998e36a876ee77b2b53f06ae2510edcd32fa46062929555791d",
+    "erp-modules/erp-oa/src/main/resources/db/migration/erp_employee_salary_source_20260911.sql": "899bb5d03adcf42a32c55acbf76af6b9699e89b95bf6ad2e7b79ef807b30ee61",
+    "erp-modules/erp-oa/src/main/resources/db/migration/erp_legacy_salary_readonly_menu_20260911.sql": "82e3996353f43ecc11fa048bf381e7a1fd7aa221237f56b774fe62c8fbf0592c",
+    "erp-modules/erp-oa/src/main/resources/mapper/oa/OaSignSalarySourceMapper.xml": "b8a17b7a771cca070c8178c50c5eddf51301e8136417f0331b9ababeed3e38db",
+    "erp-modules/erp-oa/src/test/java/com/erp/oa/service/impl/LegacyOaSalaryWriteRejectionTest.java": "1356a967990f8a2a2311fbb06a5af54f3f50993e992ceb939336d9862e455f88",
+    "erp-modules/erp-oa/src/test/java/com/erp/oa/service/impl/OaSignSalarySourceMySqlIT.java": "bdb3bbde9c2c16680c5a6f597c2e68c0fa27b716427f537b33bb97270d8191a9",
+    "erp-modules/erp-oa/src/test/java/com/erp/oa/service/impl/OaSignSalarySourceServiceTest.java": "2dfaba746777a03b90bd0ee7376d2ed4aa12ca035e3fa0181fba1c6472ba2ace",
+    "erp-modules/erp-system/src/main/java/com/erp/system/controller/HrSalarySourceController.java": "b1ac21f01378b61e4556c0eed3fbb510a389a6b720f6bd7f8a5083eec7dfe1a0",
+    "erp-modules/erp-system/src/main/java/com/erp/system/mapper/HrSalarySourceMapper.java": "dd880b1993ba7e9c08751a9d1660d9d531441e04b694ffc0eb0552ba389f6f16",
+    "erp-modules/erp-system/src/main/java/com/erp/system/service/impl/HrSalarySourceService.java": "e3d04616ad36be6ae70b59517285f672022ffa43d86c4a76083ff064d405e5ab",
+    "erp-modules/erp-system/src/main/resources/db/migration/erp_employee_salary_source_20260911.sql": "899bb5d03adcf42a32c55acbf76af6b9699e89b95bf6ad2e7b79ef807b30ee61",
+    "erp-modules/erp-system/src/main/resources/db/migration/erp_legacy_salary_readonly_menu_20260911.sql": "82e3996353f43ecc11fa048bf381e7a1fd7aa221237f56b774fe62c8fbf0592c",
+    "erp-modules/erp-system/src/main/resources/mapper/system/HrSalarySourceMapper.xml": "39751e2a40e352cf31b280713ab61a23d82b3b0c98c918719e0e6b4723eb4c90",
+    "erp-modules/erp-system/src/test/java/com/erp/system/service/impl/HrSalarySourceServiceTest.java": "7069c65de4e27008f8cda1cca850feea74c4ab1d39f504ad1bf86083eae30d58",
+    "erp-modules/erp-system/src/test/java/com/erp/system/service/impl/LegacySalaryWriteRejectionTest.java": "62f73c138d29ebb3dffb303efdc60529af2bf4b830880b8368314dc0af42a400",
+    "erp-modules/erp-system/src/test/java/com/erp/system/service/impl/SysUserSalaryWriteBoundaryTest.java": "72a23db5b98881e730496ab3b327865b7a420215caf8e172f71c581ca80c3c8b",
+    "erp-ui/src/utils/onboardSalarySync.js": "e10fe2cef108872d8bd42164e75d7dc308899c135854d6032ece0df76f79b94a",
+    "erp-ui/src/views/hr/components/HrSalarySourcePanel.vue": "07e085012942d6f95c9cec3c5c3dfc7dfbf89c7540401f0e80c71ed7e10142ac",
+    "erp-ui/src/views/hr/components/LegacySalaryNotice.vue": "a6e4309baf73eeb0d5137326b7aaf802b05bc792df9f92ae1e6c6bbe17458426",
+    "erp-ui/test/helpers/releaseSourceFixture.js": "1091bed3f12edc432fe1b51fd233d5bc27396d7c69609f15d8e477ed41decf87",
+    "scripts/audit-contract-salary-sources.sql": "f99ca393ec74ccfbc4aa5fdd66667976455127117f04b59ed9d7aa27d961f217",
+    "scripts/audit_contract_salary_sources.py": "66b2ab54e1d378bf0f212c6fe2ec93744d78034c0ab689acdaaa56f34ad74262",
+    "scripts/contract-salary-source-migrations-20260911.list": "1c416ba37c0d90a70fd04373e14ea63f063e92758d973af60c503527df56fdcc",
+    "scripts/test_audit_contract_salary_sources.py": "418fdba4c3ce8628fb3c44a8936a1ec092933d06bb524c680a82cbbf0c132d51",
+    "sql/erp_employee_salary_source_20260911.sql": "899bb5d03adcf42a32c55acbf76af6b9699e89b95bf6ad2e7b79ef807b30ee61",
+    "sql/erp_legacy_salary_readonly_menu_20260911.sql": "82e3996353f43ecc11fa048bf381e7a1fd7aa221237f56b774fe62c8fbf0592c"
+  }
+}

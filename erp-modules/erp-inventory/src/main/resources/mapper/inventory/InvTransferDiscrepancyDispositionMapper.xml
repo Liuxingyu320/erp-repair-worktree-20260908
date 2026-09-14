@@ -79,4 +79,15 @@
           and request_id = #{requestId}
         order by discrepancy_detail_id, category
     </select>
+
+    <!-- Only for replay/rejection after root and discrepancy locks: this path must not insert.
+         Fresh requests use the nonlocking lookup to avoid cross-root empty-index gap-lock cycles. -->
+    <select id="selectByRequestIdForUpdate" resultMap="DispositionResult">
+        select <include refid="columns"/>
+        from inv_transfer_discrepancy_disposition
+        where discrepancy_id = #{discrepancyId}
+          and request_id = #{requestId}
+        order by discrepancy_detail_id, category
+        for update
+    </select>
 </mapper>

@@ -13,6 +13,8 @@ import com.erp.system.domain.vo.SysNoticeReadUserVo;
  */
 public interface SysNoticeReadMapper
 {
+    com.erp.system.domain.vo.SysNoticeReadSummary selectReadSummary(@Param("noticeId") Long noticeId);
+
     /**
      * 新增已读记录（忽略重复）
      *

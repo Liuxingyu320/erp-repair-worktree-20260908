@@ -680,13 +680,8 @@ export default {
     runValidation() {
       this.validationLoading = true
       return this.persistDraft(false).then(() => runApprovalValidation({
-        businessCode: this.template.businessCode,
-        templateId: entityId(this.template, ['templateId', 'id']),
-        ruleId: this.ruleId,
         versionId: this.versionId,
-        scopeMode: 'VERSION',
-        anchorDeptId: this.previewForm.anchorDeptId || undefined,
-        businessSubtype: this.form.businessSubtype || undefined
+        validationType: 'MANUAL'
       })).then(response => {
         const value = unwrapData(response)
         this.validationResult = value && value.run

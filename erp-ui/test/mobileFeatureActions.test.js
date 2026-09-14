@@ -28,9 +28,9 @@ assert.deepStrictEqual(
 )
 
 assert.deepStrictEqual(
-  getMobileFeatureActions("purchase", { _statusKey: "submitted", _raw: { orderId: 12, qcStatus: "pending" } }).map(action => action.id),
-  ["qualityCheckPurchase"],
-  "purchase orders pending quality check should expose the line-level mobile QC action before receiving"
+  getMobileFeatureActions("purchase", { _statusKey: "submitted", _raw: { orderId: 12, qcStatus: "pending", remainingQuantity: 3 } }).map(action => action.id),
+  ["qualityCheckPurchase", "receivePurchaseAll"],
+  "pending inspection with remaining quantity should expose both another arrival and batch QC"
 )
 
 assert.deepStrictEqual(
@@ -534,3 +534,9 @@ assert.ok(
     `mobile action runtime should not retain disabled master/config write api ${apiName}`
   )
 })
+
+assert.deepStrictEqual(
+  getMobileFeatureActions("purchase", { _statusKey: "submitted", _raw: { orderId: 12, qcStatus: "pending", remainingQuantity: 0 } }).map(action => action.id),
+  ["qualityCheckPurchase"], "fully arrived purchases retain QC but do not start another receipt"
+)
+console.log("mobile feature actions regression passed")

@@ -65,7 +65,7 @@ class InvSupplierServiceImplTest
     {
         InvSupplier current = supplier(8L, "江南茶业", "SUP-JN", 301L);
         InvSupplier update = supplier(8L, "江南茶业新名称", "SUP-JN", null);
-        when(supplierMapper.selectInvSupplierById(8L)).thenReturn(current);
+        when(supplierMapper.selectInvSupplierByIdForUpdate(8L)).thenReturn(current);
         when(supplierMapper.countSupplierReferences(eq(8L), eq("江南茶业"), anyList()))
                 .thenReturn(1);
 
@@ -80,7 +80,7 @@ class InvSupplierServiceImplTest
     void deleteUsesRelatedScopeReferenceCheck()
     {
         InvSupplier current = supplier(8L, "江南茶业", "SUP-JN", 301L);
-        when(supplierMapper.selectInvSupplierById(8L)).thenReturn(current);
+        when(supplierMapper.selectInvSupplierByIdForUpdate(8L)).thenReturn(current);
         when(supplierMapper.countSupplierReferences(eq(8L), eq("江南茶业"),
                 eq(List.of(301L, 302L)))).thenReturn(1);
 

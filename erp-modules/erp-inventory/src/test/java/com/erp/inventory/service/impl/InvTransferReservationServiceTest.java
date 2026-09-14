@@ -338,6 +338,58 @@ class InvTransferReservationServiceTest
         assertThat(reservation.getStatus()).isEqualTo("PARTIAL");
     }
 
+    @Test
+    @DisplayName("原预留耗尽后批量补发保持实物与消耗事实，只增加补发冻结")
+    void shouldReserveBatchAfterOriginalReservationIsExhausted()
+    {
+        FakeReservationMapper mapper = new FakeReservationMapper();
+        mapper.addStock(1001L, "20");
+        InvTransferReservationService service = new InvTransferReservationService(mapper);
+        InvTransferOrder order = order();
+        InvTransferDetail detail = detail(11L, 1001L, "10");
+        service.reserveForSubmission(order, List.of(detail), "admin");
+        order.setApprovalRound(1);
+        service.consumeForShipment(order, detail, new BigDecimal("10"), "warehouse");
+        BigDecimal costBefore = mapper.stocksByItem.get(1001L).getTotalCost();
+        service.reserveForReshipments(order, List.of(detail), Map.of(11L, new BigDecimal("2")), "handler");
+        InvStock stock = mapper.stocksByItem.get(1001L);
+        InvTransferReservation row = mapper.reservations.get(0);
+        assertThat(stock.getCurrentQuantity()).isEqualByComparingTo("10");
+        assertThat(stock.getAvailableQuantity()).isEqualByComparingTo("8");
+        assertThat(stock.getLockedQuantity()).isEqualByComparingTo("2");
+        assertThat(stock.getTotalCost()).isEqualByComparingTo(costBefore);
+        assertThat(row.getReservedQuantity()).isEqualByComparingTo("12");
+        assertThat(row.getConsumedQuantity()).isEqualByComparingTo("10");
+        assertThat(row.getReleasedQuantity()).isEqualByComparingTo("0");
+        service.consumeForShipment(order, detail, new BigDecimal("2"), "warehouse");
+        assertThat(stock.getCurrentQuantity()).isEqualByComparingTo("8");
+        assertThat(stock.getLockedQuantity()).isEqualByComparingTo("0");
+        assertThat(row.getConsumedQuantity()).isEqualByComparingTo("12");
+    }
+
+    @Test
+    @DisplayName("同库存多补发明细先校验合计可用量，失败不得部分冻结")
+    void batchReshipRejectsAggregateShortageBeforeMutation()
+    {
+        FakeReservationMapper mapper = new FakeReservationMapper();
+        mapper.addStock(1001L, "10");
+        InvTransferReservationService service = new InvTransferReservationService(mapper);
+        InvTransferOrder order = order();
+        InvTransferDetail a = detail(11L, 1001L, "4");
+        InvTransferDetail b = detail(12L, 1001L, "4");
+        service.reserveForSubmission(order, List.of(a, b), "admin");
+        order.setApprovalRound(1);
+        service.consumeForShipment(order, a, new BigDecimal("4"), "warehouse");
+        service.consumeForShipment(order, b, new BigDecimal("4"), "warehouse");
+        int mutationsBefore = mapper.reserveCalls;
+        assertThatThrownBy(() -> service.reserveForReshipments(order, List.of(a, b),
+                Map.of(11L, new BigDecimal("2"), 12L, new BigDecimal("2")), "handler"))
+                .hasMessageContaining("补发可用库存不足");
+        assertThat(mapper.reserveCalls).isEqualTo(mutationsBefore);
+        assertThat(mapper.stocksByItem.get(1001L).getLockedQuantity()).isEqualByComparingTo("0");
+        assertThat(mapper.reservations).allSatisfy(row -> assertThat(row.getReservedQuantity()).isEqualByComparingTo("4"));
+    }
+
     private InvTransferOrder order()
     {
         InvTransferOrder order = new InvTransferOrder();

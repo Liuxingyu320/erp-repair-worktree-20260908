@@ -8,6 +8,9 @@ public interface InvSalesOrderMapper
 {
     InvSalesOrder selectInvSalesOrderById(Long orderId);
     InvSalesOrder selectInvSalesOrderByIdForUpdate(Long orderId);
+    List<InvSalesOrder> selectReturnableSalesOrderList(
+            @Param("query") com.erp.inventory.domain.dto.InvSalesReturnSourceQuery query,
+            @Param("shopDeptId") Long shopDeptId);
     List<InvSalesOrder> selectInvSalesOrderList(InvSalesOrder order);
     List<InvSalesOrder> selectMyInvSalesOrderList(InvSalesOrder order);
     int countByCustomerNameAndShop(@Param("customerName") String customerName, @Param("shopDeptId") Long shopDeptId);

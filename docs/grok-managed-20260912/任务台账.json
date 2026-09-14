@@ -1,0 +1,1050 @@
+{
+  "updated_at_utc": "2026-09-12T13:59:04.441959+00:00",
+  "implementation_root": "/Users/liuxingyu/Desktop/ERP-NEW_阿里云线上源码备份_2026-09-08_3a6fe91a2/Grok实施工作副本_20260912",
+  "grok_version": "1.0.30",
+  "roles": {
+    "programmer": "Codex",
+    "manager_and_verifier": "Codex",
+    "previous_programmer": "Grok Build"
+  },
+  "baseline": {
+    "batch": "B01",
+    "status": "verified_local",
+    "verified": true,
+    "grok_session": "01a09441-f189-7241-b075-871ddd1b3c3c",
+    "changed_files": 5,
+    "frontend_test_groups": 6,
+    "backend_tests": {
+      "passed": 22,
+      "failed": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "evidence": "问题修复实施_20260909/output/grok-managed-20260912/review-b01"
+  },
+  "total_findings": 48,
+  "confirmed_decisions": 23,
+  "findings": [
+    {
+      "id": "INV-F1",
+      "priority": "P2",
+      "title": "供应商改名/删除漏掉OE引用，OE关联断开",
+      "evidence": "源码链",
+      "version": "R",
+      "domain": "库存",
+      "batch": "B05",
+      "status": "verified_local",
+      "verified": true,
+      "active_task": "B05-F1",
+      "verification": "根审9路径哈希一致；50单元/旧回归与MySQL5.7/8.0各13真实事务，76通过0失败/错误/跳过；无浏览器/部署/线上验收",
+      "verification_record": "docs/grok-managed-20260912/B05-F1-供应商OE引用保护交付.md"
+    },
+    {
+      "id": "INV-F2",
+      "priority": "P2",
+      "title": "盘点保存返回10，覆盖保存期间新录的12",
+      "evidence": "方法复现",
+      "version": "R",
+      "domain": "库存",
+      "batch": "B03",
+      "status": "verified_local",
+      "verified": true,
+      "active_task": "B03-B",
+      "verification": "源码与定向本地测试通过；未浏览器/部署/生产验收",
+      "verification_record": "docs/grok-managed-20260912/B03-B-独立本地验收.md"
+    },
+    {
+      "id": "INV-F3",
+      "priority": "P2",
+      "title": "全部出库或盘亏后，零库存仍残留正负成本",
+      "evidence": "服务方法＋SQL链",
+      "version": "R",
+      "domain": "库存",
+      "batch": "B04",
+      "status": "verified_local",
+      "verified": true,
+      "active_task": "04D",
+      "verification": "197 定向测试通过，其中 MySQL5.7/8.0各41真实事务场景，失败/错误/跳过0；根审14路径哈希一致；未线上验收",
+      "verification_record": "docs/grok-managed-20260912/04D-库存成本结清交付.md"
+    },
+    {
+      "id": "INV-F4",
+      "priority": "P2",
+      "title": "部分采购退货被0数量行阻止；数字看不清、删除需横滚",
+      "evidence": "页面＋方法复现",
+      "version": "R",
+      "domain": "库存",
+      "batch": "B05",
+      "status": "verified_local",
+      "verified": true,
+      "confirmed_decisions": [
+        "D01"
+      ],
+      "policy_status": "confirmed_see_decision_list",
+      "active_task": "B05-A",
+      "verification": "新增9、旧4入口及上传24，共37本地Node通过，失败/错误/跳过0；未浏览器/部署验收",
+      "verification_record": "docs/grok-managed-20260912/B05-A-采购退货勾选验收.md"
+    },
+    {
+      "id": "INV-F5",
+      "priority": "P2",
+      "title": "采购/采购退货/销售退货的专岗按钮与隐含权限不一致",
+      "evidence": "入口/接口权限链",
+      "version": "R",
+      "domain": "库存",
+      "batch": "B05",
+      "status": "verified_local",
+      "verified": true,
+      "active_task": "B05-F5",
+      "verification": "根审F5最终35路径、F7最终8前端路径哈希一致；F5原200执行和独立修复82专项复跑、F7 42 Node执行项全部通过，失败/错误/跳过0；未部署/生产验收",
+      "verification_record": "docs/grok-managed-20260912/B05-D-销售退货原单验收.md"
+    },
+    {
+      "id": "INV-F6",
+      "priority": "P2",
+      "title": "采购切换商品/OE类型后，迟到响应覆盖并按新类型错解析",
+      "evidence": "方法复现",
+      "version": "R",
+      "domain": "库存",
+      "batch": "B02",
+      "status": "verified_local",
+      "verified": true,
+      "task": "03",
+      "verification": "新增28动态场景及7组原回归通过，5页模板errors/tips为0；未浏览器或部署验收",
+      "verification_record": "/Users/liuxingyu/Desktop/ERP-NEW_阿里云线上源码备份_2026-09-08_3a6fe91a2/问题修复实施_20260909/output/grok-managed-20260912/review-b03-read/03-Codex-本地验收.md"
+    },
+    {
+      "id": "INV-F7",
+      "priority": "P2",
+      "title": "销售退货只取前20张再排除草稿，找不到更早可退原单",
+      "evidence": "方法＋查询链",
+      "version": "R",
+      "domain": "库存",
+      "batch": "B05",
+      "status": "verified_local",
+      "verified": true,
+      "confirmed_decisions": [
+        "D05"
+      ],
+      "policy_status": "confirmed_see_decision_list",
+      "active_task": "B05-D",
+      "verification": "根审F5最终35路径、F7最终8前端路径哈希一致；F5原200执行和独立修复82专项复跑、F7 42 Node执行项全部通过，失败/错误/跳过0；未部署/生产验收",
+      "verification_record": "docs/grok-managed-20260912/B05-D-销售退货原单验收.md"
+    },
+    {
+      "id": "INV-U1",
+      "priority": "建议P2",
+      "title": "质检默认整批已检合格，部分质检需逐行清零",
+      "evidence": "源码＋方法；政策待确认",
+      "version": "R",
+      "domain": "库存",
+      "batch": "B05",
+      "status": "verified_local",
+      "verified": true,
+      "confirmed_decisions": [
+        "D02"
+      ],
+      "policy_status": "confirmed_see_decision_list",
+      "active_task": "B05-B",
+      "verification": "14新Vue场景、5旧入口、24上传回归，共43通过，失败/错误/跳过0；未浏览器/部署验收",
+      "verification_record": "docs/grok-managed-20260912/B05-B-部分质检验收.md"
+    },
+    {
+      "id": "INV-U2",
+      "priority": "建议P2",
+      "title": "残损处置要求手填附件节点编号，缺上传/选择入口",
+      "evidence": "源码体验候选；开关待验",
+      "version": "R",
+      "domain": "库存",
+      "batch": "B05",
+      "status": "verified_local",
+      "verified": true,
+      "confirmed_decisions": [
+        "D08"
+      ],
+      "policy_status": "confirmed_see_decision_list",
+      "active_task": "B04-U2",
+      "verification": "根审15路径哈希一致；132后端方法0失败/错误/跳过；14新前端+14共享质检+28旧异步读取与5旧脚本组通过；无DB/浏览器/部署/生产验收",
+      "verification_record": "docs/grok-managed-20260912/INV-U2-实施与本地验收.md"
+    },
+    {
+      "id": "INV-U3",
+      "priority": "建议P2",
+      "title": "已有一批待检时，不能登记同采购单后续到货",
+      "evidence": "确定服务策略；业务待确认",
+      "version": "R",
+      "domain": "库存",
+      "batch": "B04",
+      "status": "verified_local",
+      "verified": true,
+      "confirmed_decisions": [
+        "D03"
+      ],
+      "policy_status": "confirmed_see_decision_list",
+      "task": "04A/04B",
+      "verification_record": "docs/grok-managed-20260912/04B-收货前端恢复交付.md",
+      "verification": "后端66、本地前端与IDB53、旧10组通过；未真实ERP浏览器整链/部署/生产验收"
+    },
+    {
+      "id": "INV-U4",
+      "priority": "建议P3",
+      "title": "采购跨页/跨类型选料不保留已选清单，反复开窗",
+      "evidence": "源码体验候选",
+      "version": "R",
+      "domain": "库存",
+      "batch": "B05",
+      "status": "verified_local",
+      "verified": true,
+      "confirmed_decisions": [
+        "D04"
+      ],
+      "policy_status": "confirmed_see_decision_list",
+      "active_task": "B05-C",
+      "verification": "15新实际Vue/Element+14质检+4旧入口，Node33通过，失败/错误/跳过0；未浏览器/部署验收",
+      "verification_record": "docs/grok-managed-20260912/B05-C-采购选料验收.md"
+    },
+    {
+      "id": "INV-U5",
+      "priority": "建议P2",
+      "title": "大盘点缺快速定位，快照失效后全单实盘需要重录",
+      "evidence": "源码体验候选；保留安全校验",
+      "version": "R",
+      "domain": "库存",
+      "batch": "B05",
+      "status": "verified_local",
+      "verified": true,
+      "confirmed_decisions": [
+        "D06",
+        "D07"
+      ],
+      "policy_status": "confirmed_see_decision_list",
+      "active_task": "B05-E/B04-U5",
+      "verification": "PC14新+3旧组(含旧保存19场景)，H5新增5实际Vue/API场景；后端61单元及MySQL5.7/8.0各5，71环境执行0失败/错误/跳过；根审19路径与10XML；未部署/浏览器/线上验收",
+      "verification_record": "docs/grok-managed-20260912/INV-U5-后端与手机验收.md"
+    },
+    {
+      "id": "S01",
+      "priority": "P1",
+      "title": "保存用户A时切B，第二段资料请求写向B",
+      "evidence": "方法＋后端边界复核",
+      "version": "R/M",
+      "domain": "系统",
+      "batch": "B02",
+      "status": "verified_local",
+      "verified": true,
+      "task": "02",
+      "verification": {
+        "test_groups": 5,
+        "behavior_scenarios": 17,
+        "failed": 0,
+        "skipped": 0,
+        "template_errors": 0,
+        "evidence": "/Users/liuxingyu/Desktop/ERP-NEW_阿里云线上源码备份_2026-09-08_3a6fe91a2/问题修复实施_20260909/output/grok-managed-20260912/review-b02a-handoff/02A-独立本地验收.md"
+      },
+      "verification_record": "docs/grok-managed-20260912/02A-用户保存隔离交付.md"
+    },
+    {
+      "id": "S02",
+      "priority": "P2",
+      "title": "个人资料保存后回填旧扩展字段，再保存可能覆盖新值",
+      "evidence": "真实Vue响应式复现含反例",
+      "version": "R/M",
+      "domain": "系统",
+      "batch": "B03",
+      "status": "verified_local",
+      "verified": true,
+      "task": "B03-C",
+      "verification": "源码与定向本地测试通过；未浏览器/部署/生产验收",
+      "verification_record": "docs/grok-managed-20260912/B03-C-独立本地验收.md"
+    },
+    {
+      "id": "S03",
+      "priority": "P2",
+      "title": "含大写T的普通职位/名称被截成10字",
+      "evidence": "页面＋方法复现",
+      "version": "R；PC也在M",
+      "domain": "系统",
+      "batch": "B06",
+      "status": "verified_local",
+      "verified": true,
+      "task": "B06-P",
+      "verification_record": "docs/grok-managed-20260912/B06-P-个人资料验收.md"
+    },
+    {
+      "id": "S04",
+      "priority": "P2",
+      "title": "岗位/字典/角色成员等列表失败后仍一直转圈",
+      "evidence": "源码异常链",
+      "version": "R/M",
+      "domain": "系统",
+      "batch": "B06",
+      "status": "verified_local",
+      "verified": true,
+      "task": "B06-R",
+      "verification_record": "docs/grok-managed-20260912/B06-R-列表与角色实施.md"
+    },
+    {
+      "id": "S05",
+      "priority": "P2限制",
+      "title": "角色批量选用户，翻页丢前页选择",
+      "evidence": "源码＋实际依赖行为",
+      "version": "R/M",
+      "domain": "系统",
+      "batch": "B06",
+      "status": "verified_local",
+      "verified": true,
+      "confirmed_decisions": [
+        "D14"
+      ],
+      "policy_status": "confirmed_see_decision_list",
+      "task": "B06-R",
+      "verification_record": "docs/grok-managed-20260912/B06-R-列表与角色实施.md"
+    },
+    {
+      "id": "S06",
+      "priority": "建议P2",
+      "title": "用户页不能解除已停用角色，需转去角色成员页",
+      "evidence": "源码交互限制；政策待确认",
+      "version": "R/M",
+      "domain": "系统",
+      "batch": "B06",
+      "status": "verified_local",
+      "verified": true,
+      "confirmed_decisions": [
+        "D13"
+      ],
+      "policy_status": "confirmed_see_decision_list",
+      "active_task": "B06-R",
+      "task": "B06-R",
+      "verification_record": "docs/grok-managed-20260912/S06-D13-停用角色后端交付.md",
+      "verification": "前端18场景及4旧组；后端128通过，含两版本MySQL各14；未真实ERP整链/部署验收"
+    },
+    {
+      "id": "S07",
+      "priority": "P2",
+      "title": "共享附件删除按钮无法通过正常键盘Tab操作",
+      "evidence": "模板＋实际依赖代码",
+      "version": "R",
+      "domain": "系统",
+      "batch": "B06",
+      "status": "verified_local",
+      "verified": true,
+      "active_task": "B06-U",
+      "verification": "24 新 Vue/Element 场景、11 旧入口；Node 41 通过，独立 2 并发缺陷修复后复现通过；未浏览器/部署验收",
+      "verification_record": "docs/grok-managed-20260912/S07-S08-附件上传本地验收.md"
+    },
+    {
+      "id": "S08",
+      "priority": "建议P2",
+      "title": "上传整页阻断，没有逐文件进度或取消入口",
+      "evidence": "源码体验候选；弱网待验",
+      "version": "R",
+      "domain": "系统",
+      "batch": "B06",
+      "status": "verified_local",
+      "verified": true,
+      "confirmed_decisions": [
+        "D09"
+      ],
+      "policy_status": "confirmed_see_decision_list",
+      "active_task": "B06-U",
+      "verification": "24 新 Vue/Element 场景、11 旧入口；Node 41 通过，独立 2 并发缺陷修复后复现通过；未浏览器/部署验收",
+      "verification_record": "docs/grok-managed-20260912/S07-S08-附件上传本地验收.md"
+    },
+    {
+      "id": "S09",
+      "priority": "P2",
+      "title": "手机资料填一半离开无提醒，返回草稿丢失",
+      "evidence": "页面复现；PC同类候选",
+      "version": "R",
+      "domain": "系统",
+      "batch": "B06",
+      "status": "verified_local",
+      "verified": true,
+      "confirmed_decisions": [
+        "D11"
+      ],
+      "policy_status": "confirmed_see_decision_list",
+      "task": "B06-P",
+      "verification_record": "docs/grok-managed-20260912/B06-P-个人资料验收.md"
+    },
+    {
+      "id": "S10",
+      "priority": "建议P3",
+      "title": "历史消息缺搜索分页，全部已读逐条请求",
+      "evidence": "源码体验候选；规模待验",
+      "version": "R/M",
+      "domain": "系统",
+      "batch": "B06",
+      "status": "verified_local",
+      "verified": true,
+      "confirmed_decisions": [
+        "D15"
+      ],
+      "policy_status": "confirmed_see_decision_list",
+      "active_task": "B06-M",
+      "verification": "前端29、后端115通过（两版MySQL各18），根审19路径哈希与XML一致；未浏览器/部署验收",
+      "verification_record": "docs/grok-managed-20260912/S10-消息分页与批量已读交付.md"
+    },
+    {
+      "id": "S11",
+      "priority": "建议P2",
+      "title": "表单生成器无设计草稿恢复或离页保护",
+      "evidence": "源码体验候选",
+      "version": "R/M",
+      "domain": "系统",
+      "batch": "B06",
+      "status": "verified_local",
+      "verified": true,
+      "confirmed_decisions": [
+        "D17"
+      ],
+      "policy_status": "confirmed_see_decision_list",
+      "task": "B06-D",
+      "verification_record": "docs/grok-managed-20260912/S11-表单设计草稿验收.md",
+      "verification": "17新增及原生成器安全脚本通过；未浏览器/部署验收"
+    },
+    {
+      "id": "S12",
+      "priority": "建议P3",
+      "title": "布尔/枚举/数字参数仍统一手填文本",
+      "evidence": "源码体验候选",
+      "version": "R/M",
+      "domain": "系统",
+      "batch": "B06",
+      "status": "verified_local",
+      "verified": true,
+      "confirmed_decisions": [
+        "D16"
+      ],
+      "policy_status": "confirmed_see_decision_list",
+      "task": "B06-C",
+      "verification_record": "docs/grok-managed-20260912/S12-配置类型控件验收.md",
+      "verification": "10 新场景及2旧组通过；未浏览器/部署验收"
+    },
+    {
+      "id": "HR-01",
+      "priority": "P2",
+      "title": "只调岗不改工资，也因脱敏值变NaN而必须重填工资",
+      "evidence": "方法＋DTO链",
+      "version": "M",
+      "domain": "人事",
+      "batch": "B07",
+      "status": "verified_local",
+      "verified": true,
+      "confirmed_decisions": [
+        "D18"
+      ],
+      "policy_status": "confirmed_see_decision_list",
+      "task": "07B",
+      "verification_record": "docs/grok-managed-20260912/07B-调岗与调薪验收.md",
+      "verification": "后端145/前端10/隔离MySQL迁移28通过；未部署"
+    },
+    {
+      "id": "HR-02",
+      "priority": "P2",
+      "title": "手机缺资料待办的员工不在第一页，就被误报已处理",
+      "evidence": "方法＋入口链",
+      "version": "M",
+      "domain": "人事",
+      "batch": "B07",
+      "status": "verified_local",
+      "verified": true,
+      "task": "07E",
+      "verification_record": "/Users/liuxingyu/Desktop/ERP-NEW_阿里云线上源码备份_2026-09-08_3a6fe91a2/问题修复实施_20260909/output/grok-managed-20260912/review-b07e/07E-实施与本地验收.md",
+      "verification": "新增12/原读取隔离28及手机原组通过；未浏览器/部署验收"
+    },
+    {
+      "id": "HR-03",
+      "priority": "P2",
+      "title": "手机员工加载更多失败后，重试跳过整页",
+      "evidence": "方法复现",
+      "version": "M",
+      "domain": "人事",
+      "batch": "B07",
+      "status": "verified_local",
+      "verified": true,
+      "task": "07E",
+      "verification_record": "/Users/liuxingyu/Desktop/ERP-NEW_阿里云线上源码备份_2026-09-08_3a6fe91a2/问题修复实施_20260909/output/grok-managed-20260912/review-b07e/07E-实施与本地验收.md",
+      "verification": "新增12/原读取隔离28及手机原组通过；未浏览器/部署验收"
+    },
+    {
+      "id": "HR-04",
+      "priority": "P2",
+      "title": "手机员工页静默拒绝后端支持的大整数员工ID",
+      "evidence": "方法复现；存量待查",
+      "version": "M",
+      "domain": "人事",
+      "batch": "B07",
+      "status": "verified_local",
+      "verified": true,
+      "task": "07E",
+      "verification_record": "/Users/liuxingyu/Desktop/ERP-NEW_阿里云线上源码备份_2026-09-08_3a6fe91a2/问题修复实施_20260909/output/grok-managed-20260912/review-b07e/07E-实施与本地验收.md",
+      "verification": "新增12/原读取隔离28及手机原组通过；未浏览器/部署验收"
+    },
+    {
+      "id": "HR-05",
+      "priority": "P2",
+      "title": "手机员工A/B详情乱序，晚回的A覆盖B",
+      "evidence": "方法复现",
+      "version": "M",
+      "domain": "人事",
+      "batch": "B02",
+      "status": "verified_local",
+      "verified": true,
+      "task": "03",
+      "verification": "新增28动态场景及7组原回归通过，5页模板errors/tips为0；未浏览器或部署验收",
+      "verification_record": "/Users/liuxingyu/Desktop/ERP-NEW_阿里云线上源码备份_2026-09-08_3a6fe91a2/问题修复实施_20260909/output/grok-managed-20260912/review-b03-read/03-Codex-本地验收.md"
+    },
+    {
+      "id": "HR-06",
+      "priority": "P2",
+      "title": "合同批次全部生成失败，仍提示合同已生成",
+      "evidence": "方法＋聚合响应链",
+      "version": "M",
+      "domain": "人事",
+      "batch": "B07",
+      "status": "verified_local",
+      "verified": true,
+      "task": "07A",
+      "verification_record": "docs/grok-managed-20260912/07A-合同生成结果验收.md"
+    },
+    {
+      "id": "HR-08",
+      "priority": "候选P2",
+      "title": "历史补签时是否更新当前工资、同步日期的业务语义需明确",
+      "evidence": "今天日期请求已复现；界面已称同步日期，政策待确认",
+      "version": "M",
+      "domain": "人事",
+      "batch": "B07",
+      "status": "verified_local",
+      "verified": true,
+      "confirmed_decisions": [
+        "D23"
+      ],
+      "policy_status": "confirmed_see_decision_list",
+      "active_task": "07C",
+      "task": "07C",
+      "verification_record": "docs/grok-managed-20260912/07C-历史补签工资隔离验收.md",
+      "verification": "前端24/后端52通过，含MySQL19；未浏览器/部署验收"
+    },
+    {
+      "id": "HR-09",
+      "priority": "建议P2",
+      "title": "正式转正/续签后端动作缺PC/H5对应可见入口",
+      "evidence": "源码入口缺口；实际分工待验",
+      "version": "M",
+      "domain": "人事",
+      "batch": "B07",
+      "status": "verified_local",
+      "verified": true,
+      "confirmed_decisions": [
+        "D19",
+        "D20"
+      ],
+      "policy_status": "confirmed_see_decision_list",
+      "active_task": "07D",
+      "verification": "后端86、前端新14及相关原回归通过；根审21路径哈希与XML一致；未真实DB/浏览器/部署验收",
+      "verification_record": "docs/grok-managed-20260912/07D-HR09-实施与本地验收.md"
+    },
+    {
+      "id": "HR-10",
+      "priority": "建议P2",
+      "title": "审批改派要手填用户编号，确认前不显示目标姓名",
+      "evidence": "源码体验候选",
+      "version": "M",
+      "domain": "人事",
+      "batch": "B07",
+      "status": "verified_local",
+      "verified": true,
+      "confirmed_decisions": [
+        "D12"
+      ],
+      "policy_status": "confirmed_see_decision_list",
+      "active_task": "07F",
+      "verification": "13 个前端场景与 2 个旧脚本组、15 个后端用例通过；根审 11 文件哈希一致，未浏览器/数据库目录查询/部署验收",
+      "verification_record": "docs/grok-managed-20260912/HR10-审批转派本地验收.md"
+    },
+    {
+      "id": "V01",
+      "priority": "建议P2",
+      "title": "手机资料25个控件与大量只读资料混排，保存埋在长页底部",
+      "evidence": "页面实测390×844",
+      "version": "R",
+      "domain": "公共体验",
+      "batch": "B06",
+      "status": "verified_local",
+      "verified": true,
+      "confirmed_decisions": [
+        "D10"
+      ],
+      "policy_status": "confirmed_see_decision_list",
+      "task": "B06-P",
+      "verification_record": "docs/grok-managed-20260912/B06-P-个人资料验收.md"
+    },
+    {
+      "id": "ATT-F1",
+      "priority": "P1",
+      "title": "确认发布本周后切周，实际发布另一周；切店旧响应也会串表",
+      "evidence": "方法＋后端合同；边界已复核",
+      "version": "M",
+      "domain": "考勤",
+      "batch": "B02",
+      "status": "verified_local",
+      "verified": true,
+      "task": "02C",
+      "verification": {
+        "passed_groups": 3,
+        "failed_groups": 0,
+        "skipped_groups": 0,
+        "evidence": "问题修复实施_20260909/output/grok-managed-20260912/review-b02c-handoff/02C-独立验收.md",
+        "browser": false,
+        "deployed": false
+      },
+      "verification_record": "docs/grok-managed-20260912/02C-排班发布隔离交付.md"
+    },
+    {
+      "id": "ATT-F2",
+      "priority": "P2",
+      "title": "搜索员工抹掉未保存排班，版本冲突后缺保留草稿的恢复",
+      "evidence": "方法复现；后端正确回滚已区分",
+      "version": "M",
+      "domain": "考勤",
+      "batch": "B03",
+      "status": "verified_local",
+      "verified": true,
+      "task": "B03-D",
+      "verification": "源码与定向本地测试通过；未浏览器/部署/生产验收",
+      "verification_record": "docs/grok-managed-20260912/B03-D-独立本地验收.md"
+    },
+    {
+      "id": "ATT-F3",
+      "priority": "P2",
+      "title": "手机请假保存期间继续编辑，旧响应回写并关闭表单",
+      "evidence": "方法复现",
+      "version": "M",
+      "domain": "考勤",
+      "batch": "B03",
+      "status": "verified_local",
+      "verified": true,
+      "task": "B03-E",
+      "verification_record": "docs/grok-managed-20260912/B03-E-手机请假草稿验收.md"
+    },
+    {
+      "id": "ATT-F4",
+      "priority": "P2",
+      "title": "84人排6天达504条，一键保存/发布撞500条上限；大表缺分页批量填写",
+      "evidence": "真实载荷＋接口限额；规模条件",
+      "version": "M",
+      "domain": "考勤",
+      "batch": "B08",
+      "status": "verified_local",
+      "verified": true,
+      "confirmed_decisions": [
+        "D21"
+      ],
+      "policy_status": "confirmed_see_decision_list",
+      "active_task": "B08-S",
+      "task": "B08-S",
+      "verification_record": "/Users/liuxingyu/Desktop/ERP-NEW_阿里云线上源码备份_2026-09-08_3a6fe91a2/问题修复实施_20260909/output/grok-managed-20260912/review-b08-schedule/r2/R2-本地验收.md",
+      "verification": "51新动态及6旧组、后端50通过；未真实数据库事务/浏览器/部署验收"
+    },
+    {
+      "id": "ATT-U1",
+      "priority": "能力候选",
+      "title": "假期余额查询、占用、调整和扣减缺可用闭环",
+      "evidence": "明确未支持；公司制度待确认",
+      "version": "M",
+      "domain": "考勤",
+      "batch": "B08",
+      "status": "verified_local",
+      "verified": true,
+      "confirmed_decisions": [
+        "D22"
+      ],
+      "policy_status": "confirmed_see_decision_list",
+      "active_task": "B08-A/B/C/D",
+      "verification": "A/B原核心及真实MySQL事务通过；C根审32路径、97非DB+MySQL5.7/8.0各30=157执行全0；D17前端75执行项、8模板与20独审场景通过；整前端354文件0失败、完整前后端构建成功；未部署/生产验收",
+      "verification_record": "docs/grok-managed-20260912/B08-D-假期额度界面交付.md"
+    },
+    {
+      "id": "R01",
+      "title": "报销费用身份错配导致删票后费用复活",
+      "version": "R",
+      "priority": "P1",
+      "batch": "B03",
+      "status": "verified_local",
+      "verified": true,
+      "task": "B03-A",
+      "verification_record": "docs/grok-managed-20260912/B03-A-报销费用身份与冲突恢复交付.md",
+      "verification": "43动态场景及4旧组本地通过；未浏览器/部署验收"
+    },
+    {
+      "id": "R02",
+      "title": "OE/礼盒迟到详情响应串单",
+      "version": "R",
+      "priority": "P1",
+      "batch": "B02",
+      "status": "verified_local",
+      "verified": true,
+      "task": "02B",
+      "verification": {
+        "passed_groups": 5,
+        "failed_groups": 0,
+        "skipped_groups": 0,
+        "evidence": "问题修复实施_20260909/output/grok-managed-20260912/review-b02b-handoff/02B-独立本地验收.md",
+        "browser": false,
+        "deployed": false
+      },
+      "verification_record": "docs/grok-managed-20260912/02B-商品编辑隔离交付.md"
+    },
+    {
+      "id": "R03",
+      "title": "采购收货未知结果重试重复登记",
+      "version": "R",
+      "priority": "P1",
+      "batch": "B04",
+      "status": "verified_local",
+      "verified": true,
+      "task": "04A/04B",
+      "verification_record": "docs/grok-managed-20260912/04B-收货前端恢复交付.md",
+      "verification": "后端66、本地前端与IDB53、旧10组通过；未真实ERP浏览器整链/部署/生产验收"
+    },
+    {
+      "id": "R04",
+      "title": "报销冲突后旧金额覆盖新版本",
+      "version": "R",
+      "priority": "P2",
+      "batch": "B03",
+      "status": "verified_local",
+      "verified": true,
+      "task": "B03-A",
+      "verification_record": "docs/grok-managed-20260912/B03-A-报销费用身份与冲突恢复交付.md",
+      "verification": "43动态场景及4旧组本地通过；未浏览器/部署验收"
+    },
+    {
+      "id": "R05",
+      "title": "报销迟到读取覆盖新表单",
+      "version": "R",
+      "priority": "P2",
+      "batch": "B02",
+      "status": "verified_local",
+      "verified": true,
+      "task": "03",
+      "verification": "新增28动态场景及7组原回归通过，5页模板errors/tips为0；未浏览器或部署验收",
+      "verification_record": "/Users/liuxingyu/Desktop/ERP-NEW_阿里云线上源码备份_2026-09-08_3a6fe91a2/问题修复实施_20260909/output/grok-managed-20260912/review-b03-read/03-Codex-本地验收.md"
+    },
+    {
+      "id": "R06",
+      "title": "旧劳动合同薪资方案响应错配（需核对M已关闭写入口）",
+      "version": "R",
+      "priority": "P2",
+      "batch": "B07",
+      "status": "verified_local",
+      "verified": true,
+      "task": "07A",
+      "verification_record": "docs/grok-managed-20260912/07A-合同生成结果验收.md"
+    },
+    {
+      "id": "R07",
+      "title": "采购退货并发超额占用",
+      "version": "R",
+      "priority": "P2",
+      "batch": "B04",
+      "status": "verified_local",
+      "verified": true,
+      "task": "04C",
+      "verification_record": "docs/grok-managed-20260912/04C-采购退货并发占用交付.md",
+      "verification": "后端23及两个MySQL版本各15，共53通过；索引迁移须先于新后端，未浏览器/部署验收"
+    },
+    {
+      "id": "R08",
+      "title": "报修照片上传权限契约不一致",
+      "version": "R",
+      "priority": "P2",
+      "batch": "B09",
+      "status": "verified_local",
+      "verified": true,
+      "task": "09",
+      "verification": "源码与定向本地测试通过；未浏览器/部署/生产验收",
+      "verification_record": "docs/grok-managed-20260912/09-项目经理验收.md"
+    },
+    {
+      "id": "R09",
+      "title": "经营报表迟到查询覆盖新期间",
+      "version": "R",
+      "priority": "P2",
+      "batch": "B02",
+      "status": "verified_local",
+      "verified": true,
+      "task": "03",
+      "verification": "新增28动态场景及7组原回归通过，5页模板errors/tips为0；未浏览器或部署验收",
+      "verification_record": "/Users/liuxingyu/Desktop/ERP-NEW_阿里云线上源码备份_2026-09-08_3a6fe91a2/问题修复实施_20260909/output/grok-managed-20260912/review-b03-read/03-Codex-本地验收.md"
+    }
+  ],
+  "policy_updates": [
+    {
+      "decision": "D22",
+      "source": "user_replies_20260912",
+      "confirmed": "年假和调休按规则自动计算额度；由有权限HR按公司或工作地配置，系统自动匹配员工，不要求员工选省份",
+      "pending": "调休自动累积来源；具体公式、发放、结转与有效期由配置表达，不能擅定统一数值",
+      "resolution": "已实现HR配置与系统匹配；主管核定已日结加班转休自动累积；数值参数由HR按实际政策配置，上线前配置和授权另验"
+    },
+    {
+      "decision": "D22",
+      "source": "user_reply_current_manager_20260912",
+      "confirmed": "主管核定已日结加班转为调休，系统自动累积",
+      "pending": "具体额度公式、发放、结转与有效期仍通过HR配置表达；核对加班抵扣与计薪衔接，不能自行指定统一数值",
+      "resolution": "已实现HR配置与系统匹配；主管核定已日结加班转休自动累积；数值参数由HR按实际政策配置，上线前配置和授权另验"
+    }
+  ],
+  "active_tasks": [
+    {
+      "task": "02A",
+      "finding": "S01",
+      "scope": "用户页面及行为测试",
+      "grok_session": "01a0945c-392f-74b0-9b0e-45d1adcbe538",
+      "transport": "direct_process_env",
+      "status": "verified_local",
+      "pty": 15994
+    },
+    {
+      "task": "02B",
+      "finding": "R02",
+      "scope": "OE及礼盒页面及行为测试",
+      "grok_session": "01a0945d-1575-7b93-b0fe-81e45985ea3c",
+      "transport": "direct_process_env",
+      "status": "verified_local",
+      "pty": 38381
+    },
+    {
+      "task": "02C",
+      "finding": "ATT-F1",
+      "scope": "周排班页面及行为测试",
+      "grok_session": "01a0945d-1576-7391-8034-2172f868f4f6",
+      "transport": "direct_process_env",
+      "status": "verified_local",
+      "pty": 8222
+    }
+  ],
+  "manager_notes": [
+    "原任务02由项目经理在业务文件哈希仍全部不变时取消并拆小；不是用户取消整体目标。",
+    "三个Grok会话仅可修改各自允许文件，统一由Codex验收。",
+    "原代理连接出现连续TLS握手EOF，直连单次生成检查已成功；仅执行进程取消代理环境变量，恢复同一Grok会话，未改全局配置。",
+    "2026-09-12新任务完整读取原35轮对话并复核23项决定；冻结现有文件后结束旧等待审批进程，在新PTY恢复同一Grok会话。B02未通过验收，继续原范围返工。",
+    "02B独立本地验收通过：5组/0失败/0跳过及两模板编译无错；R02已标本地通过。B09/R08与B02独立并行，Grok编程、Codex审查验收。",
+    "02C通过3组本地验收，ATT-F1标本地通过。02A仅剩自身新增测试修正，03读取隔离的文件互不交叉，项目经理明确允许03先行并行；不并行派发会改同页的B03保存任务。",
+    "B03-D已派给原02C Grok，在通过的固定店周基线上继续排班草稿与冲突恢复；原验收快照保存review-b03d/before。02A完整12场景虽已执行，真实PII失败链还有unhandled rejection，已退回Grok修调用边界。",
+    "B03-C已派给完成02B后的同一Grok会话，只写PC个人资料子组件/父组件和新测试，和主用户页面/读取隔离/排班/报修/库存后端互不交叉。",
+    "02A最终5组本地通过含17真实场景，旧焦点测试合法适配可选参数后复测通过；源/API/新测试哈希未变化。B03-C/D首版分别存在权威更新被忽略及草稿跨周清理/版本覆盖风险，已书面返工，不验收。",
+    "用户最新要求剩余改由Codex直接修改，已通知全部子代理停Grok并转为Codex实施；根控制的3个Grok已精确终止，文件/哈希保留于codex-takeover。旧任务书Grok编程限制是历史要求，自本次明确授权起覆盖。",
+    "最终：用户授权后全部剩余工作由Codex实现；48项逐条本地验收记录齐全。原Grok会话与过程说明均为历史记录。最终前端354测试文件0失败、生产构建5阶段通过、完整后端打包成功；数据库业务双版本临时容器回归已验，未部署或生产验收。"
+  ],
+  "current_work": [
+    {
+      "task": "B03-B",
+      "finding": "INV-F2",
+      "manager": "root",
+      "status": "verified_local",
+      "scope": "stockCheck/index.vue + stockCheck API4函数 + 新测试",
+      "previous_grok_session": "01a0945c-392f-74b0-9b0e-45d1adcbe538",
+      "executor": "Codex"
+    },
+    {
+      "task": "B03-C",
+      "finding": "S02",
+      "manager": "root",
+      "status": "verified_local",
+      "scope": "user/profile子组件及必要父组件 + 新测试",
+      "previous_grok_session": "01a0945d-1575-7b93-b0fe-81e45985ea3c",
+      "executor": "Codex"
+    },
+    {
+      "task": "B03-D",
+      "finding": "ATT-F2",
+      "manager": "root",
+      "status": "verified_local",
+      "scope": "WeeklySchedule + 新测试",
+      "previous_grok_session": "01a0945d-1576-7391-8034-2172f868f4f6",
+      "executor": "Codex"
+    },
+    {
+      "task": "03",
+      "finding": [
+        "HR-05",
+        "R05",
+        "INV-F6",
+        "R09"
+      ],
+      "manager": "grok_status_check",
+      "status": "verified_local",
+      "scope": "HR手机/报销PC和H5/采购/报表读取隔离",
+      "previous_grok_session": "01a0949a-87b4-7920-9126-70e31f31a6c5",
+      "executor": "Codex"
+    },
+    {
+      "task": "B09",
+      "finding": "R08",
+      "manager": "conversation_decisions_audit",
+      "status": "verified_local",
+      "scope": "报修图片受控入口与PC/H5接线",
+      "previous_grok_session": "895f79bd-3b92-4a2e-9f8c-df43321d6cf7",
+      "executor": "Codex"
+    },
+    {
+      "task": "04A",
+      "finding": [
+        "R03",
+        "INV-U3"
+      ],
+      "manager": "b02_review",
+      "status": "backend_verified_local",
+      "scope": "采购收货持久幂等与多批待检后端",
+      "previous_grok_session": "01a0949f-a869-72c1-9644-096d0e5b6d1e",
+      "executor": "Codex"
+    },
+    {
+      "task": "B03-E",
+      "finding": "ATT-F3",
+      "manager": "root",
+      "executor": "Codex",
+      "status": "verified_local",
+      "scope": "MobileAttendanceLeave + 新真实组件测试"
+    },
+    {
+      "task": "07A",
+      "finding": [
+        "HR-06",
+        "R06"
+      ],
+      "manager": "conversation_decisions_audit",
+      "executor": "Codex",
+      "status": "verified_local",
+      "scope": "入职合同生成聚合提示；旧工资禁写只读验收"
+    },
+    {
+      "task": "B03-A",
+      "finding": [
+        "R01",
+        "R04"
+      ],
+      "manager": "grok_status_check",
+      "executor": "Codex",
+      "status": "verified_local",
+      "scope": "报销PC/H5与SmartFill"
+    },
+    {
+      "task": "B06-P",
+      "finding": [
+        "S03",
+        "S09",
+        "V01"
+      ],
+      "executor": "Codex",
+      "status": "verified_local"
+    },
+    {
+      "task": "B08-S",
+      "finding": [
+        "ATT-F4"
+      ],
+      "executor": "Codex",
+      "status": "verified_local"
+    },
+    {
+      "task": "04B",
+      "finding": [
+        "R03",
+        "INV-U3"
+      ],
+      "executor": "Codex",
+      "status": "verified_local"
+    },
+    {
+      "task": "07B",
+      "finding": [
+        "HR-01"
+      ],
+      "executor": "Codex",
+      "status": "verified_local"
+    },
+    {
+      "task": "B06-R",
+      "finding": [
+        "S04",
+        "S05",
+        "S06"
+      ],
+      "executor": "Codex",
+      "status": "verified_local"
+    },
+    {
+      "task": "07C",
+      "finding": [
+        "HR-08"
+      ],
+      "executor": "Codex",
+      "status": "verified_local"
+    },
+    {
+      "task": "B06-C",
+      "finding": [
+        "S12"
+      ],
+      "executor": "Codex",
+      "status": "verified_local"
+    },
+    {
+      "task": "07E",
+      "finding": [
+        "HR-02",
+        "HR-03",
+        "HR-04"
+      ],
+      "executor": "Codex",
+      "status": "verified_local"
+    },
+    {
+      "task": "B06-D",
+      "finding": [
+        "S11"
+      ],
+      "executor": "Codex",
+      "status": "verified_local"
+    },
+    {
+      "task": "04C",
+      "finding": [
+        "R07"
+      ],
+      "executor": "Codex",
+      "status": "verified_local"
+    },
+    {
+      "task": "B08-A/B/C/D与最终集成",
+      "finding": "ATT-U1",
+      "executor": "Codex",
+      "manager": "root",
+      "status": "verified_local",
+      "scope": "规则额度/已日结转休/请假审批额度/员工HR主管页面/发布接线"
+    }
+  ],
+  "execution_authorization": {
+    "changed_at_utc": "2026-09-12T08:35:39.557538+00:00",
+    "user_instruction": "剩余的不用让grok去修改你去修改",
+    "effect": "Codex直接实现全部剩余代码和测试，停止本任务Grok；保留历史改动及证据，不回退"
+  },
+  "completion": {
+    "implementation": "verified_local",
+    "verified_findings": 48,
+    "total_findings": 48,
+    "executor": "Codex",
+    "frontend_test_files": 354,
+    "frontend_failed_files": 0,
+    "frontend_build": "5 stages passed; source drift 0",
+    "backend_build": "entire reactor package successful with skipTests; not test evidence",
+    "deployed": false,
+    "production_verified": false,
+    "report": "docs/grok-managed-20260912/最终本地交付总览.md"
+  }
+}

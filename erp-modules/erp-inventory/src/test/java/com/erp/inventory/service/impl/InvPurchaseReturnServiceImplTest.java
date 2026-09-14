@@ -26,10 +26,12 @@ import com.erp.common.core.context.SecurityContextHolder;
 import com.erp.common.core.exception.ServiceException;
 import com.erp.inventory.constant.InvStatusConstants;
 import com.erp.inventory.domain.InvPurchaseDetail;
+import com.erp.inventory.domain.InvInboundRecord;
 import com.erp.inventory.domain.InvPurchaseOrder;
 import com.erp.inventory.domain.InvPurchaseReturn;
 import com.erp.inventory.domain.InvPurchaseReturnDetail;
 import com.erp.inventory.mapper.InvDeptScopeMapper;
+import com.erp.inventory.mapper.InvInboundRecordMapper;
 import com.erp.inventory.mapper.InvNumberSequenceMapper;
 import com.erp.inventory.mapper.InvPurchaseDetailMapper;
 import com.erp.inventory.mapper.InvPurchaseOrderMapper;
@@ -94,7 +96,7 @@ class InvPurchaseReturnServiceImplTest
         assertThatThrownBy(() -> service.submitReturn(purchaseReturn(), List.of(
                 purchaseReturnDetail(101L, "3.00"), purchaseReturnDetail(101L, "3.00")), 20L))
                 .isInstanceOf(ServiceException.class)
-                .hasMessageContaining("超过原采购已收货数量");
+                .hasMessageContaining("超过原采购已合格或让步入库数量");
     }
 
     @Test
@@ -176,6 +178,7 @@ class InvPurchaseReturnServiceImplTest
         original.setUnit("个");
         original.setUnitPrice(new BigDecimal("120.00"));
         original.setReceivedQuantity(new BigDecimal("2.00"));
+        original.setStockedQuantity(new BigDecimal("2.00"));
         PurchaseReturnFixture fixture = purchaseReturnServiceWithOriginalPurchaseDetail(original);
         InvPurchaseReturnDetail input = new InvPurchaseReturnDetail();
         input.setPurchaseDetailId(701L);
@@ -394,6 +397,7 @@ class InvPurchaseReturnServiceImplTest
     {
         InvPurchaseReturnServiceImpl service = new InvPurchaseReturnServiceImpl();
         service.deptScopeMapper = new FakeDeptScopeMapper(deptTypes);
+        ReflectionTestUtils.setField(service, "purchaseOrderMapper", sourcePurchaseOrderMapper());
         return service;
     }
 
@@ -433,13 +437,17 @@ class InvPurchaseReturnServiceImplTest
             return 1;
         });
         when(returnMapper.selectInvPurchaseReturnById(1L)).thenAnswer(invocation -> storedReturn.get());
+        when(returnMapper.selectInvPurchaseReturnByIdForUpdate(1L)).thenAnswer(invocation -> storedReturn.get());
         when(detailMapper.selectInvPurchaseReturnDetailByReturnId(1L)).thenAnswer(invocation -> detailsRef.get());
+        when(detailMapper.selectInvPurchaseReturnDetailByReturnIdForUpdate(1L)).thenAnswer(invocation -> detailsRef.get());
         when(numberSequenceMapper.selectLastInsertId()).thenReturn(1L);
         InvPurchaseDetail purchaseDetail = new InvPurchaseDetail();
         purchaseDetail.setProductId(101L);
         purchaseDetail.setProductName("测试商品");
         purchaseDetail.setReceivedQuantity(new BigDecimal("5.00"));
+        purchaseDetail.setStockedQuantity(new BigDecimal("5.00"));
         when(purchaseDetailMapper.selectInvPurchaseDetailByOrderId(10L)).thenReturn(List.of(purchaseDetail));
+        stubCurrentFacts(service, purchaseDetailMapper, purchaseDetail);
         when(detailMapper.sumHistoricalReturnQuantity(10L, 101L, 1L)).thenReturn(BigDecimal.ZERO);
 
         ReflectionTestUtils.setField(service, "purchaseReturnMapper", returnMapper);
@@ -486,9 +494,12 @@ class InvPurchaseReturnServiceImplTest
             return 1;
         });
         when(returnMapper.selectInvPurchaseReturnById(1L)).thenAnswer(invocation -> storedReturn.get());
+        when(returnMapper.selectInvPurchaseReturnByIdForUpdate(1L)).thenAnswer(invocation -> storedReturn.get());
         when(detailMapper.selectInvPurchaseReturnDetailByReturnId(1L)).thenAnswer(invocation -> detailsRef.get());
+        when(detailMapper.selectInvPurchaseReturnDetailByReturnIdForUpdate(1L)).thenAnswer(invocation -> detailsRef.get());
         when(numberSequenceMapper.selectLastInsertId()).thenReturn(1L);
         when(purchaseDetailMapper.selectInvPurchaseDetailByOrderId(10L)).thenReturn(List.of(purchaseDetails));
+        stubCurrentFacts(service, purchaseDetailMapper, purchaseDetails);
         when(detailMapper.sumHistoricalReturnQuantity(10L, 101L, 1L)).thenReturn(BigDecimal.ZERO);
 
         ReflectionTestUtils.setField(service, "purchaseReturnMapper", returnMapper);
@@ -497,6 +508,44 @@ class InvPurchaseReturnServiceImplTest
         ReflectionTestUtils.setField(service, "purchaseOrderMapper", sourcePurchaseOrderMapper());
         ReflectionTestUtils.setField(service, "numberSequenceMapper", numberSequenceMapper);
         return new PurchaseReturnFixture(service, storedReturn, detailsRef);
+    }
+
+    @Test
+    @DisplayName("到货待检不能作为普通退货额度，部分合格只允许退合格部分")
+    void pendingReceiptsMustNotConsumePreviouslyStockedGoods() throws Exception
+    {
+        loginAsAdmin();
+        InvPurchaseDetail pending = originalPurchaseDetail();
+        pending.setReceivedQuantity(new BigDecimal("100"));
+        pending.setStockedQuantity(BigDecimal.ZERO);
+        PurchaseReturnFixture fixture = purchaseReturnServiceWithOriginalPurchaseDetail(pending);
+        assertThatThrownBy(() -> fixture.service.submitReturn(purchaseReturn(),
+                List.of(purchaseReturnDetail(101L, "1")), 20L))
+                .isInstanceOf(ServiceException.class).hasMessageContaining("入库数量");
+
+        InvPurchaseDetail partial = originalPurchaseDetail();
+        partial.setReceivedQuantity(new BigDecimal("100"));
+        partial.setStockedQuantity(new BigDecimal("20"));
+        PurchaseReturnFixture partialFixture = purchaseReturnServiceWithOriginalPurchaseDetail(partial);
+        partialFixture.service.submitReturn(purchaseReturn(), List.of(purchaseReturnDetail(101L, "20")), 20L);
+        assertThat(partialFixture.returnRef.get().getStatus()).isEqualTo(InvStatusConstants.SUBMITTED);
+    }
+
+    private static void stubCurrentFacts(InvPurchaseReturnServiceImpl service,
+            InvPurchaseDetailMapper mapper, InvPurchaseDetail... details)
+    {
+        when(mapper.selectInvPurchaseDetailByOrderIdForUpdate(10L)).thenReturn(List.of(details));
+        List<InvInboundRecord> facts = new ArrayList<>();
+        for (InvPurchaseDetail detail : details)
+        {
+            InvInboundRecord fact = new InvInboundRecord();
+            fact.setPurchaseOrderId(10L); fact.setPurchaseDetailId(detail.getDetailId());
+            fact.setProductId(detail.getProductId()); fact.setQuantity(detail.getStockedQuantity());
+            fact.setQcResult("passed"); facts.add(fact);
+        }
+        InvInboundRecordMapper inbounds = mock(InvInboundRecordMapper.class);
+        when(inbounds.selectByOrderIdForUpdate(10L)).thenReturn(facts);
+        ReflectionTestUtils.setField(service, "inboundRecordMapper", inbounds);
     }
 
     private static InvPurchaseDetail originalPurchaseDetail()
@@ -516,6 +565,7 @@ class InvPurchaseReturnServiceImplTest
         purchaseDetail.setUnit("盒");
         purchaseDetail.setUnitPrice(new BigDecimal(unitPrice));
         purchaseDetail.setReceivedQuantity(new BigDecimal(receivedQuantity));
+        purchaseDetail.setStockedQuantity(new BigDecimal(receivedQuantity));
         return purchaseDetail;
     }
 
@@ -560,6 +610,7 @@ class InvPurchaseReturnServiceImplTest
         source.setSupplierName("来源供应商");
         source.setShopDeptId(20L);
         when(mapper.selectInvPurchaseOrderById(10L)).thenReturn(source);
+        when(mapper.selectInvPurchaseOrderByIdForUpdate(10L)).thenReturn(source);
         return mapper;
     }
 

@@ -44,3 +44,11 @@ export const getHealthCertificateAttachment = (certificateId, mode = 'preview') 
   timeout: 0,
   silentError: true
 })
+
+export const listHealthCertificateApprovalStartOutboxes = params => request({
+  url: '/system/hr/health-certificate/approval-start-outbox/list', method: 'get', params, silentError: true
+})
+
+export const replayHealthCertificateApprovalStart = (outboxId, version) => request({
+  url: `/system/hr/health-certificate/approval-start-outbox/${outboxId}/replay`, method: 'post', data: { version }, silentError: true
+})

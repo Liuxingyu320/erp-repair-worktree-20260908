@@ -107,7 +107,7 @@ assert.ok(mobileHrCompletenessSource.includes("missingProfileFields"))
 assert.ok(mobileHrCompletenessSource.includes("userId: row.userId"))
 assert.ok(!mobileHrCompletenessSource.includes("profileId:"))
 assert.ok(mobileHrEmployeeSource.includes("getHrEmployee"))
-assert.ok(mobileHrEmployeeSource.includes("updateHrEmployee(payload.userId, payload.patch)"))
+assert.ok(mobileHrEmployeeSource.includes("updateHrEmployee(userId, patch)"))
 assert.ok(mobileHrEmployeeSource.includes("accountEnabled"))
 assert.ok(mobileHrProfileEditorSource.includes("buildPatch"))
 assert.ok(mobileHrProfileEditorSource.includes("dirtySensitiveFields"))
@@ -300,6 +300,7 @@ function loadVueComponent(source, overrides = {}) {
     navigateTodo: () => Promise.resolve({ ok: true }),
     fetchTodoSummary: () => Promise.resolve({ data: {} }),
     getSelectedDeptContext: () => ({}),
+    getSelectedDeptId: () => (context.getSelectedDeptContext() || {}).deptId,
     hasValidInventoryDeptContext: context => {
       const source = context || {}
       const hasDeptId = source.deptId !== undefined && source.deptId !== null && String(source.deptId).trim() !== ""
@@ -326,6 +327,7 @@ function loadVueComponent(source, overrides = {}) {
     rollbackTodoContextLease: () => ({ ok: true }),
     formatTodoContextSwitchNotice: () => "临时切换组织",
     TODO_SORT_LABEL: "紧急优先 · 同级按最早创建",
+    require(id) { return require(id.startsWith("@/") ? path.resolve(root, "src", id.slice(2)) : id) },
     window: { addEventListener() {}, removeEventListener() {}, innerHeight: 800, scrollY: 0 },
     document: { documentElement: { scrollHeight: 1600 } },
     Promise,
@@ -519,13 +521,14 @@ async function runBehaviorContracts() {
   assert.strictEqual(employeeContext.editing.employeeName, "张三")
   await employeeContext.saveProfile({ userId: 7, patch: { bankName: "测试银行" } })
   assert.deepStrictEqual(JSON.parse(JSON.stringify(updateCalls)), [
-    { userId: 7, patch: { bankName: "测试银行" } }
+    { userId: "7", patch: { bankName: "测试银行" } }
   ])
 
   const editorComponent = loadVueComponent(mobileHrProfileEditorSource)
   const emitted = []
   const editorContext = {
     ...editorComponent.data(),
+    visible: true,
     detail: {
       userId: 7,
       employeeName: "张三",
@@ -546,7 +549,7 @@ async function runBehaviorContracts() {
   })
 
   const shellComponent = loadVueComponent(shellSource, {
-    require: request => request === "./mobileWorkbenchPolicy" ? mobileWorkbenchPolicy : {}
+    require: request => request === "./mobileWorkbenchPolicy" ? mobileWorkbenchPolicy : (request.startsWith("@/") ? require(path.resolve(root, "src", request.slice(2))) : {})
   })
   assert.strictEqual(shellComponent.computed.todoBadgeText.call({
     hasUnknownTodoProviders: false, todoTotal: 120
@@ -618,14 +621,14 @@ async function runBehaviorContracts() {
 
   let summaryQuery = null
   const metricShell = loadVueComponent(shellSource, {
-    require: request => request === "./mobileWorkbenchPolicy" ? mobileWorkbenchPolicy : {},
+    require: request => request === "./mobileWorkbenchPolicy" ? mobileWorkbenchPolicy : (request.startsWith("@/") ? require(path.resolve(root, "src", request.slice(2))) : {}),
     getSelectedDeptContext: () => ({ deptId: "88", deptType: "WAREHOUSE", isWarehouse: true }),
     getMobileWorkbenchSummary: query => {
       summaryQuery = query
-      return Promise.resolve({ data: { pendingReceiveCount: 7, pendingDeliverCount: 5, lowStockCount: 3 } })
+      return Promise.resolve({ data: { selectedDeptId: "88", selectedDeptType: "WAREHOUSE", pendingReceiveCount: 7, pendingDeliverCount: 5, lowStockCount: 3 } })
     }
   })
-  const metricContext = { normalizedContextType: "WAREHOUSE", workbenchSummary: {} }
+  const metricContext = { normalizedContextType: "WAREHOUSE", contextType: "WAREHOUSE", summaryContextRevision: 0, $store: { getters: { id: "7" } }, workbenchSummary: {} }
   Object.assign(metricContext, metricShell.methods)
   await metricContext.loadWorkbenchSummary()
   const metricProfile = metricShell.computed.profile.call(metricContext)

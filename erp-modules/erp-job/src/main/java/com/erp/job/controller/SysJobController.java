@@ -37,6 +37,24 @@ import com.erp.job.util.ScheduleUtils;
 @RequestMapping("/job")
 public class SysJobController extends BaseController
 {
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.erp.job.service.SysJobDeletionService deletionService;
+
+    @RequiresPermissions("monitor:job:remove")
+    @Log(title = "定时任务", businessType = BusinessType.DELETE)
+    @PostMapping("/deletions")
+    public AjaxResult deleteSnapshot(@RequestBody com.erp.job.service.SysJobDeletionService.Request request)
+    {
+        return success(deletionService.delete(request,SecurityUtils.getUserId()));
+    }
+
+    @RequiresPermissions("monitor:job:remove")
+    @GetMapping("/deletions/{batchId}")
+    public AjaxResult deletionReceipt(@PathVariable String batchId)
+    {
+        return success(deletionService.receipt(batchId,SecurityUtils.getUserId()));
+    }
+
     @Autowired
     private ISysJobService jobService;
 
@@ -155,9 +173,7 @@ public class SysJobController extends BaseController
     @PutMapping("/changeStatus")
     public AjaxResult changeStatus(@RequestBody SysJob job) throws SchedulerException
     {
-        SysJob newJob = jobService.selectJobById(job.getJobId());
-        newJob.setStatus(job.getStatus());
-        return toAjax(jobService.changeStatus(newJob));
+        return toAjax(jobService.changeStatus(job));
     }
 
     /**
@@ -180,7 +196,6 @@ public class SysJobController extends BaseController
     @DeleteMapping("/{jobIds}")
     public AjaxResult remove(@PathVariable Long[] jobIds) throws SchedulerException
     {
-        jobService.deleteJobByIds(jobIds);
-        return success();
+        return AjaxResult.error(409,"删除操作已升级，请刷新页面后重新选择任务");
     }
 }

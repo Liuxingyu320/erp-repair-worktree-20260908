@@ -14,6 +14,16 @@ import com.erp.system.service.push.PushDeliveryClient.DeliveryStatus;
 class ApnsPushDeliveryClientTest
 {
     @Test
+    void visibleNotificationsSpecifyAlertPushTypeAndImmediateDelivery()
+    {
+        var notification = ApnsPushDeliveryClient.buildNotification(
+                new ApnsPushDeliveryClient.ApnsEnvelope("abcdef123456", "com.erp.mobile", "{}"));
+        assertThat(notification.getPushType()).isEqualTo(com.eatthepath.pushy.apns.PushType.ALERT);
+        assertThat(notification.getPriority()).isEqualTo(com.eatthepath.pushy.apns.DeliveryPriority.IMMEDIATE);
+        assertThat(notification.getTopic()).isEqualTo("com.erp.mobile");
+    }
+
+    @Test
     void disabledOrIncompleteConfigurationMustNotReadPrivateKeyOrOpenConnection()
     {
         PushNotificationProperties properties = properties();

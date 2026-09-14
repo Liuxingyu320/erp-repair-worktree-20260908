@@ -103,6 +103,9 @@ function createGuardHarness(options = {}) {
   }
 
   executeModule(transformModule(guardPath), id => {
+    if (id === "@/services/lazyPushRegistration") {
+      return { __esModule: true, default: { resumeNavigation: () => Promise.resolve() } }
+    }
     if (id === "./router") return { __esModule: true, default: router }
     if (id === "./store") return { __esModule: true, default: store }
     if (id === "@/plugins/element-services") {
@@ -183,8 +186,8 @@ function createGuardHarness(options = {}) {
       })
       return navigationResult
     },
-    completeNavigation() {
-      afterGuard()
+    completeNavigation(path = "/inventory/stock") {
+      afterGuard({ path, fullPath: path, query: {}, meta: {} })
     }
   }
 }

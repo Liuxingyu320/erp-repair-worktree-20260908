@@ -25,8 +25,10 @@ public class HrHealthCertificateApprovalStartOutboxVo
     private Date createTime;
     private Date updateTime;
 
+    @com.fasterxml.jackson.databind.annotation.JsonSerialize(using = com.fasterxml.jackson.databind.ser.std.ToStringSerializer.class)
     public Long getOutboxId() { return outboxId; }
     public void setOutboxId(Long value) { outboxId = value; }
+    @com.fasterxml.jackson.databind.annotation.JsonSerialize(using = com.fasterxml.jackson.databind.ser.std.ToStringSerializer.class)
     public Long getCertificateId() { return certificateId; }
     public void setCertificateId(Long value) { certificateId = value; }
     public Integer getBusinessRound() { return businessRound; }

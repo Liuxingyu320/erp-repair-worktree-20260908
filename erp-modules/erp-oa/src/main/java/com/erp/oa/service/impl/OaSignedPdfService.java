@@ -24,6 +24,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import javax.imageio.ImageIO;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.apache.fontbox.ttf.CmapLookup;
 import org.apache.fontbox.ttf.TrueTypeFont;
 import org.apache.pdfbox.Loader;
@@ -86,6 +88,7 @@ public class OaSignedPdfService
             "MicrosoftYaHei", "WenQuanYiZenHei", "STHeitiSC-Medium", "STHeitiSC-Light",
             "STHeiti", "Heiti SC", "SimSun", "ArialUnicodeMS");
 
+    private static final Logger log = LoggerFactory.getLogger(OaSignedPdfService.class);
     private final OaSignFileStorageService fileStorageService;
 
     public OaSignedPdfService(OaSignFileStorageService fileStorageService)
@@ -168,6 +171,12 @@ public class OaSignedPdfService
                     signatureFile == null ? 0L : signatureFile.getFileSize(),
                     sealHash, pageCount);
         }
+        catch (RuntimeException | Error failure)
+        {
+            discardPromotedAfterFailure(signatureFile, failure);
+            discardPromotedAfterFailure(signedPdf, failure);
+            throw failure;
+        }
         finally
         {
             cleanupQuietly(signatureFile);
@@ -199,6 +208,11 @@ public class OaSignedPdfService
             return new SignedPdfResult(finalPdf.getArchiveRelativePath(), finalPdf.getPublicUrl(),
                     finalPdf.getFileHash(), finalPdf.getFileSize(), null, null, null, 0L,
                     null, pageCount);
+        }
+        catch (RuntimeException | Error failure)
+        {
+            discardPromotedAfterFailure(finalPdf, failure);
+            throw failure;
         }
         finally
         {
@@ -276,6 +290,12 @@ public class OaSignedPdfService
                     signatureFile == null ? 0L : signatureFile.getFileSize(),
                     sealHash, pageCount, pending.contentHash());
         }
+        catch (RuntimeException | Error failure)
+        {
+            discardPromotedAfterFailure(signatureFile, failure);
+            discardPromotedAfterFailure(pendingPdf, failure);
+            throw failure;
+        }
         finally
         {
             cleanupQuietly(signatureFile);
@@ -333,6 +353,11 @@ public class OaSignedPdfService
             return new SignedPdfResult(archive.getArchiveRelativePath(), archive.getPublicUrl(),
                     archive.getFileHash(), archive.getFileSize(), null, null, null, 0L,
                     sealHash, archivePageCount, expectedContentHash);
+        }
+        catch (RuntimeException | Error failure)
+        {
+            discardPromotedAfterFailure(archive, failure);
+            throw failure;
         }
         finally
         {
@@ -1987,6 +2012,24 @@ public class OaSignedPdfService
         int retainedCodePoints = Math.max(0, maxCodePoints - 1);
         int endIndex = normalized.offsetByCodePoints(0, retainedCodePoints);
         return normalized.substring(0, endIndex) + "…";
+    }
+
+    /** Only a successfully promoted, UUID-owned artifact is eligible for this rollback. */
+    private void discardPromotedAfterFailure(StagedSignFile stagedFile, Throwable failure)
+    {
+        if (stagedFile == null || stagedFile.getArchivePath() == null) return;
+        try
+        {
+            fileStorageService.discardUncommitted(
+                    stagedFile.getArchiveRelativePath(), stagedFile.getFileHash());
+        }
+        catch (RuntimeException cleanupFailure)
+        {
+            failure.addSuppressed(cleanupFailure);
+            log.error("SIGN_FILE_CLEANUP_PENDING operation={} archive={} expectedHash={}",
+                    stagedFile.getStagingDirectory().getFileName(),
+                    stagedFile.getArchiveRelativePath(), stagedFile.getFileHash(), cleanupFailure);
+        }
     }
 
     private void cleanupQuietly(StagedSignFile stagedFile)

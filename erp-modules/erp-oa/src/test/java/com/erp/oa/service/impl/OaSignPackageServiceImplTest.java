@@ -1019,6 +1019,7 @@ class OaSignPackageServiceImplTest
     private OaSignPackageServiceImpl newPackageService()
     {
         OaSignPackageServiceImpl service = new OaSignPackageServiceImpl();
+        ReflectionTestUtils.setField(service, "salarySources", org.mockito.Mockito.mock(OaSignSalarySourceService.class));
         OaSignTaskMapper taskMapper = mock(OaSignTaskMapper.class);
         OaSignTaskEventService taskEventService = mock(OaSignTaskEventService.class);
         OaSignNotificationOutboxService outboxService = mock(OaSignNotificationOutboxService.class);
@@ -3260,6 +3261,7 @@ class OaSignPackageServiceImplTest
     void shouldEnqueueFinalReadyAndCompletionFromTaskTransitions()
     {
         OaSignPackageServiceImpl service = new OaSignPackageServiceImpl();
+        ReflectionTestUtils.setField(service, "salarySources", org.mockito.Mockito.mock(OaSignSalarySourceService.class));
         OaSignTaskMapper taskMapper = mock(OaSignTaskMapper.class);
         OaSignTaskEventService taskEventService = mock(OaSignTaskEventService.class);
         OaSignNotificationOutboxService outboxService = mock(OaSignNotificationOutboxService.class);
@@ -3322,6 +3324,48 @@ class OaSignPackageServiceImplTest
         assertThatThrownBy(() -> fixture.service.confirmDocumentRead(500L, 51L, tampered))
                 .isInstanceOf(ServiceException.class)
                 .hasMessageContaining("文件校验不一致");
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans = { false, true })
+    void secondDocumentFailureTracksAndCleansFirstResult(boolean transactionCallbacks) throws Exception
+    {
+        SigningFixture fixture = signingFixture();
+        SignedPdfResult firstResult = new SignedPdfResult("owned/first.pdf", "/private/first.pdf",
+                "first-hash", 100L, null, null, null, null, 2);
+        if (transactionCallbacks)
+            org.springframework.transaction.support.TransactionSynchronizationManager.initSynchronization();
+        try
+        {
+            when(fixture.signedPdfService.generateSignedPdf(any(), eq(fixture.signPackage), any(), any(),
+                    any(), eq(null), any(), any(), eq(null), eq(null))).thenAnswer(call -> {
+                OaSignPackageDocument document = call.getArgument(2);
+                if (document.getDocumentId().equals(52L))
+                {
+                    if (transactionCallbacks)
+                        assertThat(org.springframework.transaction.support.TransactionSynchronizationManager.getSynchronizations()).hasSize(1);
+                    throw new ServiceException("second render failed");
+                }
+                return firstResult;
+            });
+            assertThatThrownBy(() -> fixture.service.signPackage(500L,
+                    signRequest("SP-500-V1", "second-render-failure", fixture.first, fixture.second)))
+                    .hasMessageContaining("second render failed");
+            verify(fixture.signedPdfService).discardUncommitted(firstResult);
+            verify(fixture.documentMapper, never()).updateOaSignPackageDocument(any());
+            verify(fixture.evidenceMapper, never()).insertOaSignFileEvidence(any());
+            if (transactionCallbacks)
+            {
+                for (var callback : org.springframework.transaction.support.TransactionSynchronizationManager.getSynchronizations())
+                    callback.afterCompletion(org.springframework.transaction.support.TransactionSynchronization.STATUS_ROLLED_BACK);
+                verify(fixture.signedPdfService, times(2)).discardUncommitted(firstResult);
+            }
+        }
+        finally
+        {
+            if (transactionCallbacks)
+                org.springframework.transaction.support.TransactionSynchronizationManager.clearSynchronization();
+        }
     }
 
     private SigningFixture signingFixture() throws Exception

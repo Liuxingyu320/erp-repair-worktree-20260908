@@ -30,12 +30,15 @@ class ReceiptQualityMapperBindingTest
 
         assertMapped(configuration, InvReceiptBatchMapper.class, "selectByIdForUpdate");
         assertMapped(configuration, InvReceiptBatchMapper.class, "selectPendingByOrderId");
+        assertMapped(configuration, InvReceiptBatchMapper.class, "selectByOrderIdForUpdate");
         assertMapped(configuration, InvReceiptBatchMapper.class, "updateProgress");
         assertMapped(configuration, InvReceiptBatchDetailMapper.class, "selectByBatchIdForUpdate");
+        assertMapped(configuration, InvReceiptBatchDetailMapper.class, "selectByOrderIdForUpdate");
         assertMapped(configuration, InvReceiptBatchDetailMapper.class, "updateInspectionProgress");
         assertMapped(configuration, InvQualityInspectionMapper.class, "insertInvQualityInspection");
         assertMapped(configuration, InvQualityInspectionAttachmentMapper.class, "batchInsert");
         assertMapped(configuration, InvInboundRecordMapper.class, "selectByBatchDetailIdForUpdate");
+        assertMapped(configuration, InvInboundRecordMapper.class, "selectByOrderIdForUpdate");
     }
 
     private static void registerAlias(Configuration configuration, String alias, String className)

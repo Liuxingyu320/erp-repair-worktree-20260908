@@ -56,7 +56,7 @@ class InvExistingStockAdjustmentServiceTest
         InvStock updated = stock("8.0000", "6.0000", 8L, 201L);
         when(stockMapper.selectInvStockByIdForUpdate(1001L)).thenReturn(current);
         when(stockMapper.deductInvStockWithCost(1001L, 7L, new BigDecimal("2.0000"),
-                new BigDecimal("10.000000"), "stock-operator")).thenReturn(1);
+                new BigDecimal("10.00"), "stock-operator")).thenReturn(1);
         when(stockMapper.selectInvStockById(1001L)).thenReturn(updated);
         when(stockLogMapper.insertInvStockLog(any(InvStockLog.class))).thenReturn(1);
 

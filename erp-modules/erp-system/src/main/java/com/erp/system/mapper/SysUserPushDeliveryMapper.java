@@ -24,6 +24,10 @@ public interface SysUserPushDeliveryMapper
             @Param("version") Long version,
             @Param("lastResult") String lastResult);
 
+    int markSkipped(@Param("deliveryId") Long deliveryId,
+            @Param("version") Long version,
+            @Param("lastResult") String lastResult);
+
     int markRetry(@Param("deliveryId") Long deliveryId,
             @Param("version") Long version,
             @Param("lastError") String lastError);

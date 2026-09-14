@@ -754,8 +754,10 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
              left join sys_dept d on d.dept_id = u.dept_id
              left join sys_user_profile p on p.user_id = u.user_id
              left join hr_employee_health_certificate hc on hc.user_id = u.user_id
-                  and hc.current_flag = 'Y' and hc.review_status = 'APPROVED'
-                  and hc.del_flag = '0'
+                  and hc.certificate_id = <include refid="com.erp.system.mapper.HrHealthCertificateMapper.chosenCertificateId">
+                      <property name="owner" value="u.user_id"/>
+                      <property name="asOfExpr" value="#{params.healthAsOfDate}"/>
+                  </include>
              left join hr_onboarding hoc on hoc.linked_user_id = u.user_id
                   and not exists (
                       select 1 from hr_onboarding newer
@@ -829,10 +831,11 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         </if>
         <if test="healthCertificateStatus != null and healthCertificateStatus != ''">
             <choose>
+                <when test="healthCertificateStatus == 'NOT_YET_EFFECTIVE'">and coalesce(hc.valid_from,hc.issued_date) &gt; #{params.healthAsOfDate}</when>
                 <when test="healthCertificateStatus == 'NOT_SUBMITTED'">and hc.certificate_id is null</when>
-                <when test="healthCertificateStatus == 'EXPIRED'">and hc.expires_on &lt; current_date()</when>
-                <when test="healthCertificateStatus == 'EXPIRING'">and hc.expires_on between current_date() and date_add(current_date(), interval 30 day)</when>
-                <when test="healthCertificateStatus == 'VALID'">and hc.expires_on &gt; date_add(current_date(), interval 30 day)</when>
+                <when test="healthCertificateStatus == 'EXPIRED'">and coalesce(hc.valid_from,hc.issued_date) &lt;= #{params.healthAsOfDate} and hc.expires_on &lt; #{params.healthAsOfDate}</when>
+                <when test="healthCertificateStatus == 'EXPIRING'">and coalesce(hc.valid_from,hc.issued_date) &lt;= #{params.healthAsOfDate} and hc.expires_on between #{params.healthAsOfDate} and date_add(#{params.healthAsOfDate}, interval 30 day)</when>
+                <when test="healthCertificateStatus == 'VALID'">and coalesce(hc.valid_from,hc.issued_date) &lt;= #{params.healthAsOfDate} and hc.expires_on &gt; date_add(#{params.healthAsOfDate}, interval 30 day)</when>
                 <otherwise>and 1 = 0</otherwise>
             </choose>
         </if>
@@ -1313,6 +1316,15 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 		set pwd_update_date = sysdate(), password = #{password},
 			must_change_password = #{mustChangePassword}, update_time = sysdate()
 		where user_id = #{userId}
+	</update>
+
+	<update id="changeOwnPasswordIfCurrent">
+		update sys_user
+		set pwd_update_date = sysdate(), password = #{passwordHash}, credential_state = 'ACTIVE',
+			must_change_password = '0', temporary_password_expires_at = null,
+			update_by = #{updateBy}, update_time = sysdate()
+		where user_id = #{userId} and del_flag = '0' and status = '0'
+			and binary password = binary #{expectedPasswordHash}
 	</update>
 
 	<update id="activateUserPassword">

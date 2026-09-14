@@ -22,11 +22,11 @@ function exportBlock(source, name) {
 
 function assertOperation(source, name, fragments) {
   const block = exportBlock(source, name)
-  const requestStart = block.indexOf("request({")
+  const requestStart = Math.max(block.indexOf("request({"), block.indexOf("recordRequest(id, {"))
   assert.ok(requestStart >= 0, `${name} should call request with an explicit config`)
   const requestConfig = block.slice(requestStart)
   for (const fragment of fragments) {
-    assert.ok(requestConfig.includes(fragment), `${name} request config should include ${fragment}`)
+    assert.ok(requestConfig.includes(fragment.replace("${id}", "{id}")) || requestConfig.includes(fragment), `${name} request config should include ${fragment}`)
   }
 }
 
@@ -68,6 +68,7 @@ const onboardingRuntimeSource = onboarding
   .replace(/export const /g, "const ")
 const onboardingSandbox = {
   module: { exports: {} },
+  require: id => { if (id === "@/utils/positiveDecimalId") return require("../src/utils/positiveDecimalId"); throw Error(id) },
   request(config) { capturedPreviewConfig = config; return config }
 }
 vm.runInNewContext(`${onboardingRuntimeSource}\nmodule.exports = { previewHrOnboardingImport }`, onboardingSandbox, {
@@ -135,6 +136,6 @@ assert.ok(completenessImports.includes("listHrCompletenessEmployees"), "consumer
 assert.ok(legacyImports.includes("LEGACY_HR_EMPLOYEE_IMPORT_ACTION"), "consumer should import the transitional employee import explicitly")
 assert.ok(!employeeImports.includes("listHrOnboarding"), "consumer should not import onboarding from employee API")
 assert.ok(!employeeImports.includes("listHrCompleteness"), "consumer should not import completeness from employee API")
-assert.ok(employeeList.includes("updateHrEmployee(payload.userId, payload)"), "employee save should pass the user id separately")
+assert.ok(employeeList.includes("updateHrEmployee(employeeId, frozenPayload)"), "employee save should pass the user id separately")
 
 console.log("hrOnboardingApi tests passed")

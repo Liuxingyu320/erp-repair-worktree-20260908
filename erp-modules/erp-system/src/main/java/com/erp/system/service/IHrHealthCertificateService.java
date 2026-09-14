@@ -36,6 +36,8 @@ public interface IHrHealthCertificateService
     Map<Long, HrHealthCertificateVo> selectCurrentProjection(
             List<Long> userIds);
 
+    Map<Long, HrHealthCertificateVo> selectCurrentProjectionAt(List<Long> userIds, java.time.LocalDate asOfDate);
+
     Long resolveAttachmentNode(Long certificateId, Long requesterUserId);
 
     ApprovalBusinessCallbackResponse applyApprovalCallback(

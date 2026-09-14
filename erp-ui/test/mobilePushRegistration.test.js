@@ -160,6 +160,7 @@ function createHarness(createPushRegistrationService, options = {}) {
   const listeners = {}
   const removed = []
   const uploaded = []
+  const channels = []
   const uploadedRequests = []
   const disabled = []
   const disabledRequests = []
@@ -179,6 +180,10 @@ function createHarness(createPushRegistrationService, options = {}) {
           return options.onRemove ? options.onRemove(name) : undefined
         }
       }
+    },
+    async createChannel(channel) {
+      channels.push(channel)
+      if (options.onCreateChannel) return options.onCreateChannel(channel)
     },
     async checkPermissions() {
       calls.check += 1
@@ -234,6 +239,7 @@ function createHarness(createPushRegistrationService, options = {}) {
     removed,
     uploaded,
     uploadedRequests,
+    channels,
     disabled,
     disabledRequests,
     routed,
@@ -302,6 +308,20 @@ async function run() {
   assert.strictEqual(android.calls.check, 1)
   assert.strictEqual(android.calls.request, 1, "Android 13 prompt should request permission")
   assert.strictEqual(android.calls.register, 1)
+  assert.deepStrictEqual(android.channels, [{
+    id: "erp_messages", name: "工作消息", description: "审批、签约和个人业务消息提醒",
+    importance: 4, visibility: 0, vibration: true
+  }], "Android should create the high-importance FCM channel and preserve the default sound")
+  assert.deepStrictEqual(web.channels, [], "web must not create native channels")
+  const iosChannel = createHarness(createPushRegistrationService, { platform: "ios" })
+  await iosChannel.service.initialize(201)
+  assert.deepStrictEqual(iosChannel.channels, [], "iOS must not call the Android-only channel API")
+  const brokenChannel = createHarness(createPushRegistrationService, {
+    onCreateChannel() { throw new Error("channel creation failed") }
+  })
+  assert.strictEqual((await brokenChannel.service.initialize(201)).reason, "channel-unavailable")
+  assert.strictEqual(brokenChannel.calls.register, 0, "a failed channel must not report registration success")
+  assert.deepStrictEqual(brokenChannel.service.getStatus(), { phase: "error", reason: "channel-unavailable" })
   await android.listeners.registration({ value: "fcm-secret-token" })
   assert.deepStrictEqual(android.uploaded, [{
     platform: "ANDROID",
@@ -317,7 +337,7 @@ async function run() {
   await missingUser.service.initialize(201)
   const missingResult = await missingUser.service.initialize(null)
   assert.strictEqual(missingResult.reason, "missing-user")
-  assert.strictEqual(missingUser.removed.length, 3,
+  assert.strictEqual(missingUser.removed.length, 2,
     "missing-user initialization must still hand off previous listeners")
 
   let switchablePlatform = "android"
@@ -328,7 +348,7 @@ async function run() {
   switchablePlatform = "web"
   const switchedToWeb = await nativeToWeb.service.initialize(201)
   assert.strictEqual(switchedToWeb.reason, "web")
-  assert.strictEqual(nativeToWeb.removed.length, 3,
+  assert.strictEqual(nativeToWeb.removed.length, 2,
     "web initialization must still hand off previous native listeners")
 
   const concurrent = createHarness(createPushRegistrationService)
@@ -356,8 +376,8 @@ async function run() {
   })
   const failedResult = await failed.service.initialize(201)
   assert.strictEqual(failedResult.reason, "permission-unavailable")
-  assert.strictEqual(failed.removed.length, 3,
-    "failed initialization should remove every listener it installed")
+  assert.strictEqual(failed.removed.length, 2,
+    "failed initialization should remove session listeners while retaining cold-start navigation")
 
   const malformedListener = createHarness(createPushRegistrationService, {
     onAddListener() { return {} }
@@ -372,7 +392,7 @@ async function run() {
     })
     assert.strictEqual((await malformed.service.initialize(201)).reason, "permission-unavailable")
     assert.strictEqual(malformed.calls.register, 0)
-    assert.strictEqual(malformed.removed.length, 3)
+    assert.strictEqual(malformed.removed.length, 2)
   }
 
   const timerClock = createFakeClock()
@@ -465,7 +485,7 @@ async function run() {
   })
   assert.strictEqual((await malformedRequest.service.initialize(206)).reason, "permission-unavailable")
   assert.strictEqual(malformedRequest.calls.register, 0)
-  assert.strictEqual(malformedRequest.removed.length, 3)
+  assert.strictEqual(malformedRequest.removed.length, 2)
 
   const registerClock = createFakeClock()
   const pendingNativeRegister = deferred()
@@ -592,8 +612,8 @@ async function run() {
     setTimeout: preemptClock.setTimeout,
     clearTimeout: preemptClock.clearTimeout,
     onAddListener(name) {
-      addAttempt += 1
-      if (addAttempt === 1) return oldAdd.promise
+      if (name === "registration") addAttempt += 1
+      if (name === "registration" && addAttempt === 1) return oldAdd.promise
       return {
         remove() {
           preempted.removed.push(name)
@@ -620,9 +640,10 @@ async function run() {
   const oldRegistrationCallback = staleCallbacks.listeners.registration
   const oldActionCallback = staleCallbacks.listeners.pushNotificationActionPerformed
   await staleCallbacks.service.initialize(213)
+  await staleCallbacks.service.resumeNavigation(213)
   await oldRegistrationCallback({ value: "old-account-token" })
   await oldActionCallback({
-    notification: { data: { routeType: "OA_SIGN_HR_TASK", taskId: "99" } }
+    notification: { data: { routeType: "OA_SIGN_HR_TASK", taskId: "99", recipientUserId: "212" } }
   })
   assert.deepStrictEqual(staleCallbacks.uploaded, [],
     "an old account listener must not upload a registration token")
@@ -841,18 +862,20 @@ async function run() {
   assert.strictEqual(resolvePushRoute({ routeType: "https://evil.example", url: "https://evil.example" }), null)
   assert.strictEqual(resolvePushRoute({ routeType: "OA_SIGN_PACKAGE_SIGN", packageId: "1e2" }), null)
 
+  await android.service.resumeNavigation(201)
   await android.listeners.pushNotificationActionPerformed({
-    notification: { data: { routeType: "OA_SIGN_PACKAGE_SIGN", packageId: "90" } }
+    notification: { data: { routeType: "OA_SIGN_PACKAGE_SIGN", packageId: "90", recipientUserId: "201" } }
   })
   await android.listeners.pushNotificationActionPerformed({
-    notification: { data: { routeType: "OA_SIGN_HR_TASK", taskId: "9" } }
+    notification: { data: { routeType: "OA_SIGN_HR_TASK", taskId: "9", recipientUserId: "201" } }
   })
   await android.listeners.pushNotificationActionPerformed({
     notification: { data: { routeType: "https://evil.example", url: "https://evil.example" } }
   })
   assert.deepStrictEqual(android.routed, [
     { path: "/mobile/sign-package", query: { packageId: "90" } },
-    { path: "/oa/sign-task", query: { taskId: "9" } }
+    { path: "/mobile/messages" },
+    { path: "/mobile/messages" }
   ])
 
   await android.service.disable()
@@ -891,6 +914,92 @@ async function run() {
     platform: "ANDROID",
     token: "rotating-token"
   }], "disable and late stale upload must run distinct cleanup phases")
+
+  const coldStart = createHarness(createPushRegistrationService)
+  await coldStart.service.bootstrap()
+  assert.strictEqual(coldStart.calls.check, 0, "bootstrap must not ask permission before login")
+  await coldStart.listeners.pushNotificationActionPerformed({
+    notification: { id: "cold-start-1", data: {
+      recipientUserId: "601", routeType: "OA_SIGN_PACKAGE_SIGN", packageId: "91"
+    } }
+  })
+  assert.deepStrictEqual(coldStart.routed, [], "cold-start taps must wait for an authenticated session")
+  await coldStart.service.initialize(601)
+  assert.deepStrictEqual(coldStart.routed, [], "profile restoration alone must not interrupt route generation")
+  await coldStart.service.resumeNavigation(601)
+  assert.deepStrictEqual(coldStart.routed, [{ path: "/mobile/sign-package", query: { packageId: "91" } }])
+  await coldStart.listeners.pushNotificationActionPerformed({
+    notification: { id: "cold-start-1", data: {
+      recipientUserId: "601", routeType: "OA_SIGN_PACKAGE_SIGN", packageId: "91"
+    } }
+  })
+  assert.strictEqual(coldStart.routed.length, 1, "duplicate delivery of one tap must navigate only once")
+  await coldStart.service.disable()
+  assert.ok(!coldStart.removed.includes("pushNotificationActionPerformed"),
+    "logout must retain the launch listener without retaining the old destination")
+  await coldStart.listeners.pushNotificationActionPerformed({
+    notification: { id: "old-account-1", data: {
+      recipientUserId: "601", routeType: "OA_SIGN_PACKAGE_SIGN", packageId: "91"
+    } }
+  })
+  await coldStart.service.initialize(602)
+  await coldStart.service.resumeNavigation(602)
+  assert.strictEqual(coldStart.routed.length, 1, "an old recipient cannot navigate the next account")
+  await coldStart.listeners.pushNotificationActionPerformed({
+    notification: { id: "legacy", data: { routeType: "OA_SIGN_PACKAGE_SIGN", packageId: "91" } }
+  })
+  assert.deepStrictEqual(coldStart.routed[1], { path: "/mobile/messages" },
+    "a legacy payload without a recipient can only open the current account inbox")
+  await coldStart.listeners.pushNotificationActionPerformed({
+    notification: { id: "unknown", data: { recipientUserId: "602", routeType: "URL", url: "https://evil.example" } }
+  })
+  assert.deepStrictEqual(coldStart.routed[2], { path: "/mobile/messages" })
+  await coldStart.listeners.pushNotificationActionPerformed({
+    notification: { id: "health-legacy-params", data: {
+      recipientUserId: "602", routeType: "HR_HEALTH_CERT_DUE", userId: "602", certificateId: "35"
+    } }
+  })
+  assert.deepStrictEqual(coldStart.routed[3], {
+    path: "/mobile/hr/health-certificate", query: { employeeId: "602", healthCertificateView: "mine", certificateId: "35" }
+  }, "native navigation should also retain the existing health routeParams.userId representation")
+  const statusEvents = []
+  const unsubscribe = coldStart.service.subscribeStatus(value => statusEvents.push(value))
+  assert.strictEqual(coldStart.service.getStatus().phase, "waiting-token")
+  await coldStart.listeners.registration({ value: "never-show-this-token" })
+  assert.strictEqual(coldStart.service.getStatus().phase, "ready")
+  assert.ok(!JSON.stringify(statusEvents).includes("never-show-this-token"), "UI status must never expose device tokens")
+  assert.ok(statusEvents.every(value => Object.keys(value).every(key => ["phase", "reason"].includes(key))))
+  unsubscribe()
+  await coldStart.listeners.registrationError({ error: "sensitive native diagnostics" })
+  assert.deepStrictEqual(coldStart.service.getStatus(), { phase: "error", reason: "register-unavailable" })
+  assert.ok(!JSON.stringify(coldStart.service.getStatus()).includes("sensitive"))
+
+  const manualRetry = createHarness(createPushRegistrationService, {
+    permissions: ["prompt"], requestResult: "denied"
+  })
+  await manualRetry.service.initialize(603)
+  await manualRetry.service.initialize(603)
+  assert.strictEqual(manualRetry.calls.request, 1, "passive retries must not repeatedly prompt after denial")
+  await manualRetry.service.initialize(603, { retry: true })
+  assert.strictEqual(manualRetry.calls.request, 2, "an explicit retry may request permission again if the OS allows it")
+
+  assert.deepStrictEqual(resolvePushRoute({ routeType: "HR_HEALTH_CERT_DUE", employeeId: "602", recipientUserId: "602", certificateId: "35" }, { mobile: true }), {
+    path: "/mobile/hr/health-certificate", query: { employeeId: "602", healthCertificateView: "mine", certificateId: "35" }
+  })
+  assert.deepStrictEqual(resolvePushRoute({ routeType: "USER_NOTIFICATION", url: "https://evil.example" }, { mobile: true }), {
+    path: "/mobile/messages"
+  })
+  assert.deepStrictEqual(resolvePushRoute({
+    routeType: "HR_HEALTH_CERT_DUE", employeeId: "602", recipientUserId: "999", certificateId: "35"
+  }, { mobile: true }), { path: "/mobile/messages" }, "manager reminders must not open the manager's own certificate")
+  assert.deepStrictEqual(resolvePushRoute({
+    routeType: "HR_HEALTH_CERT_DUE", employeeId: "602", recipientUserId: "602", certificateId: "35"
+  }), {
+    path: "/hr/healthCertificate", query: { employeeId: "602", healthCertificateView: "mine", certificateId: "35" }
+  }, "desktop self reminders must use the canonical health-certificate menu path")
+  assert.strictEqual(resolvePushRoute({ routeType: "HR_HEALTH_CERT_DUE", employeeId: "../602" }, { mobile: true }), null)
+  assert.strictEqual(resolvePushRoute({ routeType: "OA_SIGN_PACKAGE_SIGN", packageId: 9007199254740992 }), null,
+    "unsafe numeric ids must not silently round to another document")
 
   const mainSource = readFile("src/main.js")
   assert.ok(mainSource.includes("pushRegistration.setRouter(router)"))

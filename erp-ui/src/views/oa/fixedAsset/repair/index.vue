@@ -12,7 +12,7 @@
         </div>
       </div>
       <div class="oa-hero__actions">
-        <el-button type="primary" size="mini" icon="el-icon-plus" :disabled="repairActionDisabled" @click="openRepairForm" v-hasPermi="['oa:fixedAsset:repair:add']">新建上报</el-button>
+        <el-button type="primary" size="mini" icon="el-icon-plus" :disabled="saving || repairActionDisabled" @click="openRepairForm" v-hasPermi="['oa:fixedAsset:repair:add']">新建上报</el-button>
         <el-button size="mini" icon="el-icon-download" :disabled="!currentStoreDeptId" @click="handleExport" v-hasPermi="['oa:fixedAsset:repair:export']">导出</el-button>
       </div>
     </section>
@@ -117,7 +117,8 @@
       />
     </el-card>
 
-    <el-dialog title="新建固定资产维修上报" :visible.sync="repairOpen" width="780px" append-to-body>
+    <el-dialog title="新建固定资产维修上报" :visible.sync="repairOpen" :show-close="!saving" :close-on-click-modal="!saving" :close-on-press-escape="!saving" width="780px" append-to-body>
+      <el-alert v-if="repairError" :title="repairError" type="error" :closable="false" show-icon />
       <el-alert
         type="info"
         :closable="false"
@@ -186,7 +187,7 @@
           </div>
           <div v-if="repairQuotaExceeded" class="purchase-reference-list">
             <div v-for="item in overQuotaPurchaseItems" :key="item.oeItemId" class="purchase-reference-card">
-              <img v-if="item.imageUrl" :src="item.imageUrl" alt="同款OE图片">
+              <image-gallery :value="item" />
               <div class="purchase-reference-content">
                 <strong>{{ item.oeItemName || '同款OE器皿' }}</strong>
                 <span>编码：{{ item.oeItemCode || '-' }} · 订货单位：{{ item.orderUnit || '-' }}</span>
@@ -208,14 +209,22 @@
           <el-input v-model="form.faultDescription" type="textarea" :rows="4" maxlength="1000" show-word-limit />
         </el-form-item>
         <el-form-item label="图片/附件">
-          <image-upload v-model="form.imageUrls" :limit="5" :file-size="5" />
+          <image-upload
+            v-model="form.imageUrls"
+            action="/oa/fixedAsset/repair/image/upload"
+            :data="repairImageUploadData"
+            :disabled="repairImageUploadDisabled"
+            :limit="5"
+            :file-size="5"
+            :delete-on-remove="false"
+          />
         </el-form-item>
         <el-form-item label="备注">
           <el-input v-model="form.remark" type="textarea" :rows="2" maxlength="500" show-word-limit />
         </el-form-item>
       </el-form>
       <div slot="footer">
-        <el-button @click="repairOpen = false">取消</el-button>
+        <el-button :disabled="saving" @click="repairOpen = false">取消</el-button>
         <el-button type="primary" :loading="saving" :disabled="repairQuotaExceeded || repairActionDisabled" @click="submitRepair">上报</el-button>
       </div>
     </el-dialog>
@@ -230,7 +239,7 @@
         <div><span>批准人</span><strong>{{ detail.approvedBy || '-' }}</strong></div>
         <div><span>批准时间</span><strong>{{ detail.approvedTime || '-' }}</strong></div>
         <div class="full"><span>破损说明</span><p>{{ detail.faultDescription || '-' }}</p></div>
-        <div class="full"><span>附件</span><p>{{ detail.imageUrls || '-' }}</p></div>
+        <div class="full"><span>附件</span><image-gallery :value="detail.imageUrls" /></div>
       </div>
       <div slot="footer">
         <el-button type="primary" @click="detailOpen = false">关闭</el-button>
@@ -240,10 +249,12 @@
 </template>
 
 <script>
+import ImageGallery from "@/components/ImageGallery"
 import { getFixedAssetQuota, getFixedAssetRepair, listFixedAssetConfigs, listFixedAssetRepairs, submitFixedAssetRepairBatch } from "@/api/oa/fixedAsset"
 import ImageUpload from "@/components/ImageUpload"
 import { getBusinessEmptyText } from "@/utils/businessEmptyState"
 import { getSelectedDeptContext } from "@/utils/shopContext"
+const { createUiOperationScope } = require("@/utils/uiOperationScope")
 const { createTodoBusinessFocusMixin } = require("@/mixins/todoBusinessFocus")
 const resolveSelectedDeptContext = typeof getSelectedDeptContext === "function"
   ? getSelectedDeptContext
@@ -251,7 +262,7 @@ const resolveSelectedDeptContext = typeof getSelectedDeptContext === "function"
 
 export default {
   name: "OaFixedAssetRepair",
-  components: { ImageUpload },
+  components: { ImageUpload, ImageGallery },
   mixins: [createTodoBusinessFocusMixin({
     featureKey: "fixedAssetRepair",
     loadFocusedRow(repairId) { return getFixedAssetRepair(repairId) }
@@ -262,6 +273,8 @@ export default {
     return {
       loading: false,
       saving: false,
+      repairError: "",
+      draftGeneration: 0,
       repairOpen: false,
       detailOpen: false,
       total: 0,
@@ -283,6 +296,12 @@ export default {
     },
     currentStoreDeptId() {
       return this.selectedDeptContext.isStore ? this.selectedDeptContext.deptId : undefined
+    },
+    repairImageUploadData() {
+      return this.currentStoreDeptId ? { shopDeptId: this.currentStoreDeptId } : {}
+    },
+    repairImageUploadDisabled() {
+      return !this.currentStoreDeptId
     },
     currentStoreName() {
       return this.selectedDeptContext.deptName || "当前门店"
@@ -326,9 +345,35 @@ export default {
     }
   },
   created() {
+    if (typeof window !== "undefined") window.addEventListener("erp:dept-changed", this.invalidateRepairContext)
     this.getList()
   },
+  beforeDestroy() {
+    if (typeof window !== "undefined") window.removeEventListener("erp:dept-changed", this.invalidateRepairContext)
+    this.operationScope().deactivate()
+  },
+  deactivated() { this.operationScope().deactivate(); this.repairOpen = false; this.saving = false },
+  activated() { this.operationScope().activate() },
+  watch: {
+    repairOpen(value) { if (!value) { this.operationScope().invalidate("repair-write"); this.draftGeneration++; this.saving = false } },
+    "$store.state.user.sessionRevision"() { this.invalidateRepairContext() },
+    "$route.fullPath"() { this.invalidateRepairContext() }
+  },
   methods: {
+    operationScope() {
+      if (!this._operationScope) this._operationScope = createUiOperationScope(() => {
+        const user = this.$store && this.$store.state && this.$store.state.user || {}
+        return { actor: String(user.id || ""), session: user.sessionRevision || 0,
+          shop: String(this.effectiveShopDeptId() || "") }
+      })
+      return this._operationScope
+    },
+    invalidateRepairContext() {
+      this.operationScope().invalidate()
+      this.draftGeneration++
+      this.repairOpen = false
+      this.saving = false
+    },
     effectiveShopDeptId() {
       return this.currentStoreDeptId
     },
@@ -364,38 +409,39 @@ export default {
     },
     loadQuota(shopDeptId) {
       shopDeptId = shopDeptId || this.effectiveShopDeptId()
-      getFixedAssetQuota({ shopDeptId }).then(res => {
-        this.quota = res.data || {}
-      }).catch(() => {
-        this.quota = {}
-      })
+      const scope = this.operationScope(), target = { shop: String(shopDeptId || ""), draft: this.draftGeneration }
+      const operation = scope.begin("repair-quota", target)
+      const current = () => scope.isCurrent(operation, { shop: String(this.effectiveShopDeptId() || ""), draft: this.draftGeneration })
+      return getFixedAssetQuota({ shopDeptId }).then(res => {
+        if (current()) this.quota = res.data || {}
+      }).catch(() => { if (current()) this.quota = {} })
     },
     openRepairForm() {
+      if (this.saving) return
       if (this.repairActionDisabled) {
         this.$modal.msgWarning(this.repairActionAlert.title)
         return
       }
+      this.operationScope().invalidate("repair-write")
+      this.draftGeneration++
       const shopDeptId = this.effectiveShopDeptId()
-      this.form = {
-        shopDeptId,
-        faultDescription: "",
-        imageUrls: "",
-        remark: ""
-      }
+      this.form = { shopDeptId, faultDescription: "", imageUrls: "", remark: "" }
       this.repairAssetRows = [this.createRepairAssetRow()]
+      this.repairError = ""
+      this.assetOptions = []
+      this.repairOpen = true
       this.loadAssets(shopDeptId)
       this.loadQuota(shopDeptId)
-      this.repairOpen = true
     },
     loadAssets(shopDeptId) {
       shopDeptId = shopDeptId || this.form.shopDeptId || this.effectiveShopDeptId()
-      if (!shopDeptId) {
-        this.assetOptions = []
-        return
-      }
-      listFixedAssetConfigs({ pageNum: 1, pageSize: 100, shopDeptId, status: "0" }).then(res => {
-        this.assetOptions = res.rows || []
-      })
+      if (!shopDeptId) { this.assetOptions = []; return Promise.resolve() }
+      const scope = this.operationScope(), target = { shop: String(shopDeptId), draft: this.draftGeneration }
+      const operation = scope.begin("repair-assets", target)
+      const current = () => this.repairOpen && scope.isCurrent(operation, { shop: String(this.form.shopDeptId || ""), draft: this.draftGeneration })
+      return listFixedAssetConfigs({ pageNum: 1, pageSize: 100, shopDeptId, status: "0" }).then(res => {
+        if (current()) this.assetOptions = res.rows || []
+      }).catch(() => { if (current()) this.repairError = "资产明细加载失败，请保留草稿后重新加载" })
     },
     createRepairAssetRow(asset) {
       return {
@@ -461,42 +507,40 @@ export default {
       return true
     },
     submitRepair() {
-      if (this.repairActionDisabled) {
-        this.$modal.msgWarning(this.repairActionAlert.title)
-        return
-      }
-      this.$refs.repairForm.validate(valid => {
-        if (!valid) return
-        if (!this.validateRepairAssetRows()) return
+      if (this.saving || !this.repairOpen) return Promise.resolve(null)
+      if (this.repairActionDisabled) { this.$modal.msgWarning(this.repairActionAlert.title); return Promise.resolve(null) }
+      const scope = this.operationScope(), target = { shop: String(this.form.shopDeptId || ""), draft: this.draftGeneration }
+      const operation = scope.begin("repair-write", target)
+      const current = () => this.repairOpen && scope.isCurrent(operation, { shop: String(this.form.shopDeptId || ""), draft: this.draftGeneration })
+      this.saving = true
+      this.repairError = ""
+      return new Promise(resolve => this.$refs.repairForm.validate(valid => {
+        if (!current()) { resolve(null); return }
+        if (!valid || !this.validateRepairAssetRows()) { this.saving = false; resolve(null); return }
         if (this.repairQuotaExceeded) {
           this.$modal.msgWarning(this.overQuotaReferencesReady
             ? "当前可用额度不足，请按同款参考自行购买且无需上报"
             : "当前可用额度不足，同款资料尚未完善，请联系仓库")
-          return
+          this.saving = false; resolve(null); return
         }
-        this.saving = true
-        const payload = Object.assign({}, this.form, {
-          items: this.repairAssetRows.map(row => ({
-            oeItemId: row.oeItemId,
-            repairQuantity: row.repairQuantity
-          }))
-        })
+        const payload = { ...this.form, items: this.repairAssetRows.map(row => ({ oeItemId: row.oeItemId, repairQuantity: row.repairQuantity })) }
         submitFixedAssetRepairBatch(payload).then(() => {
+          if (!current()) return null
           this.$modal.msgSuccess("固定资产维修上报成功")
+          this.saving = false
           this.repairOpen = false
-          this.getList()
+          return this.getList()
         }).catch(error => {
+          if (!current()) return null
           const responseData = error && error.response ? error.response.data : null
           if (responseData && responseData.errorCode === "FIXED_ASSET_QUOTA_EXCEEDED") {
-            this.loadQuota(this.form.shopDeptId)
+            this.loadQuota(payload.shopDeptId)
             const precheck = responseData.precheck || {}
-            this.$modal.msgWarning(precheck.message || "额度已被其他上报占用，不能继续上报")
-          }
-          return Promise.reject(error)
-        }).finally(() => {
-          this.saving = false
-        })
-      })
+            this.repairError = precheck.message || "额度已被其他上报占用，请核对额度和明细后再上报"
+          } else this.repairError = "上报结果待核对，请先刷新上报列表确认；当前描述、明细和图片已保留，请勿重复上报"
+          return null
+        }).finally(() => { if (current()) this.saving = false }).then(resolve)
+      }))
     },
     showDetail(row) {
       this.detail = Object.assign({}, row)

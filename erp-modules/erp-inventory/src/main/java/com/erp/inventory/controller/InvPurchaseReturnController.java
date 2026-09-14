@@ -19,6 +19,7 @@ import com.erp.common.log.annotation.Log;
 import com.erp.common.log.enums.BusinessType;
 import com.erp.common.security.annotation.IdempotentSubmit;
 import com.erp.common.security.annotation.RequiresPermissions;
+import com.erp.common.security.annotation.Logical;
 import com.erp.inventory.domain.InvPurchaseOrder;
 import com.erp.inventory.domain.InvPurchaseReturn;
 import com.erp.inventory.domain.dto.InvPurchaseReturnSaveRequest;
@@ -30,6 +31,15 @@ public class InvPurchaseReturnController extends InvBaseController
 {
     @Autowired
     private IInvPurchaseReturnService purchaseReturnService;
+
+    @RequiresPermissions(value = { "inv:purchaseReturn:add", "inv:purchaseReturn:submit", "inv:purchaseReturn:confirm", "inv:purchaseReturn:remove" }, logical = Logical.OR)
+    @GetMapping("/action-context/{returnId}")
+    public AjaxResult actionContext(@PathVariable("returnId") Long returnId, HttpServletRequest request,
+            HttpServletResponse response)
+    {
+        response.setHeader("Cache-Control", "no-store, max-age=0");
+        return success(purchaseReturnService.getActionContext(returnId, resolveShopDeptId(request)));
+    }
 
     @RequiresPermissions("inv:purchaseReturn:list")
     @GetMapping("/list")
@@ -72,6 +82,15 @@ public class InvPurchaseReturnController extends InvBaseController
         disableCaching(response);
         return success(purchaseReturnService.getReturnableSourceOrder(orderId,
                 resolveShopDeptId(request)));
+    }
+
+    @RequiresPermissions("inv:purchaseReturn:add")
+    @GetMapping("/draft/{returnId}")
+    public AjaxResult draft(@PathVariable("returnId") Long returnId, HttpServletRequest request,
+            HttpServletResponse response)
+    {
+        response.setHeader("Cache-Control", "no-store, max-age=0");
+        return success(purchaseReturnService.getReturnDraft(returnId, resolveShopDeptId(request)));
     }
 
     @RequiresPermissions("inv:purchaseReturn:query")

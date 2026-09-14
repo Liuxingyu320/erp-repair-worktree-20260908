@@ -12,6 +12,7 @@ import com.erp.common.security.annotation.EnableRyFeignClients;
  */
 @EnableCustomConfig
 @EnableRyFeignClients
+@org.springframework.scheduling.annotation.EnableScheduling
 @SpringBootApplication
 public class ErpJobApplication
 {

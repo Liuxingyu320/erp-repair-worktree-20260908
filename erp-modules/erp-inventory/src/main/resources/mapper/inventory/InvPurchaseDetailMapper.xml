@@ -19,22 +19,33 @@
         <result property="unitPrice" column="unit_price"/>
         <result property="amount" column="amount"/>
         <result property="receivedQuantity" column="received_quantity"/>
+        <result property="stockedQuantity" column="stocked_quantity"/>
     </resultMap>
 
+    <sql id="stockedQuantity">
+        (select coalesce(sum(case
+            when i.receipt_batch_detail_id is not null
+                then coalesce(i.accepted_quantity, 0) + coalesce(i.concession_quantity, 0)
+            when i.qc_result in ('passed', 'concession') then i.quantity
+            else 0 end), 0)
+         from inv_inbound_record i
+         where i.purchase_order_id = d.order_id
+           and (i.purchase_detail_id = d.detail_id or
+                (i.purchase_detail_id is null and i.product_id = d.product_id
+                 and (select count(*) from inv_purchase_detail legacy
+                      where legacy.order_id = d.order_id and legacy.product_id = d.product_id) = 1)))
+    </sql>
+
     <select id="selectInvPurchaseDetailByOrderId" parameterType="Long" resultMap="InvPurchaseDetailResult">
-        select detail_id, order_id, item_type, item_id, item_code, item_name,
-               product_id, warehouse_id, product_name, sku, spec, unit,
-               quantity, unit_price, amount, received_quantity
-        from inv_purchase_detail
-        where order_id = #{orderId}
+        select d.*, <include refid="stockedQuantity"/> as stocked_quantity
+        from inv_purchase_detail d
+        where d.order_id = #{orderId}
     </select>
 
     <select id="selectInvPurchaseDetailByOrderIdForUpdate" parameterType="Long" resultMap="InvPurchaseDetailResult">
-        select detail_id, order_id, item_type, item_id, item_code, item_name,
-               product_id, warehouse_id, product_name, sku, spec, unit,
-               quantity, unit_price, amount, received_quantity
-        from inv_purchase_detail
-        where order_id = #{orderId} for update
+        select d.*, <include refid="stockedQuantity"/> as stocked_quantity
+        from inv_purchase_detail d
+        where d.order_id = #{orderId} for update
     </select>
 
     <insert id="insertInvPurchaseDetail" parameterType="InvPurchaseDetail" useGeneratedKeys="true" keyProperty="detailId">

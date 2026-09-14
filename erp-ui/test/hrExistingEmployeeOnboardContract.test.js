@@ -269,6 +269,7 @@ function loadSfcComponent(source, globals, filename) {
     .replace("export default", "module.exports =")
   const sandbox = {
     module: { exports: {} }, exports: {}, process: { env: { VUE_APP_SIGN_EXCEL_IMPORT_ENABLED: "true" } },
+    syncOnboardSalaryBeforeGenerate: async () => {},
     setTimeout, clearTimeout, crypto: { randomUUID: () => "uuid" },
     require(request) {
       if (request === "../mobileErrorMessage") return require("../src/views/mobile/mobileErrorMessage")

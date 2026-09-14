@@ -12,15 +12,22 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.erp.common.core.exception.ServiceException;
+import com.erp.inventory.domain.vo.InvSpecialistReadVo;
+import com.erp.inventory.domain.vo.InvSpecialistActionContext;
 import com.erp.common.security.utils.SecurityUtils;
 import com.erp.inventory.constant.InvStatusConstants;
 import com.erp.inventory.domain.InvSalesDetail;
+import com.erp.inventory.domain.dto.InvSalesReturnSourceQuery;
+import com.erp.inventory.domain.vo.InvSalesReturnSourceOrderVo;
+import com.github.pagehelper.PageHelper;
+import com.erp.inventory.domain.InvOutboundRecord;
 import com.erp.inventory.domain.InvSalesOrder;
 import com.erp.inventory.domain.InvSalesReturn;
 import com.erp.inventory.domain.InvSalesReturnDetail;
 import com.erp.inventory.domain.InvStock;
 import com.erp.inventory.domain.InvStockLog;
 import com.erp.inventory.mapper.InvNumberSequenceMapper;
+import com.erp.inventory.mapper.InvOutboundRecordMapper;
 import com.erp.inventory.mapper.InvSalesDetailMapper;
 import com.erp.inventory.mapper.InvSalesOrderMapper;
 import com.erp.inventory.mapper.InvSalesReturnDetailMapper;
@@ -52,7 +59,19 @@ public class InvSalesReturnServiceImpl extends InvBaseService implements IInvSal
     private InvStockLogMapper stockLogMapper;
 
     @Autowired
+    private InvOutboundRecordMapper outboundRecordMapper;
+
+    @Autowired
     private InvNumberSequenceMapper numberSequenceMapper;
+
+    @Override
+    public InvSpecialistActionContext getActionContext(Long returnId, Long selectedShopDeptId)
+    {
+        Long shopDeptId = requireStoreContext(selectedShopDeptId, "请选择门店");
+        InvSalesReturn order = assertAndGetScopedReturn(returnId, shopDeptId);
+        if (!shopDeptId.equals(order.getShopDeptId())) throw new ServiceException("退货单不属于当前门店");
+        return InvSpecialistActionContext.salesReturn(order);
+    }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -82,7 +101,7 @@ public class InvSalesReturnServiceImpl extends InvBaseService implements IInvSal
         }
         else
         {
-            InvSalesReturn db = assertAndGetScopedReturn(salesReturn.getReturnId(), selectedShopDeptId);
+            InvSalesReturn db = lockScopedReturn(salesReturn.getReturnId(), selectedShopDeptId, salesReturn.getSalesOrderId());
             InvStateGuard.requireDraftForEdit(db.getStatus());
             if (salesReturn.getSalesOrderId() == null)
             {
@@ -92,6 +111,7 @@ public class InvSalesReturnServiceImpl extends InvBaseService implements IInvSal
             normalizeReturnDetails(salesReturn, details);
             salesReturn.setStatus(InvStatusConstants.DRAFT);
             salesReturn.setUpdateBy(SecurityUtils.getUsername());
+            salesReturn.getParams().put("updateContent", true);
             salesReturnMapper.updateInvSalesReturn(salesReturn);
             if (details != null)
             {
@@ -116,15 +136,126 @@ public class InvSalesReturnServiceImpl extends InvBaseService implements IInvSal
         update.setReturnId(saved.getReturnId());
         update.setStatus(InvStatusConstants.SUBMITTED);
         update.setUpdateBy(SecurityUtils.getUsername());
-        salesReturnMapper.updateInvSalesReturn(update);
+        updateState(update, InvStatusConstants.DRAFT);
         return salesReturnMapper.selectInvSalesReturnById(saved.getReturnId());
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public InvSalesReturn submitSavedReturn(Long returnId, Long selectedShopDeptId)
+    {
+        Long shopDeptId = requireStoreContext(selectedShopDeptId, "请选择门店");
+        InvSalesReturn draft = lockScopedReturn(returnId, shopDeptId);
+        if (!shopDeptId.equals(draft.getShopDeptId())) throw new ServiceException("退货单不属于当前门店");
+        InvStateGuard.requireDraftForEdit(draft.getStatus());
+        if (draft.getReturnTitle() == null || draft.getReturnTitle().isBlank() || draft.getReturnTitle().length() > 128
+                || draft.getCustomerName() == null || draft.getCustomerName().isBlank())
+            throw new ServiceException("退货草稿主题或客户资料不完整，请先编辑保存");
+        InvSalesOrder source = salesOrderMapper.selectInvSalesOrderByIdForUpdate(draft.getSalesOrderId());
+        requireReturnableSourceHeader(source, shopDeptId);
+        List<InvSalesDetail> sourceDetails = salesDetailMapper.selectInvSalesDetailByOrderIdForUpdate(draft.getSalesOrderId());
+        List<InvSalesReturnDetail> details = salesReturnDetailMapper.selectInvSalesReturnDetailByReturnIdForUpdate(returnId);
+        validateLockedReturnQuantity(draft, returnId, sourceDetails, details);
+        InvSalesReturn update = new InvSalesReturn();
+        update.setReturnId(returnId); update.setStatus(InvStatusConstants.SUBMITTED);
+        update.setUpdateBy(SecurityUtils.getUsername());
+        updateState(update, InvStatusConstants.DRAFT);
+        // Return the locked persisted draft; no body fields or stale consistent reads can replace its content.
+        draft.setStatus(InvStatusConstants.SUBMITTED); draft.setDetails(details);
+        return InvSpecialistReadVo.salesReturn(draft);
+    }
+
+    @Override
+    public List<InvSalesOrder> selectReturnableSourceOrders(InvSalesReturnSourceQuery query, Long selectedShopDeptId)
+    {
+        if (query == null) query = new InvSalesReturnSourceQuery();
+        query.validate();
+        Long shopDeptId = requireStoreContext(selectedShopDeptId, "请选择门店");
+        // Resolve scope before starting pagination so directory lookups cannot consume the page request.
+        try
+        {
+            var page = PageHelper.startPage(query.getPageNum(), query.getPageSize()).setReasonable(false);
+            // PageHelper 6.1 calculates offset with int multiplication; keep valid large pages in long arithmetic.
+            long offset = ((long) query.getPageNum() - 1L) * query.getPageSize();
+            page.setStartRow(offset).setEndRow(offset + query.getPageSize());
+            List<InvSalesOrder> rows = salesOrderMapper.selectReturnableSalesOrderList(query, shopDeptId);
+            for (int i = 0; i < rows.size(); i++) rows.set(i, InvSalesReturnSourceOrderVo.from(rows.get(i)));
+            return rows;
+        }
+        finally { PageHelper.clearPage(); }
+    }
+
+    @Override
+    public InvSalesOrder getReturnableSourceOrder(Long orderId, Long selectedShopDeptId)
+    {
+        Long shopDeptId = requireStoreContext(selectedShopDeptId, "请选择门店");
+        InvSalesOrder source = salesOrderMapper.selectInvSalesOrderById(orderId);
+        requireReturnableSourceHeader(source, shopDeptId);
+        List<InvSalesDetail> details = salesDetailMapper.selectInvSalesDetailByOrderId(orderId);
+        boolean hasReturnable = false;
+        for (InvSalesDetail detail : details)
+        {
+            BigDecimal used = zero(salesReturnDetailMapper.sumHistoricalReturnQuantityBySalesDetailId(orderId, detail.getDetailId(), null));
+            BigDecimal itemDelivered = details.stream().filter(row -> itemKey(row).equals(itemKey(detail)))
+                    .map(row -> zero(row.getDeliveredQuantity())).reduce(BigDecimal.ZERO, BigDecimal::add);
+            BigDecimal itemUsed = zero(salesReturnDetailMapper.sumHistoricalReturnQuantityByItem(orderId,
+                    itemType(detail.getItemType()), itemId(detail.getItemId(), detail.getProductId()), null));
+            BigDecimal remaining = zero(detail.getDeliveredQuantity()).subtract(used)
+                    .min(itemDelivered.subtract(itemUsed)).max(BigDecimal.ZERO);
+            if (detail.getDetailId() == null || itemId(detail.getItemId(), detail.getProductId()) == null
+                    || !("product".equals(itemType(detail.getItemType())) || "gift".equals(itemType(detail.getItemType()))))
+                remaining = BigDecimal.ZERO;
+            detail.setHistoricalReturnedQuantity(used); detail.setReturnableQuantity(remaining);
+            hasReturnable |= remaining.signum() > 0;
+        }
+        if (!hasReturnable) throw new ServiceException("原销售单暂无可退明细");
+        source.setDetails(details);
+        return InvSalesReturnSourceOrderVo.from(source);
+    }
+
+    private void requireReturnableSourceHeader(InvSalesOrder source, Long shopDeptId)
+    {
+        if (source == null) throw new ServiceException("原销售单不存在");
+        if (!shopDeptId.equals(source.getShopDeptId())) throw new ServiceException("原销售单不属于当前门店");
+        if (InvStatusConstants.DRAFT.equals(source.getStatus()) || InvStatusConstants.CANCELLED.equals(source.getStatus()))
+            throw new ServiceException("原销售单当前状态不可退货");
+    }
+
+    @Override
+    public InvSalesReturn getReturnDraft(Long returnId, Long selectedShopDeptId)
+    {
+        Long shopDeptId = requireStoreContext(selectedShopDeptId, "请选择门店");
+        InvSalesReturn draft = getReturnDetail(returnId, shopDeptId);
+        if (!shopDeptId.equals(draft.getShopDeptId())) throw new ServiceException("退货单不属于当前门店");
+        InvStateGuard.requireDraftForEdit(draft.getStatus());
+        return InvSpecialistReadVo.salesReturn(draft);
     }
 
     @Override
     public InvSalesReturn getReturnDetail(Long returnId, Long selectedShopDeptId)
     {
         InvSalesReturn salesReturn = assertAndGetScopedReturn(returnId, selectedShopDeptId);
-        salesReturn.setDetails(salesReturnDetailMapper.selectInvSalesReturnDetailByReturnId(returnId));
+        List<InvSalesReturnDetail> details = salesReturnDetailMapper.selectInvSalesReturnDetailByReturnId(returnId);
+        List<InvSalesDetail> source = salesDetailMapper.selectInvSalesDetailByOrderId(salesReturn.getSalesOrderId());
+        for (InvSalesReturnDetail detail : details)
+        {
+            InvSalesDetail original;
+            try
+            {
+                original = resolveSalesDetailForReturn(detail, source);
+            }
+            catch (ServiceException ambiguousHistory)
+            {
+                // Historical evidence remains readable; editing must reselect an unambiguous source row.
+                detail.setReturnableQuantity(BigDecimal.ZERO);
+                continue;
+            }
+            applyItemSnapshot(detail, original);
+            BigDecimal used = zero(salesReturnDetailMapper.sumHistoricalReturnQuantityBySalesDetailId(
+                    salesReturn.getSalesOrderId(), original.getDetailId(), returnId));
+            detail.setReturnableQuantity(zero(original.getDeliveredQuantity()).subtract(used).max(BigDecimal.ZERO));
+        }
+        salesReturn.setDetails(details);
         return salesReturn;
     }
 
@@ -147,32 +278,37 @@ public class InvSalesReturnServiceImpl extends InvBaseService implements IInvSal
     @Transactional(rollbackFor = Exception.class)
     public void confirmReturn(Long returnId, Long selectedShopDeptId)
     {
-        InvSalesReturn salesReturn = assertAndGetScopedReturn(returnId, selectedShopDeptId);
+        InvSalesReturn salesReturn = lockScopedReturn(returnId, selectedShopDeptId);
         InvStateGuard.requireSubmittedForReturnConfirm(salesReturn.getStatus());
-        InvSalesReturn locked = salesReturnMapper.selectInvSalesReturnByIdForUpdate(returnId);
-        InvStateGuard.requireSubmittedForReturnConfirm(locked.getStatus());
         validateReturnQuantity(salesReturn, returnId);
         List<InvSalesReturnDetail> details = salesReturnDetailMapper.selectInvSalesReturnDetailByReturnIdForUpdate(returnId);
         if (details.isEmpty())
         {
             throw new ServiceException("退货单无明细");
         }
+        List<InvSalesDetail> sourceDetails = salesDetailMapper.selectInvSalesDetailByOrderId(salesReturn.getSalesOrderId());
         for (InvSalesReturnDetail detail : details)
         {
+            InvSalesDetail original = resolveSalesDetailForReturn(detail, sourceDetails);
+            applyItemSnapshot(detail, original);
             BigDecimal toReturn = detail.getQuantity().subtract(
                     detail.getReturnedQuantity() != null ? detail.getReturnedQuantity() : BigDecimal.ZERO);
             if (toReturn.compareTo(BigDecimal.ZERO) <= 0)
             {
                 continue;
             }
-            InvStock stock = stockMapper.selectInvStockByProductAndShopForUpdate(detail.getProductId(), salesReturn.getShopDeptId());
-            BigDecimal unitCost = resolveReturnUnitCost(
-                    salesReturn.getSalesOrderId(), detail.getProductId(), stock);
-            BigDecimal incomingCost = toReturn.multiply(unitCost);
+            InvStock stock = stockMapper.selectInvStockByItemShopWarehouseForUpdate(
+                    itemType(detail.getItemType()), itemId(detail.getItemId(), detail.getProductId()),
+                    salesReturn.getShopDeptId(), salesReturn.getShopDeptId());
+            BigDecimal incomingCost = resolveReturnCostAmount(
+                    salesReturn.getSalesOrderId(), detail, original, sourceDetails, toReturn);
+            BigDecimal unitCost = incomingCost.divide(toReturn, 2, RoundingMode.HALF_UP);
             BigDecimal beforeQty = BigDecimal.ZERO;
             if (stock == null)
             {
                 stock = new InvStock();
+                stock.setItemType(itemType(detail.getItemType()));
+                stock.setItemId(itemId(detail.getItemId(), detail.getProductId()));
                 stock.setProductId(detail.getProductId());
                 stock.setShopDeptId(salesReturn.getShopDeptId());
                 stock.setWarehouseId(salesReturn.getShopDeptId());
@@ -187,12 +323,17 @@ public class InvSalesReturnServiceImpl extends InvBaseService implements IInvSal
             else
             {
                 beforeQty = stock.getCurrentQuantity();
-                stockMapper.addInvStockWithCost(stock.getStockId(), stock.getVersion(), toReturn, incomingCost, SecurityUtils.getUsername());
+                if (stockMapper.addInvStockWithCost(stock.getStockId(), stock.getVersion(), toReturn, incomingCost, SecurityUtils.getUsername()) != 1)
+                {
+                    throw new ServiceException("库存已变化，请刷新后重试");
+                }
                 stock = stockMapper.selectInvStockById(stock.getStockId());
             }
 
             // 库存变动日志
             InvStockLog log = new InvStockLog();
+            log.setItemType(itemType(detail.getItemType()));
+            log.setItemId(itemId(detail.getItemId(), detail.getProductId()));
             log.setProductId(detail.getProductId());
             log.setShopDeptId(salesReturn.getShopDeptId());
             log.setWarehouseId(salesReturn.getShopDeptId());
@@ -204,6 +345,7 @@ public class InvSalesReturnServiceImpl extends InvBaseService implements IInvSal
             log.setBeforeQuantity(beforeQty);
             log.setAfterQuantity(stock.getCurrentQuantity());
             log.setCostPrice(unitCost);
+            log.setCostAmount(incomingCost);
             log.setCreateBy(SecurityUtils.getUsername());
             log.setCreateTime(new Date());
             log.setRemark("销售退货入库");
@@ -212,248 +354,234 @@ public class InvSalesReturnServiceImpl extends InvBaseService implements IInvSal
             // 更新明细已退数量
             detail.setReturnedQuantity(detail.getReturnedQuantity() != null
                     ? detail.getReturnedQuantity().add(toReturn) : toReturn);
-            salesReturnDetailMapper.updateInvSalesReturnDetail(detail);
+            detail.setReturnedCostAmount(zero(detail.getReturnedCostAmount()).add(incomingCost));
+            if (salesReturnDetailMapper.updateInvSalesReturnDetail(detail) != 1)
+                throw new ServiceException("退货明细已变化，请刷新后重试");
         }
 
         InvSalesReturn update = new InvSalesReturn();
         update.setReturnId(returnId);
         update.setStatus(InvStatusConstants.RETURNED);
         update.setUpdateBy(SecurityUtils.getUsername());
-        salesReturnMapper.updateInvSalesReturn(update);
+        updateState(update, InvStatusConstants.SUBMITTED);
     }
 
-    private BigDecimal resolveReturnStockCost(InvStock stock)
+    /** Allocate from the unreturned cost balance and settle rounding on the final quantity. */
+    private BigDecimal resolveReturnCostAmount(Long orderId, InvSalesReturnDetail detail,
+            InvSalesDetail original, List<InvSalesDetail> sourceDetails, BigDecimal toReturn)
     {
-        if (stock == null || stock.getCostPrice() == null)
+        ReturnCostBasis basis = resolveReturnCostBasis(orderId, detail, original, sourceDetails);
+        BigDecimal returnedQuantity = BigDecimal.ZERO;
+        BigDecimal returnedCost = BigDecimal.ZERO;
+        List<InvSalesReturnDetail> facts = salesReturnDetailMapper.selectReturnedCostFacts(
+                orderId, original.getDetailId(), itemType(detail.getItemType()), detail.getItemId());
+        if (facts != null)
         {
-            return BigDecimal.ZERO;
-        }
-        return stock.getCostPrice();
-    }
-
-    /**
-     * 销售退货优先冲回原销售单的实际出库成本，避免用当前库存均价造成退货成本失真。
-     * 历史数据没有出库日志时，才回退到当前库存成本。
-     */
-    private BigDecimal resolveReturnUnitCost(Long salesOrderId, Long productId, InvStock stock)
-    {
-        BigDecimal originalOutboundCost = resolveOriginalOutboundCost(salesOrderId, productId);
-        return originalOutboundCost != null ? originalOutboundCost : resolveReturnStockCost(stock);
-    }
-
-    private BigDecimal resolveOriginalOutboundCost(Long salesOrderId, Long productId)
-    {
-        if (salesOrderId == null || productId == null)
-        {
-            return null;
-        }
-
-        InvStockLog query = new InvStockLog();
-        query.setBusinessId(salesOrderId);
-        query.setProductId(productId);
-        query.setMovementType(InvStatusConstants.MOVEMENT_SALES_OUT);
-        List<InvStockLog> outboundLogs = stockLogMapper.selectInvStockLogList(query);
-        if (outboundLogs == null || outboundLogs.isEmpty())
-        {
-            return null;
-        }
-
-        BigDecimal outboundQuantity = BigDecimal.ZERO;
-        BigDecimal outboundCost = BigDecimal.ZERO;
-        for (InvStockLog log : outboundLogs)
-        {
-            String businessType = log.getBusinessType();
-            BigDecimal changeQuantity = log.getChangeQuantity();
-            BigDecimal costPrice = log.getCostPrice();
-            if (!("sales".equals(businessType) || "outbound".equals(businessType))
-                    || changeQuantity == null || changeQuantity.compareTo(BigDecimal.ZERO) >= 0
-                    || costPrice == null || costPrice.compareTo(BigDecimal.ZERO) < 0)
+            for (InvSalesReturnDetail fact : facts)
             {
-                continue;
+                // A whole-return log cannot prove how much cost belonged to each original line.
+                if (!java.util.Objects.equals(original.getDetailId(), fact.getSalesDetailId())
+                        || !itemType(detail.getItemType()).equals(itemType(fact.getItemType()))
+                        || !java.util.Objects.equals(detail.getItemId(), itemId(fact.getItemId(), fact.getProductId()))
+                        || fact.getReturnedQuantity() == null || fact.getReturnedQuantity().signum() <= 0
+                        || fact.getReturnedCostAmount() == null || fact.getReturnedCostAmount().signum() < 0)
+                    throw new ServiceException("历史退货明细成本证据不完整，无法确认退货，请先核对历史退货记录");
+                returnedQuantity = returnedQuantity.add(fact.getReturnedQuantity());
+                returnedCost = returnedCost.add(fact.getReturnedCostAmount());
             }
-            BigDecimal quantity = changeQuantity.abs();
-            outboundQuantity = outboundQuantity.add(quantity);
-            outboundCost = outboundCost.add(quantity.multiply(costPrice));
         }
-        if (outboundQuantity.compareTo(BigDecimal.ZERO) <= 0)
+        BigDecimal remainingQuantity = basis.quantity.subtract(returnedQuantity);
+        BigDecimal remainingCost = basis.amount.subtract(returnedCost);
+        if (toReturn == null || toReturn.signum() <= 0 || remainingCost.signum() < 0
+                || toReturn.compareTo(remainingQuantity) > 0)
+            throw new ServiceException("原销售明细剩余可退数量或成本异常，请核对出库及历史退货记录");
+        if (toReturn.compareTo(remainingQuantity) == 0) return remainingCost;
+        return remainingCost.multiply(toReturn).divide(remainingQuantity, 2, RoundingMode.HALF_UP);
+    }
+
+    private static class ReturnCostBasis
+    {
+        private final BigDecimal quantity;
+        private final BigDecimal amount;
+        private ReturnCostBasis(BigDecimal quantity, BigDecimal amount)
         {
-            return null;
+            this.quantity = quantity;
+            this.amount = amount.setScale(2, RoundingMode.HALF_UP);
         }
-        return outboundCost.divide(outboundQuantity, 2, RoundingMode.HALF_UP);
+    }
+
+    /** Prefer the selected source line's frozen outbound amount; never borrow another line's cost. */
+    private ReturnCostBasis resolveReturnCostBasis(Long orderId, InvSalesReturnDetail detail,
+            InvSalesDetail original, List<InvSalesDetail> sourceDetails)
+    {
+        BigDecimal delivered = zero(original.getDeliveredQuantity());
+        List<InvOutboundRecord> records = outboundRecordMapper.selectInvOutboundRecordBySalesDetailId(
+                orderId, original.getDetailId());
+        BigDecimal quantity = BigDecimal.ZERO;
+        BigDecimal amount = BigDecimal.ZERO;
+        boolean completeCosts = records != null && !records.isEmpty();
+        if (records != null)
+        {
+            for (InvOutboundRecord record : records)
+            {
+                if (!itemType(detail.getItemType()).equals(itemType(record.getItemType()))
+                        || !java.util.Objects.equals(detail.getItemId(), itemId(record.getItemId(), record.getProductId())))
+                    throw new ServiceException("原销售出库物料与退货明细不一致，请核对出库记录");
+                if (record.getQuantity() == null || record.getQuantity().signum() <= 0)
+                    throw new ServiceException("原销售出库数量异常，请核对出库记录");
+                BigDecimal cost = record.getCostAmount();
+                if (cost == null && record.getCostPrice() != null)
+                    cost = record.getQuantity().multiply(record.getCostPrice());
+                if (cost == null) completeCosts = false;
+                else if (cost.signum() < 0) throw new ServiceException("原销售出库成本异常，请核对出库记录");
+                else amount = amount.add(cost);
+                quantity = quantity.add(record.getQuantity());
+            }
+        }
+        if (completeCosts && quantity.signum() > 0 && quantity.compareTo(delivered) == 0)
+            return new ReturnCostBasis(quantity, amount);
+
+        // Old logs have only order + material identity. They are sufficient only when
+        // that material has one delivered source line and all delivered quantity is accounted for.
+        long deliveredLines = sourceDetails.stream().filter(row -> itemKey(row).equals(itemKey(original))
+                && zero(row.getDeliveredQuantity()).signum() > 0).count();
+        if (deliveredLines != 1) throw unknownReturnCost();
+        InvSalesOrder order = salesOrderMapper.selectInvSalesOrderById(orderId);
+        InvStockLog query = new InvStockLog();
+        query.setBusinessId(orderId);
+        query.setItemType(itemType(detail.getItemType()));
+        query.setItemId(itemId(detail.getItemId(), detail.getProductId()));
+        query.setProductId(detail.getProductId());
+        query.setMovementType(InvStatusConstants.MOVEMENT_SALES_OUT);
+        List<InvStockLog> logs = stockLogMapper.selectInvStockLogList(query);
+        quantity = BigDecimal.ZERO;
+        amount = BigDecimal.ZERO;
+        if (logs != null)
+        {
+            for (InvStockLog log : logs)
+            {
+                boolean knownOrder = "sales".equals(log.getBusinessType())
+                        || ("outbound".equals(log.getBusinessType()) && order != null
+                            && order.getOrderNo() != null && order.getOrderNo().equals(log.getBusinessNo()));
+                if (!knownOrder || log.getChangeQuantity() == null || log.getChangeQuantity().signum() >= 0)
+                    continue;
+                if (log.getCostPrice() == null || log.getCostPrice().signum() < 0) throw unknownReturnCost();
+                BigDecimal delta = log.getChangeQuantity().abs();
+                quantity = quantity.add(delta);
+                amount = amount.add(delta.multiply(log.getCostPrice()));
+            }
+        }
+        if (quantity.signum() <= 0 || quantity.compareTo(delivered) != 0) throw unknownReturnCost();
+        return new ReturnCostBasis(quantity, amount);
+    }
+
+    private ServiceException unknownReturnCost()
+    {
+        return new ServiceException("原销售明细成本证据不完整，无法确认退货，请先核对原出库记录");
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void cancelReturn(Long returnId, Long selectedShopDeptId)
     {
-        InvSalesReturn salesReturn = assertAndGetScopedReturn(returnId, selectedShopDeptId);
+        InvSalesReturn salesReturn = lockScopedReturn(returnId, selectedShopDeptId);
         InvStateGuard.requireCancelableDocument(salesReturn.getStatus());
         InvSalesReturn update = new InvSalesReturn();
         update.setReturnId(returnId);
         update.setStatus(InvStatusConstants.CANCELLED);
         update.setUpdateBy(SecurityUtils.getUsername());
-        salesReturnMapper.updateInvSalesReturn(update);
+        updateState(update, salesReturn.getStatus());
     }
 
     private void validateReturnQuantity(InvSalesReturn salesReturn, Long excludeReturnId)
     {
-        if (salesReturn.getSalesOrderId() == null)
+        if (salesReturn.getSalesOrderId() == null) throw new ServiceException("销售退货单未关联销售单");
+        // Serialize reservations across different return documents for the same sales order.
+        if (salesOrderMapper.selectInvSalesOrderByIdForUpdate(salesReturn.getSalesOrderId()) == null)
+            throw new ServiceException("原销售单不存在");
+        List<InvSalesDetail> source = salesDetailMapper.selectInvSalesDetailByOrderId(salesReturn.getSalesOrderId());
+        List<InvSalesReturnDetail> details = salesReturnDetailMapper.selectInvSalesReturnDetailByReturnId(excludeReturnId);
+        validateLockedReturnQuantity(salesReturn, excludeReturnId, source, details);
+    }
+
+    private void validateLockedReturnQuantity(InvSalesReturn salesReturn, Long excludeReturnId,
+            List<InvSalesDetail> source, List<InvSalesReturnDetail> details)
+    {
+        if (details == null || details.isEmpty()) throw new ServiceException("退货单无明细");
+        Map<Long, BigDecimal> quantities = new HashMap<>();
+        Map<String, BigDecimal> itemQuantities = new HashMap<>();
+        for (InvSalesReturnDetail detail : details)
         {
-            throw new ServiceException("销售退货单未关联销售单");
+            InvSalesDetail original = resolveSalesDetailForReturn(detail, source);
+            if (detail.getQuantity() == null || detail.getQuantity().signum() <= 0)
+                throw new ServiceException("退货数量必须大于0");
+            quantities.merge(original.getDetailId(), detail.getQuantity(), BigDecimal::add);
+            itemQuantities.merge(itemKey(original), detail.getQuantity(), BigDecimal::add);
         }
-        List<InvSalesDetail> salesDetails = salesDetailMapper.selectInvSalesDetailByOrderId(salesReturn.getSalesOrderId());
-        if (salesDetails.isEmpty())
+        for (InvSalesDetail original : source)
         {
-            throw new ServiceException("原销售单无明细");
+            BigDecimal quantity = quantities.get(original.getDetailId());
+            if (quantity == null) continue;
+            BigDecimal historical = zero(salesReturnDetailMapper.sumHistoricalReturnQuantityBySalesDetailId(
+                    salesReturn.getSalesOrderId(), original.getDetailId(), excludeReturnId));
+            if (quantity.add(historical).compareTo(zero(original.getDeliveredQuantity())) > 0)
+                throw new ServiceException("物料 [" + original.getProductName() + "] 退货数量超过原销售明细已出库数量，历史已退(" + historical + ")");
         }
-        List<InvSalesReturnDetail> returnDetails = salesReturnDetailMapper.selectInvSalesReturnDetailByReturnId(excludeReturnId);
-        if (returnDetails == null || returnDetails.isEmpty())
+        // Legacy rows without a source detail still consume the material's total allowance.
+        for (Map.Entry<String, BigDecimal> entry : itemQuantities.entrySet())
         {
-            throw new ServiceException("退货单无明细");
-        }
-        Map<Long, InvSalesDetail> originalDetailById = new HashMap<>();
-        Map<Long, InvSalesDetail> uniqueDetailByProduct = new HashMap<>();
-        Map<Long, Integer> detailCountByProduct = new HashMap<>();
-        Map<Long, BigDecimal> deliveredQtyByProduct = new HashMap<>();
-        Map<Long, String> originalNameByProduct = new HashMap<>();
-        for (InvSalesDetail sd : salesDetails)
-        {
-            if (sd.getProductId() == null)
-            {
-                continue;
-            }
-            if (sd.getDetailId() != null)
-            {
-                originalDetailById.put(sd.getDetailId(), sd);
-            }
-            uniqueDetailByProduct.putIfAbsent(sd.getProductId(), sd);
-            detailCountByProduct.merge(sd.getProductId(), 1, Integer::sum);
-            deliveredQtyByProduct.merge(sd.getProductId(),
-                    sd.getDeliveredQuantity() != null ? sd.getDeliveredQuantity() : BigDecimal.ZERO,
-                    BigDecimal::add);
-            originalNameByProduct.putIfAbsent(sd.getProductId(), sd.getProductName());
-        }
-        Map<Long, BigDecimal> currentQtyByProduct = new HashMap<>();
-        Map<Long, BigDecimal> currentQtyByDetail = new HashMap<>();
-        Map<Long, InvSalesDetail> currentOriginalByDetail = new HashMap<>();
-        Map<Long, String> returnNameByProduct = new HashMap<>();
-        for (InvSalesReturnDetail rd : returnDetails)
-        {
-            InvSalesDetail originalDetail = resolveSalesDetailForReturn(rd, originalDetailById,
-                    uniqueDetailByProduct, detailCountByProduct);
-            if (rd.getQuantity() == null || rd.getQuantity().compareTo(BigDecimal.ZERO) <= 0)
-            {
-                throw new ServiceException("商品 [" + originalDetail.getProductName() + "] 退货数量必须大于0");
-            }
-            currentQtyByProduct.merge(originalDetail.getProductId(), rd.getQuantity(), BigDecimal::add);
-            returnNameByProduct.putIfAbsent(originalDetail.getProductId(), originalDetail.getProductName());
-            if (originalDetail.getDetailId() != null)
-            {
-                currentQtyByDetail.merge(originalDetail.getDetailId(), rd.getQuantity(), BigDecimal::add);
-                currentOriginalByDetail.putIfAbsent(originalDetail.getDetailId(), originalDetail);
-            }
-        }
-        for (Map.Entry<Long, BigDecimal> entry : currentQtyByDetail.entrySet())
-        {
-            Long salesDetailId = entry.getKey();
-            InvSalesDetail originalDetail = currentOriginalByDetail.get(salesDetailId);
-            BigDecimal deliveredQty = originalDetail.getDeliveredQuantity() != null
-                    ? originalDetail.getDeliveredQuantity() : BigDecimal.ZERO;
-            BigDecimal historicalReturned = salesReturnDetailMapper.sumHistoricalReturnQuantityBySalesDetailId(
-                    salesReturn.getSalesOrderId(), salesDetailId, excludeReturnId);
-            if (historicalReturned == null)
-            {
-                historicalReturned = BigDecimal.ZERO;
-            }
-            BigDecimal totalReturned = entry.getValue().add(historicalReturned);
-            if (totalReturned.compareTo(deliveredQty) > 0)
-            {
-                throw new ServiceException("商品 [" + originalDetail.getProductName() + "] 退货数量(" + totalReturned
-                        + ")超过原销售明细已出库数量(" + deliveredQty + ")，历史已退(" + historicalReturned + ")");
-            }
-        }
-        for (Map.Entry<Long, BigDecimal> entry : currentQtyByProduct.entrySet())
-        {
-            Long productId = entry.getKey();
-            BigDecimal deliveredQty = deliveredQtyByProduct.getOrDefault(productId, BigDecimal.ZERO);
-            BigDecimal historicalReturned = salesReturnDetailMapper.sumHistoricalReturnQuantity(
-                    salesReturn.getSalesOrderId(), productId, excludeReturnId);
-            if (historicalReturned == null)
-            {
-                historicalReturned = BigDecimal.ZERO;
-            }
-            BigDecimal totalReturned = entry.getValue().add(historicalReturned);
-            if (totalReturned.compareTo(deliveredQty) > 0)
-            {
-                String productName = returnNameByProduct.getOrDefault(productId, originalNameByProduct.get(productId));
-                throw new ServiceException("商品 [" + productName + "] 退货数量(" + totalReturned
-                        + ")超过原销售已出库数量(" + deliveredQty + ")，历史已退(" + historicalReturned + ")");
-            }
+            InvSalesDetail original = source.stream().filter(row -> itemKey(row).equals(entry.getKey())).findFirst().orElseThrow();
+            BigDecimal delivered = source.stream().filter(row -> itemKey(row).equals(entry.getKey()))
+                    .map(row -> zero(row.getDeliveredQuantity())).reduce(BigDecimal.ZERO, BigDecimal::add);
+            BigDecimal historical = zero(salesReturnDetailMapper.sumHistoricalReturnQuantityByItem(
+                    salesReturn.getSalesOrderId(), itemType(original.getItemType()),
+                    itemId(original.getItemId(), original.getProductId()), excludeReturnId));
+            if (entry.getValue().add(historical).compareTo(delivered) > 0)
+                throw new ServiceException("物料 [" + original.getProductName() + "] 退货数量超过原销售已出库数量，历史已退(" + historical + ")");
         }
     }
 
     private void normalizeReturnDetails(InvSalesReturn salesReturn, List<InvSalesReturnDetail> details)
     {
-        if (details == null)
+        if (details == null) return;
+        List<InvSalesDetail> source = salesDetailMapper.selectInvSalesDetailByOrderId(salesReturn.getSalesOrderId());
+        BigDecimal total = BigDecimal.ZERO;
+        for (InvSalesReturnDetail detail : details)
         {
-            return;
+            InvSalesDetail original = resolveSalesDetailForReturn(detail, source);
+            if (detail.getQuantity() == null || detail.getQuantity().signum() <= 0)
+                throw new ServiceException("退货数量必须大于0");
+            applyItemSnapshot(detail, original);
+            detail.setUnitPrice(zero(original.getUnitPrice()));
+            detail.setAmount(detail.getQuantity().multiply(detail.getUnitPrice()));
+            total = total.add(detail.getAmount());
         }
-        if (details.isEmpty())
-        {
-            salesReturn.setTotalAmount(BigDecimal.ZERO);
-            return;
-        }
-        if (salesReturn.getSalesOrderId() == null)
-        {
-            throw new ServiceException("销售退货单未关联销售单");
-        }
-
-        List<InvSalesDetail> salesDetails = salesDetailMapper.selectInvSalesDetailByOrderId(salesReturn.getSalesOrderId());
-        if (salesDetails.isEmpty())
-        {
-            throw new ServiceException("原销售单无明细");
-        }
-        Map<Long, InvSalesDetail> originalDetailById = new HashMap<>();
-        Map<Long, InvSalesDetail> uniqueDetailByProduct = new HashMap<>();
-        Map<Long, Integer> detailCountByProduct = new HashMap<>();
-        for (InvSalesDetail salesDetail : salesDetails)
-        {
-            if (salesDetail.getProductId() != null)
-            {
-                uniqueDetailByProduct.putIfAbsent(salesDetail.getProductId(), salesDetail);
-                detailCountByProduct.merge(salesDetail.getProductId(), 1, Integer::sum);
-            }
-            if (salesDetail.getDetailId() != null)
-            {
-                originalDetailById.put(salesDetail.getDetailId(), salesDetail);
-            }
-        }
-
-        BigDecimal totalAmount = BigDecimal.ZERO;
-        for (InvSalesReturnDetail returnDetail : details)
-        {
-            InvSalesDetail originalDetail = resolveSalesDetailForReturn(returnDetail, originalDetailById,
-                    uniqueDetailByProduct, detailCountByProduct);
-            BigDecimal quantity = returnDetail.getQuantity();
-            if (quantity == null || quantity.compareTo(BigDecimal.ZERO) <= 0)
-            {
-                throw new ServiceException("商品 [" + originalDetail.getProductName() + "] 退货数量必须大于0");
-            }
-            BigDecimal unitPrice = originalDetail.getUnitPrice() != null ? originalDetail.getUnitPrice() : BigDecimal.ZERO;
-            BigDecimal amount = quantity.multiply(unitPrice);
-
-            returnDetail.setSalesDetailId(originalDetail.getDetailId());
-            returnDetail.setProductId(originalDetail.getProductId());
-            returnDetail.setProductName(originalDetail.getProductName());
-            returnDetail.setSku(originalDetail.getSku());
-            returnDetail.setSpec(originalDetail.getSpec());
-            returnDetail.setUnit(originalDetail.getUnit());
-            returnDetail.setUnitPrice(unitPrice);
-            returnDetail.setAmount(amount);
-            totalAmount = totalAmount.add(amount);
-        }
-        salesReturn.setTotalAmount(totalAmount);
+        salesReturn.setTotalAmount(total);
     }
+
+    private void applyItemSnapshot(InvSalesReturnDetail detail, InvSalesDetail original)
+    {
+        String type = itemType(original.getItemType());
+        Long id = itemId(original.getItemId(), original.getProductId());
+        if (!("product".equals(type) || "gift".equals(type)) || id == null)
+            throw new ServiceException("原销售明细物料身份无效，请核对原单");
+        detail.setSalesDetailId(original.getDetailId());
+        detail.setItemType(type);
+        detail.setItemId(id);
+        detail.setItemCode(original.getItemCode() != null && !original.getItemCode().isBlank() ? original.getItemCode() : original.getSku());
+        detail.setItemName(original.getItemName() != null && !original.getItemName().isBlank() ? original.getItemName() : original.getProductName());
+        detail.setProductId("product".equals(type) ? id : null);
+        detail.setProductName(detail.getItemName());
+        detail.setSku(original.getSku());
+        detail.setSpec(original.getSpec());
+        detail.setUnit(original.getUnit());
+    }
+
+    private static String itemType(String type) { return type == null || type.isBlank() ? "product" : type; }
+    private static Long itemId(Long id, Long productId) { return id != null ? id : productId; }
+    private static BigDecimal zero(BigDecimal value) { return value == null ? BigDecimal.ZERO : value; }
+    private static String itemKey(InvSalesDetail row)
+    { return itemType(row.getItemType()) + ":" + itemId(row.getItemId(), row.getProductId()); }
 
     private void applySourceOrderSnapshot(InvSalesReturn salesReturn, Long shopDeptId)
     {
@@ -461,7 +589,7 @@ public class InvSalesReturnServiceImpl extends InvBaseService implements IInvSal
         {
             throw new ServiceException("销售退货单未关联销售单");
         }
-        InvSalesOrder sourceOrder = salesOrderMapper.selectInvSalesOrderById(salesReturn.getSalesOrderId());
+        InvSalesOrder sourceOrder = salesOrderMapper.selectInvSalesOrderByIdForUpdate(salesReturn.getSalesOrderId());
         if (sourceOrder == null)
         {
             throw new ServiceException("原销售单不存在");
@@ -478,38 +606,54 @@ public class InvSalesReturnServiceImpl extends InvBaseService implements IInvSal
         }
     }
 
-    private InvSalesDetail resolveSalesDetailForReturn(InvSalesReturnDetail returnDetail,
-            Map<Long, InvSalesDetail> originalDetailById,
-            Map<Long, InvSalesDetail> uniqueDetailByProduct,
-            Map<Long, Integer> detailCountByProduct)
+    private InvSalesDetail resolveSalesDetailForReturn(InvSalesReturnDetail detail, List<InvSalesDetail> source)
     {
-        if (returnDetail.getSalesDetailId() != null)
+        List<InvSalesDetail> matches = source.stream().filter(row -> detail.getSalesDetailId() != null
+                ? detail.getSalesDetailId().equals(row.getDetailId())
+                : (itemType(detail.getItemType()).equals(itemType(row.getItemType()))
+                    && java.util.Objects.equals(itemId(detail.getItemId(), detail.getProductId()),
+                            itemId(row.getItemId(), row.getProductId())))).toList();
+        if (matches.isEmpty()) throw new ServiceException("原销售明细不存在，请重新选择原销售明细");
+        if (matches.size() != 1) throw new ServiceException("原销售单中存在多行相同物料，请选择原销售明细");
+        InvSalesDetail original = matches.get(0);
+        if ((detail.getItemType() != null && !itemType(detail.getItemType()).equals(itemType(original.getItemType())))
+                || (detail.getItemId() != null && !detail.getItemId().equals(itemId(original.getItemId(), original.getProductId())))
+                || (detail.getProductId() != null && !("product".equals(itemType(original.getItemType()))
+                    && detail.getProductId().equals(itemId(original.getItemId(), original.getProductId())))))
+            throw new ServiceException("退货物料与原销售明细不一致，请重新选择原销售明细");
+        return original;
+    }
+
+    private InvSalesReturn lockScopedReturn(Long returnId, Long selectedShopDeptId)
+    {
+        return lockScopedReturn(returnId, selectedShopDeptId, null);
+    }
+
+    private InvSalesReturn lockScopedReturn(Long returnId, Long selectedShopDeptId, Long requestedSourceId)
+    {
+        InvSalesReturn snapshot = assertAndGetScopedReturn(returnId, selectedShopDeptId);
+        // Lock source orders before return rows so concurrent reservations share one lock order.
+        java.util.SortedSet<Long> sourceIds = new java.util.TreeSet<>();
+        if (snapshot.getSalesOrderId() != null) sourceIds.add(snapshot.getSalesOrderId());
+        if (requestedSourceId != null) sourceIds.add(requestedSourceId);
+        for (Long sourceId : sourceIds)
         {
-            InvSalesDetail originalDetail = originalDetailById.get(returnDetail.getSalesDetailId());
-            if (originalDetail == null)
-            {
-                throw new ServiceException("原销售明细不存在，请重新选择原销售明细");
-            }
-            if (returnDetail.getProductId() != null && !returnDetail.getProductId().equals(originalDetail.getProductId()))
-            {
-                throw new ServiceException("退货商品与原销售明细不一致，请重新选择原销售明细");
-            }
-            return originalDetail;
+            if (salesOrderMapper.selectInvSalesOrderByIdForUpdate(sourceId) == null)
+                throw new ServiceException("原销售单不存在");
         }
-        if (returnDetail.getProductId() == null)
-        {
-            throw new ServiceException("退货商品不能为空");
-        }
-        Integer detailCount = detailCountByProduct.get(returnDetail.getProductId());
-        if (detailCount == null)
-        {
-            throw new ServiceException("商品 [" + returnDetail.getProductName() + "] 不在原销售单中");
-        }
-        if (detailCount > 1)
-        {
-            throw new ServiceException("商品 [" + returnDetail.getProductName() + "] 在原销售单中存在多行，请选择原销售明细");
-        }
-        return uniqueDetailByProduct.get(returnDetail.getProductId());
+        InvSalesReturn locked = salesReturnMapper.selectInvSalesReturnByIdForUpdate(returnId);
+        if (locked == null) throw new ServiceException("销售退货单不存在");
+        assertShopVisible(locked.getShopDeptId(), selectedShopDeptId, "无权访问该店铺销售退货单");
+        if (!java.util.Objects.equals(snapshot.getSalesOrderId(), locked.getSalesOrderId()))
+            throw new ServiceException("退货原单已变化，请刷新后重试");
+        return locked;
+    }
+
+    private void updateState(InvSalesReturn update, String expectedStatus)
+    {
+        update.getParams().put("expectedStatus", expectedStatus);
+        if (salesReturnMapper.updateInvSalesReturn(update) != 1)
+            throw new ServiceException("退货单状态已变化，请刷新后重试");
     }
 
     private InvSalesReturn assertAndGetScopedReturn(Long returnId, Long selectedShopDeptId)

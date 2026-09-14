@@ -30,7 +30,7 @@ for (const permission of ["hr:employee:query", "hr:employee:list", "hr:onboardin
 
 for (const fragment of [
   "/system/hr/onboarding/config/list", "/system/hr/onboarding/config/options",
-  "/system/hr/onboarding/config/${id}", "/system/hr/onboarding/config/${id}/disable"
+  "/system/hr/onboarding/config/{id}", "/system/hr/onboarding/config/{id}/disable"
 ]) assert.ok(onboardingApi.includes(fragment), `position config API missing ${fragment}`)
 for (const field of [
   "postId", "employeeCategory", "roleIds", "dataScopeStrategy", "contractTypeMode",
@@ -60,7 +60,7 @@ function loadApi(request) {
   const source = onboardingApi
     .replace(/import request from ["'][^"']+["']\s*/, "")
     .replace(/export const /g, "const ")
-  const sandbox = { module: { exports: {} }, request }
+  const sandbox = { module: { exports: {} }, request, require: name => { assert.strictEqual(name, "@/utils/positiveDecimalId"); return require("../src/utils/positiveDecimalId") } }
   vm.runInNewContext(`${source}\nmodule.exports = { listHrOnboardingPositionConfigs, getHrOnboardingPositionConfig, createHrOnboardingPositionConfig, updateHrOnboardingPositionConfig, disableHrOnboardingPositionConfig, getHrOnboardingPositionConfigOptions }`, sandbox)
   return sandbox.module.exports
 }

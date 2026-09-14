@@ -37,6 +37,8 @@ public class InvStock extends BaseEntity
     @Excel(name = "分类路径")
     private String categoryFullPath;
 
+    private String categoryType;
+
     private String itemCategoryName;
 
     private String itemCategoryFullPath;
@@ -157,6 +159,8 @@ public class InvStock extends BaseEntity
     public void setCategoryName(String categoryName) { this.categoryName = categoryName; }
     public String getCategoryFullPath() { return categoryFullPath; }
     public void setCategoryFullPath(String categoryFullPath) { this.categoryFullPath = categoryFullPath; }
+    public String getCategoryType() { return categoryType; }
+    public void setCategoryType(String categoryType) { this.categoryType = categoryType; }
     public String getItemCategoryName() { return itemCategoryName; }
     public void setItemCategoryName(String itemCategoryName) { this.itemCategoryName = itemCategoryName; }
     public String getItemCategoryFullPath() { return itemCategoryFullPath; }

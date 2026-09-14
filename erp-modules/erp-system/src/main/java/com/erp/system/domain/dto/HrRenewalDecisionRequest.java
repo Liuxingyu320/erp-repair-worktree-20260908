@@ -18,6 +18,13 @@ public class HrRenewalDecisionRequest
     @Size(max = 64, message = "requestId长度不能超过64个字符")
     private String requestId;
 
+    /** The archive entry freezes the old contract cycle shown to HR. */
+    @Size(max = 128, message = "旧合同周期标识无效")
+    private String expectedCycleKey;
+    public String getExpectedCycleKey() { return expectedCycleKey; }
+    public void setExpectedCycleKey(String value) { expectedCycleKey = value; }
+
+
     @NotNull(message = "续签决定不能为空")
     private Decision decision;
 

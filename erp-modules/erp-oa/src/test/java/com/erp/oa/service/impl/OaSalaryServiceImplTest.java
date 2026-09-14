@@ -84,6 +84,9 @@ class OaSalaryServiceImplTest
                 .thenAnswer(value -> { stored.clear(); return 1; });
 
         service = new OaSalaryServiceImpl();
+        // Isolate the retained legacy implementation; real write rejection is covered separately.
+        ReflectionTestUtils.setField(service, "legacySalaryWrites",
+                org.mockito.Mockito.mock(com.erp.common.security.service.LegacySalaryWriteGuard.class));
         ReflectionTestUtils.setField(service, "configMapper", configs);
         ReflectionTestUtils.setField(service, "salaryMapper", salaries);
         ReflectionTestUtils.setField(service, "attendancePayrollMapper",
@@ -389,6 +392,35 @@ class OaSalaryServiceImplTest
         assertThat(result.getShopDeptId()).isEqualTo(201L);
         assertThat(result.getSalaryMonth()).isEqualTo("2026-06");
         assertThat(result.getTotalSalary()).isEqualByComparingTo("3000");
+    }
+
+    @Test
+    void retainedPayrollCalculationSubtractsBothOffsetAndCompensatoryMinutes()
+    {
+        when(employees.selectSalaryEmployeesByShopDeptId(201L,"2026-06")).thenReturn(List.of(employee(11L,"seller01","3000")));
+        DayResult row=settled(1L,11L,LocalDate.of(2026,6,1),480,600,0,0,0,0,0,"NORMAL");
+        row.rawOvertimeMinutes=120;row.timeCreditUsedMinutes=30;row.overtimeTransferredMinutes=60;row.netOvertimeMinutes=30;
+        when(attendance.selectPublishedDayResultsForPayroll(anyLong(),any(),any())).thenReturn(List.of(row));
+        OaSalaryRecord result=service.calculateSalary(201L,"2026-06",201L).get(0);
+        assertThat(result.getOvertimeHours()).isEqualByComparingTo("0.50");assertThat(result.getTotalSalary()).isEqualByComparingTo("3025.00");
+        verify(timeCredits).lockMonthDayResults(201L,LocalDate.of(2026,6,1),LocalDate.of(2026,6,30));
+    }
+    @Test
+    void invalidCompensatorySourceBlocksPreflightAndRetainedSalaryWrite()
+    {
+        when(employees.selectSalaryEmployeesByShopDeptId(201L,"2026-06")).thenReturn(List.of(employee(11L,"seller01","3000")));
+        DayResult row=settled(1L,11L,LocalDate.of(2026,6,1),480,600,0,0,0,0,0,"NORMAL");row.overtimeTransferInvalid=1;
+        when(attendance.selectPublishedDayResultsForPayroll(anyLong(),any(),any())).thenReturn(List.of(row));
+        assertThat(service.preflightAttendance(201L,"2026-06",201L).isBlocked()).isTrue();
+        assertThatThrownBy(()->service.calculateSalary(201L,"2026-06",201L)).hasMessageContaining("转休来源失效");verify(salaries,never()).deleteByShopDeptIdAndMonth(anyLong(),anyString());
+    }
+    @Test
+    void combinedSourceAllocationsCannotExceedRawOvertimeInPayroll()
+    {
+        when(employees.selectSalaryEmployeesByShopDeptId(201L,"2026-06")).thenReturn(List.of(employee(11L,"seller01","3000")));
+        DayResult row=settled(1L,11L,LocalDate.of(2026,6,1),480,600,0,0,0,0,0,"NORMAL");row.timeCreditUsedMinutes=80;row.overtimeTransferredMinutes=60;
+        when(attendance.selectPublishedDayResultsForPayroll(anyLong(),any(),any())).thenReturn(List.of(row));
+        assertThatThrownBy(()->service.calculateSalary(201L,"2026-06",201L)).hasMessageContaining("超过当前可核定");verify(salaries,never()).deleteByShopDeptIdAndMonth(anyLong(),anyString());
     }
 
     private OaSalaryEmployee employee(Long userId, String userName,

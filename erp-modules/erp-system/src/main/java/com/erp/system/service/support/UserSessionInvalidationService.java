@@ -8,6 +8,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import com.erp.common.core.exception.ServiceException;
 import com.erp.system.domain.SecuritySessionInvalidationOutbox;
+import com.erp.common.security.service.SessionRetentionDigest;
 import com.erp.system.mapper.SecuritySessionInvalidationOutboxMapper;
 
 @Service
@@ -58,12 +59,14 @@ public class UserSessionInvalidationService
         outbox.setEventId(eventId);
         outbox.setUserId(userId);
         outbox.setReasonCode(reasonCode);
+        String allowedRetainedToken = PASSWORD_CHANGED.equals(reasonCode) ? retainedToken : null;
+        outbox.setRetainedSessionDigest(SessionRetentionDigest.fromUserKey(userId, allowedRetainedToken));
         if (mapper.insert(outbox) != 1)
         {
             throw new ServiceException("安全会话失效任务写入失败");
         }
         publisher.publishEvent(new UserSecurityStateChangedEvent(eventId, userId,
-                reasonCode, retainedToken));
+                reasonCode, allowedRetainedToken));
         return eventId;
     }
 

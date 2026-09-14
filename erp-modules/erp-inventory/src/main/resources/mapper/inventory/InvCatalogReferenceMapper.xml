@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.inventory.mapper.InvCatalogReferenceMapper">
+    <!-- Only raw master rows are locked: never acquire business-parent or category locks here. -->
+    <select id="selectStatusForUpdate" resultType="string">
+        select status from
+        <choose><when test="itemType == 'oe'">inv_oe_item where oe_item_id = #{itemId}</when>
+        <otherwise>inv_gift_box where gift_id = #{itemId}</otherwise></choose>
+        and del_flag = '0' for update
+    </select>
+    <!-- Called only after all masters are locked in a new READ_COMMITTED deletion transaction. -->
+    <select id="countReferences" resultType="long">
+        select (select count(1) from inv_stock where item_type = #{itemType} and item_id = #{itemId})
+        + (select count(1) from inv_stock_log where item_type = #{itemType} and item_id = #{itemId})
+        + (select count(1) from inv_purchase_detail where item_type = #{itemType} and item_id = #{itemId})
+        + (select count(1) from inv_sales_detail where item_type = #{itemType} and item_id = #{itemId})
+        + (select count(1) from inv_purchase_return_detail where item_type = #{itemType} and item_id = #{itemId})
+        + (select count(1) from inv_sales_return_detail where item_type = #{itemType} and item_id = #{itemId})
+        + (select count(1) from inv_delivery_notice_detail where item_type = #{itemType} and item_id = #{itemId})
+        + (select count(1) from inv_inbound_record where item_type = #{itemType} and item_id = #{itemId})
+        + (select count(1) from inv_outbound_record where item_type = #{itemType} and item_id = #{itemId})
+        + (select count(1) from inv_transfer_detail where item_type = #{itemType} and item_id = #{itemId})
+        + (select count(1) from inv_transfer_shipment_detail where item_type = #{itemType} and item_id = #{itemId})
+        + (select count(1) from inv_stock_check_detail where item_type = #{itemType} and item_id = #{itemId})
+        + (select count(1) from inv_receipt_batch_detail where item_type = #{itemType} and item_id = #{itemId})
+        + (select count(1) from inv_transfer_reservation where item_type = #{itemType} and item_id = #{itemId})
+        + (select count(1) from inv_transfer_discrepancy_detail where item_type = #{itemType} and item_id = #{itemId})
+        + (select count(1) from inv_inventory_lot where item_type = #{itemType} and item_id = #{itemId})
+        + (select count(1) from inv_inventory_serial where item_type = #{itemType} and item_id = #{itemId})
+        + (select count(1) from inv_item_fulfillment_policy where item_type = #{itemType} and item_id = #{itemId})
+        + (select count(1) from inv_stock_balance_detail where item_type = #{itemType} and item_id = #{itemId})
+        + (select count(1) from inv_stock_ledger_detail where item_type = #{itemType} and item_id = #{itemId})
+        + (select count(1) from inv_transfer_quarantine_reservation where item_type = #{itemType} and item_id = #{itemId})
+        + (select count(1) from inv_transfer_receipt_discrepancy_adjudication_workflow_link where item_type = #{itemType} and item_id = #{itemId})
+        + (select count(1) from inv_transfer_receipt_discrepancy_damage_loss_ledger where item_type = #{itemType} and item_id = #{itemId})
+        + (select count(1) from inv_transfer_receipt_discrepancy_responsibility_ledger where item_type = #{itemType} and item_id = #{itemId})
+        + (select count(1) from inv_transfer_receipt_discrepancy_shortage_loss_ledger where item_type = #{itemType} and item_id = #{itemId})
+        + (select count(1) from inv_transfer_shipment_receipt_allocation where item_type = #{itemType} and item_id = #{itemId})
+        + (select count(1) from inv_transfer_shipment_serial where item_type = #{itemType} and item_id = #{itemId})
+        + (select count(1) from inv_warehouse_task_detail where item_type = #{itemType} and item_id = #{itemId})
+        <if test="itemType == 'oe'">+ (select count(1) from oa_fixed_asset_config where oe_item_id = #{itemId})</if>
+    </select>
+    <update id="deleteUnreferenced">
+        update <choose><when test="itemType == 'oe'">inv_oe_item</when><otherwise>inv_gift_box</otherwise></choose>
+        set del_flag = '2'
+        where <choose><when test="itemType == 'oe'">oe_item_id</when><otherwise>gift_id</otherwise></choose> = #{itemId}
+        and del_flag = '0'
+    </update>
+</mapper>

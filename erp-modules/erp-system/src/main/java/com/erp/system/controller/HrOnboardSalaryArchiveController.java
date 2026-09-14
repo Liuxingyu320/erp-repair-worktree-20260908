@@ -22,6 +22,16 @@ public class HrOnboardSalaryArchiveController extends BaseController
     { this.service = service; }
 
     @RequiresPermissions("oa:signTask:send")
+    @PostMapping("/preview")
+    public AjaxResult preview(@RequestBody HrOnboardSalaryArchiveRequest request)
+    { return success(service.preview(request)); }
+
+    @RequiresPermissions("oa:signTask:send")
+    @PostMapping("/status")
+    public AjaxResult status(@RequestBody HrOnboardSalaryArchiveRequest request)
+    { return success(service.status(request)); }
+
+    @RequiresPermissions("oa:signTask:send")
     @Log(title = "入职合同Excel工资入档", businessType = BusinessType.IMPORT,
             isSaveRequestData = false, isSaveResponseData = false)
     @PostMapping("/archive")

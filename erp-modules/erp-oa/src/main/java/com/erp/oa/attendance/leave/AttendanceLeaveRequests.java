@@ -21,6 +21,8 @@ public final class AttendanceLeaveRequests
         @NotNull public LocalDateTime startTime;
         @NotNull public LocalDateTime endTime;
         @NotBlank @Size(max = 1000) public String reason;
+        public java.math.BigDecimal requestedDays;
+        public com.erp.oa.attendance.leave.balance.AttendanceLeaveQuotaModels.PolicySnapshot quotaPolicySnapshot;
         public Long rowVersion;
     }
 

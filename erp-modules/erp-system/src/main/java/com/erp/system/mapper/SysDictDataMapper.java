@@ -11,6 +11,8 @@ import com.erp.system.api.domain.SysDictData;
  */
 public interface SysDictDataMapper
 {
+    SysDictData lockDictDataById(Long dictCode);
+    List<Long> lockDictDataIdsByType(String dictType);
     /**
      * 根据条件分页查询字典数据
      * 

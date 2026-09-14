@@ -83,6 +83,7 @@ function loadWorkbenchComponent() {
     module,
     exports: module.exports,
     require(specifier) {
+      if (specifier === "@/utils/uiOperationScope") return require("../src/utils/uiOperationScope")
       if (specifier === "../mobileNavigation") return navigation
       if (specifier === "../mobileViewport") {
         return {

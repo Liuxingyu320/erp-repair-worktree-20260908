@@ -25,6 +25,7 @@ import static com.erp.approval.constant.ApprovalRuntimeConstants.TASK_WAITING;
 
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
@@ -44,6 +45,7 @@ import com.erp.approval.mapper.ApprovalDefinitionMapper;
 import com.erp.approval.mapper.ApprovalRuntimeMapper;
 import com.erp.common.core.exception.ServiceException;
 import com.erp.common.security.auth.AuthUtil;
+import com.erp.common.security.utils.SecurityUtils;
 
 @Service
 public class ApprovalTaskService
@@ -199,6 +201,43 @@ public class ApprovalTaskService
         return close(taskId, request, operatorId, operatorName,
                 ACTION_REJECT, TASK_REJECTED, CANDIDATE_REJECTED,
                 INSTANCE_REJECTING, "REJECT", "REJECTED", false);
+    }
+
+    /** Same eligibility as reassign; the write rechecks these facts before claiming. */
+    public Map<String, Object> reassignOptions(Long taskId,
+            Long fromCandidateId, String keyword, int pageNum, Long operatorId)
+    {
+        String search = keyword == null ? "" : keyword.trim();
+        if (pageNum < 1 || pageNum > 1000 || search.length() > 64)
+        {
+            throw new ServiceException("候选人查询参数无效");
+        }
+        ApprovalTask task = requireTask(taskId);
+        ApprovalInstance instance = runtimeService.requireInstance(task.getInstanceId());
+        // Match instance-detail visibility before exposing its candidate directory.
+        if (!SecurityUtils.isAdmin() && !AuthUtil.hasPermi("approval:instance:query")
+                && (operatorId == null || runtimeMapper.countInstanceParticipant(
+                        instance.getInstanceId(), operatorId) == 0))
+        {
+            throw new ServiceException("无权查看该审批实例");
+        }
+        requirePending(task, instance);
+        ApprovalTaskCandidate from = runtimeMapper.selectCandidateById(fromCandidateId);
+        if (from == null || !Objects.equals(from.getTaskId(), taskId)
+                || !CANDIDATE_PENDING.equals(from.getCandidateStatus()))
+        {
+            throw new ServiceException("改派源候选人不是当前待办候选人");
+        }
+        String permission = candidatePermission(instance, from);
+        if (permission == null || permission.isBlank())
+        {
+            throw new ServiceException("当前审批业务未配置候选人权限");
+        }
+        List<ApprovalDirectoryUser> users = directoryMapper.selectReassignOptions(
+                taskId, permission, search, (pageNum - 1) * 20, 21);
+        return Map.of("rows", users.subList(0, Math.min(20, users.size())),
+                "hasMore", users.size() > 20, "taskId", String.valueOf(taskId),
+                "instanceId", String.valueOf(instance.getInstanceId()), "fromCandidateId", String.valueOf(fromCandidateId));
     }
 
     @Transactional

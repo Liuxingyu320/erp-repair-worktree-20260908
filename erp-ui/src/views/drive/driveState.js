@@ -1,3 +1,4 @@
+const { newUploadOperationId } = require('./uploadReceipt')
 const BYTE_UNITS = ['B', 'KB', 'MB', 'GB', 'TB']
 const PREVIEW_EXTENSIONS = new Set(['jpg', 'jpeg', 'png', 'gif', 'webp', 'pdf', 'txt', 'csv'])
 const VIEWS = new Set(['files', 'recent', 'trash'])
@@ -158,6 +159,8 @@ function createUploadItem(file, spaceId, parentId, logicalPath) {
   uploadSequence += 1
   return {
     id: `${Date.now()}-${uploadSequence}`,
+    operationId: newUploadOperationId(),
+    freshUpload: true,
     file,
     name: file && file.name ? file.name : '',
     size: file && Number.isFinite(Number(file.size)) ? Number(file.size) : 0,

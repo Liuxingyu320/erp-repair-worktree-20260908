@@ -9,14 +9,14 @@
       tone="blue"
       :features="['现存量', '库存预警', '变动日志']"
     />
-    <div class="stock-layout" :class="{ 'is-category-collapsed': categoryCollapsed }">
-      <aside class="category-panel">
+    <div class="stock-layout" :class="{ 'is-category-collapsed': categoryCollapsed || !queryParams.itemType }">
+      <aside v-if="queryParams.itemType" class="category-panel">
         <el-card shadow="never" class="category-card">
           <div slot="header" class="card-header">
             <span>物料分类</span>
             <div class="card-actions">
               <el-tooltip content="刷新分类" placement="top">
-                <el-button v-hasPermi="['inv:category:list', 'inv:category:tree']" type="text" size="mini" icon="el-icon-refresh" @click="loadCategories">刷新</el-button>
+                <el-button v-hasPermi="categoryPermissions" type="text" size="mini" icon="el-icon-refresh" @click="loadCategories">刷新</el-button>
               </el-tooltip>
               <el-tooltip content="收起分类" placement="top">
                 <el-button type="text" size="mini" icon="el-icon-d-arrow-left" @click="toggleCategoryPanel(true)">收起</el-button>
@@ -37,7 +37,7 @@
             class="category-tree"
             :data="categoryTreeData"
             :props="categoryProps"
-            node-key="categoryId"
+            node-key="categoryKey"
             default-expand-all
             highlight-current
             :expand-on-click-node="false"
@@ -50,7 +50,7 @@
             </span>
           </el-tree>
           <div class="category-summary">
-            <div v-if="categoryLoadError" class="category-error">{{ categoryLoadError }}</div>
+            <div v-if="categoryLoadError" class="category-error" role="alert">{{ categoryLoadError }} <el-button type="text" :disabled="categoryLoading" @click="loadCategories">重试</el-button></div>
             <div>当前分类：{{ selectedCategoryName }}</div>
             <div>筛选到 {{ total }} 条库存</div>
           </div>
@@ -58,7 +58,7 @@
       </aside>
 
       <main class="stock-main">
-        <div class="collapsed-category-action">
+        <div v-if="queryParams.itemType" class="collapsed-category-action">
           <el-button size="mini" icon="el-icon-d-arrow-right" @click="toggleCategoryPanel(false)">展开分类</el-button>
         </div>
 
@@ -360,6 +360,9 @@
 import { listStock, getStockSummary, adjustStock } from "@/api/inventory/stock"
 import { getProduct } from "@/api/inventory/product"
 import { categoryTree } from "@/api/inventory/category"
+import { oeCategoryTree } from "@/api/inventory/oe"
+import { giftCategoryTree } from "@/api/inventory/gift"
+const { createUiOperationScope } = require("@/utils/uiOperationScope")
 import { listShopTree, listVisibleStoreDept } from "@/api/system/dept"
 import { getSelectedDeptContext, getSelectedDeptId, getSelectedDeptName, isSelectedStore, isSelectedWarehouse } from "@/utils/shopContext"
 import InventoryItemSelect from "@/views/inventory/components/InventoryItemSelect"
@@ -372,6 +375,7 @@ export default {
       loading: false,
       summaryLoading: false,
       categoryLoading: false,
+      categoryLoadedType: "", stockContextRevision: 0,
       adjustLoading: false,
       categoryCollapsed: false,
       categoryKeyword: "",
@@ -451,19 +455,27 @@ export default {
     }
   },
   computed: {
+    categoryPermissions() {
+      return { product: ["inv:category:list", "inv:category:tree"], oe: ["inv:oeCategory:list", "inv:oeCategory:tree"], gift: ["inv:giftCategory:list", "inv:giftCategory:tree"] }[this.queryParams.itemType] || []
+    },
     currentDeptId() {
+      void this.stockContextRevision
       return getSelectedDeptId()
     },
     currentDeptName() {
+      void this.stockContextRevision
       return getSelectedDeptName() || "当前组织"
     },
     currentDeptContext() {
+      void this.stockContextRevision
       return getSelectedDeptContext()
     },
     isWarehouseContext() {
+      void this.stockContextRevision
       return isSelectedWarehouse()
     },
     isStoreContext() {
+      void this.stockContextRevision
       return isSelectedStore()
     },
     stockEntry() {
@@ -599,13 +611,17 @@ export default {
     }
   },
   watch: {
+    "$store.getters.id"() { this.onStockContextChanged() },
+    "$store.getters.token"() { this.onStockContextChanged() },
     categoryKeyword(value) {
       if (this.$refs.categoryTree) {
         this.$refs.categoryTree.filter(value)
       }
     },
     "$route.fullPath"() {
+      this.stockOperationScope().invalidate()
       this.applyEntryDefaults()
+      this.loadCategories()
       this.loadVisibleStoreOptions()
       if (this.ensureEntryContext()) {
         this.loadStockData()
@@ -613,6 +629,8 @@ export default {
     }
   },
   created() {
+    this._stockDeptChanged = () => this.onStockContextChanged()
+    window.addEventListener("erp:dept-changed", this._stockDeptChanged)
     this.applyEntryDefaults()
     this.loadCategories()
     this.loadDeptMap()
@@ -621,7 +639,29 @@ export default {
       this.loadStockData()
     }
   },
+  beforeDestroy() {
+    window.removeEventListener("erp:dept-changed", this._stockDeptChanged)
+    this.stockOperationScope().deactivate()
+  },
   methods: {
+    stockOperationScope() {
+      if (!this._stockScope) this._stockScope = createUiOperationScope(() => ({
+        actor: String((this.$store && this.$store.getters.id) || ""), dept: String(getSelectedDeptId() || ""),
+        revision: this.stockContextRevision, route: (this.$route && this.$route.fullPath) || ""
+      }))
+      return this._stockScope
+    },
+    onStockContextChanged() {
+      this.stockContextRevision += 1
+      this.stockOperationScope().invalidate()
+      this.productMap = {}
+      this.queryParams.categoryId = undefined
+      this.selectedCategory = null
+      this.queryParams.pageNum = 1
+      this.applyEntryDefaults()
+      this.loadCategories()
+      this.loadStockData()
+    },
     itemTypeLabel(type) {
       return { product: "商品", oe: "器皿", gift: "礼盒" }[type] || "其他物料"
     },
@@ -645,40 +685,50 @@ export default {
         const currentPath = pathPrefix.concat(currentName)
         const children = this.decorateCategories(item.children || [], currentPath)
         return Object.assign({}, item, {
+          categoryKey: String(this.queryParams.itemType) + ":" + item.categoryId,
+          itemType: this.queryParams.itemType,
           categoryFullPath: currentPath.filter(Boolean).join(" / "),
           children: children
         })
       })
     },
     getDefaultCategoryTree(children) {
-      return [{ categoryId: 0, categoryName: "全部库存", categoryFullPath: "全部库存", children: children || [] }]
+      return [{ categoryId: 0, categoryKey: String(this.queryParams.itemType) + ":0", itemType: this.queryParams.itemType,
+        categoryName: "全部库存", categoryFullPath: "全部库存", children: children || [] }]
     },
     loadCategories() {
+      const type = this.queryParams.itemType
+      const operation = this.stockOperationScope().begin("categories")
+      const current = () => this.stockOperationScope().isCurrent(operation) && type === this.queryParams.itemType
+      this.categoryLoadedType = ""
+      this.categoryTreeData = []
+      this.categoryOptions = []
+      this.categoryLoadError = ""
+      const api = { product: categoryTree, oe: oeCategoryTree, gift: giftCategoryTree }[type]
+      if (!api) {
+        this.queryParams.categoryId = undefined
+        this.selectedCategory = null
+        this.categoryLoading = false
+        return Promise.resolve([])
+      }
       this.categoryLoading = true
-      return categoryTree().then(res => {
-        this.categoryLoadError = ""
+      return api().then(res => {
+        if (!current()) return { discarded: true }
         const roots = this.decorateCategories(res.data || [])
         this.categoryTreeData = this.getDefaultCategoryTree(roots)
         this.categoryOptions = this.flattenCategories(roots)
+        this.categoryLoadedType = type
         this.$nextTick(() => {
-          if (this.$refs.categoryTree) {
+          if (current() && this.$refs.categoryTree) {
             this.$refs.categoryTree.filter(this.categoryKeyword)
-            this.$refs.categoryTree.setCurrentKey(this.queryParams.categoryId || 0)
+            this.$refs.categoryTree.setCurrentKey(type + ":" + (this.queryParams.categoryId || 0))
           }
         })
       }).catch(() => {
-        this.categoryLoadError = "分类加载失败，请联系管理员授权"
-        this.categoryTreeData = this.getDefaultCategoryTree()
-        this.categoryOptions = []
-        this.selectedCategory = null
-        this.queryParams.categoryId = undefined
-        this.$nextTick(() => {
-          if (this.$refs.categoryTree) {
-            this.$refs.categoryTree.setCurrentKey(0)
-          }
-        })
+        if (!current()) return { discarded: true }
+        this.categoryLoadError = this.itemTypeLabel(type) + "分类加载失败，请重试或检查权限"
       }).finally(() => {
-        this.categoryLoading = false
+        if (this.stockOperationScope().isCurrent(operation)) this.categoryLoading = false
       })
     },
     toggleCategoryPanel(collapsed) {
@@ -711,6 +761,7 @@ export default {
       return text.indexOf(keyword) !== -1
     },
     handleCategoryClick(data) {
+      if (this.categoryLoading || this.categoryLoadedType !== this.queryParams.itemType || !data || data.itemType !== this.queryParams.itemType) return
       this.selectedCategory = data.categoryId ? data : null
       this.queryParams.categoryId = data.categoryId || undefined
       this.queryParams.pageNum = 1
@@ -746,35 +797,47 @@ export default {
     },
     getSummary() {
       if (!this.ensureEntryContext(false)) return
+      const operation = this.stockOperationScope().begin("summary")
       this.summaryLoading = true
       const summaryParams = Object.assign({}, this.queryParams, { stockScope: "" })
-      getStockSummary(summaryParams).then(res => {
-        this.summary = res.data || {}
-      }).finally(() => { this.summaryLoading = false })
+      const queryKey = JSON.stringify(summaryParams)
+      return getStockSummary(summaryParams).then(res => {
+        if (this.stockOperationScope().isCurrent(operation) && queryKey === JSON.stringify({ ...this.queryParams, stockScope: "" })) this.summary = res.data || {}
+      }).finally(() => { if (this.stockOperationScope().isCurrent(operation)) this.summaryLoading = false })
     },
     getList() {
       if (!this.ensureEntryContext(false)) return
+      const operation = this.stockOperationScope().begin("list")
+      const query = { ...this.queryParams }
+      const queryKey = JSON.stringify(query)
+      const current = () => this.stockOperationScope().isCurrent(operation) && queryKey === JSON.stringify(this.queryParams)
       this.loading = true
       this.stockLoadError = ""
-      return listStock(this.queryParams).then(res => {
+      this.list = []
+      return listStock(query).then(res => {
+        if (!current()) return { discarded: true }
         this.list = res.rows || []
         this.total = res.total || 0
-        return this.hydrateProducts(this.list)
+        return this.hydrateProducts(this.list, current)
       }).catch(() => {
+        if (!current()) return { discarded: true }
         this.list = []
         this.total = 0
         this.stockLoadError = "暂时无法加载库存列表。请检查网络或稍后重试；当前不会把失败误显示为 0 条库存。"
-      }).finally(() => { this.loading = false })
+      }).finally(() => { if (this.stockOperationScope().isCurrent(operation)) this.loading = false })
     },
     handleProductQueryChange() {
       this.queryParams.pageNum = 1
     },
     handleItemTypeQueryChange() {
+      this.categoryKeyword = ""
       this.queryParams.itemId = undefined
       this.queryParams.productId = undefined
       this.queryParams.categoryId = undefined
       this.selectedCategory = null
       this.queryParams.pageNum = 1
+      this.loadCategories()
+      this.loadStockData()
     },
     handleStatusChange() {
       this.queryParams.pageNum = 1
@@ -823,6 +886,7 @@ export default {
         }
       })
       this.applyEntryDefaults()
+      this.loadCategories()
       this.loadStockData()
     },
     normalizeStoreFilter() {
@@ -1089,7 +1153,7 @@ export default {
       })
       return stores
     },
-    hydrateProducts(rows) {
+    hydrateProducts(rows, isCurrent = () => true) {
       const productIds = rows
         .filter(row => row && (row.itemType || "product") === "product" && !row.itemName && !row.productName)
         .map(row => row.productId)
@@ -1099,6 +1163,7 @@ export default {
       return Promise.all(uniqueProductIds.map(productId => {
         return getProduct(productId).then(res => res.data).catch(() => null)
       })).then(products => {
+        if (!isCurrent()) return
         const nextProductMap = Object.assign({}, this.productMap)
         products.forEach(product => {
           if (product && product.productId) {

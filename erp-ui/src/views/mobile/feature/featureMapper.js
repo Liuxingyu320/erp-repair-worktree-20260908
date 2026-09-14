@@ -1,3 +1,4 @@
+const { imageUrls } = require("../../../utils/imageGallery")
 const { purchaseBusinessStageLabel } = require("../../../utils/purchaseBusinessStage")
 const {
   STATUS_LABELS,
@@ -190,6 +191,7 @@ function mapOeRow(row, index, options) {
 
   return {
     title: safeText(oeName, "OE资料"),
+    imageUrls: imageUrls(row),
     code: safeText(oeCode, "OE-" + String(index + 1).padStart(3, "0")),
     detail: joinDetail(detailParts),
     status: statusLabel(row.status, STATUS_LABELS.oe)
@@ -205,6 +207,7 @@ function mapGiftRow(row, index) {
 
   return {
     title: safeText(giftName, "礼盒资料"),
+    imageUrls: imageUrls(row),
     code: safeText(giftCode, "GIFT-" + String(index + 1).padStart(3, "0")),
     detail: joinDetail([category, price1 ? "指导售价1 " + price1 : "", price2 ? "指导售价2 " + price2 : ""]),
     status: statusLabel(row.status, STATUS_LABELS.gift)
@@ -378,6 +381,7 @@ function mapFixedAssetRepairRow(row, index) {
 
   return {
     title: safeText(firstText(row, ["oeItemName", "assetName", "goodsName"]), "资产报修"),
+    imageUrls: imageUrls(row),
     code: safeText(repairId ? "FA-" + repairId : "", "FA-" + String(index + 1).padStart(3, "0")),
     detail: joinDetail([
       firstText(row, ["faultDescription"]),

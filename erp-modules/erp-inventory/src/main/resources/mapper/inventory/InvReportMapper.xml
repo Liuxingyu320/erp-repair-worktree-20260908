@@ -18,6 +18,16 @@
 
     <resultMap type="com.erp.inventory.domain.InvStock" id="ReportStockResult">
         <id property="stockId" column="stock_id"/>
+        <result property="itemType" column="item_type"/>
+        <result property="itemId" column="item_id"/>
+        <result property="itemCode" column="item_code"/>
+        <result property="itemName" column="item_name"/>
+        <result property="itemCategoryName" column="item_category_name"/>
+        <result property="itemCategoryFullPath" column="item_category_full_path"/>
+        <result property="categoryType" column="category_type"/>
+        <result property="itemSpec" column="item_spec"/>
+        <result property="itemUnit" column="item_unit"/>
+
         <result property="productId" column="product_id"/>
         <result property="productName" column="product_name"/>
         <result property="productCode" column="product_code"/>
@@ -50,6 +60,8 @@
     </resultMap>
 
     <sql id="ReportStockScope">
+        <if test="itemType != null">and coalesce(s.item_type, 'product') = #{itemType}</if>
+        <if test="itemId != null">and coalesce(s.item_id, s.product_id) = #{itemId}</if>
         <if test="productId != null">and s.product_id = #{productId}</if>
         <if test="categoryId != null">and p.category_id = #{categoryId}</if>
         <if test="shopDeptId != null">and s.shop_dept_id = #{shopDeptId}</if>
@@ -65,6 +77,8 @@
     </sql>
 
     <sql id="ReportOrderProductScope">
+        <if test="itemType != null">and coalesce(d.item_type, 'product') = #{itemType}</if>
+        <if test="itemId != null">and coalesce(d.item_id, d.product_id) = #{itemId}</if>
         <if test="productId != null">and d.product_id = #{productId}</if>
         <if test="categoryId != null">and (p.category_id = #{categoryId} or find_in_set(#{categoryId}, c.ancestors))</if>
     </sql>
@@ -77,8 +91,43 @@
     </sql>
 
     <sql id="ReportLogProductScope">
+        <if test="itemType != null">and coalesce(l.item_type, 'product') = #{itemType}</if>
+        <if test="itemId != null">and coalesce(l.item_id, l.product_id) = #{itemId}</if>
         <if test="productId != null">and l.product_id = #{productId}</if>
         <if test="categoryId != null">and (p.category_id = #{categoryId} or find_in_set(#{categoryId}, c.ancestors))</if>
+    </sql>
+
+    <!-- Accepted QC increments are events; pending receipt totals are not stock. -->
+    <sql id="PurchaseStockedEvents">
+        select q.purchase_order_id, q.purchase_detail_id,
+               coalesce(q.accepted_quantity, 0) + coalesce(q.concession_quantity, 0) as quantity,
+               q.inspection_time as occurred_at
+        from inv_quality_inspection q
+        union all
+        select i.purchase_order_id,
+               coalesce(i.purchase_detail_id,
+                   (select min(legacy.detail_id) from inv_purchase_detail legacy
+                    where legacy.order_id = i.purchase_order_id and legacy.product_id = i.product_id
+                    having count(*) = 1)) as purchase_detail_id,
+               i.quantity, coalesce(i.qc_time, i.create_time) as occurred_at
+        from inv_inbound_record i
+        where i.receipt_batch_detail_id is null and i.qc_result in ('passed', 'concession')
+    </sql>
+
+    <sql id="ReportPurchaseEventScope">
+        <if test="shopDeptId != null">and o.shop_dept_id = #{shopDeptId}</if>
+        <if test="warehouseId != null">and o.shop_dept_id = #{warehouseId}</if>
+        <if test="params.scopeDeptIds != null">and o.shop_dept_id in <foreach collection="params.scopeDeptIds" item="deptId" open="(" close=")" separator=",">#{deptId}</foreach></if>
+        <if test="params.beginTime != null and params.beginTime != ''">and date(qevent.occurred_at) &gt;= #{params.beginTime}</if>
+        <if test="params.endTime != null and params.endTime != ''">and date(qevent.occurred_at) &lt;= #{params.endTime}</if>
+    </sql>
+
+    <sql id="ReportPurchaseReturnEventScope">
+        <if test="shopDeptId != null">and r.shop_dept_id = #{shopDeptId}</if>
+        <if test="warehouseId != null">and r.shop_dept_id = #{warehouseId}</if>
+        <if test="params.scopeDeptIds != null">and r.shop_dept_id in <foreach collection="params.scopeDeptIds" item="deptId" open="(" close=")" separator=",">#{deptId}</foreach></if>
+        <if test="params.beginTime != null and params.beginTime != ''">and date(revent.occurred_at) &gt;= #{params.beginTime}</if>
+        <if test="params.endTime != null and params.endTime != ''">and date(revent.occurred_at) &lt;= #{params.endTime}</if>
     </sql>
 
     <select id="selectReportSummary" parameterType="com.erp.inventory.domain.InvStock" resultMap="InvReportSummaryResult">
@@ -101,7 +150,7 @@
                     (
                     select count(1)
                     from inv_stock s
-                    left join inv_product p on p.product_id = s.product_id and p.del_flag = '0'
+                    left join inv_product p on p.product_id = coalesce(s.item_id, s.product_id) and coalesce(s.item_type, 'product') = 'product' and p.del_flag = '0'
                     <where>
                         <include refid="ReportStockScope"/>
                     </where>
@@ -112,7 +161,7 @@
                          and coalesce(s.available_quantity, s.current_quantity, 0) &lt;= p.safety_stock_min
                         then 1 else 0 end), 0)
                     from inv_stock s
-                    left join inv_product p on p.product_id = s.product_id and p.del_flag = '0'
+                    left join inv_product p on p.product_id = coalesce(s.item_id, s.product_id) and coalesce(s.item_type, 'product') = 'product' and p.del_flag = '0'
                     <where>
                         <include refid="ReportStockScope"/>
                     </where>
@@ -120,7 +169,7 @@
                     (
                     select coalesce(sum(case when coalesce(p.safety_stock_min, 0) &lt;= 0 then 1 else 0 end), 0)
                     from inv_stock s
-                    left join inv_product p on p.product_id = s.product_id and p.del_flag = '0'
+                    left join inv_product p on p.product_id = coalesce(s.item_id, s.product_id) and coalesce(s.item_type, 'product') = 'product' and p.del_flag = '0'
                     <where>
                         <include refid="ReportStockScope"/>
                     </where>
@@ -128,7 +177,7 @@
                     (
                     select coalesce(sum(case when coalesce(s.available_quantity, s.current_quantity, 0) &lt;= 0 then 1 else 0 end), 0)
                     from inv_stock s
-                    left join inv_product p on p.product_id = s.product_id and p.del_flag = '0'
+                    left join inv_product p on p.product_id = coalesce(s.item_id, s.product_id) and coalesce(s.item_type, 'product') = 'product' and p.del_flag = '0'
                     <where>
                         <include refid="ReportStockScope"/>
                     </where>
@@ -136,7 +185,7 @@
                     (
                     select coalesce(sum(s.total_cost), 0)
                     from inv_stock s
-                    left join inv_product p on p.product_id = s.product_id and p.del_flag = '0'
+                    left join inv_product p on p.product_id = coalesce(s.item_id, s.product_id) and coalesce(s.item_type, 'product') = 'product' and p.del_flag = '0'
                     <where>
                         <include refid="ReportStockScope"/>
                     </where>
@@ -144,39 +193,45 @@
                     (
                     select count(distinct o.order_id)
                     from inv_purchase_order o
-                    inner join inv_purchase_detail d on d.order_id = o.order_id
-                    left join inv_product p on p.product_id = d.product_id and p.del_flag = '0'
+                    inner join (<include refid="PurchaseStockedEvents"/>) qevent on qevent.purchase_order_id = o.order_id
+                    inner join inv_purchase_detail d on d.detail_id = qevent.purchase_detail_id and d.order_id = o.order_id
+                    left join inv_product p on p.product_id = coalesce(d.item_id, d.product_id) and coalesce(d.item_type, 'product') = 'product' and p.del_flag = '0'
                     left join inv_product_category c on c.category_id = p.category_id and c.del_flag = '0'
                     <where>
                         o.status in ('submitted', 'received')
-                        and coalesce(d.received_quantity, 0) &gt; 0
-                        <include refid="ReportOrderScope"/>
+                        and coalesce(qevent.quantity, 0) &gt; 0
+                        <include refid="ReportPurchaseEventScope"/>
                         <include refid="ReportOrderProductScope"/>
                     </where>
                     ) as purchase_order_count,
                     (
-                    select coalesce(sum(coalesce(d.received_quantity, 0) * coalesce(d.unit_price, 0)), 0)
+                    select coalesce(sum(coalesce(qevent.quantity, 0) * coalesce(d.unit_price, 0)), 0)
                     from inv_purchase_order o
-                    inner join inv_purchase_detail d on d.order_id = o.order_id
-                    left join inv_product p on p.product_id = d.product_id and p.del_flag = '0'
+                    inner join (<include refid="PurchaseStockedEvents"/>) qevent on qevent.purchase_order_id = o.order_id
+                    inner join inv_purchase_detail d on d.detail_id = qevent.purchase_detail_id and d.order_id = o.order_id
+                    left join inv_product p on p.product_id = coalesce(d.item_id, d.product_id) and coalesce(d.item_type, 'product') = 'product' and p.del_flag = '0'
                     left join inv_product_category c on c.category_id = p.category_id and c.del_flag = '0'
                     <where>
                         o.status in ('submitted', 'received')
-                        and coalesce(d.received_quantity, 0) &gt; 0
-                        <include refid="ReportOrderScope"/>
+                        and coalesce(qevent.quantity, 0) &gt; 0
+                        <include refid="ReportPurchaseEventScope"/>
                         <include refid="ReportOrderProductScope"/>
                     </where>
                     ) as purchase_received_amount,
                     (
                     select coalesce(sum(coalesce(d.returned_quantity, 0) * coalesce(d.unit_price, 0)), 0)
                     from inv_purchase_return r
+                    inner join (select business_id, min(create_time) as occurred_at
+                                from inv_stock_log where business_type = 'purchase_return'
+                                  and movement_type = 'purchase_return_out'
+                                group by business_id) revent on revent.business_id = r.return_id
                     inner join inv_purchase_return_detail d on d.return_id = r.return_id
-                    left join inv_product p on p.product_id = d.product_id and p.del_flag = '0'
+                    left join inv_product p on p.product_id = coalesce(d.item_id, d.product_id) and coalesce(d.item_type, 'product') = 'product' and p.del_flag = '0'
                     left join inv_product_category c on c.category_id = p.category_id and c.del_flag = '0'
                     <where>
                         r.status = 'returned'
                         and coalesce(d.returned_quantity, 0) &gt; 0
-                        <include refid="ReportReturnScope"/>
+                        <include refid="ReportPurchaseReturnEventScope"/>
                         <include refid="ReportOrderProductScope"/>
                     </where>
                     ) as purchase_return_amount,
@@ -184,7 +239,7 @@
                     select count(distinct o.order_id)
                     from inv_sales_order o
                     inner join inv_sales_detail d on d.order_id = o.order_id
-                    left join inv_product p on p.product_id = d.product_id and p.del_flag = '0'
+                    left join inv_product p on p.product_id = coalesce(d.item_id, d.product_id) and coalesce(d.item_type, 'product') = 'product' and p.del_flag = '0'
                     left join inv_product_category c on c.category_id = p.category_id and c.del_flag = '0'
                     <where>
                         o.status in ('submitted', 'noticed', 'delivered')
@@ -197,7 +252,7 @@
                     select coalesce(sum(coalesce(d.delivered_quantity, 0) * coalesce(d.unit_price, 0)), 0)
                     from inv_sales_order o
                     inner join inv_sales_detail d on d.order_id = o.order_id
-                    left join inv_product p on p.product_id = d.product_id and p.del_flag = '0'
+                    left join inv_product p on p.product_id = coalesce(d.item_id, d.product_id) and coalesce(d.item_type, 'product') = 'product' and p.del_flag = '0'
                     left join inv_product_category c on c.category_id = p.category_id and c.del_flag = '0'
                     <where>
                         o.status in ('submitted', 'noticed', 'delivered')
@@ -210,7 +265,7 @@
                     select coalesce(sum(coalesce(d.returned_quantity, 0) * coalesce(d.unit_price, 0)), 0)
                     from inv_sales_return r
                     inner join inv_sales_return_detail d on d.return_id = r.return_id
-                    left join inv_product p on p.product_id = d.product_id and p.del_flag = '0'
+                    left join inv_product p on p.product_id = coalesce(d.item_id, d.product_id) and coalesce(d.item_type, 'product') = 'product' and p.del_flag = '0'
                     left join inv_product_category c on c.category_id = p.category_id and c.del_flag = '0'
                     <where>
                         r.status = 'returned'
@@ -220,10 +275,10 @@
                     </where>
                     ) as sales_return_amount,
                     (
-                    select coalesce(sum(abs(coalesce(l.change_quantity, 0)) * coalesce(l.cost_price, 0)), 0)
+                    select coalesce(sum(coalesce(l.cost_amount, abs(coalesce(l.change_quantity, 0)) * coalesce(l.cost_price, 0))), 0)
                     from inv_stock_log l
                     inner join inv_sales_order o on o.order_id = l.business_id
-                    left join inv_product p on p.product_id = l.product_id and p.del_flag = '0'
+                    left join inv_product p on p.product_id = coalesce(l.item_id, l.product_id) and coalesce(l.item_type, 'product') = 'product' and p.del_flag = '0'
                     left join inv_product_category c on c.category_id = p.category_id and c.del_flag = '0'
                     <where>
                         l.movement_type in ('sales_out', 'outbound_out')
@@ -235,10 +290,10 @@
                     </where>
                     ) as sales_out_cost,
                     (
-                    select coalesce(sum(coalesce(l.change_quantity, 0) * coalesce(l.cost_price, 0)), 0)
+                    select coalesce(sum(coalesce(l.cost_amount, coalesce(l.change_quantity, 0) * coalesce(l.cost_price, 0))), 0)
                     from inv_stock_log l
                     inner join inv_sales_return r on r.return_id = l.business_id
-                    left join inv_product p on p.product_id = l.product_id and p.del_flag = '0'
+                    left join inv_product p on p.product_id = coalesce(l.item_id, l.product_id) and coalesce(l.item_type, 'product') = 'product' and p.del_flag = '0'
                     left join inv_product_category c on c.category_id = p.category_id and c.del_flag = '0'
                     <where>
                         l.movement_type in ('sales_return_in', 'sales_return')
@@ -254,7 +309,20 @@
     </select>
 
     <select id="selectStockWarningList" parameterType="com.erp.inventory.domain.InvStock" resultMap="ReportStockResult">
-        select s.stock_id, s.product_id, p.product_code, p.product_name, c.category_name,
+        select s.stock_id, coalesce(s.item_type, 'product') as item_type,
+               coalesce(s.item_id, s.product_id) as item_id,
+               case coalesce(s.item_type, 'product') when 'oe' then oe.oe_item_code when 'gift' then gift.gift_code else p.product_code end as item_code,
+               case coalesce(s.item_type, 'product') when 'oe' then oe.oe_item_name when 'gift' then gift.gift_name else p.product_name end as item_name,
+               case coalesce(s.item_type, 'product') when 'oe' then oe.item_description when 'gift' then gift.spec else p.spec end as item_spec,
+               case coalesce(s.item_type, 'product') when 'oe' then oe.order_unit when 'gift' then gift.replenishment_unit else p.unit end as item_unit,
+               coalesce(s.item_type, 'product') as category_type,
+               case coalesce(s.item_type, 'product') when 'oe' then oc.category_name when 'gift' then gc.category_name else c.category_name end as item_category_name,
+               case coalesce(s.item_type, 'product')
+                   when 'oe' then (select group_concat(cat.category_name order by find_in_set(cat.category_id, concat(oc.ancestors, ',', oc.category_id)) separator ' / ') from inv_oe_category cat where cat.del_flag='0' and find_in_set(cat.category_id, concat(oc.ancestors, ',', oc.category_id)) &gt; 0)
+                   when 'gift' then (select group_concat(cat.category_name order by find_in_set(cat.category_id, concat(gc.ancestors, ',', gc.category_id)) separator ' / ') from inv_gift_category cat where cat.del_flag='0' and find_in_set(cat.category_id, concat(gc.ancestors, ',', gc.category_id)) &gt; 0)
+                   else (select group_concat(cat.category_name order by find_in_set(cat.category_id, concat(c.ancestors, ',', c.category_id)) separator ' / ') from inv_product_category cat where cat.del_flag='0' and find_in_set(cat.category_id, concat(c.ancestors, ',', c.category_id)) &gt; 0)
+               end as item_category_full_path,
+               s.product_id, p.product_code, p.product_name, c.category_name,
                (
                    select group_concat(pc.category_name order by find_in_set(pc.category_id, concat(c.ancestors, ',', c.category_id)) separator ' / ')
                    from inv_product_category pc
@@ -268,8 +336,12 @@
                s.batch_no, s.expiry_date, s.serial_no, s.location_code, s.location_name,
                s.last_in_time, s.last_out_time
         from inv_stock s
-        left join inv_product p on p.product_id = s.product_id and p.del_flag = '0'
+        left join inv_product p on p.product_id = coalesce(s.item_id, s.product_id) and coalesce(s.item_type, 'product') = 'product' and p.del_flag = '0'
         left join inv_product_category c on c.category_id = p.category_id and c.del_flag = '0'
+        left join inv_oe_item oe on coalesce(s.item_type, 'product')='oe' and oe.oe_item_id=coalesce(s.item_id,s.product_id) and oe.del_flag='0'
+        left join inv_gift_box gift on coalesce(s.item_type, 'product')='gift' and gift.gift_id=coalesce(s.item_id,s.product_id) and gift.del_flag='0'
+        left join inv_oe_category oc on oc.category_id=oe.category_id and oc.del_flag='0'
+        left join inv_gift_category gc on gc.category_id=gift.category_id and gc.del_flag='0'
         left join sys_dept shop_dept on shop_dept.dept_id = s.shop_dept_id
         left join sys_dept warehouse_dept on warehouse_dept.dept_id = s.warehouse_id
         <where>
@@ -301,7 +373,7 @@
     <select id="selectReportProductOptions" parameterType="com.erp.inventory.domain.InvStock" resultMap="ReportProductOptionResult">
         select p.product_id, p.product_code, p.product_name, p.spec, p.unit
         from inv_stock s
-        inner join inv_product p on p.product_id = s.product_id and p.del_flag = '0'
+        inner join inv_product p on p.product_id = coalesce(s.item_id, s.product_id) and coalesce(s.item_type, 'product') = 'product' and p.del_flag = '0'
         <where>
             <include refid="ReportStockScope"/>
             <if test="params.keyword != null and params.keyword != ''">
@@ -311,6 +383,33 @@
         </where>
         group by p.product_id, p.product_code, p.product_name, p.spec, p.unit
         order by p.product_code asc, p.product_id asc
+        limit #{params.optionLimit}
+    </select>
+    <resultMap type="com.erp.inventory.domain.vo.InvReportItemOption" id="ReportItemOptionResult">
+        <id property="itemType" column="item_type"/><id property="itemId" column="item_id"/>
+        <result property="itemCode" column="item_code"/><result property="itemName" column="item_name"/>
+        <result property="spec" column="item_spec"/><result property="unit" column="item_unit"/>
+    </resultMap>
+    <select id="selectReportItemOptions" parameterType="com.erp.inventory.domain.InvStock" resultMap="ReportItemOptionResult">
+        select item_options.* from (
+            select distinct coalesce(s.item_type, 'product') as item_type,
+               coalesce(s.item_id, s.product_id) as item_id,
+               case coalesce(s.item_type, 'product') when 'oe' then oe.oe_item_code when 'gift' then gift.gift_code else p.product_code end as item_code,
+               case coalesce(s.item_type, 'product') when 'oe' then oe.oe_item_name when 'gift' then gift.gift_name else p.product_name end as item_name,
+               case coalesce(s.item_type, 'product') when 'oe' then oe.item_description when 'gift' then gift.spec else p.spec end as item_spec,
+               case coalesce(s.item_type, 'product') when 'oe' then oe.order_unit when 'gift' then gift.replenishment_unit else p.unit end as item_unit
+            from inv_stock s
+            left join inv_product p on coalesce(s.item_type, 'product')='product' and p.product_id=coalesce(s.item_id,s.product_id) and p.del_flag='0'
+        left join inv_oe_item oe on coalesce(s.item_type, 'product')='oe' and oe.oe_item_id=coalesce(s.item_id,s.product_id) and oe.del_flag='0'
+        left join inv_gift_box gift on coalesce(s.item_type, 'product')='gift' and gift.gift_id=coalesce(s.item_id,s.product_id) and gift.del_flag='0'
+            <where><include refid="ReportStockScope"/></where>
+        ) item_options
+        where item_options.item_name is not null
+        <if test="params.keyword != null and params.keyword != ''">
+            and (item_options.item_code like concat('%', #{params.keyword}, '%') escape '!'
+              or item_options.item_name like concat('%', #{params.keyword}, '%') escape '!')
+        </if>
+        order by item_options.item_type, item_options.item_code, item_options.item_id
         limit #{params.optionLimit}
     </select>
 </mapper>

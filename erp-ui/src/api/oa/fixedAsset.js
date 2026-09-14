@@ -76,3 +76,14 @@ export function submitFixedAssetRepairBatch(data) {
     data
   })
 }
+
+// Full shop snapshot and durable atomic configuration command.
+export function getFixedAssetConfigSnapshot(shopDeptId) {
+  return request({ url: '/oa/fixedAsset/config/snapshot', method: 'get', params: { shopDeptId }, silentError: true })
+}
+export function saveFixedAssetConfigBatch(data) {
+  return request({ url: '/oa/fixedAsset/config/batch-save', method: 'post', data, silentError: true })
+}
+export function getFixedAssetConfigBatchCommand(requestId, shopDeptId) {
+  return request({ url: '/oa/fixedAsset/config/batch-commands/' + encodeURIComponent(requestId), method: 'get', params: { shopDeptId }, silentError: true })
+}

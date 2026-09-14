@@ -29,6 +29,8 @@ function loadComponent(source, globals = {}) {
     .replace(/import\s+[\s\S]*?\s+from\s+["'][^"']+["']\s*/g, "")
     .replace("export default", "module.exports =")
   const sandbox = {
+    require: name => name === '@/utils/uiOperationScope' ? require('../src/utils/uiOperationScope') : {},
+    getSelectedDeptId: () => '202',
     module: { exports: {} },
     exports: {},
     Promise,
@@ -41,6 +43,7 @@ function loadComponent(source, globals = {}) {
     setInterval: () => 1,
     clearInterval: () => {},
     getBusinessEmptyText: () => "",
+    LegacySalaryNotice: {},
     ...globals
   }
   sandbox.exports = sandbox.module.exports

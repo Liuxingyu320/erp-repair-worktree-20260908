@@ -153,15 +153,16 @@ class HrHealthCertificateServiceImplTest
                 .when(featureService).requireIntakeEnabled();
         HrHealthCertificateVo pending=vo(88L,7L,null);pending.setReviewStatus("PENDING_REVIEW");
         when(mapper.selectById(88L)).thenReturn(pending);
+        when(mapper.selectByIdForUpdate(88L)).thenReturn(pending);
         when(mapper.lockEmployeeProfile(7L)).thenReturn(7L);
-        when(mapper.reviewCertificate(88L,0L,"APPROVED","Y",9L,"hr",null)).thenReturn(1);
+        when(mapper.reviewCertificate(88L,0L,"APPROVED",null,9L,"hr",null)).thenReturn(1);
         HrHealthCertificateReviewRequest request=new HrHealthCertificateReviewRequest();
         request.setVersion(0L);request.setDecision("APPROVED");
 
         assertThat(service.review(88L,request,9L,"hr")).isNotNull();
 
         verify(featureService,never()).requireIntakeEnabled();
-        verify(mapper).reviewCertificate(88L,0L,"APPROVED","Y",9L,"hr",null);
+        verify(mapper).reviewCertificate(88L,0L,"APPROVED",null,9L,"hr",null);
     }
 
     @Test
@@ -171,6 +172,8 @@ class HrHealthCertificateServiceImplTest
         current.setEmployeeName("员工甲");
         current.setCurrentDeptName("门店一");
         when(mapper.selectByIdForUpdate(88L)).thenReturn(current);
+        when(mapper.selectById(88L)).thenReturn(current);
+        when(mapper.lockEmployeeProfile(7L)).thenReturn(7L);
         when(mapper.markApprovalSubmitting(88L, 7L, 0L, 1,
                 "employee")).thenReturn(1);
         when(mapper.selectById(88L)).thenReturn(current);
@@ -205,6 +208,8 @@ class HrHealthCertificateServiceImplTest
     {
         HrHealthCertificateVo current = vo(88L, 7L, null);
         when(mapper.selectByIdForUpdate(88L)).thenReturn(current);
+        when(mapper.selectById(88L)).thenReturn(current);
+        when(mapper.lockEmployeeProfile(7L)).thenReturn(7L);
         when(mapper.markApprovalSubmitting(88L, 7L, 0L, 1,
                 "employee")).thenReturn(1);
         when(outboxService.enqueue(eq(current), any(), eq("employee")))
@@ -230,6 +235,8 @@ class HrHealthCertificateServiceImplTest
         current.setApprovalRound(2);
         current.setVersion(5L);
         when(mapper.selectByIdForUpdate(88L)).thenReturn(current);
+        when(mapper.selectById(88L)).thenReturn(current);
+        when(mapper.lockEmployeeProfile(7L)).thenReturn(7L);
         HrHealthCertificateApprovalStartOutbox outbox =
                 new HrHealthCertificateApprovalStartOutbox();
         outbox.setOutboxId(502L);
@@ -257,6 +264,8 @@ class HrHealthCertificateServiceImplTest
         current.setApprovalRound(1);
         current.setApprovalInstanceId(null);
         when(mapper.selectByIdForUpdate(88L)).thenReturn(current);
+        when(mapper.selectById(88L)).thenReturn(current);
+        when(mapper.lockEmployeeProfile(7L)).thenReturn(7L);
 
         ApprovalBusinessCallbackResponse response = service
                 .applyApprovalCallback(callback(9001L, 1, "APPROVE"));
@@ -276,6 +285,8 @@ class HrHealthCertificateServiceImplTest
         current.setApprovalRound(2);
         current.setApprovalInstanceId(9002L);
         when(mapper.selectByIdForUpdate(88L)).thenReturn(current);
+        when(mapper.selectById(88L)).thenReturn(current);
+        when(mapper.lockEmployeeProfile(7L)).thenReturn(7L);
 
         ApprovalBusinessCallbackResponse response = service
                 .applyApprovalCallback(callback(9001L, 1, "APPROVE"));
@@ -320,6 +331,7 @@ class HrHealthCertificateServiceImplTest
         HrHealthCertificateVo pending=vo(88L,7L,null);
         pending.setReviewStatus("PENDING_REVIEW");
         when(mapper.selectById(88L)).thenReturn(pending);
+        when(mapper.selectByIdForUpdate(88L)).thenReturn(pending);
         HrHealthCertificateReviewRequest request=new HrHealthCertificateReviewRequest();
         request.setVersion(0L);
         request.setDecision("REJECTED");
@@ -331,6 +343,31 @@ class HrHealthCertificateServiceImplTest
 
         verify(mapper,never()).lockEmployeeProfile(any());
         verify(mapper,never()).reviewCertificate(any(),any(),any(),any(),any(),any(),any());
+    }
+
+    @Test
+    void futureReviewPreservesValidCurrentAndReturnsNotYetEffective()
+    {
+        HrHealthCertificateVo old=vo(87L,7L,null);old.setReviewStatus("APPROVED");old.setCurrentFlag("Y");
+        HrHealthCertificateVo next=vo(88L,7L,null);next.setReviewStatus("PENDING_REVIEW");
+        next.setValidFrom(LocalDate.of(2026,7,14));
+        when(mapper.selectById(88L)).thenReturn(next);when(mapper.selectByIdForUpdate(88L)).thenReturn(next);
+        when(mapper.lockEmployeeProfile(7L)).thenReturn(7L);
+        when(mapper.selectByUserIdForUpdate(7L)).thenReturn(java.util.List.of(old,next));
+        when(mapper.reviewCertificate(88L,0L,"APPROVED",null,9L,"hr",null)).thenAnswer(call -> { next.setReviewStatus("APPROVED");return 1; });
+        HrHealthCertificateReviewRequest request=new HrHealthCertificateReviewRequest();request.setVersion(0L);request.setDecision("APPROVED");
+        assertThat(service.review(88L,request,9L,"hr").getHealthCertificateStatus()).isEqualTo("NOT_YET_EFFECTIVE");
+        verify(mapper,never()).clearCurrentByUserId(any(),any());
+        verify(mapper,never()).setCurrentCertificate(any(),any(),any(),any());
+    }
+
+    @Test
+    void dateDecorationUsesShanghaiEvenWhenClockHasUtcZone()
+    {
+        HrHealthCertificateVo next=vo(88L,7L,null);next.setReviewStatus("APPROVED");next.setValidFrom(LocalDate.of(2026,7,14));
+        when(mapper.selectByUserId(7L)).thenReturn(java.util.List.of(next));
+        ReflectionTestUtils.setField(service,"clock",Clock.fixed(Instant.parse("2026-07-13T16:00:00Z"),ZoneId.of("UTC")));
+        assertThat(service.selectMine(7L).get(0).getHealthCertificateStatus()).isEqualTo("VALID");
     }
 
     private HrHealthCertificate draft(Long nodeId)
@@ -351,6 +388,7 @@ class HrHealthCertificateServiceImplTest
         value.setUserId(userId);
         value.setAttachmentNodeId(nodeId);
         value.setReviewStatus("DRAFT");
+        value.setDelFlag("0");
         value.setIssuedDate(LocalDate.of(2026, 7, 1));
         value.setExpiresOn(LocalDate.of(2027, 6, 30));
         value.setVersion(0L);

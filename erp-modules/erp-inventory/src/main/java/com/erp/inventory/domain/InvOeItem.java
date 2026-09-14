@@ -1,6 +1,9 @@
 package com.erp.inventory.domain;
 
 import java.math.BigDecimal;
+import java.util.List;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.erp.common.core.utils.file.ImageUrlList;
 import java.util.Date;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
@@ -11,6 +14,16 @@ import com.erp.common.core.web.domain.BaseEntity;
 public class InvOeItem extends BaseEntity
 {
     private static final long serialVersionUID = 1L;
+
+    @JsonIgnore
+    private final java.util.Set<String> jsonProvidedFields = new java.util.HashSet<>();
+
+    /** Only the JSON request subtype records presence; normalization and Excel setters do not. */
+    protected final void recordJsonProvidedField(String field) { jsonProvidedFields.add(field); }
+
+    @JsonIgnore
+    public final boolean wasJsonFieldProvided(String field) { return jsonProvidedFields.contains(field); }
+
 
     private Long oeItemId;
 
@@ -45,6 +58,10 @@ public class InvOeItem extends BaseEntity
 
     @Excel(name = "图片")
     private String imageUrl;
+
+    @Excel(name = "图片列表（JSON数组，[]清空）")
+    private String imageUrlsText;
+
 
     @Excel(name = "同款购买链接")
     private String purchaseReferenceUrl;
@@ -95,8 +112,16 @@ public class InvOeItem extends BaseEntity
     public void setSupplierName(String supplierName) { this.supplierName = supplierName; }
     public String getSupplierPhone() { return supplierPhone; }
     public void setSupplierPhone(String supplierPhone) { this.supplierPhone = supplierPhone; }
-    public String getImageUrl() { return imageUrl; }
+    public String getImageUrl() { return ImageUrlList.cover(imageUrlsText, imageUrl); }
     public void setImageUrl(String imageUrl) { this.imageUrl = imageUrl; }
+    @JsonIgnore
+    public String getRawImageUrl() { return imageUrl; }
+    @JsonIgnore
+    public String getImageUrlsText() { return imageUrlsText; }
+    public void setImageUrlsText(String value) { this.imageUrlsText = value; }
+    public List<String> getImageUrls() { return ImageUrlList.read(imageUrlsText, imageUrl); }
+    public void setImageUrls(List<String> value) { this.imageUrlsText = ImageUrlList.validateAndWrite(value); }
+
     @Size(max = 1000, message = "同款购买链接不能超过1000个字符")
     public String getPurchaseReferenceUrl() { return purchaseReferenceUrl; }
     public void setPurchaseReferenceUrl(String purchaseReferenceUrl) { this.purchaseReferenceUrl = purchaseReferenceUrl; }

@@ -36,6 +36,7 @@ import com.erp.system.service.ISysDictTypeService;
 @RequestMapping("/dict/data")
 public class SysDictDataController extends BaseController
 {
+    @Autowired private com.erp.system.service.support.DictCacheCoordinator dictCache;
     @Autowired
     private ISysDictDataService dictDataService;
     
@@ -95,7 +96,7 @@ public class SysDictDataController extends BaseController
     public AjaxResult add(@Validated @RequestBody SysDictData dict)
     {
         dict.setCreateBy(SecurityUtils.getUsername());
-        return toAjax(dictDataService.insertDictData(dict));
+        return dictCache.attachOutcome(toAjax(dictDataService.insertDictData(dict)));
     }
 
     /**
@@ -107,7 +108,7 @@ public class SysDictDataController extends BaseController
     public AjaxResult edit(@Validated @RequestBody SysDictData dict)
     {
         dict.setUpdateBy(SecurityUtils.getUsername());
-        return toAjax(dictDataService.updateDictData(dict));
+        return dictCache.attachOutcome(toAjax(dictDataService.updateDictData(dict)));
     }
 
     /**
@@ -119,6 +120,6 @@ public class SysDictDataController extends BaseController
     public AjaxResult remove(@PathVariable Long[] dictCodes)
     {
         dictDataService.deleteDictDataByIds(dictCodes);
-        return success();
+        return dictCache.attachOutcome(success());
     }
 }

@@ -69,7 +69,7 @@ class HrRenewalLifecycleTest
                 outboxMapper, renewalGuardMapper, mock(SysPostMapper.class),
                 mock(com.erp.system.mapper.SysDeptMapper.class),
                 mock(com.erp.system.mapper.SysUserMapper.class),
-                mock(SysUserPostMapper.class), userShopService, objectMapper);
+                mock(SysUserPostMapper.class), userShopService, objectMapper, org.mockito.Mockito.mock(com.erp.system.service.impl.HrSalarySourceService.class));
     }
 
     @Test

@@ -16,6 +16,7 @@ import com.erp.file.drive.domain.DriveNode;
 import com.erp.file.drive.domain.DriveSpace;
 import com.erp.file.drive.domain.vo.DriveNodeVo;
 import com.erp.file.drive.exception.DriveException;
+import com.erp.file.drive.exception.DriveUploadPreClaimRejectedException;
 import com.erp.file.drive.metric.DriveMetrics;
 import com.erp.file.drive.storage.DriveStorageProvider;
 import org.slf4j.Logger;
@@ -61,6 +62,67 @@ public class DriveUploadService
         this.metrics = metrics;
     }
 
+    private DriveUploadOperationService operations;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public void setUploadOperations(DriveUploadOperationService operations)
+    {
+        this.operations = operations;
+    }
+
+    public DriveUploadOperationService.Receipt uploadWithReceipt(MultipartFile file, Long spaceId,
+            Long parentId, DriveActor actor, String operationId)
+    {
+        Long effectiveParent = parentId == null ? DriveConstants.ROOT_PARENT_ID : parentId;
+        String name;
+        String hash;
+        try
+        {
+            if (file == null || file.isEmpty())
+                throw new DriveException(DriveErrorCodes.DRIVE_FILE_TYPE_REJECTED, "文件不能为空");
+            spaceService.requireWritableSpace(spaceId, actor);
+            nodeService.requireParent(spaceId, effectiveParent);
+            filePolicy.validate(file.getOriginalFilename(), file.getContentType(), file.getSize());
+            name = namePolicy.normalizeDisplayName(file.getOriginalFilename());
+            MessageDigest digest = messageDigest();
+            try (DigestInputStream input = new DigestInputStream(file.getInputStream(), digest))
+            {
+                input.transferTo(java.io.OutputStream.nullOutputStream());
+            }
+            hash = HexFormat.of().formatHex(digest.digest());
+        }
+        catch (DriveException | IOException ex)
+        {
+            // Preserve an earlier durable outcome even when a later request fails preflight.
+            // Receipt lookup failure is UNKNOWN and must not produce a pre-claim rejection marker.
+            DriveUploadOperationService.Receipt existing = operations.receipt(operationId, actor);
+            if (!"NOT_OBSERVED".equals(existing.status())) return existing;
+            throw new DriveUploadPreClaimRejectedException(operationId, translateUploadFailure(ex));
+        }
+        DriveUploadOperationService.Claim claim = operations.claim(operationId, actor,
+                spaceId, effectiveParent, name, file.getSize(), hash);
+        if (!claim.acquired()) return operations.receipt(operationId, actor);
+        long startedAt = metrics.start();
+        try
+        {
+            doUpload(file, spaceId, effectiveParent, actor, claim, hash);
+            metrics.recordUploadSuccess(startedAt);
+        }
+        catch (RuntimeException ex)
+        {
+            DriveException translated = translateUploadFailure(ex);
+            metrics.recordUploadFailure(startedAt, translated.getBusinessCode());
+            logService.failure(DriveConstants.ACTION_UPLOAD, actor, translated.getBusinessCode());
+            throw translated;
+        }
+        return operations.receipt(operationId, actor);
+    }
+
+    public DriveUploadOperationService.Receipt uploadReceipt(String operationId, DriveActor actor)
+    {
+        return operations.receipt(operationId, actor);
+    }
+
     public DriveNodeVo upload(MultipartFile file, Long spaceId, Long parentId, DriveActor actor)
     {
         long startedAt = metrics.start();
@@ -87,68 +149,76 @@ public class DriveUploadService
 
     private DriveNodeVo doUpload(MultipartFile file, Long spaceId, Long parentId, DriveActor actor)
     {
-        if (file == null || file.isEmpty())
-        {
-            throw new DriveException(DriveErrorCodes.DRIVE_FILE_TYPE_REJECTED, "文件不能为空");
-        }
-        Long effectiveParent = parentId == null ? DriveConstants.ROOT_PARENT_ID : parentId;
-        DriveSpace space = spaceService.requireWritableSpace(spaceId, actor);
-        DriveNode parent = nodeService.requireParent(spaceId, effectiveParent);
-        filePolicy.validate(file.getOriginalFilename(), file.getContentType(), file.getSize());
-        quotaService.preflight(space, file.getSize());
-        String originalName = namePolicy.normalizeDisplayName(file.getOriginalFilename());
-        String extension = filePolicy.extension(originalName);
-        String storageKey = storageKey(extension);
-        String reservationId = reservationService.reserveBeforeStorage(
-                spaceId, storageKey, file.getSize(), actor);
-        MessageDigest sha256 = messageDigest();
+        return doUpload(file, spaceId, parentId, actor, null, null);
+    }
 
-        try (DigestInputStream input = new DigestInputStream(file.getInputStream(), sha256))
-        {
-            storage.put(storageKey, input);
-        }
-        catch (RuntimeException | IOException ex)
-        {
-            settleReservation(reservationId, compensateDelete(storageKey, actor), actor);
-            throw translateUploadFailure(ex);
-        }
-
-        String hash = HexFormat.of().formatHex(sha256.digest());
+    private DriveNodeVo doUpload(MultipartFile file, Long spaceId, Long parentId, DriveActor actor,
+            DriveUploadOperationService.Claim claim, String expectedHash)
+    {
+        String storageKey = null;
+        String reservationId = null;
+        boolean putStarted = false;
+        boolean putCompleted = false;
         DriveNode persisted = null;
         try
         {
+            if (file == null || file.isEmpty())
+                throw new DriveException(DriveErrorCodes.DRIVE_FILE_TYPE_REJECTED, "文件不能为空");
+            Long effectiveParent = parentId == null ? DriveConstants.ROOT_PARENT_ID : parentId;
+            DriveSpace space = spaceService.requireWritableSpace(spaceId, actor);
+            DriveNode parent = nodeService.requireParent(spaceId, effectiveParent);
+            filePolicy.validate(file.getOriginalFilename(), file.getContentType(), file.getSize());
+            quotaService.preflight(space, file.getSize());
+            String originalName = namePolicy.normalizeDisplayName(file.getOriginalFilename());
+            String extension = filePolicy.extension(originalName);
+            storageKey = storageKey(extension);
+            reservationId = reservationService.reserveBeforeStorage(spaceId, storageKey, file.getSize(), actor);
+            MessageDigest sha256 = messageDigest();
+            try (DigestInputStream input = new DigestInputStream(file.getInputStream(), sha256))
+            {
+                putStarted = true;
+                storage.put(storageKey, input);
+                putCompleted = true;
+            }
+            String hash = HexFormat.of().formatHex(sha256.digest());
+            if (expectedHash != null && !expectedHash.equals(hash))
+                throw new DriveException(DriveErrorCodes.DRIVE_CONCURRENT_MODIFICATION,
+                        "上传内容已变化，请重新选择原文件");
             for (int attempt = 0; attempt < MAX_NAME_ATTEMPTS && persisted == null; attempt++)
             {
-                String displayName = nodeService.availableFileName(
-                        spaceId, effectiveParent, originalName);
+                String displayName = nodeService.availableFileName(spaceId, effectiveParent, originalName);
                 DriveNode candidate = fileNode(space, parent, effectiveParent,
                         displayName, storageKey, file, extension, hash, actor);
                 try
                 {
-                    persisted = persistence.persist(candidate, file.getSize(), reservationId);
+                    persisted = claim == null ? persistence.persist(candidate, file.getSize(), reservationId)
+                            : persistence.persist(candidate, file.getSize(), reservationId, claim);
                 }
                 catch (DuplicateKeyException ex)
                 {
-                    if (!isConstraint(ex, "uk_drive_node_active_name"))
-                    {
-                        throw ex;
-                    }
+                    if (!isConstraint(ex, "uk_drive_node_active_name")) throw ex;
                 }
             }
             if (persisted == null)
-            {
-                throw new DriveException(DriveErrorCodes.DRIVE_NAME_CONFLICT,
-                        "同名文件较多，请重试");
-            }
+                throw new DriveException(DriveErrorCodes.DRIVE_NAME_CONFLICT, "同名文件较多，请重试");
         }
-        catch (RuntimeException ex)
+        catch (RuntimeException | IOException ex)
         {
-            settleReservation(reservationId, compensateDelete(storageKey, actor), actor);
+            if (claim != null)
+            {
+                // A commit exception may arrive AFTER the DB committed. Never delete first.
+                DriveUploadOperationService.Receipt receipt = operations.fenceForCleanup(claim);
+                if ("SUCCEEDED".equals(receipt.status()))
+                    return nodeService.detail(Long.valueOf(receipt.nodeId()), actor);
+            }
+            boolean absent = storageKey == null || compensateDelete(storageKey, actor);
+            // An interrupted remote PUT can still finish later. Absence now does not make it retryable.
+            boolean safelyAbsent = absent && (!putStarted || putCompleted);
+            if (reservationId != null) settleReservation(reservationId, claim == null ? absent : safelyAbsent, actor);
+            if (claim != null) operations.finishCleanup(claim, safelyAbsent);
             throw translateUploadFailure(ex);
         }
-
-        logService.success(DriveConstants.ACTION_UPLOAD, actor,
-                persisted, null, persisted.getNodeName());
+        logService.success(DriveConstants.ACTION_UPLOAD, actor, persisted, null, persisted.getNodeName());
         return nodeService.toVo(persisted, actor);
     }
 

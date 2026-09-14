@@ -89,6 +89,7 @@
     </div>
 
     <div class="table-card post-table-card">
+    <div v-if="loadError" role="alert" class="system-list-error"><span>加载失败：{{ loadError }}</span> <el-button type="text" :disabled="loading" @click="getList">重新加载</el-button></div>
     <el-table v-accessible-table="'岗位列表'" v-loading="loading" :data="postList" @selection-change="handleSelectionChange">
       <el-table-column type="selection" width="55" align="center" />
       <el-table-column label="岗位编号" align="center" prop="postId" />
@@ -168,10 +169,12 @@
 </template>
 
 <script>
+import systemListRecovery from "@/mixins/systemListRecovery"
 import { listPost, getPost, delPost, addPost, updatePost } from "@/api/system/post"
 import { confirmExportAction } from "@/utils/exportConfirm"
 
 export default {
+  mixins: [systemListRecovery],
   name: "Post",
   dicts: ['sys_normal_disable'],
   data() {
@@ -224,11 +227,11 @@ export default {
   methods: {
     /** 查询岗位列表 */
     getList() {
-      this.loading = true
-      listPost(this.queryParams).then(response => {
+      const query = { ...this.queryParams }
+      return this.runSystemListRequest(() => listPost(query, { silentError: true }), response => {
+        if (!response || !Array.isArray(response.rows)) throw new Error("列表响应无效，请重试")
         this.postList = response.rows
-        this.total = response.total
-        this.loading = false
+        this.total = Number(response.total) || 0
       })
     },
     // 取消按钮

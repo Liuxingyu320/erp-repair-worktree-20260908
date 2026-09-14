@@ -33,6 +33,7 @@ final class InvTransferWorkflowResources
     final InvDeptScopeMapper deptScopeMapper;
     final ShopScopeService shopScopeService;
     final InvTransferReservationService transferReservationService;
+    final InvTransferEvidenceService evidenceService;
 
     InvTransferWorkflowResources(
             InvTransferOrderMapper transferOrderMapper,
@@ -51,6 +52,27 @@ final class InvTransferWorkflowResources
             ShopScopeService shopScopeService,
             InvTransferReservationService transferReservationService)
     {
+        this(transferOrderMapper, transferDetailMapper, transferDiscrepancyMapper,
+                dispositionMapper, transferShipmentMapper, transferShipmentDetailMapper,
+                stockMapper, stockLogMapper, numberSequenceMapper, statusLogMapper,
+                businessFeatureGate, businessMetrics, deptScopeMapper, shopScopeService,
+                transferReservationService, new InvTransferEvidenceService(null));
+    }
+
+    InvTransferWorkflowResources(
+            InvTransferOrderMapper transferOrderMapper, InvTransferDetailMapper transferDetailMapper,
+            InvTransferDiscrepancyMapper transferDiscrepancyMapper,
+            InvTransferDiscrepancyDispositionMapper dispositionMapper,
+            InvTransferShipmentMapper transferShipmentMapper,
+            InvTransferShipmentDetailMapper transferShipmentDetailMapper,
+            InvStockMapper stockMapper, InvStockLogMapper stockLogMapper,
+            InvNumberSequenceMapper numberSequenceMapper, InvTransferStatusLogMapper statusLogMapper,
+            BusinessFeatureGate businessFeatureGate, InventoryBusinessMetrics businessMetrics,
+            InvDeptScopeMapper deptScopeMapper, ShopScopeService shopScopeService,
+            InvTransferReservationService transferReservationService,
+            InvTransferEvidenceService evidenceService)
+    {
+        this.evidenceService = evidenceService == null ? new InvTransferEvidenceService(null) : evidenceService;
         this.transferOrderMapper = transferOrderMapper;
         this.transferDetailMapper = transferDetailMapper;
         this.transferDiscrepancyMapper = transferDiscrepancyMapper;

@@ -34,8 +34,11 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
              inner join sys_dept d on d.dept_id = p.dept_id
              left join sys_user u on u.user_id = p.user_id
              left join hr_employee_health_certificate hc on hc.user_id = p.user_id
-                  and hc.current_flag = 'Y' and hc.review_status = 'APPROVED'
-                  and hc.del_flag = '0'
+                  and hc.certificate_id = <include refid="com.erp.system.mapper.HrHealthCertificateMapper.chosenCertificateId">
+                      <property name="owner" value="p.user_id"/>
+                      <property name="asOfExpr" value="#{asOfDate}"/>
+                  </include>
+                  and coalesce(hc.valid_from,hc.issued_date) &lt;= #{asOfDate}
              left join (
                  select sup.user_id,
                         group_concat(distinct sp.post_name order by sp.post_sort, sp.post_name separator '、') as post_names

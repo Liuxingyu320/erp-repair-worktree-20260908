@@ -98,7 +98,7 @@
               <el-input v-model.trim="model.workCityLevel" maxlength="64" />
             </el-form-item>
           </el-col>
-          <el-col :span="24"><h3 class="transfer-section-title">合同主体与薪资</h3></el-col>
+          <el-col :span="24"><h3 class="transfer-section-title">合同主体</h3></el-col>
           <el-col :xs="24" :sm="8">
             <el-form-item label="法人主体编号" prop="legalEntityId" required>
               <el-input-number v-model="model.legalEntityId" :min="1" :precision="0" :controls="false" />
@@ -114,6 +114,12 @@
               <el-input v-model.trim="model.legalEntityName" maxlength="128" />
             </el-form-item>
           </el-col>
+          <el-col v-if="canAdjustSalary" :span="24">
+            <el-form-item label="">
+              <el-checkbox v-model="model.adjustSalary">同时调整工资</el-checkbox>
+            </el-form-item>
+          </el-col>
+          <template v-if="canAdjustSalary && model.adjustSalary">
           <el-col :xs="24" :sm="8">
             <el-form-item label="基本工资" prop="baseSalary" required>
               <el-input-number v-model="model.baseSalary" :min="0" :precision="2" :controls="false" />
@@ -140,11 +146,7 @@
               <small class="auto-total-note">由四项薪资自动合计</small>
             </el-form-item>
           </el-col>
-          <el-col :xs="24" :sm="8">
-            <el-form-item label="薪资版本" prop="salaryVersion" required>
-              <el-input v-model.trim="model.salaryVersion" maxlength="32" />
-            </el-form-item>
-          </el-col>
+          </template>
         </el-row>
       </el-form>
 
@@ -217,7 +219,7 @@ const emptyModel = () => ({
   fieldAllowance: null,
   performanceSalary: null,
   salaryTotal: null,
-  salaryVersion: ""
+  adjustSalary: false
 })
 
 export default {
@@ -300,9 +302,14 @@ export default {
       if (this.isHistorical) return `高风险补录：业务生效日 ${this.model.effectiveDate}，实际操作日 ${this.businessDate}`
       return ""
     },
+    canAdjustSalary() {
+      const getters = this.$store && this.$store.getters || {}
+      const permissions = Array.isArray(getters.permissions) ? getters.permissions : []
+      return permissions.includes("*:*:*") || permissions.includes("hr:employee:salary:edit")
+    },
     salaryValid() {
       const values = [this.model.baseSalary, this.model.postSalary, this.model.fieldAllowance, this.model.performanceSalary, this.model.salaryTotal]
-      if (values.some(value => value === null || value === undefined || Number(value) < 0)) return false
+      if (values.some(value => value === null || value === undefined || value === "" || !Number.isFinite(Number(value)) || Number(value) < 0)) return false
       const components = values.slice(0, 4).reduce((total, value) => total + Number(value), 0)
       return Number(this.model.salaryTotal) > 0 && Math.abs(components - Number(this.model.salaryTotal)) < 0.005
     },
@@ -310,7 +317,7 @@ export default {
       return Boolean(this.businessDate && this.model.effectiveDate && this.selectedDept && this.selectedPost &&
         this.model.jobGradeCode && this.model.workLocation && this.model.workCityLevel &&
         this.model.legalEntityId && this.model.legalEntityCode && this.model.legalEntityName &&
-        this.model.salaryVersion && this.salaryValid)
+        (!this.model.adjustSalary || (this.canAdjustSalary && this.salaryValid)))
     },
     hasBusinessChanges() {
       return Number(this.currentDeptId) !== Number(this.model.targetDeptId) ||
@@ -322,12 +329,8 @@ export default {
         Number(this.field("legalEntityId") || 0) !== Number(this.model.legalEntityId || 0) ||
         String(this.field("legalEntityCode") || "") !== String(this.model.legalEntityCode || "") ||
         String(this.field("legalEntity") || this.field("legalEntityName") || "") !== String(this.model.legalEntityName || "") ||
-        Number(this.field("baseSalary") || 0) !== Number(this.model.baseSalary || 0) ||
-        Number(this.field("postSalary") || 0) !== Number(this.model.postSalary || 0) ||
-        Number(this.field("fieldAllowance") || 0) !== Number(this.model.fieldAllowance || 0) ||
-        Number(this.field("performanceSalary") || 0) !== Number(this.model.performanceSalary || 0) ||
-        Number(this.field("salaryTotal") || 0) !== Number(this.model.salaryTotal || 0) ||
-        String(this.field("salaryVersion") || "") !== String(this.model.salaryVersion || "")
+        (this.model.adjustSalary && this.canAdjustSalary && ["baseSalary", "postSalary", "fieldAllowance", "performanceSalary", "salaryTotal"]
+          .some(key => this.numberField(key) !== this.model[key]))
     },
     canSubmit() {
       return !this.businessDateLoading && !this.submitting && !this.isFuture &&
@@ -342,6 +345,9 @@ export default {
     employee(value, previous) {
       if (this.visible && value && (!previous || value.userId !== previous.userId)) this.openDialog()
     },
+    canAdjustSalary(value) {
+      if (!value) this.model.adjustSalary = false
+    },
     "model.baseSalary": "syncSalaryTotal",
     "model.postSalary": "syncSalaryTotal",
     "model.fieldAllowance": "syncSalaryTotal",
@@ -353,7 +359,7 @@ export default {
   methods: {
     syncSalaryTotal() {
       const values = [this.model.baseSalary, this.model.postSalary, this.model.fieldAllowance, this.model.performanceSalary]
-      this.model.salaryTotal = values.some(value => value === null || value === undefined || value === "")
+      this.model.salaryTotal = values.some(value => value === null || value === undefined || value === "" || !Number.isFinite(Number(value)))
         ? null
         : Number(values.reduce((total, value) => total + Number(value), 0).toFixed(2))
     },
@@ -373,7 +379,7 @@ export default {
     },
     numberField(key) {
       const value = this.field(key)
-      return value === null || value === undefined || value === "" ? null : Number(value)
+      return value === null || value === undefined || value === "" || !Number.isFinite(Number(value)) ? null : Number(value)
     },
     initialModel() {
       return {
@@ -391,13 +397,13 @@ export default {
         postSalary: this.numberField("postSalary"),
         fieldAllowance: this.numberField("fieldAllowance"),
         performanceSalary: this.numberField("performanceSalary"),
-        salaryTotal: this.numberField("salaryTotal"),
-        salaryVersion: this.field("salaryVersion") || ""
+        salaryTotal: this.numberField("salaryTotal")
       }
     },
     openDialog() {
       const generation = ++this.generation
       this.model = this.initialModel()
+      this.submitting = false
       this.businessDate = ""
       this.businessDateLoading = true
       this.requestId = this.requestKey()
@@ -442,12 +448,14 @@ export default {
         legalEntityId: this.model.legalEntityId,
         legalEntityCode: this.model.legalEntityCode,
         legalEntityName: this.model.legalEntityName,
-        baseSalary: this.model.baseSalary,
-        postSalary: this.model.postSalary,
-        fieldAllowance: this.model.fieldAllowance,
-        performanceSalary: this.model.performanceSalary,
-        salaryTotal: this.model.salaryTotal,
-        salaryVersion: this.model.salaryVersion,
+        adjustSalary: this.model.adjustSalary && this.canAdjustSalary,
+        ...(this.model.adjustSalary && this.canAdjustSalary ? {
+          baseSalary: this.model.baseSalary,
+          postSalary: this.model.postSalary,
+          fieldAllowance: this.model.fieldAllowance,
+          performanceSalary: this.model.performanceSalary,
+          salaryTotal: this.model.salaryTotal
+        } : {}),
         riskConfirmation: riskConfirmation || null
       }
     },
@@ -483,7 +491,7 @@ export default {
       return this.submitPayload(this.historicalConfirmation())
     },
     submitPayload(riskConfirmation) {
-      if (this.submitting) return Promise.resolve(null)
+      if (this.submitting || !this.canSubmit || !this.visible) return Promise.resolve(null)
       const generation = this.generation
       const requestId = this.requestId
       const employeeId = this.employee && this.employee.userId

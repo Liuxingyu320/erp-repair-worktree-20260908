@@ -12,7 +12,7 @@
       </header>
       <form class="mobile-form-layout" novalidate @submit.prevent="emitSubmit(defaultSubmitAction)" @focusin="handleFocusIn">
         <div ref="formBody" class="form-body mobile-system-sheet__body">
-          <div class="mobile-form-list">
+          <fieldset class="mobile-form-list" :disabled="saving" :inert="saving ? true : null" :aria-busy="saving ? 'true' : 'false'">
             <div
               v-for="field in fields"
               :key="field.key"
@@ -83,11 +83,17 @@
                 v-else-if="field.type === 'image-upload'"
                 :id="fieldControlId(field)"
                 v-model="localData[field.key]"
+                :action="imageUploadAction(field)"
+                :context-key="uploadContextKey"
+                :data="imageUploadData(field)"
+                :disabled="imageUploadDisabled(field)"
+                :delete-on-remove="imageUploadDeleteOnRemove(field)"
                 :limit="field.limit || 5"
                 :file-size="field.fileSize || 5"
                 :accept="field.accept || 'image/*'"
                 :capture="field.capture || 'environment'"
                 :compress="field.compress !== false"
+                @upload-state="handleUploadState"
                 @input="emitInput"
               />
               <mobile-line-items-editor
@@ -137,7 +143,7 @@
                 @input="emitInput"
               >
             </div>
-          </div>
+          </fieldset>
           <section
             v-if="showFixedAssetPurchaseReference"
             class="mobile-fixed-asset-reference"
@@ -148,12 +154,7 @@
               <span>额度不足，无法上报</span>
               <strong>{{ fixedAssetPrecheck.oeItemName || "同款器皿" }}</strong>
             </div>
-            <img
-              v-if="fixedAssetPrecheck.imageUrl"
-              :src="fixedAssetPrecheck.imageUrl"
-              :alt="(fixedAssetPrecheck.oeItemName || '同款器皿') + '图片'"
-              class="mobile-fixed-asset-reference__image"
-            >
+            <image-gallery :value="fixedAssetPrecheck" />
             <dl class="mobile-fixed-asset-reference__details">
               <div><dt>器皿编码</dt><dd>{{ fixedAssetPrecheck.oeItemCode || "-" }}</dd></div>
               <div><dt>规格说明</dt><dd>{{ fixedAssetPrecheck.itemDescription || "-" }}</dd></div>
@@ -187,6 +188,9 @@
           <p>{{ error || "当前账号没有保存权限" }}</p>
           <button v-if="validationError" type="button" @click="focusValidationError">转到错误字段</button>
         </div>
+        <p v-if="uploadsUnfinished" role="status">附件尚未上传完成，请处理后再保存。</p>
+        <p v-if="returnSourceLoading" role="status">正在加载原单明细…</p>
+        <p v-if="returnSourceError" role="alert">{{ returnSourceError }}</p>
         <footer class="form-footer mobile-system-sheet__footer">
           <span v-if="saving" class="mobile-dialog-status" role="status" aria-live="polite">正在保存表单</span>
           <div class="detail-actions">
@@ -196,7 +200,7 @@
               :key="mode.action"
               :type="mode.action === primarySubmitAction ? 'submit' : 'button'"
               :class="submitModeClass(mode)"
-              :disabled="saving || mode.disabled === true"
+              :disabled="saving || uploadsUnfinished || returnSourceLoading || !!returnSourceError || mode.disabled === true"
               :title="mode.disabledReason || null"
               @click="handleSubmitModeClick(mode)"
             >
@@ -210,13 +214,14 @@
 </template>
 
 <script>
+import ImageGallery from "@/components/ImageGallery"
 import MobileEntityPicker from "./MobileEntityPicker.vue"
 import MobileLineItemsEditor from "./MobileLineItemsEditor.vue"
 import { mountMobileOverlay, releaseMobileOverlay } from "./mobileOverlayStack"
 import { createMobileDialogFocusManager } from "./mobileDialogFocus"
 import { createSalesReturnDataFromOrder, createPurchaseReturnDataFromOrder } from "../mobileReturnSourceOrders"
-import { getSalesDetail } from "@/api/inventory/sales"
-import { getPurchaseDetail } from "@/api/inventory/purchase"
+import { getSalesReturnSourceOrder } from "@/api/inventory/salesReturn"
+import { getPurchaseReturnSourceOrder } from "@/api/inventory/purchaseReturn"
 import ImageUpload from "@/components/ImageUpload"
 
 const { isFieldRequired } = require("../mobileValidation")
@@ -225,9 +230,10 @@ const { applyMobileTransferSmartPasteRecipient } = require("../mobileTransferSma
 
 export default {
   name: "MobileFormSheet",
-  components: { MobileEntityPicker, MobileLineItemsEditor, ImageUpload },
+  components: { ImageGallery, MobileEntityPicker, MobileLineItemsEditor, ImageUpload },
   props: {
     open: Boolean,
+    contextKey: { type: [String, Number], default: '' },
     title: { type: String, default: "" },
     feature: { type: Object, required: true },
     config: { type: Object, required: true },
@@ -243,13 +249,22 @@ export default {
   data() {
     return {
       localData: Object.assign({}, this.value),
+      uploadStates: {},
       activeControl: null,
       viewportFrame: null,
       viewportListening: false,
-      dialogFocusManager: null
+      dialogFocusManager: null,
+      returnSourceSequence: 0,
+      returnSourceLoading: false,
+      returnSourceError: ""
     }
   },
   computed: {
+    uploadContextKey() {
+      return JSON.stringify([this.contextKey, this.config && this.config.idKey,
+        this.value && this.config && this.value[this.config.idKey], this.context && this.context.selectedDeptId])
+    },
+    uploadsUnfinished() { return Object.values(this.uploadStates).some(Boolean) },
     fields() {
       return (Array.isArray(this.config.fields) ? this.config.fields : []).filter(this.canShowField)
     },
@@ -305,6 +320,9 @@ export default {
   },
   watch: {
     open(value) {
+      this.returnSourceSequence += 1
+      this.returnSourceLoading = false
+      this.returnSourceError = ""
       if (value) {
         this.$nextTick(() => {
           if (!this.open) return
@@ -387,6 +405,36 @@ export default {
     isCustomField(field) {
       return ["entity-picker", "line-items", "image-upload"].indexOf(field && field.type) > -1
     },
+    imageUploadAction(field) {
+      return field && field.action ? field.action : "/file/upload"
+    },
+    imageUploadData(field) {
+      if (!(field && field.action)) {
+        return field && field.data ? field.data : undefined
+      }
+      const data = field.data ? Object.assign({}, field.data) : {}
+      if (this.hasRepairImageShopContext()) {
+        data.shopDeptId = this.context.selectedDeptId
+      }
+      return data
+    },
+    imageUploadDisabled(field) {
+      if (!(field && field.action)) return false
+      return !this.hasRepairImageShopContext()
+    },
+    imageUploadDeleteOnRemove(field) {
+      return !!(field && field.deleteOnRemove)
+    },
+    hasRepairImageShopContext() {
+      const type = this.context && this.context.selectedDeptType
+      const isStore = String(type || "").trim().toUpperCase() === "STORE"
+      return isStore && this.hasPositiveShopDeptId(this.context && this.context.selectedDeptId)
+    },
+    hasPositiveShopDeptId(value) {
+      if (value === undefined || value === null || value === "") return false
+      const numeric = Number(value)
+      return Number.isInteger(numeric) && numeric > 0
+    },
     fieldIdPart(field) {
       return String(field && field.key ? field.key : "field").replace(/[^a-zA-Z0-9_-]/g, "-")
     },
@@ -437,6 +485,11 @@ export default {
       this.emitInput()
     },
     handleEntitySelectionCleared(field) {
+      if (["salesOrderId", "purchaseOrderId"].includes(field.key)) {
+        this.returnSourceSequence += 1
+        this.returnSourceLoading = false
+        this.returnSourceError = ""
+      }
       const relatedFields = {
         customerId: ["customerName"],
         supplierId: ["supplierName"],
@@ -461,6 +514,10 @@ export default {
         this.$set(this.localData, field.key, option.value)
       }
 
+      if (field.salesWarehouseDefault && Array.isArray(this.localData.details)) {
+        this.$set(this.localData, "details", this.localData.details.map(detail => Object.assign({}, detail,
+          detail.warehouseId ? {} : { warehouseId: option.value, warehouseName: label })))
+      }
       if (field.key === "customerId") {
         this.setIfValue("customerName", row.customerName || label)
       }
@@ -469,6 +526,7 @@ export default {
       }
       if (field.key === "salesOrderId") {
         const orderNo = row.orderNo || row.salesOrderNo || label
+        this.updateReturnTitle("销售退货-", this.localData.salesOrderNo, orderNo)
         this.setIfValue("salesOrderNo", orderNo)
         this.setIfValue("customerId", row.customerId)
         this.setIfValue("customerName", row.customerName)
@@ -478,6 +536,7 @@ export default {
       }
       if (field.key === "purchaseOrderId") {
         const orderNo = row.orderNo || row.purchaseOrderNo || label
+        this.updateReturnTitle("采购退货-", this.localData.purchaseOrderNo, orderNo)
         this.setIfValue("purchaseOrderNo", orderNo)
         this.setIfValue("supplierId", row.supplierId)
         this.setIfValue("supplierName", row.supplierName)
@@ -492,28 +551,37 @@ export default {
       this.localData = applyMobileTransferSmartPasteRecipient(this.localData, recipient)
       this.emitInput()
     },
-    loadSalesReturnSourceOrder(orderId, row) {
-      if (!orderId) {
-        this.emitInput()
-        return
+    updateReturnTitle(prefix, previousOrderNo, nextOrderNo) {
+      if (!this.localData.returnTitle || this.localData.returnTitle === prefix + (previousOrderNo || "")) {
+        this.$set(this.localData, "returnTitle", nextOrderNo ? prefix + nextOrderNo : "")
       }
-      getSalesDetail(orderId).then(response => {
-        const sourceOrder = Object.assign({}, row || {}, response && response.data ? response.data : {})
-        this.applyReturnSourceData(createSalesReturnDataFromOrder(sourceOrder, this.localData))
-      }).catch(() => {
-        this.emitInput()
-      })
+    },
+    loadSalesReturnSourceOrder(orderId, row) {
+      return this.loadReturnSourceOrder("salesOrderId", orderId, row, getSalesReturnSourceOrder, createSalesReturnDataFromOrder)
     },
     loadPurchaseReturnSourceOrder(orderId, row) {
-      if (!orderId) {
-        this.emitInput()
-        return
-      }
-      getPurchaseDetail(orderId).then(response => {
-        const sourceOrder = Object.assign({}, row || {}, response && response.data ? response.data : {})
-        this.applyReturnSourceData(createPurchaseReturnDataFromOrder(sourceOrder, this.localData))
+      return this.loadReturnSourceOrder("purchaseOrderId", orderId, row, getPurchaseReturnSourceOrder, createPurchaseReturnDataFromOrder)
+    },
+    loadReturnSourceOrder(key, orderId, row, fetchOrder, createData) {
+      const sequence = ++this.returnSourceSequence
+      this.returnSourceLoading = !!orderId
+      this.returnSourceError = ""
+      this.$set(this.localData, "details", [])
+      this.emitInput()
+      if (!orderId) return Promise.resolve()
+      const current = () => this.open && sequence === this.returnSourceSequence
+        && String(this.localData[key]) === String(orderId)
+      return fetchOrder(orderId).then(response => {
+        if (!current()) return
+        const source = Object.assign({}, row || {}, response && response.data ? response.data : {})
+        if (String(source.orderId) !== String(orderId)) throw new Error("原单信息不匹配")
+        this.applyReturnSourceData(createData(source, this.localData))
       }).catch(() => {
+        if (!current()) return
+        this.returnSourceError = "原单加载失败，请重新选择原单后再保存"
         this.emitInput()
+      }).finally(() => {
+        if (current()) this.returnSourceLoading = false
       })
     },
     applyReturnSourceData(data) {
@@ -531,9 +599,17 @@ export default {
       this.setIfValue(key, value)
     },
     emitInput() {
+      if (this.saving) return
       this.$emit("input", Object.assign({}, this.localData))
     },
+    handleUploadState(state) {
+      if (!state || state.id == null) return
+      if (state.blocking) this.$set(this.uploadStates, state.id, true)
+      else this.$delete(this.uploadStates, state.id)
+    },
     emitSubmit(submitAction) {
+      if (this.saving || this.uploadsUnfinished) return
+      if (this.returnSourceLoading || this.returnSourceError) return
       const mode = this.effectiveSubmitModes.find(item => item.action === submitAction)
       if (mode && mode.disabled) return
       this.emitInput()
@@ -644,6 +720,7 @@ export default {
 </script>
 
 <style scoped lang="scss">
+fieldset.mobile-form-list { min-width: 0; margin: 0; padding: 0; border: 0; }
 @import "./mobileSheet.scss";
 
 .mobile-fixed-asset-reference {

@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.oa.attendance.leave.balance.AttendanceLeaveBalanceOptionsMapper">
+    <select id="selectTypes" resultType="com.erp.oa.attendance.leave.balance.AttendanceLeaveBalanceOptionsMapper$TypeOption">
+        SELECT CAST(leave_type_id AS CHAR) AS leaveTypeId, type_name AS typeName, type_code AS typeCode,
+               unit_mode AS unitMode, balance_required AS balanceRequired
+        FROM oa_attendance_leave_type WHERE status='ENABLED' ORDER BY sort_no,leave_type_id
+    </select>
+    <select id="selectCompanies" resultType="com.erp.oa.attendance.leave.balance.AttendanceLeaveBalanceOptionsMapper$CompanyOption">
+        SELECT DISTINCT CAST(le.legal_entity_id AS CHAR) AS legalEntityId,
+               le.legal_entity_name AS legalEntityName, le.legal_entity_code AS legalEntityCode
+        FROM sys_dept d JOIN sys_dept owner ON owner.dept_id=d.dept_id OR FIND_IN_SET(owner.dept_id,d.ancestors)
+        JOIN sys_legal_entity le ON le.legal_entity_id=owner.legal_entity_id
+        WHERE d.dept_id=#{ownerDeptId} AND d.status='0' AND d.del_flag='0'
+          AND owner.status='0' AND owner.del_flag='0' AND le.status='0'
+        ORDER BY legalEntityName,legalEntityId
+    </select>
+    <sql id="employeeScope">
+        FROM sys_user u JOIN sys_user_profile p ON p.user_id=u.user_id
+        JOIN sys_dept dept ON dept.dept_id=u.dept_id AND dept.status='0' AND dept.del_flag='0'
+        JOIN sys_dept root ON root.dept_id=#{ownerDeptId} AND root.status='0' AND root.del_flag='0'
+        WHERE u.status='0' AND u.del_flag='0' AND p.employee_status IN ('试用','正式','在职','待离职')
+          AND (dept.dept_id=root.dept_id OR FIND_IN_SET(root.dept_id,dept.ancestors))
+        <if test="keyword != null">
+          AND (LOCATE(#{keyword},COALESCE(u.nick_name,''))&gt;0 OR LOCATE(#{keyword},COALESCE(u.user_name,''))&gt;0
+               OR LOCATE(#{keyword},COALESCE(p.employee_no,''))&gt;0)
+        </if>
+    </sql>
+    <select id="countEmployees" resultType="int">SELECT COUNT(*) <include refid="employeeScope"/></select>
+    <select id="selectEmployees" resultType="com.erp.oa.attendance.leave.balance.AttendanceLeaveBalanceOptionsMapper$EmployeeOption">
+        SELECT CAST(u.user_id AS CHAR) AS userId, COALESCE(NULLIF(u.nick_name,''),u.user_name) AS userName,
+               u.user_name AS account, dept.dept_name AS deptName
+        <include refid="employeeScope"/> ORDER BY u.user_id LIMIT #{offset},#{limit}
+    </select>
+    <sql id="sourceScope">
+        FROM oa_attendance_day_result r
+        JOIN oa_attendance_schedule s ON s.schedule_id=r.schedule_id AND s.status='PUBLISHED'
+             AND s.user_id=r.user_id AND s.shop_id=r.shop_id AND s.business_date=r.business_date
+        JOIN sys_user u ON u.user_id=r.user_id AND u.status='0' AND u.del_flag='0'
+        JOIN sys_user_profile p ON p.user_id=u.user_id AND p.employee_status IN ('试用','正式','在职','待离职')
+        JOIN sys_dept dept ON dept.dept_id=u.dept_id AND dept.status='0' AND dept.del_flag='0'
+        JOIN sys_dept root ON root.dept_id=#{ownerDeptId} AND root.status='0' AND root.del_flag='0'
+        WHERE r.shop_id=#{ownerDeptId} AND (dept.dept_id=root.dept_id OR FIND_IN_SET(root.dept_id,dept.ancestors))
+          AND r.business_date BETWEEN #{dateFrom} AND #{dateTo} AND r.settled_at IS NOT NULL
+          AND r.row_version IS NOT NULL AND r.row_version&gt;=0 AND r.scheduled_minutes&gt;=0 AND r.worked_minutes&gt;r.scheduled_minutes
+        <if test="keyword != null">
+          AND (LOCATE(#{keyword},COALESCE(u.nick_name,''))&gt;0 OR LOCATE(#{keyword},COALESCE(u.user_name,''))&gt;0
+               OR LOCATE(#{keyword},COALESCE(p.employee_no,''))&gt;0)
+        </if>
+    </sql>
+    <select id="countOvertimeSources" resultType="int">SELECT COUNT(*) <include refid="sourceScope"/></select>
+    <select id="selectOvertimeSources" resultType="com.erp.oa.attendance.leave.balance.AttendanceLeaveBalanceOptionsMapper$SourceOption">
+        SELECT CAST(r.day_result_id AS CHAR) AS dayResultId, CAST(r.row_version AS CHAR) AS rowVersion,
+               CAST(r.user_id AS CHAR) AS userId, CAST(r.shop_id AS CHAR) AS shopId, CAST(r.schedule_id AS CHAR) AS scheduleId,
+               r.user_name AS userName,r.business_date AS businessDate,r.worked_minutes AS workedMinutes,
+               r.scheduled_minutes AS scheduledMinutes,r.settled_at AS settledAt,r.result_status AS resultStatus
+        <include refid="sourceScope"/> ORDER BY r.business_date DESC,r.day_result_id DESC LIMIT #{offset},#{limit}
+    </select>
+</mapper>

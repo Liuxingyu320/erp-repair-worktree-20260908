@@ -31,6 +31,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Supplier;
 import javax.imageio.ImageIO;
 import org.apache.poi.util.Units;
 import org.apache.poi.xwpf.usermodel.IBodyElement;
@@ -58,6 +59,7 @@ import com.erp.oa.domain.dto.OaLaborContractSignRequest;
 public class OaLaborContractDocumentService
 {
     private static final String MODULE_DIR = "labor-contract";
+    private final ThreadLocal<Long> activeArchiveContract = new ThreadLocal<>();
     private static final int MAX_SIGNATURE_BYTES = 1024 * 1024;
     private static final int MIN_SIGNATURE_WIDTH = 120;
     private static final int MIN_SIGNATURE_HEIGHT = 40;
@@ -219,9 +221,57 @@ public class OaLaborContractDocumentService
         }
     }
 
+    /** Keep this scope open through the conditional DB update and event append, not only PDF generation. */
+    public <T> T withSignedArchiveAttempt(OaLaborContract contract, Supplier<T> work)
+    {
+        if (contract == null || contract.getContractId() == null) throw new ServiceException("合同ID不能为空");
+        if (activeArchiveContract.get() != null)
+        {
+            throw new ServiceException("合同归档操作不可嵌套");
+        }
+        OaLaborContractArchiveAttempt attempt = new OaLaborContractArchiveAttempt(contract.getContractId());
+        try
+        {
+            Path configuredRoot = Paths.get(localFilePath).toAbsolutePath().normalize();
+            Files.createDirectories(configuredRoot);
+            Path root = configuredRoot.toRealPath();
+            Path directory = root.resolve(MODULE_DIR).resolve(String.valueOf(contract.getContractId()));
+            Files.createDirectories(directory);
+            if (!directory.toRealPath().equals(directory)) throw new ServiceException("合同归档目录不能使用链接目录");
+            for (String name : Arrays.asList("signature.png", "archive.docx", "archive.pdf", "certificate.pdf"))
+            {
+                attempt.reserve(directory.resolve(name));
+            }
+            attempt.registerRollback();
+            activeArchiveContract.set(contract.getContractId());
+            return work.get();
+        }
+        catch (IOException e)
+        {
+            ServiceException failure = new ServiceException("创建合同归档文件失败，请核对后重试");
+            failure.addSuppressed(e);
+            attempt.cleanup(failure);
+            throw failure;
+        }
+        catch (RuntimeException | Error failure)
+        {
+            attempt.cleanup(failure);
+            throw failure;
+        }
+        finally
+        {
+            activeArchiveContract.remove();
+        }
+    }
+
     public GeneratedContractFile generateSignedArchive(OaLaborContract contract, OaLaborContractTemplate template,
             OaCompanySealConfig sealConfig, OaLaborContractSignRequest request)
     {
+        if (activeArchiveContract.get() == null)
+        {
+            return withSignedArchiveAttempt(contract, () -> generateSignedArchive(contract, template, sealConfig, request));
+        }
+        if (!activeArchiveContract.get().equals(contract.getContractId())) throw new ServiceException("合同归档上下文不匹配");
         try
         {
             StoredFile signatureFile = writeSignatureImage(contract, request.getSignatureDataUrl());

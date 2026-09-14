@@ -113,6 +113,9 @@ export default {
     }
   },
   watch: {
+    readOnly(value) {
+      if (this.Quill) this.Quill.enable(!value)
+    },
     value: {
       handler(val) {
         if (val !== this.currentValue) {

@@ -77,7 +77,7 @@ class SysProfileControllerTest
         UserSessionInvalidationService sessionInvalidationService = mock(UserSessionInvalidationService.class);
         ISysConfigService configService = mock(ISysConfigService.class);
         when(configService.selectConfigByKey("sys.account.chrtype")).thenReturn("0");
-        when(userService.activateUserPassword(eq(42L), anyString(), eq("temp-user"))).thenReturn(1);
+        when(userService.changeOwnPassword(eq(42L), anyString(), anyString(), eq("temp-user"), eq("token-42"))).thenReturn(1);
 
         String oldPlain = "OldTemp~Password01";
         String newPlain = "NewActive~Password02";
@@ -102,7 +102,6 @@ class SysProfileControllerTest
         SysProfileController controller = new SysProfileController();
         ReflectionTestUtils.setField(controller, "userService", userService);
         ReflectionTestUtils.setField(controller, "tokenService", tokenService);
-        ReflectionTestUtils.setField(controller, "userSessionInvalidationService", sessionInvalidationService);
         ReflectionTestUtils.setField(controller, "configService", configService);
 
         SysSelfPasswordUpdateRequest params = new SysSelfPasswordUpdateRequest();
@@ -112,7 +111,7 @@ class SysProfileControllerTest
         AjaxResult result = controller.updatePwd(params);
 
         assertThat(result.get(AjaxResult.CODE_TAG)).isEqualTo(200);
-        verify(userService).activateUserPassword(eq(42L), anyString(), eq("temp-user"));
+        verify(userService).changeOwnPassword(eq(42L), eq(oldHash), anyString(), eq("temp-user"), eq("token-42"));
         assertThat(loginUser.getCredentialState()).isEqualTo(SysUser.CREDENTIAL_STATE_ACTIVE);
         assertThat(loginUser.getTemporaryPasswordExpiresAt()).isNull();
         assertThat(loginUser.getSysUser().getCredentialState()).isEqualTo(SysUser.CREDENTIAL_STATE_ACTIVE);
@@ -120,8 +119,7 @@ class SysProfileControllerTest
         assertThat(loginUser.getSysUser().getTemporaryPasswordExpiresAt()).isNull();
         assertThat(SecurityUtils.matchesPassword(newPlain, loginUser.getSysUser().getPassword())).isTrue();
         verify(tokenService).setLoginUser(loginUser);
-        verify(sessionInvalidationService).record(eq(42L),
-                eq(UserSessionInvalidationService.PASSWORD_CHANGED), eq("token-42"));
+        org.mockito.Mockito.verifyNoInteractions(sessionInvalidationService);
     }
 
     @Test

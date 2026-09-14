@@ -178,8 +178,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             #{currentPositionStartDate}, #{contractStartDate}, #{contractEndDate},
             #{contractType}, #{renewalCount}, #{workLocation}, #{workCityLevel}, #{attendanceMethod}, #{householdType},
             #{socialType}, #{socialSecurityLocation}, #{housingFundLocation}, #{leaveDate}, #{bankName}, #{bankAccount},
-            #{legalEntity}, #{legalEntityId}, #{legalEntityCode}, #{baseSalary}, #{postSalary},
-            #{fieldAllowance}, #{performanceSalary}, #{salaryTotal}, #{salaryVersion},
+            #{legalEntity}, #{legalEntityId}, #{legalEntityCode}, NULL, NULL,
+            NULL, NULL, NULL, NULL,
             #{createBy}, sysdate(), #{updateBy}, sysdate()
         )
     </insert>
@@ -280,12 +280,6 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             legal_entity = #{legalEntity},
             legal_entity_id = #{legalEntityId},
             legal_entity_code = #{legalEntityCode},
-            base_salary = #{baseSalary},
-            post_salary = #{postSalary},
-            field_allowance = #{fieldAllowance},
-            performance_salary = #{performanceSalary},
-            salary_total = #{salaryTotal},
-            salary_version = #{salaryVersion},
             update_by = #{updateBy},
             update_time = sysdate()
         where user_id = #{userId}
@@ -533,6 +527,11 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
           and employee_status &lt;&gt; '离职'
     </update>
 
+    <select id="selectSalaryProfileForUpdate" resultType="com.erp.system.api.domain.SysUserProfile">
+        select user_id userId, id_number idNumber, base_salary baseSalary, post_salary postSalary,
+               field_allowance fieldAllowance, performance_salary performanceSalary, salary_total salaryTotal
+        from sys_user_profile where user_id = #{userId} for update
+    </select>
     <update id="updateRegularizationProfile">
         update sys_user_profile
         set employee_status = '正式',
@@ -591,4 +590,10 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
           and leave_date &lt;=&gt; #{expectedLeaveDate}
     </update>
 
+    <update id="updateRegularizationDateOnly">
+        update sys_user_profile
+        set employee_status = '正式', actual_regularization_date = #{effectiveDate},
+            update_by = #{updateBy}, update_time = sysdate()
+        where user_id = #{employeeId} and employee_status = '试用'
+    </update>
 </mapper>

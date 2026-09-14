@@ -9,6 +9,11 @@
       tone="amber"
       :features="['采购下单', '收货登记', '质量检验']"
     />
+    <el-card v-hasPermi="['inv:purchase:receive']" v-if="receiveRecoveryRecords.length || receiveRecoveryError" shadow="never" class="mb12">
+      <p role="status">{{ receiveRecoveryError || '以下收货结果待核对；即使采购单已收完，也可在这里恢复原操作。' }}</p>
+      <el-button size="small" @click="refreshReceiveRecovery">刷新待核对记录</el-button>
+      <el-button v-for="record in receiveRecoveryRecords" :key="record.requestId" :disabled="receiveRecoveryBusy || receiveSubmitting" @click="recoverPurchaseReceive(record)">核对采购单 {{ record.orderId }} 的上一笔收货</el-button>
+    </el-card>
     <el-card shadow="never" class="mb12">
       <el-form :model="queryParams" inline size="small">
         <el-form-item label="单号">
@@ -267,7 +272,7 @@
       </div>
     </el-dialog>
 
-    <el-dialog title="选择采购物料" :visible.sync="productDialogOpen" width="920px" append-to-body :close-on-click-modal="false">
+    <el-dialog title="选择采购物料" :visible.sync="productDialogOpen" @close="handleProductSelectorClose" width="920px" append-to-body :close-on-click-modal="false">
       <el-form :model="productQuery" inline size="small" class="product-query">
         <el-form-item label="物料类型" required>
           <el-radio-group v-model="selectedItemType" size="small" @change="handleItemTypeChange">
@@ -285,7 +290,7 @@
           <el-button size="mini" icon="el-icon-refresh" @click="resetProductQuery">重置</el-button>
         </el-form-item>
       </el-form>
-      <el-table ref="productTable" v-loading="productLoading" :data="productList" border size="small" height="360" :empty-text="selectedItemType ? '暂无可选物料' : '请先选择物料类型'" @selection-change="handleProductSelectionChange">
+      <el-table ref="productTable" v-loading="productLoading" :data="productList" border size="small" height="360" :empty-text="selectedItemType ? '暂无可选物料' : '请先选择物料类型'" :row-key="productSelectionKey" @select="handleProductRowSelect" @select-all="handleProductSelectionChange">
         <el-table-column type="selection" width="45"/>
         <el-table-column label="物料名称" prop="itemName" min-width="170"/>
         <el-table-column label="物料编码" prop="itemCode" width="130"/>
@@ -295,9 +300,19 @@
         <el-table-column label="采购参考价" prop="purchasePrice" width="110" align="right"/>
       </el-table>
       <pagination v-show="productTotal>0" :total="productTotal" :page.sync="productQuery.pageNum" :limit.sync="productQuery.pageSize" @pagination="getProductList"/>
+      <section class="product-chosen-list" aria-label="已选商品">
+        <div><strong>已选商品 {{ productSelection.length }} 项</strong><el-button type="text" :disabled="!productSelection.length" @click="clearProductSelection">清空已选</el-button></div>
+        <p v-if="!productSelection.length">同一供应商内可以翻页、切换类型和继续搜索，选齐后统一添加。</p>
+        <ul v-else>
+          <li v-for="item in productSelection" :key="productSelectionKey(item)">
+            <span>{{ itemTypeLabel(item.itemType) }} · {{ item.itemName }} <small>{{ item.itemCode }}</small></span>
+            <button type="button" :aria-label="'移除已选：' + item.itemName" @click="removeProductSelection(item)">移除</button>
+          </li>
+        </ul>
+      </section>
       <div slot="footer">
         <el-button @click="productDialogOpen = false">取消</el-button>
-        <el-button type="primary" :disabled="!selectedItemType || !productSelection.length" @click="confirmProductSelection">添加到明细</el-button>
+        <el-button type="primary" :disabled="productLoading || !productSelection.length" @click="confirmProductSelection">添加到明细</el-button>
       </div>
     </el-dialog>
 
@@ -371,9 +386,10 @@
           </el-table-column>
         </el-table>
       </el-form>
+      <p v-if="receiveNeedsReopen" role="status">当前输入尚未作为新收货提交。请重新打开收货窗口，核对最新可收数量后确认新到货。</p>
       <div slot="footer">
         <el-button :disabled="receiveSubmitting" @click="receiveOpen = false">取消</el-button>
-        <el-button v-hasPermi="['inv:purchase:receive']" type="primary" :loading="receiveSubmitting" :disabled="receiveLoading || receiveSubmitting" @click="submitReceive">提交收货</el-button>
+        <el-button v-hasPermi="['inv:purchase:receive']" type="primary" :loading="receiveSubmitting" :disabled="receiveLoading || receiveSubmitting || receiveNeedsReopen" @click="submitReceive">提交收货</el-button>
       </div>
     </el-dialog>
 
@@ -402,7 +418,7 @@
           type="info"
           :closable="false"
           show-icon
-          title="逐行填写合格、拒收和让步数量，三者之和必须等于本次检验数量。合格和让步数量才会增加库存。"
+          title="勾选本次检验的商品，未勾选商品继续待检。合格、拒收和让步数量之和须等于本次检验数量。"
           class="mb12"
         />
         <el-form ref="qcFormRef" :model="qcForm" :rules="qcRules" label-width="96px">
@@ -414,7 +430,7 @@
             </el-col>
             <el-col v-if="!qcLegacyMode" :span="16">
               <el-form-item label="收货批次">
-                <el-select v-model="qcForm.receiptBatchId" style="width:100%" @change="handleQcBatchChange">
+                <el-select v-model="qcForm.receiptBatchId" :disabled="qcSubmitting" style="width:100%" @change="handleQcBatchChange">
                   <el-option
                     v-for="batch in qcBatches"
                     :key="batch.batchId"
@@ -444,11 +460,15 @@
           <div class="receive-batch-actions">
             <span>待检明细 {{ qcForm.items.length }} 条</span>
             <div>
-              <el-button size="mini" type="success" plain @click="fillAllQcPassed">全部合格</el-button>
-              <el-button size="mini" @click="clearQcClassifications">清空分类数量</el-button>
+              <el-checkbox :value="qcForm.items.length > 0 && qcForm.items.every(isQcSelected)" :disabled="qcSubmitting" @change="setQcSelection">全选</el-checkbox>
+              <el-button size="mini" type="success" plain :disabled="qcSubmitting" @click="fillAllQcPassed">所选全部合格</el-button>
+              <el-button size="mini" :disabled="qcSubmitting" @click="clearQcClassifications">清空分类数量</el-button>
             </div>
           </div>
           <el-table :data="qcForm.items" border size="mini" max-height="520">
+            <el-table-column label="检验" width="64" fixed="left" align="center">
+              <template slot-scope="scope"><el-checkbox :value="isQcSelected(scope.row)" :disabled="qcSubmitting" :aria-label="'选择检验：' + (scope.row.itemName || scope.row.itemCode)" @change="value => $set(scope.row, 'qcSelected', value)" /></template>
+            </el-table-column>
             <el-table-column label="物料" min-width="160" fixed="left">
               <template slot-scope="scope">
                 <div class="product-name">{{ scope.row.itemName || '-' }}</div>
@@ -458,31 +478,31 @@
             <el-table-column label="待检" prop="pendingQuantity" width="82" align="right"/>
             <el-table-column label="本次检验" width="130">
               <template slot-scope="scope">
-                <el-input-number v-model="scope.row.inspectedQuantity" :min="0" :max="scope.row.pendingQuantity" :precision="2" :controls="false" size="mini" style="width:105px"/>
+                <el-input-number v-model="scope.row.inspectedQuantity" :disabled="qcSubmitting || !isQcSelected(scope.row)" :min="0" :max="scope.row.pendingQuantity" :precision="2" :controls="false" size="mini" style="width:105px"/>
               </template>
             </el-table-column>
             <el-table-column label="合格" width="120">
-              <template slot-scope="scope"><el-input-number v-model="scope.row.acceptedQuantity" :min="0" :precision="2" :controls="false" size="mini" style="width:96px"/></template>
+              <template slot-scope="scope"><el-input-number v-model="scope.row.acceptedQuantity" :disabled="qcSubmitting || !isQcSelected(scope.row)" :min="0" :precision="2" :controls="false" size="mini" style="width:96px"/></template>
             </el-table-column>
             <el-table-column label="拒收" width="120">
-              <template slot-scope="scope"><el-input-number v-model="scope.row.rejectedQuantity" :min="0" :precision="2" :controls="false" size="mini" style="width:96px"/></template>
+              <template slot-scope="scope"><el-input-number v-model="scope.row.rejectedQuantity" :disabled="qcSubmitting || !isQcSelected(scope.row)" :min="0" :precision="2" :controls="false" size="mini" style="width:96px"/></template>
             </el-table-column>
             <el-table-column label="让步" width="120">
-              <template slot-scope="scope"><el-input-number v-model="scope.row.concessionQuantity" :min="0" :precision="2" :controls="false" size="mini" style="width:96px"/></template>
+              <template slot-scope="scope"><el-input-number v-model="scope.row.concessionQuantity" :disabled="qcSubmitting || !isQcSelected(scope.row)" :min="0" :precision="2" :controls="false" size="mini" style="width:96px"/></template>
             </el-table-column>
             <el-table-column label="缺陷等级" width="118">
               <template slot-scope="scope">
-                <el-select v-model="scope.row.defectLevel" clearable size="mini" placeholder="选填">
+                <el-select v-model="scope.row.defectLevel" :disabled="qcSubmitting || !isQcSelected(scope.row)" clearable size="mini" placeholder="选填">
                   <el-option label="轻微" value="minor"/><el-option label="一般" value="major"/><el-option label="严重" value="critical"/>
                 </el-select>
               </template>
             </el-table-column>
             <el-table-column label="拒收/让步原因" min-width="190">
-              <template slot-scope="scope"><el-input v-model="scope.row.defectReason" maxlength="500" size="mini" clearable placeholder="有拒收或让步数量时必填"/></template>
+              <template slot-scope="scope"><el-input v-model="scope.row.defectReason" :disabled="qcSubmitting || !isQcSelected(scope.row)" maxlength="500" size="mini" clearable placeholder="有拒收或让步数量时必填"/></template>
             </el-table-column>
             <el-table-column label="附件" min-width="180">
               <template slot-scope="scope">
-                <file-upload v-model="scope.row.attachmentUrls" :limit="3" :file-size="10" :is-show-tip="false" :drag="false" :file-type="['jpg', 'jpeg', 'png', 'pdf']"/>
+                <file-upload v-model="scope.row.attachmentUrls" :disabled="qcSubmitting || !isQcSelected(scope.row)" :context-key="[qcOpen, qcForm.orderId, qcForm.receiptBatchId, scope.row.batchDetailId].join(':')" @upload-state="handleQcUploadState" :limit="3" :file-size="10" :is-show-tip="false" :drag="false" :file-type="['jpg', 'jpeg', 'png', 'pdf']"/>
               </template>
             </el-table-column>
           </el-table>
@@ -497,21 +517,18 @@
 </template>
 
 <script>
-import { listPurchase, getPurchaseDetail, savePurchase, submitPurchase, receivePurchase, qualityCheckPurchase, listPendingReceiptBatches, qualityCheckPurchaseBatch, cancelPurchase, deleteDraftPurchase } from "@/api/inventory/purchase"
-import { listProduct } from "@/api/inventory/product"
-import { listOe } from "@/api/inventory/oe"
-import { listGift } from "@/api/inventory/gift"
-import { listSupplier } from "@/api/inventory/supplier"
+import { listPurchase, getPurchaseDetail, getPurchaseDraft, getPurchaseActionContext, getPurchaseReceiveContext, listPurchaseSuppliers, listPurchaseProducts, listPurchaseOeItems, listPurchaseGifts, savePurchase, submitPurchase, submitPurchaseDraft, qualityCheckPurchase, listPendingReceiptBatches, qualityCheckPurchaseBatch, cancelPurchase, deleteDraftPurchase } from "@/api/inventory/purchase"
 import WarehouseSelect from "@/views/inventory/components/WarehouseSelect"
 import { parseTime } from "@/utils/common"
 import { getSelectedDeptId, getSelectedDeptName, isSelectedWarehouse } from "@/utils/shopContext"
 import { canReceivePurchase, canQualityCheckPurchase, canCancelPurchase } from "./purchaseActionRules"
 import { purchaseBusinessStageLabel, purchaseBusinessStageTone } from "@/utils/purchaseBusinessStage"
+const { getPurchaseReceiveRecovery, purchaseReceiveResultMessage } = require("@/utils/purchaseReceiveRecovery")
 const { createTodoBusinessFocusMixin } = require("@/mixins/todoBusinessFocus")
 export default {
   mixins: [createTodoBusinessFocusMixin({
     featureKey: "purchase",
-    loadFocusedRow(orderId) { return getPurchaseDetail(orderId) },
+    loadFocusedRow(orderId) { return getPurchaseActionContext(orderId, { silentError: true }) },
     actions: {
       qualityCheckPurchase(row) {
         if (!this.canQualityCheck(row)) return this.showTodoBusinessHandled()
@@ -529,10 +546,14 @@ export default {
     return {
       loading: false, total: 0, list: [], listError: "", listRequestSequence: 0, activeListQuerySnapshot: "",
       open: false, formSubmitting: false, detailOpen: false, detailLoading: false, receiveOpen: false, receiveLoading: false,
-      receiveSubmitting: false, receiveRequestSequence: 0,
+      receiveSubmitting: false, receiveRequestSequence: 0, receiveScope: null, receiveObservedRequestId: null, receiveNeedsReopen: false,
+      receiveRecoveryRecords: [], receiveRecoveryError: "", receiveRecoveryListSequence: 0, receiveRecoveryBusy: false,
+      qcUploadStates: {},
       qcOpen: false, qcLoading: false, qcSubmitting: false, qcLegacyMode: false, qcBatches: [],
       qcRequestSequence: 0, qcLoadError: "", qcTargetOrderId: undefined,
       productDialogOpen: false, productLoading: false, productList: [], productTotal: 0, productSelection: [],
+      productSelectionScope: "", productSelectionForm: null,
+      productReadSeq: 0, productReadContext: "", productPageInactive: false, productDeptListenerBound: false,
       supplierLoading: false, supplierOptions: [],
       allowedItemTypes: ["product", "oe", "gift"],
       selectedItemType: null,
@@ -593,7 +614,28 @@ export default {
       return this.form.details.reduce((sum, item) => sum + this.toNumber(item.quantity) * this.toNumber(item.unitPrice), 0).toFixed(2)
     }
   },
-  created() { this.getList() },
+  created() { this.bindProductDeptListener(); this.getList(); this.refreshReceiveRecovery() },
+  activated() { this.productPageInactive = false; this.bindProductDeptListener(); this.refreshReceiveRecovery() },
+  deactivated() { this.productPageInactive = true; this.closeProductSelector(); this.invalidateReceiveSession() },
+  beforeDestroy() {
+    this.invalidateReceiveSession()
+    this.productPageInactive = true
+    this.closeProductSelector()
+    if (this.productDeptListenerBound && typeof window !== "undefined") window.removeEventListener("erp:dept-changed", this.handleProductDeptChanged)
+    this.productDeptListenerBound = false
+  },
+  watch: {
+    productQuery: { deep: true, handler() { this.handleProductContextChange() } },
+    selectedItemType() { this.handleProductContextChange() },
+    "form.supplierId"() { this.handleProductContextChange() },
+    "form.supplierName"() { this.handleProductContextChange() },
+    form() { this.handleProductContextChange() },
+    "form.orderId"() { this.handleProductContextChange() },
+    productDialogOpen(value) { if (!value) this.handleProductSelectorClose() },
+    "$route.fullPath"() { this.closeProductSelector(); this.invalidateReceiveSession(); this.refreshReceiveRecovery() },
+    "$store.getters.id"() { this.closeProductSelector(); this.invalidateReceiveSession(); this.refreshReceiveRecovery() },
+    receiveOpen(value) { if (!value) { this.invalidateReceiveSession(); this.refreshReceiveRecovery() } }
+  },
   methods: {
     statusType(s) { const m = { draft: 'info', submitted: 'warning', received: 'success', cancelled: 'danger' }; return m[s] || 'info' },
     statusLabel(s) { const m = { draft: '草稿', submitted: '已提交', received: '已收货', cancelled: '已取消' }; return m[s] || '未知采购状态' },
@@ -710,31 +752,91 @@ export default {
     isCurrentListRequest(requestSequence, querySnapshot) {
       return requestSequence === this.listRequestSequence && querySnapshot === this.activeListQuerySnapshot
     },
+    productContextKey() {
+      return JSON.stringify({ type: this.selectedItemType, query: this.productQuery,
+        orderId: this.form.orderId, supplierId: this.form.supplierId,
+        supplierName: this.form.supplierName, deptId: getSelectedDeptId(), actor: this.productActor() })
+    },
+    productActor() { return this.$store && this.$store.getters ? this.$store.getters.id : null },
+    productScopeKey() {
+      return JSON.stringify([this.productActor(), getSelectedDeptId(), this.$route && this.$route.fullPath, this.form.orderId,
+        this.form.supplierId, this.form.supplierName])
+    },
+    isProductSelectionCurrent() {
+      return this.productDialogOpen && !this.productPageInactive && this.productSelectionForm === this.form &&
+        this.productSelectionScope === this.productScopeKey()
+    },
+    invalidateProductReads(preserveSelection = false) {
+      this.productReadSeq += 1
+      this.productReadContext = ""
+      this.productLoading = false
+      this.productList = []
+      this.productTotal = 0
+      if (!preserveSelection) {
+        this.productSelection = []
+        this.productSelectionScope = ""
+        this.productSelectionForm = null
+      }
+    },
+    handleProductContextChange() {
+      if (this.productSelectionScope && !this.isProductSelectionCurrent()) { this.closeProductSelector(); return }
+      if (this.productReadContext && this.productReadContext !== this.productContextKey()) this.invalidateProductReads(true)
+    },
+    closeProductSelector() {
+      this.productDialogOpen = false
+      this.invalidateProductReads()
+    },
+    handleProductSelectorClose() {
+      if (!this.productDialogOpen) this.invalidateProductReads()
+    },
+    bindProductDeptListener() {
+      if (!this.productDeptListenerBound && typeof window !== "undefined") {
+        window.addEventListener("erp:dept-changed", this.handleProductDeptChanged)
+        this.productDeptListenerBound = true
+      }
+    },
+    handleProductDeptChanged() { this.closeProductSelector(); this.invalidateReceiveSession(); this.refreshReceiveRecovery() },
+    isCurrentProductRead(seq, context) {
+      return !this.productPageInactive && this.productDialogOpen && seq === this.productReadSeq && context === this.productContextKey()
+    },
     getProductList() {
-      if (!this.selectedItemType) {
-        this.productList = []
-        this.productTotal = 0
-        return
+      if (!this.isProductSelectionCurrent()) { this.closeProductSelector(); return Promise.resolve() }
+      if (!this.allowedItemTypes.includes(this.selectedItemType)) {
+        this.invalidateProductReads(true)
+        return Promise.resolve()
       }
+      const type = this.selectedItemType
+      const query = Object.assign({}, this.productQuery)
+      const context = this.productContextKey()
+      const seq = ++this.productReadSeq
+      this.productReadContext = context
+      this.productList = []
+      this.productTotal = 0
       this.productLoading = true
-      this.listCatalogItems().then(res => {
-        this.productList = (res.rows || []).filter(p => p.status === "0").map(item => this.normalizeCatalogItem(item))
+      return this.listCatalogItems(type, query).then(res => {
+        if (!this.isCurrentProductRead(seq, context)) return
+        this.productList = (res.rows || []).filter(p => p.status === "0").map(item => this.normalizeCatalogItem(item, type))
         this.productTotal = res.total || 0
-      }).finally(() => { this.productLoading = false })
+        this.restoreProductSelection()
+      }).catch(() => {
+        if (this.isCurrentProductRead(seq, context)) this.$modal.msgError("采购物料加载失败，请重试")
+      }).finally(() => {
+        if (this.isCurrentProductRead(seq, context)) this.productLoading = false
+      })
     },
-    listCatalogItems() {
-      const keyword = this.normalizeText(this.productQuery.productName)
-      const base = { pageNum: this.productQuery.pageNum, pageSize: this.productQuery.pageSize, status: "0" }
-      if (this.selectedItemType === "oe") {
-        return listOe(Object.assign(base, keyword ? { keyword } : {}, this.productQuery.supplierName ? { supplierName: this.productQuery.supplierName } : {}))
+    listCatalogItems(type = this.selectedItemType, query = this.productQuery) {
+      const keyword = this.normalizeText(query.productName)
+      const base = { pageNum: query.pageNum, pageSize: query.pageSize, status: "0" }
+      const options = { silentError: true }
+      if (type === "oe") {
+        return listPurchaseOeItems(Object.assign(base, keyword ? { keyword } : {}, query.supplierName ? { supplierName: query.supplierName } : {}), options)
       }
-      if (this.selectedItemType === "gift") {
-        return listGift(Object.assign(base, keyword ? { keyword } : {}))
+      if (type === "gift") {
+        return listPurchaseGifts(Object.assign(base, keyword ? { keyword } : {}), options)
       }
-      return listProduct(Object.assign(base, keyword ? { keyword } : {}, this.productQuery.supplierName ? { supplierName: this.productQuery.supplierName } : {}))
+      return listPurchaseProducts(Object.assign(base, keyword ? { keyword } : {}, query.supplierName ? { supplierName: query.supplierName } : {}), options)
     },
-    normalizeCatalogItem(raw) {
-      const type = this.selectedItemType || "product"
+    normalizeCatalogItem(raw, type = this.selectedItemType || "product") {
       if (type === "oe") {
         return Object.assign({}, raw, { itemType: type, itemId: raw.oeItemId, itemCode: raw.oeItemCode, itemName: raw.oeItemName, productId: null, productCode: raw.oeItemCode, productName: raw.oeItemName, spec: raw.itemDescription || "", unit: raw.orderUnit || "", purchasePrice: raw.costPrice || 0 })
       }
@@ -749,22 +851,21 @@ export default {
     },
     resetProductQuery() {
       this.productQuery = { pageNum: 1, pageSize: 10, productName: undefined, supplierName: this.form.supplierName || undefined, status: "0" }
-      if (this.selectedItemType) this.getProductList()
+      return this.getProductList()
     },
     handleItemTypeChange() {
-      this.productSelection = []
-      this.resetProductQuery()
-      this.$nextTick(() => {
-        if (this.$refs.productTable) this.$refs.productTable.clearSelection()
-      })
+      return this.resetProductQuery()
     },
     openProductSelector() {
-      if (!this.ensureWarehouseContext()) return
+      if (this.productPageInactive || !this.ensureWarehouseContext()) return
+      this.invalidateProductReads()
       if (!this.form.supplierId || !this.form.supplierName) {
         this.$modal.msgError("请先选择合作中的供应商档案")
         return
       }
       this.productDialogOpen = true
+      this.productSelectionScope = this.productScopeKey()
+      this.productSelectionForm = this.form
       this.selectedItemType = null
       this.productSelection = []
       this.productList = []
@@ -773,45 +874,66 @@ export default {
         if (this.$refs.productTable) this.$refs.productTable.clearSelection()
       })
     },
+    productSelectionKey(row) { return row ? row.itemType + ":" + String(row.itemId) : "" },
+    restoreProductSelection() {
+      const context = this.productContextKey(), sequence = this.productReadSeq
+      this.$nextTick(() => {
+        if (!this.isProductSelectionCurrent() || context !== this.productContextKey() || sequence !== this.productReadSeq) return
+        const table = this.$refs.productTable
+        if (!table) return
+        table.clearSelection()
+        this.productList.forEach(row => {
+          if (this.productSelection.some(item => this.productSelectionKey(item) === this.productSelectionKey(row)))
+            table.toggleRowSelection(row, true)
+        })
+      })
+    },
+    handleProductRowSelect(rows, row) {
+      if (!this.isProductSelectionCurrent() || this.productLoading || !this.productList.includes(row)) return
+      const key = this.productSelectionKey(row)
+      const chosen = (rows || []).some(item => this.productSelectionKey(item) === key)
+      this.productSelection = this.productSelection.filter(item => this.productSelectionKey(item) !== key)
+      if (chosen) this.productSelection.push(Object.assign({}, row))
+    },
     handleProductSelectionChange(rows) {
-      this.productSelection = rows || []
+      if (!this.isProductSelectionCurrent() || this.productLoading) return
+      const pageKeys = new Set(this.productList.map(this.productSelectionKey))
+      const selectedKeys = new Set((rows || []).map(this.productSelectionKey))
+      const outside = this.productSelection.filter(item => !pageKeys.has(this.productSelectionKey(item)))
+      const selected = this.productList.filter(item => selectedKeys.has(this.productSelectionKey(item)))
+      this.productSelection = outside.concat(selected.map(row => Object.assign({}, row)))
+    },
+    removeProductSelection(row) {
+      if (!this.isProductSelectionCurrent()) { this.closeProductSelector(); return }
+      this.productSelection = this.productSelection.filter(item => this.productSelectionKey(item) !== this.productSelectionKey(row))
+      this.restoreProductSelection()
+    },
+    clearProductSelection() {
+      this.productSelection = []
+      this.restoreProductSelection()
     },
     confirmProductSelection() {
+      if (!this.isProductSelectionCurrent()) { this.closeProductSelector(); return }
+      if (this.productLoading) return
       if (!this.productSelection.length) {
         this.$modal.msgError("请选择物料")
         return
       }
-      const missingSupplierNames = []
-      const mismatchedSupplierNames = []
-      let changedCount = 0
-      this.productSelection.forEach(product => {
-        if (!this.normalizeText(product.supplierName)) {
-          missingSupplierNames.push(product.itemName)
-          return
-        }
-        if (product.itemType !== "gift" && this.normalizeText(product.supplierName) !== this.normalizeText(this.form.supplierName)) {
-          mismatchedSupplierNames.push(product.itemName)
-          return
-        }
+      const selected = this.productSelection.slice()
+      const missing = selected.filter(item => !this.normalizeText(item.supplierName))
+      const mismatched = selected.filter(item => item.itemType !== "gift" && this.normalizeText(item.supplierName) !== this.normalizeText(this.form.supplierName))
+      if (missing.length || mismatched.length) {
+        this.$modal.msgError("以下物料供应商信息已不适用，请移除后重新选择：" + missing.concat(mismatched).map(item => item.itemName).join("、"))
+        return
+      }
+      selected.forEach(product => {
         const existing = this.form.details.find(item => item.itemType === product.itemType && String(item.itemId) === String(product.itemId))
         if (existing) {
           existing.quantity = this.toNumber(existing.quantity) + 1
           if (!this.hasValue(existing.unitPrice)) existing.unitPrice = product.purchasePrice || 0
-          changedCount++
-          return
-        }
-        this.form.details.push(this.buildDetailFromProduct(product))
-        changedCount++
+        } else this.form.details.push(this.buildDetailFromProduct(product))
       })
-      if (missingSupplierNames.length > 0) {
-        this.$modal.msgError("以下物料未绑定供应商：" + missingSupplierNames.join("、"))
-      }
-      if (mismatchedSupplierNames.length > 0) {
-        this.$modal.msgError("以下物料不属于当前供应商：" + mismatchedSupplierNames.join("、"))
-      }
-      if (changedCount > 0) {
-        this.productDialogOpen = false
-      }
+      this.closeProductSelector()
     },
     buildDetailFromProduct(product) {
       return {
@@ -834,6 +956,7 @@ export default {
     },
     openForm(row) {
       if (!this.ensureWarehouseContext()) return
+      this.closeProductSelector()
       if (!row) {
         this.form = { orderId: undefined, orderTitle: "", supplierId: undefined, supplierName: "", orderDate: this.defaultOrderDate(), remark: "", totalAmount: 0, details: [] }
         this.supplierOptions = []
@@ -842,7 +965,7 @@ export default {
         this.$nextTick(() => { if (this.$refs.formRef) this.$refs.formRef.clearValidate() })
         return
       }
-      getPurchaseDetail(row.orderId).then(res => {
+      getPurchaseDraft(row.orderId).then(res => {
         const data = res.data || {}
         this.form = Object.assign({}, data, {
           orderDate: data.orderDate || this.defaultOrderDate(),
@@ -984,7 +1107,7 @@ export default {
         return Promise.resolve([])
       }
       this.supplierLoading = true
-      return listSupplier({
+      return listPurchaseSuppliers({
         pageNum: 1,
         pageSize: 100,
         status: "0",
@@ -1003,6 +1126,7 @@ export default {
       }).finally(() => { this.supplierLoading = false })
     },
     onSupplierChange(supplierId) {
+      this.closeProductSelector()
       const supplier = this.supplierOptions.find(item => String(item.supplierId) === String(supplierId))
       this.form.supplierName = supplier ? supplier.supplierName : ""
       this.productQuery.supplierName = this.form.supplierName || undefined
@@ -1013,105 +1137,155 @@ export default {
     },
     doSubmit(row) {
       if (!this.ensureWarehouseContext()) return
-      getPurchaseDetail(row.orderId).then(res => {
-        submitPurchase(res.data).then(() => { this.$modal.msgSuccess("提交成功"); this.getList() })
-      })
+      submitPurchaseDraft(row.orderId).then(() => { this.$modal.msgSuccess("提交成功"); this.getList() })
     },
-    doReceive(row) {
-      if (!this.ensureWarehouseContext()) return
+    invalidateReceiveSession() {
+      this.receiveRequestSequence += 1
+      this.receiveRecoveryListSequence += 1
+      this.receiveOpen = false
+      this.receiveSubmitting = false
+      this.receiveLoading = false
+    },
+    isCurrentReceive(sequence, scope, requireOpen = true) {
+      if (this.productPageInactive || sequence !== this.receiveRequestSequence || (requireOpen && !this.receiveOpen)) return false
+      try { getPurchaseReceiveRecovery().assertCurrent(scope); return true } catch (_) { return false }
+    },
+    async refreshReceiveRecovery() {
+      const sequence = ++this.receiveRecoveryListSequence
+      try {
+        const records = await getPurchaseReceiveRecovery().list()
+        if (!this.productPageInactive && sequence === this.receiveRecoveryListSequence) {
+          this.receiveRecoveryRecords = records
+          this.receiveRecoveryError = ""
+        }
+      } catch (error) {
+        if (!this.productPageInactive && sequence === this.receiveRecoveryListSequence) {
+          this.receiveRecoveryRecords = []
+          this.receiveRecoveryError = error.message
+        }
+      }
+    },
+    async recoverPurchaseReceive(record) {
+      if (this.receiveRecoveryBusy || this.receiveSubmitting) return
+      const recovery = getPurchaseReceiveRecovery()
+      const sequence = this.receiveRequestSequence
+      let scope
+      this.receiveRecoveryBusy = true
+      try {
+        scope = recovery.capture()
+        await this.$modal.confirm("将核对采购单 " + record.orderId + " 的上一笔收货，本次新输入不会提交。")
+        if (!this.isCurrentReceive(sequence, scope, false)) return
+        const result = await recovery.run({ orderId: record.orderId, requestId: record.requestId, scope,
+          recoveryOnly: true, isCurrent: () => this.isCurrentReceive(sequence, scope, false) })
+        if (!this.isCurrentReceive(sequence, scope, false)) return
+        this.$modal.msgSuccess(purchaseReceiveResultMessage(result))
+        await recovery.acknowledge(result)
+        this.getList()
+      } catch (error) {
+        if (error !== "cancel" && error !== "close" && (!scope || this.isCurrentReceive(sequence, scope, false))) this.$modal.msgError(error.message || "收货结果仍待核对")
+      } finally { this.receiveRecoveryBusy = false; this.refreshReceiveRecovery() }
+    },
+    async doReceive(row) {
+      if (this.receiveSubmitting || !this.ensureWarehouseContext()) return
       const requestSequence = ++this.receiveRequestSequence
       this.receiveOpen = true
       this.receiveLoading = true
-      this.receiveForm = { orderId: row.orderId, orderNo: row.orderNo, shopDeptId: this.currentWarehouseId, warehouseId: this.currentWarehouseId, supplierBatchNo: "", deliveryNoteNo: "", arrivedTime: this.defaultReceiveTime(), remark: "", details: [] }
-      getPurchaseDetail(row.orderId).then(res => {
-        if (requestSequence !== this.receiveRequestSequence || !this.receiveOpen) return
+      this.receiveNeedsReopen = false
+      const recovery = getPurchaseReceiveRecovery()
+      let scope
+      try {
+        scope = recovery.capture()
+        this.receiveScope = scope
+        this.receiveForm = { orderId: row.orderId, orderNo: row.orderNo, shopDeptId: scope.dept, warehouseId: scope.dept, supplierBatchNo: "", deliveryNoteNo: "", arrivedTime: this.defaultReceiveTime(), remark: "", details: [] }
+        const head = await recovery.inspect(row.orderId, scope)
+        if (!this.isCurrentReceive(requestSequence, scope)) return
+        if (head.pending) {
+          this.receiveOpen = false
+          await this.refreshReceiveRecovery()
+          this.$modal.msgWarning("上一笔收货结果待核对，请先使用页面上方的核对入口；新到货暂未提交。")
+          return
+        }
+        this.receiveObservedRequestId = head.observedRequestId
+        const res = await getPurchaseReceiveContext(row.orderId)
+        if (requestSequence !== this.receiveRequestSequence || !this.receiveOpen || !this.isCurrentReceive(requestSequence, scope)) return
         const order = res.data || {}
+        if (String(order.orderId) !== String(row.orderId)) throw new Error("采购详情身份无法确认")
         const details = (order.details || []).map(item => {
-          const quantity = this.toNumber(item.quantity)
-          const receivedQuantity = this.toNumber(item.receivedQuantity)
-          const remainingQuantity = Math.max(quantity - receivedQuantity, 0)
-          return Object.assign({}, item, {
-            quantity: quantity,
-            receivedQuantity: receivedQuantity,
-            remainingQuantity: remainingQuantity,
-            receiveQuantity: 0
-          })
+          const quantity = this.toNumber(item.quantity), receivedQuantity = this.toNumber(item.receivedQuantity)
+          return Object.assign({}, item, { quantity, receivedQuantity, remainingQuantity: Math.max(quantity - receivedQuantity, 0), receiveQuantity: 0 })
         })
-        this.receiveForm = Object.assign({}, this.receiveForm, {
-          orderId: order.orderId || row.orderId,
-          orderNo: order.orderNo || row.orderNo,
-          shopDeptId: this.currentWarehouseId,
-          warehouseId: this.currentWarehouseId,
-          details: details
-        })
-        this.$nextTick(() => {
-          if (this.$refs.receiveFormRef) this.$refs.receiveFormRef.clearValidate()
-        })
-      }).finally(() => {
-        if (requestSequence === this.receiveRequestSequence) this.receiveLoading = false
-      })
+        this.receiveForm = Object.assign({}, this.receiveForm, { orderId: order.orderId, orderNo: order.orderNo || row.orderNo,
+          shopDeptId: scope.dept, warehouseId: scope.dept, details })
+        this.$nextTick(() => { if (this.isCurrentReceive(requestSequence, scope) && this.$refs.receiveFormRef) this.$refs.receiveFormRef.clearValidate() })
+      } catch (error) {
+        if (!scope || this.isCurrentReceive(requestSequence, scope)) { this.receiveNeedsReopen = true; this.$modal.msgError(error.message || "收货详情加载失败") }
+      } finally { if (requestSequence === this.receiveRequestSequence) this.receiveLoading = false }
     },
     submitReceive() {
-      if (this.receiveSubmitting) return
-      if (!this.ensureWarehouseContext()) return
-      this.receiveForm.warehouseId = this.currentWarehouseId
+      if (this.receiveSubmitting || this.receiveLoading || this.receiveNeedsReopen || !this.receiveOpen || !this.ensureWarehouseContext()) return Promise.resolve()
+      const operation = { sequence: this.receiveRequestSequence, scope: this.receiveScope,
+        head: this.receiveObservedRequestId, form: JSON.parse(JSON.stringify(this.receiveForm)) }
+      if (!this.isCurrentReceive(operation.sequence, operation.scope)) return Promise.resolve()
+      this.receiveSubmitting = true
       const formRef = this.$refs.receiveFormRef
-      if (formRef) {
-        formRef.validate(valid => {
-          if (valid) this.submitValidatedReceive()
-        })
-        return
-      }
-      this.submitValidatedReceive()
-    },
-    submitValidatedReceive() {
-      if (!this.receiveForm.details || this.receiveForm.details.length === 0) {
-        this.$modal.msgError("采购单无可收货明细")
-        return
-      }
-      if (!this.hasValue(this.receiveForm.warehouseId)) {
-        this.$modal.msgError("启用仓库模式后，采购收货必须选择仓库")
-        return
-      }
-      const items = []
-      for (let i = 0; i < this.receiveForm.details.length; i++) {
-        const detail = this.receiveForm.details[i]
-        const receiveQuantity = this.toNumber(detail.receiveQuantity)
-        const remainingQuantity = this.toNumber(detail.remainingQuantity)
-        if (receiveQuantity < 0) {
-          this.$modal.msgError("本次收货数量不能小于 0")
-          return
-        }
-        if (receiveQuantity > remainingQuantity) {
-          this.$modal.msgError("商品 [" + (detail.productName || detail.detailId) + "] 本次收货数量不能超过未收数量")
-          return
-        }
-        if (receiveQuantity > 0) {
-          items.push({ detailId: detail.detailId, receiveQuantity: receiveQuantity })
-        }
-      }
-      if (items.length === 0) {
-        this.$modal.msgError("请至少录入一条大于 0 的本次收货数量")
-        return
-      }
-      const data = {
-        warehouseId: this.currentWarehouseId,
-        supplierBatchNo: this.normalizeText(this.receiveForm.supplierBatchNo) || undefined,
-        deliveryNoteNo: this.normalizeText(this.receiveForm.deliveryNoteNo) || undefined,
-        arrivedTime: this.receiveForm.arrivedTime || this.defaultReceiveTime(),
-        remark: this.normalizeText(this.receiveForm.remark) || undefined,
-        items: items
-      }
-      this.$modal.confirm(this.getReceiveConfirmMessage(items)).then(() => {
-        this.receiveSubmitting = true
-        receivePurchase(this.receiveForm.orderId, data).then(() => {
-          this.$modal.msgSuccess("收货成功")
-          this.receiveOpen = false
+      return getPurchaseReceiveRecovery().inspect(operation.form.orderId, operation.scope).then(async head => {
+        if (!this.isCurrentReceive(operation.sequence, operation.scope)) return
+        if (head.pending || head.observedRequestId !== operation.head) {
+          // Reconcile before validating edited quantities or reading new remaining amounts.
+          await this.$modal.confirm("先核对采购单 " + operation.form.orderId + " 的上一笔收货；当前新输入不会提交。")
+          if (!this.isCurrentReceive(operation.sequence, operation.scope)) return
+          const recovery = getPurchaseReceiveRecovery()
+          const result = await recovery.run({ orderId: operation.form.orderId, requestId: head.observedRequestId,
+            recoveryOnly: true, scope: operation.scope, isCurrent: () => this.isCurrentReceive(operation.sequence, operation.scope) })
+          if (!this.isCurrentReceive(operation.sequence, operation.scope)) return
+          this.$modal.msgSuccess(purchaseReceiveResultMessage(result))
+          this.receiveNeedsReopen = true
+          await recovery.acknowledge(result)
           this.getList()
-        }).finally(() => {
-          this.receiveSubmitting = false
+          return
+        }
+        const valid = await new Promise(resolve => {
+          if (formRef) formRef.validate(result => resolve(result))
+          else resolve(true)
         })
+        if (valid && this.isCurrentReceive(operation.sequence, operation.scope)) return this.submitValidatedReceive(operation)
+      }).catch(error => {
+        if (error !== "cancel" && error !== "close" && this.isCurrentReceive(operation.sequence, operation.scope)) this.$modal.msgError(error.message || "收货结果仍待核对")
+      }).finally(() => {
+        if (this.isCurrentReceive(operation.sequence, operation.scope)) this.receiveSubmitting = false
+        this.refreshReceiveRecovery()
       })
+    },
+    async submitValidatedReceive(operation) {
+      const form = operation.form
+      try {
+        const items = []
+        for (const detail of form.details || []) {
+          const quantity = Number(detail.receiveQuantity)
+          if (!Number.isFinite(quantity) || quantity < 0 || quantity > Number(detail.remainingQuantity)) throw new Error("本次收货数量须在 0 与未收数量之间")
+          if (quantity > 0) items.push({ detailId: detail.detailId, receiveQuantity: quantity })
+        }
+        if (!items.length) throw new Error("请至少录入一条大于 0 的本次收货数量")
+        if (!form.arrivedTime) throw new Error("请选择实际到货时间")
+        if (this.normalizeText(form.supplierBatchNo).length > 100 || this.normalizeText(form.deliveryNoteNo).length > 100 || this.normalizeText(form.remark).length > 500)
+          throw new Error("收货批号、送货单号或备注超过允许长度")
+        const data = { warehouseId: operation.scope.dept, supplierBatchNo: this.normalizeText(form.supplierBatchNo) || undefined,
+          deliveryNoteNo: this.normalizeText(form.deliveryNoteNo) || undefined, arrivedTime: form.arrivedTime,
+          remark: this.normalizeText(form.remark) || undefined, items }
+        await this.$modal.confirm(this.getReceiveConfirmMessage(items))
+        if (!this.isCurrentReceive(operation.sequence, operation.scope)) return
+        const recovery = getPurchaseReceiveRecovery()
+        const result = await recovery.run({ orderId: form.orderId, payload: data, scope: operation.scope,
+          observedRequestId: operation.head, isCurrent: () => this.isCurrentReceive(operation.sequence, operation.scope) })
+        if (!this.isCurrentReceive(operation.sequence, operation.scope)) return
+        this.$modal.msgSuccess(purchaseReceiveResultMessage(result))
+        if (result.purchaseReceiveRecovery.recovered) this.receiveNeedsReopen = true
+        else this.receiveOpen = false
+        await recovery.acknowledge(result)
+        this.getList()
+      } catch (error) {
+        if (error !== "cancel" && error !== "close" && this.isCurrentReceive(operation.sequence, operation.scope)) this.$modal.msgError(error.message || "收货结果待核对，请核对上一笔")
+      } finally { this.refreshReceiveRecovery() }
     },
     fillReceiveQuantities() {
       ;(this.receiveForm.details || []).forEach(item => {
@@ -1208,8 +1382,9 @@ export default {
         const pending = this.toNumber(item.pendingQuantity)
         return Object.assign({}, item, {
           pendingQuantity: pending,
-          inspectedQuantity: pending,
-          acceptedQuantity: pending,
+          qcSelected: false,
+          inspectedQuantity: 0,
+          acceptedQuantity: 0,
           rejectedQuantity: 0,
           concessionQuantity: 0,
           defectLevel: "",
@@ -1227,10 +1402,19 @@ export default {
       const trace = batch.supplierBatchNo ? " / 供应商批次 " + batch.supplierBatchNo : ""
       return (batch.batchNo || "-") + " / 到货 " + (batch.arrivedTime || "-") + " / 待检 " + this.formatAmount(batch.pendingQuantity) + trace
     },
+    isQcSelected(row) {
+      return !!row && (row.qcSelected === true || (row.qcSelected === undefined && Number(row.inspectedQuantity) > 0))
+    },
+    setQcSelection(selected) {
+      if (this.qcSubmitting) return
+      ;(this.qcForm.items || []).forEach(row => this.$set(row, 'qcSelected', selected))
+    },
     fillAllQcPassed() {
-      ;(this.qcForm.items || []).forEach(item => {
-        item.inspectedQuantity = this.toNumber(item.pendingQuantity)
-        item.acceptedQuantity = this.toNumber(item.pendingQuantity)
+      if (this.qcSubmitting) return
+      ;(this.qcForm.items || []).filter(this.isQcSelected).forEach(item => {
+        const requested = Number(item.inspectedQuantity), pending = Number(item.pendingQuantity)
+        item.inspectedQuantity = Number.isFinite(requested) && requested > 0 && requested <= pending ? requested : pending
+        item.acceptedQuantity = item.inspectedQuantity
         item.rejectedQuantity = 0
         item.concessionQuantity = 0
         item.defectLevel = ""
@@ -1238,13 +1422,29 @@ export default {
       })
     },
     clearQcClassifications() {
-      ;(this.qcForm.items || []).forEach(item => {
+      if (this.qcSubmitting) return
+      ;(this.qcForm.items || []).filter(this.isQcSelected).forEach(item => {
         item.acceptedQuantity = 0
         item.rejectedQuantity = 0
         item.concessionQuantity = 0
       })
     },
+    handleQcUploadState(state) {
+      if (!state || state.id == null) return
+      if (state.blocking) this.$set(this.qcUploadStates, state.id, true)
+      else this.$delete(this.qcUploadStates, state.id)
+    },
+    qualityUploadsBlocked() {
+      return Object.values(this.qcUploadStates || {}).some(Boolean)
+    },
+    qualityAttachmentSnapshot() {
+      return JSON.stringify((this.qcForm.items || []).map(row => [String(row.batchDetailId), row.attachmentUrls || '']))
+    },
     submitQualityCheck() {
+      if (this.qualityUploadsBlocked()) {
+        this.$modal.msgError('质检附件尚未上传完成，请重试或移除后再提交')
+        return Promise.resolve({ blocked: true })
+      }
       if (this.qcSubmitting || this.qcLoading || this.qcLoadError || !this.qcOpen || !this.qcForm.orderId) {
         return Promise.resolve({ blocked: true })
       }
@@ -1267,17 +1467,17 @@ export default {
       const items = []
       for (let i = 0; i < (this.qcForm.items || []).length; i++) {
         const row = this.qcForm.items[i]
-        const inspected = this.toNumber(row.inspectedQuantity)
-        const accepted = this.toNumber(row.acceptedQuantity)
-        const rejected = this.toNumber(row.rejectedQuantity)
-        const concession = this.toNumber(row.concessionQuantity)
+        if (!this.isQcSelected(row)) continue
+        const inspected = Number(row.inspectedQuantity)
+        const accepted = Number(row.acceptedQuantity)
+        const rejected = Number(row.rejectedQuantity)
+        const concession = Number(row.concessionQuantity)
         const itemName = row.itemName || row.itemCode || row.batchDetailId
-        if ([inspected, accepted, rejected, concession].some(value => value < 0)) {
-          this.$modal.msgError("物料 [" + itemName + "] 质检数量不能为负数")
+        if ([inspected, accepted, rejected, concession].some(value => !Number.isFinite(value) || value < 0)) {
+          this.$modal.msgError("物料 [" + itemName + "] 质检数量必须是非负数")
           return null
         }
-        if (inspected === 0 && accepted === 0 && rejected === 0 && concession === 0) continue
-        if (inspected <= 0 || inspected > this.toNumber(row.pendingQuantity)) {
+        if (inspected <= 0 || !Number.isFinite(Number(row.pendingQuantity)) || inspected > Number(row.pendingQuantity)) {
           this.$modal.msgError("物料 [" + itemName + "] 本次检验数量必须大于 0 且不能超过待检数量")
           return null
         }
@@ -1305,16 +1505,31 @@ export default {
         })
       }
       if (items.length === 0) {
-        this.$modal.msgError("请至少完成一条质检明细")
+        this.$modal.msgError("请至少勾选并完成一条质检明细")
         return null
       }
       return items
     },
+    qualityInputSnapshot() {
+      return JSON.stringify([this.qcLegacyMode, this.qcForm.qcResult, this.qcForm.qcRemark,
+        (this.qcForm.items || []).map(row => [String(row.batchDetailId), this.isQcSelected(row),
+          row.inspectedQuantity, row.acceptedQuantity, row.rejectedQuantity, row.concessionQuantity,
+          row.defectLevel, row.defectReason, row.attachmentUrls])])
+    },
     confirmAndSubmitQualityCheck(data, api) {
       const orderId = this.qcForm.orderId
+      const batchId = this.qcForm.receiptBatchId, attachments = this.qualityAttachmentSnapshot(), inputSnapshot = this.qualityInputSnapshot()
       return this.$modal.confirm(this.getQualityCheckConfirmMessage()).then(() => {
+        if (inputSnapshot !== this.qualityInputSnapshot()) {
+          this.$modal.msgError('本次勾选或质检内容已变化，请核对后重新提交')
+          return { discarded: true }
+        }
+        if (this.qualityUploadsBlocked() || attachments !== this.qualityAttachmentSnapshot()) {
+          this.$modal.msgError('附件状态已变化，请处理完毕后重新提交质检')
+          return { discarded: true }
+        }
         if (!this.qcOpen || this.qcLoading || this.qcLoadError || this.qcSubmitting ||
-          String(orderId) !== String(this.qcTargetOrderId) || String(orderId) !== String(this.qcForm.orderId)) {
+          String(batchId) !== String(this.qcForm.receiptBatchId) || String(orderId) !== String(this.qcTargetOrderId) || String(orderId) !== String(this.qcForm.orderId)) {
           return { discarded: true }
         }
         this.qcSubmitting = true
@@ -1341,7 +1556,7 @@ export default {
     },
     getQualityCheckConfirmMessage() {
       if (!this.qcLegacyMode) {
-        const totals = (this.qcForm.items || []).reduce((sum, item) => {
+        const totals = (this.qcForm.items || []).filter(this.isQcSelected).reduce((sum, item) => {
           sum.inspected += this.toNumber(item.inspectedQuantity)
           sum.accepted += this.toNumber(item.acceptedQuantity)
           sum.rejected += this.toNumber(item.rejectedQuantity)
@@ -1430,6 +1645,12 @@ export default {
   line-height: 18px;
   margin-top: 3px;
 }
+.product-chosen-list { margin-top: 16px; border-top: 1px solid #dcdfe6; padding-top: 12px; }
+.product-chosen-list > div, .product-chosen-list li { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.product-chosen-list ul { list-style: none; margin: 0; padding: 0; max-height: 180px; overflow: auto; }
+.product-chosen-list li { padding: 6px 0; }
+.product-chosen-list small { color: #606266; }
+.product-chosen-list button { min-height: 32px; cursor: pointer; }
 .product-query {
   margin-bottom: 8px;
 }

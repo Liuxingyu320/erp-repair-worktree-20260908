@@ -48,6 +48,42 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         order by notification_id desc
     </select>
 
+    <select id="selectMaxIdByUserId" resultType="long">
+        select coalesce(max(notification_id), 0) from sys_user_notification where user_id = #{userId}
+    </select>
+
+    <sql id="pageConditions">
+        where user_id = #{userId} and notification_id &lt;= #{snapshotMaxId}
+        <if test="query.keywordPattern != null">
+            and (title like #{query.keywordPattern} escape '!' or body like #{query.keywordPattern} escape '!')
+        </if>
+        <if test="query.routeType != null and query.routeType != ''">and route_type = #{query.routeType}</if>
+        <if test="query.readStatus != null and query.readStatus != ''">and read_status = #{query.readStatus}</if>
+        <if test="query.startTime != null">and create_time &gt;= #{query.startTime}</if>
+        <if test="query.endTimeExclusive != null">and create_time &lt; #{query.endTimeExclusive}</if>
+    </sql>
+
+    <select id="countPage" resultType="long">
+        select count(1) from sys_user_notification <include refid="pageConditions"/>
+    </select>
+
+    <select id="selectPage" resultMap="SysUserNotificationResult">
+        <include refid="selectNotificationColumns"/>
+        <include refid="pageConditions"/>
+        order by create_time desc, notification_id desc
+        limit #{query.offset}, #{query.pageSize}
+    </select>
+
+    <select id="selectRouteTypesByUserId" resultType="string">
+        select distinct route_type from sys_user_notification
+        where user_id = #{userId} and route_type &lt;> '' order by route_type
+    </select>
+
+    <update id="markAllRead">
+        update sys_user_notification set read_status = '1', read_time = sysdate()
+        where user_id = #{userId} and notification_id &lt;= #{snapshotMaxId} and read_status = '0'
+    </update>
+
     <select id="countUnreadByUserId" resultType="long">
         select count(1)
         from sys_user_notification

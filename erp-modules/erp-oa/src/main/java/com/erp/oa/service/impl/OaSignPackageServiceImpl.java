@@ -61,11 +61,14 @@ import com.erp.oa.mapper.OaSignTemplateMapper;
 import com.erp.oa.mapper.OaSignTaskMapper;
 import com.erp.oa.mapper.OaSignFinalConfirmationMapper;
 import com.erp.oa.service.IOaSignPackageService;
+import com.erp.oa.service.rule.TransferSalaryChangePolicy;
 import com.erp.system.api.domain.SysLegalEntity;
 
 @Service
 public class OaSignPackageServiceImpl implements IOaSignPackageService
 {
+    @Autowired private OaSignSalarySourceService salarySources;
+
     private static final String YES = "Y";
     private static final String NO = "N";
     private static final String FINAL_GENERATION_TEXT = "沿用员工首次签名并补充公司及印章";
@@ -768,6 +771,7 @@ public class OaSignPackageServiceImpl implements IOaSignPackageService
                 signPackage, new Date()));
         signPackage.setConfirmStatus("NOT_REQUIRED");
         signPackage.setUpdateBy(String.valueOf(assignedHrUserId));
+        salarySources.requireSend(signPackage);
         if (packageMapper.sendStagedFinalCandidate(signPackage, expectedVersion) != 1)
         {
             OaSignPackage latest = packageMapper.selectOaSignPackageById(packageId);
@@ -971,6 +975,13 @@ public class OaSignPackageServiceImpl implements IOaSignPackageService
                 || !Objects.equals(documentVersion, document.getDocumentVersion())))
         {
             throw new ServiceException("签约文件尚未准备完成");
+        }
+        if (documents.stream().anyMatch(document ->
+                OaSignTemplateType.TRANSFER_SALARY_CONFIRM.equals(document.getTemplateType())))
+        {
+            OaSignTask frozenTask = taskMapper.selectOaSignTaskById(taskId);
+            if (!TransferSalaryChangePolicy.changedForPackage(frozenTask, signPackage))
+                throw new ServiceException("调岗前后实际工资未变化，当前文件不应包含工资确认书，请人事重新核对并生成合同");
         }
         if (OaSignSigningSequence.SIGNATURE_FIRST.equals(signPackage.getSigningSequence()))
         {
@@ -1180,6 +1191,7 @@ public class OaSignPackageServiceImpl implements IOaSignPackageService
             Date sentTime, Date signDeadline, String deadlinePolicySource,
             Integer deadlineDaysSnapshot)
     {
+        salarySources.requireSend(signPackage);
         DEADLINE_POLICY.validateSendDeadline(
                 sentTime, signDeadline, deadlinePolicySource, deadlineDaysSnapshot);
         Long expectedVersion = signPackage.getVersion() == null ? 0L : signPackage.getVersion();
@@ -1274,6 +1286,7 @@ public class OaSignPackageServiceImpl implements IOaSignPackageService
         Long expectedVersion = signPackage.getVersion() == null ? 0L : signPackage.getVersion();
         String confirmStatus = signPackage.getTaskId() == null
                 ? signPackage.getConfirmStatus() : "NOT_REQUIRED";
+        salarySources.requireSend(signPackage);
         if (packageMapper.markSignatureFirstSentWithVersion(signPackage.getPackageId(),
                 signPackage.getTaskId(), expectedVersion, signPackage.getDocumentVersion(),
                 signPackage.getFinalDocumentVersion(), actualRoot, sentTime, signDeadline,
@@ -1446,13 +1459,24 @@ public class OaSignPackageServiceImpl implements IOaSignPackageService
                 }
                 templates.add(template);
             }
-            return templates;
+            return filterTransferSalaryTemplates(templates, signPackage);
         }
         if (signPackage.getSourcePlanId() != null)
         {
-            return planMapper.selectActiveTemplatesByPlanId(signPackage.getSourcePlanId());
+            return filterTransferSalaryTemplates(planMapper.selectActiveTemplatesByPlanId(signPackage.getSourcePlanId()), signPackage);
         }
-        return templateMapper.selectMatchedActiveTemplates(signPackage);
+        return filterTransferSalaryTemplates(templateMapper.selectMatchedActiveTemplates(signPackage), signPackage);
+    }
+
+    private List<OaSignTemplate> filterTransferSalaryTemplates(List<OaSignTemplate> templates, OaSignPackage signPackage)
+    {
+        if (templates == null || templates.stream().noneMatch(template -> template != null
+                && OaSignTemplateType.TRANSFER_SALARY_CONFIRM.equals(template.getTemplateType()))) return templates;
+        OaSignTask task = signPackage.getTaskId() == null ? null
+                : taskMapper.selectOaSignTaskById(signPackage.getTaskId());
+        if (TransferSalaryChangePolicy.changedForPackage(task, signPackage)) return templates;
+        return templates.stream().filter(template -> template == null
+                || !OaSignTemplateType.TRANSFER_SALARY_CONFIRM.equals(template.getTemplateType())).toList();
     }
 
     private List<OaSignTemplate> filterTemplatesForPackage(List<OaSignTemplate> candidates,
@@ -1768,19 +1792,19 @@ public class OaSignPackageServiceImpl implements IOaSignPackageService
 
         Date signedTime = new Date();
         Map<Long, SignedPdfResult> signedResults = new LinkedHashMap<>();
-        for (OaSignPackageDocument document : requiredDocuments)
-        {
-            OaSignedPdfService.PdfImagePlacement signaturePlacement =
-                    placementPolicyService.resolveSignaturePlacement(document);
-            SignedPdfResult result = signedPdfService.generateSignedPdf(null, signPackage, document,
-                    reviewPdfPaths.get(document.getDocumentId()), signaturePng, null, signedTime,
-                    signRequest.getSignConfirmText(), signaturePlacement, null);
-            signedResults.put(document.getDocumentId(), result);
-        }
-        fileLifecycle().registerSignedPdfRollbackCleanup(signedResults.values());
         GeneratedSignDocument certificate = null;
         try
         {
+            for (OaSignPackageDocument document : requiredDocuments)
+            {
+                OaSignedPdfService.PdfImagePlacement signaturePlacement =
+                        placementPolicyService.resolveSignaturePlacement(document);
+                SignedPdfResult result = signedPdfService.generateSignedPdf(null, signPackage, document,
+                        reviewPdfPaths.get(document.getDocumentId()), signaturePng, null, signedTime,
+                        signRequest.getSignConfirmText(), signaturePlacement, null);
+                signedResults.put(document.getDocumentId(), result);
+                fileLifecycle().registerSignedPdfRollbackCleanup(List.of(result));
+            }
             applySignedResultSnapshot(requiredDocuments, signedResults);
             signPackage.setSignedTime(signedTime);
             String eventRootHash = eventMapper.selectLatestEventHashByPackageId(packageId);
@@ -2092,8 +2116,8 @@ public class OaSignPackageServiceImpl implements IOaSignPackageService
                 SignedPdfResult result = generateFinalDocumentPdf(signPackage, document,
                         finalDocument, finalReviewPdf, signatureBytes, sealBytes, generatedTime);
                 finalResults.put(document.getDocumentId(), result);
+                fileLifecycle().registerSignedPdfRollbackCleanup(List.of(result));
             }
-            fileLifecycle().registerSignedPdfRollbackCleanup(finalResults.values());
             for (OaSignPackageDocument document : visibleDocuments)
             {
                 GeneratedSignDocument generated = generatedDocuments.get(document.getDocumentId());
@@ -2203,69 +2227,76 @@ public class OaSignPackageServiceImpl implements IOaSignPackageService
         Date confirmedTime = new Date((System.currentTimeMillis() / 1000L) * 1000L);
         Map<Long, SignedPdfResult> archiveResults = generateFinalArchives(signPackage,
                 documents, confirmedTime, actualRootHash);
-        fileLifecycle().registerSignedPdfRollbackCleanup(archiveResults.values());
-        String archiveRootHash =
-                fileIntegrity().archiveDocumentRootHash(archiveResults);
-        OaSignFinalConfirmation confirmation = new OaSignFinalConfirmation();
-        confirmation.setPackageId(packageId);
-        confirmation.setEmployeeId(SecurityUtils.getUserId());
-        confirmation.setFinalDocumentVersion(signPackage.getFinalDocumentVersion());
-        confirmation.setDocumentRootHash(actualRootHash);
-        confirmation.setConfirmationText(confirmationText);
-        confirmation.setIdentityMethod("LOGIN_TOKEN");
-        confirmation.setRequestId(requestId);
-        confirmation.setIpAddress(confirmerIp);
-        confirmation.setUserAgent(confirmerUserAgent);
-        confirmation.setConfirmedTime(confirmedTime);
-        if (finalConfirmationMapper.insertConfirmation(confirmation) != 1)
+        try
         {
-            throw new ServiceException("最终合同确认保存失败");
-        }
-        for (OaSignPackageDocument document : documents)
-        {
-            OaSignFinalConfirmationDocument confirmationDocument =
-                    new OaSignFinalConfirmationDocument();
-            confirmationDocument.setConfirmationId(confirmation.getConfirmationId());
-            confirmationDocument.setPackageId(packageId);
-            confirmationDocument.setDocumentId(document.getDocumentId());
-            confirmationDocument.setFinalDocumentVersion(
-                    signPackage.getFinalDocumentVersion());
-            confirmationDocument.setFinalPdfHash(document.getFinalPdfHash());
-            if (finalConfirmationMapper.insertConfirmationDocument(
-                    confirmationDocument) != 1)
+            String archiveRootHash =
+                    fileIntegrity().archiveDocumentRootHash(archiveResults);
+            OaSignFinalConfirmation confirmation = new OaSignFinalConfirmation();
+            confirmation.setPackageId(packageId);
+            confirmation.setEmployeeId(SecurityUtils.getUserId());
+            confirmation.setFinalDocumentVersion(signPackage.getFinalDocumentVersion());
+            confirmation.setDocumentRootHash(actualRootHash);
+            confirmation.setConfirmationText(confirmationText);
+            confirmation.setIdentityMethod("LOGIN_TOKEN");
+            confirmation.setRequestId(requestId);
+            confirmation.setIpAddress(confirmerIp);
+            confirmation.setUserAgent(confirmerUserAgent);
+            confirmation.setConfirmedTime(confirmedTime);
+            if (finalConfirmationMapper.insertConfirmation(confirmation) != 1)
             {
-                throw new ServiceException("最终合同逐文件确认保存失败");
+                throw new ServiceException("最终合同确认保存失败");
             }
-            SignedPdfResult archive = archiveResults.get(document.getDocumentId());
-            OaSignPackageDocument updateDocument = new OaSignPackageDocument();
-            updateDocument.setDocumentId(document.getDocumentId());
-            updateDocument.setFinalArchivePdfUrl(archive.getSignedPdfUrl());
-            updateDocument.setFinalArchivePdfHash(archive.getSignedPdfHash());
-            updateDocument.setSigned(YES);
-            updateDocument.setStatus(OaSignPackageStatus.SIGNED);
-            if (documentMapper.updateOaSignPackageDocument(updateDocument) != 1)
+            for (OaSignPackageDocument document : documents)
             {
-                throw new ServiceException("最终归档文档状态保存失败");
+                OaSignFinalConfirmationDocument confirmationDocument =
+                        new OaSignFinalConfirmationDocument();
+                confirmationDocument.setConfirmationId(confirmation.getConfirmationId());
+                confirmationDocument.setPackageId(packageId);
+                confirmationDocument.setDocumentId(document.getDocumentId());
+                confirmationDocument.setFinalDocumentVersion(
+                        signPackage.getFinalDocumentVersion());
+                confirmationDocument.setFinalPdfHash(document.getFinalPdfHash());
+                if (finalConfirmationMapper.insertConfirmationDocument(
+                        confirmationDocument) != 1)
+                {
+                    throw new ServiceException("最终合同逐文件确认保存失败");
+                }
+                SignedPdfResult archive = archiveResults.get(document.getDocumentId());
+                OaSignPackageDocument updateDocument = new OaSignPackageDocument();
+                updateDocument.setDocumentId(document.getDocumentId());
+                updateDocument.setFinalArchivePdfUrl(archive.getSignedPdfUrl());
+                updateDocument.setFinalArchivePdfHash(archive.getSignedPdfHash());
+                updateDocument.setSigned(YES);
+                updateDocument.setStatus(OaSignPackageStatus.SIGNED);
+                if (documentMapper.updateOaSignPackageDocument(updateDocument) != 1)
+                {
+                    throw new ServiceException("最终归档文档状态保存失败");
+                }
+                evidenceStore().recordFinalArchive(
+                        signPackage, document, archive, confirmedTime);
             }
-            evidenceStore().recordFinalArchive(
-                    signPackage, document, archive, confirmedTime);
+            if (packageMapper.updateFinalConfirmed(packageId,
+                    OaSignPackageStatus.PENDING_FINAL_CONFIRM, expectedVersion,
+                    confirmedTime, archiveRootHash, confirmedTime,
+                    SecurityUtils.getUsername()) != 1)
+            {
+                throw new ServiceException("最终合同确认状态已变化，请刷新后查看");
+            }
+            signPackage.setStatus(OaSignPackageStatus.SIGNED);
+            signPackage.setFinalConfirmationStatus("CONFIRMED");
+            signPackage.setFinalConfirmedTime(confirmedTime);
+            signPackage.setFinalArchiveRootHash(archiveRootHash);
+            signPackage.setFinalEvidenceGeneratedTime(confirmedTime);
+            signPackage.setVersion(expectedVersion + 1);
+            recordEvent(packageId, null, "FINAL_CONTRACT_CONFIRMED", eventPayload,
+                    actualRootHash, confirmerIp, confirmerUserAgent, "EMPLOYEE", requestId,
+                    confirmedTime);
         }
-        if (packageMapper.updateFinalConfirmed(packageId,
-                OaSignPackageStatus.PENDING_FINAL_CONFIRM, expectedVersion,
-                confirmedTime, archiveRootHash, confirmedTime,
-                SecurityUtils.getUsername()) != 1)
+        catch (RuntimeException | Error failure)
         {
-            throw new ServiceException("最终合同确认状态已变化，请刷新后查看");
+            fileLifecycle().discardSignedPdfResults(archiveResults.values(), failure);
+            throw failure;
         }
-        signPackage.setStatus(OaSignPackageStatus.SIGNED);
-        signPackage.setFinalConfirmationStatus("CONFIRMED");
-        signPackage.setFinalConfirmedTime(confirmedTime);
-        signPackage.setFinalArchiveRootHash(archiveRootHash);
-        signPackage.setFinalEvidenceGeneratedTime(confirmedTime);
-        signPackage.setVersion(expectedVersion + 1);
-        recordEvent(packageId, null, "FINAL_CONTRACT_CONFIRMED", eventPayload,
-                actualRootHash, confirmerIp, confirmerUserAgent, "EMPLOYEE", requestId,
-                confirmedTime);
     }
 
     @Override
@@ -2613,8 +2644,8 @@ public class OaSignPackageServiceImpl implements IOaSignPackageService
                         finalDocument, finalReviewPdf, signatureBytes,
                         sealRequired ? company.sealBytes() : null, generatedTime);
                 finalResults.put(document.getDocumentId(), result);
+                fileLifecycle().registerSignedPdfRollbackCleanup(List.of(result));
             }
-            fileLifecycle().registerSignedPdfRollbackCleanup(finalResults.values());
             for (OaSignPackageDocument document : visibleDocuments)
             {
                 GeneratedSignDocument generated = generatedDocuments.get(document.getDocumentId());
@@ -2696,8 +2727,8 @@ public class OaSignPackageServiceImpl implements IOaSignPackageService
                         : signedPdfService.generatePendingFinalPdfWithoutMarks(null,
                                 signPackage, finalDocument, frozenReviewPdf);
                 finalResults.put(document.getDocumentId(), result);
+                fileLifecycle().registerSignedPdfRollbackCleanup(List.of(result));
             }
-            fileLifecycle().registerSignedPdfRollbackCleanup(finalResults.values());
             for (OaSignPackageDocument document : visibleDocuments)
             {
                 SignedPdfResult result = finalResults.get(document.getDocumentId());
@@ -2831,28 +2862,37 @@ public class OaSignPackageServiceImpl implements IOaSignPackageService
                 throw new ServiceException("公司印章快照校验不一致");
             }
         }
-        for (OaSignPackageDocument document : documents)
+        try
         {
-            boolean signatureRequired = placementPolicyService.requiresEmployeeSignature(document);
-            boolean sealRequired = placementPolicyService.requiresCompanySeal(document);
-            byte[] signatureBytes = signatureRequired
-                    ? fileIntegrity().readFinalSignatureBytes(
-                            signPackage, document) : null;
-            SignedPdfResult archive = signedPdfService.archiveConfirmedFinalPdf(
-                    signPackage.getTaskId(), signPackage, document,
-                    documentService.resolveGeneratedSignPackageFile(document.getFinalPdfUrl()),
-                    document.getFinalPdfHash(), document.getFinalContentHash(), finalRootHash,
-                    signatureBytes, sealRequired ? sealBytes : null,
-                    signatureRequired ? employeeSignatureTime(signPackage) : null,
-                    sealRequired ? signPackage.getFinalGeneratedTime() : null,
-                    confirmedTime,
-                    signatureRequired
-                            ? placementPolicyService.resolveSignaturePlacement(document) : null,
-                    sealRequired
-                            ? placementPolicyService.resolveCompanySealPlacement(document) : null);
-            archives.put(document.getDocumentId(), archive);
+            for (OaSignPackageDocument document : documents)
+            {
+                boolean signatureRequired = placementPolicyService.requiresEmployeeSignature(document);
+                boolean sealRequired = placementPolicyService.requiresCompanySeal(document);
+                byte[] signatureBytes = signatureRequired
+                        ? fileIntegrity().readFinalSignatureBytes(
+                                signPackage, document) : null;
+                SignedPdfResult archive = signedPdfService.archiveConfirmedFinalPdf(
+                        signPackage.getTaskId(), signPackage, document,
+                        documentService.resolveGeneratedSignPackageFile(document.getFinalPdfUrl()),
+                        document.getFinalPdfHash(), document.getFinalContentHash(), finalRootHash,
+                        signatureBytes, sealRequired ? sealBytes : null,
+                        signatureRequired ? employeeSignatureTime(signPackage) : null,
+                        sealRequired ? signPackage.getFinalGeneratedTime() : null,
+                        confirmedTime,
+                        signatureRequired
+                                ? placementPolicyService.resolveSignaturePlacement(document) : null,
+                        sealRequired
+                                ? placementPolicyService.resolveCompanySealPlacement(document) : null);
+                archives.put(document.getDocumentId(), archive);
+                fileLifecycle().registerSignedPdfRollbackCleanup(List.of(archive));
+            }
+            return archives;
         }
-        return archives;
+        catch (RuntimeException | Error failure)
+        {
+            fileLifecycle().discardSignedPdfResults(archives.values(), failure);
+            throw failure;
+        }
     }
 
     private String sha256(byte[] bytes)

@@ -19,7 +19,10 @@ import com.erp.common.log.annotation.Log;
 import com.erp.common.log.enums.BusinessType;
 import com.erp.common.security.annotation.IdempotentSubmit;
 import com.erp.common.security.annotation.RequiresPermissions;
+import com.erp.common.security.annotation.Logical;
 import com.erp.inventory.domain.InvSalesReturn;
+import com.erp.inventory.domain.InvSalesOrder;
+import com.erp.inventory.domain.dto.InvSalesReturnSourceQuery;
 import com.erp.inventory.domain.dto.InvSalesReturnSaveRequest;
 import com.erp.inventory.service.IInvSalesReturnService;
 
@@ -29,6 +32,15 @@ public class InvSalesReturnController extends InvBaseController
 {
     @Autowired
     private IInvSalesReturnService salesReturnService;
+
+    @RequiresPermissions(value = { "inv:salesReturn:add", "inv:salesReturn:submit", "inv:salesReturn:confirm", "inv:salesReturn:remove" }, logical = Logical.OR)
+    @GetMapping("/action-context/{returnId}")
+    public AjaxResult actionContext(@PathVariable("returnId") Long returnId, HttpServletRequest request,
+            HttpServletResponse response)
+    {
+        response.setHeader("Cache-Control", "no-store, max-age=0");
+        return success(salesReturnService.getActionContext(returnId, resolveShopDeptId(request)));
+    }
 
     @RequiresPermissions("inv:salesReturn:list")
     @GetMapping("/list")
@@ -48,6 +60,47 @@ public class InvSalesReturnController extends InvBaseController
         return getDataTable(list);
     }
 
+    @RequiresPermissions("inv:salesReturn:add")
+    @GetMapping("/draft/{returnId}")
+    public AjaxResult draft(@PathVariable("returnId") Long returnId, HttpServletRequest request,
+            HttpServletResponse response)
+    {
+        response.setHeader("Cache-Control", "no-store, max-age=0");
+        return success(salesReturnService.getReturnDraft(returnId, resolveShopDeptId(request)));
+    }
+
+    @RequiresPermissions("inv:salesReturn:add")
+    @GetMapping("/source-orders")
+    public TableDataInfo sourceOrders(InvSalesReturnSourceQuery query, HttpServletRequest request,
+            HttpServletResponse response)
+    {
+        response.setHeader("Cache-Control", "no-store, max-age=0");
+        query.validate();
+        List<InvSalesOrder> rows = salesReturnService.selectReturnableSourceOrders(query, resolveShopDeptId(request));
+        return getDataTable(rows);
+    }
+
+    @RequiresPermissions("inv:salesReturn:add")
+    @GetMapping("/source-orders/{orderId}")
+    public AjaxResult sourceOrder(@PathVariable("orderId") Long orderId, HttpServletRequest request,
+            HttpServletResponse response)
+    {
+        response.setHeader("Cache-Control", "no-store, max-age=0");
+        return success(salesReturnService.getReturnableSourceOrder(orderId, resolveShopDeptId(request)));
+    }
+
+    @RequiresPermissions("inv:salesReturn:submit")
+    @IdempotentSubmit(timeout = 30)
+    @Log(title = "销售退货管理", businessType = BusinessType.UPDATE)
+    @PostMapping("/submit/{returnId}")
+    public AjaxResult submitSaved(@PathVariable("returnId") Long returnId, HttpServletRequest request,
+            HttpServletResponse response)
+    {
+        response.setHeader("Cache-Control", "no-store, max-age=0");
+        return success(com.erp.inventory.domain.vo.InvSpecialistActionContext.salesReturn(
+                salesReturnService.submitSavedReturn(returnId, resolveShopDeptId(request))));
+    }
+
     @RequiresPermissions("inv:salesReturn:query")
     @GetMapping("/{returnId}")
     public AjaxResult getInfo(@PathVariable("returnId") Long returnId, HttpServletRequest request)
@@ -64,7 +117,7 @@ public class InvSalesReturnController extends InvBaseController
         return success(salesReturnService.saveDraft(request, request.getDetails(), resolveShopDeptId(httpRequest)));
     }
 
-    @RequiresPermissions("inv:salesReturn:submit")
+    @RequiresPermissions(value = { "inv:salesReturn:add", "inv:salesReturn:submit" })
     @IdempotentSubmit(timeout = 30)
     @Log(title = "销售退货管理", businessType = BusinessType.UPDATE)
     @PostMapping("/submit")

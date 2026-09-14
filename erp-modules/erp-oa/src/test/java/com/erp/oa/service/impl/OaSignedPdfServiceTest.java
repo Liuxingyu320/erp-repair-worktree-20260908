@@ -1771,6 +1771,63 @@ class OaSignedPdfServiceTest
                 .doesNotContain("/Type /ObjStm");
     }
 
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans = { false, true })
+    void partialPromotionFailureCleansOnlyThisAttempt(boolean failAfterSecondPromotion) throws Exception
+    {
+        OaSignFileStorageService storage = org.mockito.Mockito.spy(storage());
+        java.util.concurrent.atomic.AtomicInteger promotions = new java.util.concurrent.atomic.AtomicInteger();
+        org.mockito.Mockito.doAnswer(call -> {
+            int attempt = promotions.incrementAndGet();
+            if (attempt == 2 && !failAfterSecondPromotion) throw new ServiceException("second promote failed");
+            Object result = call.callRealMethod();
+            if (attempt == 2) throw new ServiceException("second promote failed after move");
+            return result;
+        }).when(storage).promote(org.mockito.ArgumentMatchers.any());
+        Path original = tempDir.resolve("archive/retained.pdf");
+        Files.createDirectories(original.getParent());
+        Files.writeString(original, "previous committed evidence");
+        Path review = twoPageReviewPdf();
+        String reviewHash = sha256(review);
+        OaSignPackage signPackage = signPackage(400L);
+        OaSignPackageDocument document = signDocument(40L, 400L, review);
+        assertThatThrownBy(() -> new OaSignedPdfService(storage).generateSignedPdf(null,
+                signPackage, document, review, signaturePng(), null, new Date(), null,
+                "本人确认签署本签约包", null, null)).hasMessageContaining("second promote failed");
+        assertThat(Files.readString(original)).isEqualTo("previous committed evidence");
+        assertThat(sha256(review)).isEqualTo(reviewHash);
+        try (var files = Files.walk(tempDir.resolve("archive")))
+        {
+            assertThat(files.filter(Files::isRegularFile).toList()).containsExactly(original);
+        }
+        try (var files = Files.walk(tempDir.resolve("staging")))
+        {
+            assertThat(files.filter(Files::isRegularFile).toList()).isEmpty();
+        }
+    }
+
+    @Test
+    void cleanupFailureDoesNotMaskThePromotionFailure() throws Exception
+    {
+        OaSignFileStorageService storage = org.mockito.Mockito.spy(storage());
+        java.util.concurrent.atomic.AtomicInteger promotions = new java.util.concurrent.atomic.AtomicInteger();
+        org.mockito.Mockito.doAnswer(call -> {
+            if (promotions.incrementAndGet() == 2) throw new ServiceException("original promote failure");
+            return call.callRealMethod();
+        }).when(storage).promote(org.mockito.ArgumentMatchers.any());
+        org.mockito.Mockito.doThrow(new ServiceException("cleanup unavailable"))
+                .when(storage).discardUncommitted(org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString());
+        Path review = twoPageReviewPdf();
+        OaSignPackage signPackage = signPackage(400L);
+        OaSignPackageDocument document = signDocument(40L, 400L, review);
+        assertThatThrownBy(() -> new OaSignedPdfService(storage).generateSignedPdf(null,
+                signPackage, document, review, signaturePng(), null, new Date(), null,
+                "本人确认签署本签约包", null, null))
+                .hasMessageContaining("original promote failure")
+                .satisfies(error -> assertThat(error.getSuppressed()).singleElement()
+                        .extracting(Throwable::getMessage).isEqualTo("cleanup unavailable"));
+    }
+
     private OaSignedPdfService service()
     {
         return new OaSignedPdfService(storage());

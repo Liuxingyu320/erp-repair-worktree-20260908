@@ -1,50 +1,21 @@
-const state = {
-  dict: new Array()
-}
+import Vue from 'vue'
+const state = { dict: [], revisions: {}, epoch: 0 }
 const mutations = {
-  SET_DICT: (state, { key, value }) => {
-    if (key !== null && key !== "") {
-      state.dict.push({
-        key: key,
-        value: value
-      })
-    }
+  SET_DICT(state, { key, value, revision, epoch }) {
+    if (key == null || key === '') return
+    if (revision !== undefined && (revision !== (state.revisions[key] || 0) || epoch !== state.epoch)) return
+    state.dict = state.dict.filter(item => item.key !== key)
+    state.dict.push({ key, value })
   },
-  REMOVE_DICT: (state, key) => {
-    try {
-      for (let i = 0; i < state.dict.length; i++) {
-        if (state.dict[i].key == key) {
-          state.dict.splice(i, 1)
-          return true
-        }
-      }
-    } catch (e) {
-    }
+  REMOVE_DICT(state, key) {
+    state.dict = state.dict.filter(item => item.key !== key)
+    Vue.set(state.revisions, key, (state.revisions[key] || 0) + 1)
   },
-  CLEAN_DICT: (state) => {
-    state.dict = new Array()
-  }
+  CLEAN_DICT(state) { state.dict = []; state.epoch += 1; state.revisions = {} }
 }
-
 const actions = {
-  // 设置字典
-  setDict({ commit }, data) {
-    commit('SET_DICT', data)
-  },
-  // 删除字典
-  removeDict({ commit }, key) {
-    commit('REMOVE_DICT', key)
-  },
-  // 清空字典
-  cleanDict({ commit }) {
-    commit('CLEAN_DICT')
-  }
+  setDict({ commit }, data) { commit('SET_DICT', data) },
+  removeDict({ commit }, key) { commit('REMOVE_DICT', key) },
+  cleanDict({ commit }) { commit('CLEAN_DICT') }
 }
-
-export default {
-  namespaced: true,
-  state,
-  mutations,
-  actions
-}
-
+export default { namespaced: true, state, mutations, actions }

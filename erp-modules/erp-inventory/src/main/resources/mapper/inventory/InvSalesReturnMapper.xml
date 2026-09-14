@@ -107,14 +107,19 @@
     <update id="updateInvSalesReturn" parameterType="InvSalesReturn">
         update inv_sales_return
         <set>
+            <if test="params.updateContent == true">
+                sales_order_id = #{salesOrderId}, sales_order_no = #{salesOrderNo},
+            </if>
             <if test="returnTitle != null and returnTitle != ''">return_title = #{returnTitle},</if>
             <if test="customerName != null and customerName != ''">customer_name = #{customerName},</if>
             <if test="totalAmount != null">total_amount = #{totalAmount},</if>
             <if test="returnDate != null">return_date = #{returnDate},</if>
             <if test="status != null">status = #{status},</if>
+            <if test="params.updateContent == true">remark = #{remark},</if>
             update_by = #{updateBy}, update_time = sysdate()
         </set>
         where return_id = #{returnId}
+        <if test="params.expectedStatus != null">and status = #{params.expectedStatus}</if>
     </update>
 
     <delete id="deleteInvSalesReturnByIds" parameterType="Long">

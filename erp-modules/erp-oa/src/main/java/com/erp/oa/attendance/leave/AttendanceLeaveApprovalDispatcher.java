@@ -150,14 +150,14 @@ public class AttendanceLeaveApprovalDispatcher
         if (result == null || result.getInstanceId() == null
                 || result.getInstanceId() <= 0)
         {
-            outboxService.markFailed(row, response.getCode(),
-                    "INVALID_REMOTE_RESPONSE", "审批中心结果缺少实例ID");
+            scheduleRetry(row, now, response.getCode(),
+                    "INVALID_REMOTE_RESPONSE", "审批中心结果缺少实例ID，保留原占用并按原请求核对");
             return;
         }
         if (!Objects.equals(row.businessRound, result.getBusinessRound()))
         {
-            outboxService.markFailed(row, response.getCode(),
-                    "REMOTE_ROUND_MISMATCH", "审批中心返回业务轮次不一致");
+            scheduleRetry(row, now, response.getCode(),
+                    "REMOTE_ROUND_MISMATCH", "审批中心返回业务轮次不一致，保留原占用核对");
             return;
         }
         outboxService.recordRemoteSucceeded(row, result.getInstanceId(),
@@ -175,7 +175,7 @@ public class AttendanceLeaveApprovalDispatcher
         }
         catch (AttendanceLeaveApprovalOutboxService.PermanentFailure failure)
         {
-            outboxService.markFailed(row, row.lastHttpStatus,
+            scheduleRetry(row, now, row.lastHttpStatus,
                     failure.getErrorCode(), failure.getMessage());
         }
         catch (RuntimeException transientFailure)
@@ -209,10 +209,8 @@ public class AttendanceLeaveApprovalDispatcher
             int status)
     {
         String code = "REMOTE_HTTP_" + status;
-        if (status >= 400 && status < 500 && status != 408
-                && status != 425 && status != 429)
-            outboxService.markFailed(row, status, code, "审批中心拒绝发起请求");
-        else scheduleRetry(row, now, status, code, "审批中心暂时无法完成请求");
+        // A prior attempt may already have committed. HTTP status alone cannot release its reservation.
+        scheduleRetry(row, now, status, code, "审批中心结果待核对，保留原占用并按同一请求重试");
     }
 
     private void scheduleRetry(ApprovalOutbox row, LocalDateTime now,

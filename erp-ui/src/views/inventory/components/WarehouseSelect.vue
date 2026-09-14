@@ -39,22 +39,26 @@ export default {
     shopDeptId: [Number, String],
     scopeDeptId: [Number, String],
     purpose: { type: String, default: "" },
-    autoload: { type: Boolean, default: false }
+    autoload: { type: Boolean, default: false },
+    allowedWarehouseIds: { type: Array, default: null }
   },
   data() {
     return {
       loaded: false,
       loading: false,
-      warehouses: []
+      warehouses: [],
+      requestSequence: 0
     }
   },
   computed: {
     filteredWarehouses() {
+      const candidates = this.allowedWarehouseIds === null ? this.warehouses : this.warehouses.filter(item =>
+        this.allowedWarehouseIds.some(id => String(id) === String(item.deptId)))
       if (!this.shopDeptId) {
-        return this.warehouses
+        return candidates
       }
       const shopDeptId = String(this.shopDeptId)
-      return this.warehouses.filter(item => {
+      return candidates.filter(item => {
         return String(item.deptId) === shopDeptId ||
           String(item.parentId) === shopDeptId ||
           String(item.ancestors || "").split(",").includes(shopDeptId)
@@ -85,27 +89,40 @@ export default {
       this.loadWarehouses()
     }
   },
+  beforeDestroy() { this.requestSequence += 1 },
   methods: {
     reloadWarehouses() {
+      this.requestSequence += 1
       this.loaded = false
+      this.loading = false
       this.warehouses = []
+      this._warehousePromise = null
       if (this.autoload || (this.value !== undefined && this.value !== null && this.value !== "")) {
-        this.loadWarehouses()
+        return this.loadWarehouses()
       }
+      return Promise.resolve([])
     },
     loadWarehouses() {
-      if (this.loaded || this.loading) {
-        return
-      }
+      if (this.loaded) return Promise.resolve(this.filteredWarehouses)
+      if (this.loading) return this._warehousePromise
+      const sequence = ++this.requestSequence
+      const query = this.warehouseQuery()
+      const current = () => sequence === this.requestSequence && JSON.stringify(query) === JSON.stringify(this.warehouseQuery())
       this.loading = true
-      listWarehouseDept(this.warehouseQuery()).then(res => {
+      this._warehousePromise = listWarehouseDept(query).then(res => {
+        if (!current()) return []
         this.warehouses = this.flattenDeptList(res.data || res.rows || res || [])
           .filter(item => item && item.deptType === "WAREHOUSE" && this.isEnabledWarehouse(item))
         this.loaded = true
         this.$emit("loaded", this.filteredWarehouses)
+        return this.filteredWarehouses
+      }).catch(error => {
+        if (current()) this.$emit("load-error", error)
+        return []
       }).finally(() => {
-        this.loading = false
+        if (current()) this.loading = false
       })
+      return this._warehousePromise
     },
     warehouseQuery() {
       const query = {}

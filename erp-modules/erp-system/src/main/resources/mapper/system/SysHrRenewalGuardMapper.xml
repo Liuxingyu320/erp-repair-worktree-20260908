@@ -57,4 +57,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
                      or pending_o.status in ('PENDING', 'RETRY', 'SENDING', 'DEAD'))
           )
     </update>
+    <select id="selectCurrent" resultMap="HrRenewalGuardResult">
+        select employee_id, scenario, status, action_id, task_id, version
+        from sys_hr_renewal_guard where employee_id = #{employeeId} and scenario = #{scenario}
+    </select>
 </mapper>

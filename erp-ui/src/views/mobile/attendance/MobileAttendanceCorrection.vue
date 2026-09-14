@@ -2,13 +2,16 @@
   <section class="correction-card">
     <div class="section-heading">
       <div><small>保留原始证据</small><h2>{{ approvalFocus ? '补卡详情' : '我的补卡' }}</h2></div>
-      <button v-if="canSelf && !approvalFocus" type="button" :disabled="busy || scheduleLoading || !!scheduleError" @click="openNew">新建补卡</button>
+      <button v-if="canSelf && !approvalFocus" type="button" :disabled="busy || !!recoveryAttempt || scheduleLoading || !!scheduleError" @click="openNew">新建补卡</button>
     </div>
     <div v-if="error" class="correction-message error" role="alert">{{ error }}</div>
     <div v-if="scheduleError" class="correction-message warning" role="status">{{ scheduleError }}</div>
     <div v-if="success" class="correction-message success" role="status">{{ success }}</div>
 
+    <div v-if="recoveryAttempt && recoveryStorageUnavailable" class="correction-message warning" role="alert">浏览器未能保存恢复标记，请在核对完成前保留当前页面。原申请标识：{{ recoveryAttempt.clientRequestId }}。</div>
+    <div v-if="recoveryAttempt" class="correction-message warning" role="status">原补卡结果尚待核对。<button type="button" :disabled="busy" @click="reconcileCorrection(true)">核对原申请并恢复</button></div>
     <form v-if="showForm && canSelf" class="correction-form" @submit.prevent>
+      <fieldset :disabled="busy || (!!recoveryAttempt && !restoredInputRequired)" class="correction-fields">
       <label><span>对应排班</span>
         <select v-model="form.scheduleId" required @change="scheduleChanged">
           <option value="" disabled>请选择已发布排班</option>
@@ -39,10 +42,11 @@
       <label><span>申请更正为</span><input v-model="form.requestedPunchTime" type="datetime-local" step="60" required></label>
       <label><span>更正原因</span><textarea v-model.trim="form.reason" maxlength="1000" rows="4" placeholder="请说明为何需要补卡，原事件不会被修改" required /></label>
       <div class="evidence-note"><i class="el-icon-lock" /><span>通过后服务端会生成更正结果；原始打卡事件和照片证据保持不变。</span></div>
+      </fieldset>
       <div class="correction-actions">
-        <button type="button" :disabled="busy" @click="closeForm">取消</button>
-        <button type="button" :disabled="busy" @click="saveDraft(false)">{{ busy ? '处理中…' : '保存草稿' }}</button>
-        <button class="submit" type="button" :disabled="busy" @click="saveDraft(true)">保存并提交</button>
+        <button type="button" :disabled="busy || !!recoveryAttempt" @click="closeForm">取消</button>
+        <button type="button" :disabled="busy || !!recoveryAttempt" @click="saveDraft(false)">{{ busy ? '处理中…' : '保存草稿' }}</button>
+        <button class="submit" type="button" :disabled="busy || !!recoveryAttempt" @click="saveDraft(true)">保存并提交</button>
       </div>
     </form>
 
@@ -61,6 +65,7 @@
         <p>{{ row.reason || '-' }}</p>
         <div v-if="!approvalFocus" class="correction-row__actions">
           <button type="button" @click="openRow(row)">查看详情</button>
+          <button v-if="canSelf && row.status === 'SUBMITTING'" type="button" :disabled="busy || !!recoveryAttempt" @click="retrySubmitting(row)">重试原申请提交</button>
           <button v-if="canSelf && editableStatus(row.status)" type="button" @click="editRow(row)">继续编辑</button>
         </div>
       </article>
@@ -72,6 +77,7 @@
 import {
   createAttendanceCorrectionDraft,
   getAttendanceCorrection,
+  getAttendanceCorrectionByClientRequest,
   listAttendanceCorrectionEligiblePunchEvents,
   listAttendanceCorrectionEligibleSchedules,
   listMyAttendanceCorrections,
@@ -83,16 +89,20 @@ import { checkPermi } from '@/utils/permission'
 import { getSelectedDeptContext } from '@/utils/shopContext'
 
 const { attendanceErrorText, dataOf, isSegmentPunchContext, normalizePunchSlot, punchSlotLabel } = require('./attendancePunchPolicy')
+const recovery = require('@/utils/correctionRequestRecovery')
+const { createUiOperationScope } = require('@/utils/uiOperationScope')
+const { normalizePositiveDecimalId } = require('@/utils/positiveDecimalId')
+const { definiteRejection } = require('@/utils/leaveBalanceUi')
 const pad = number => String(number).padStart(2, '0')
 const dateOnly = date => `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
 const localInput = date => `${dateOnly(date)}T${pad(date.getHours())}:${pad(date.getMinutes())}`
-const emptyForm = () => ({ correctionRequestId: null, scheduleId: '', correctionType: 'MISSING_PUNCH', targetPunchType: 'IN', targetPunchSlotKey: '', targetScheduleSegmentSnapshotId: null, originalPunchEventId: '', requestedPunchTime: '', reason: '', rowVersion: null, status: 'DRAFT' })
+const emptyForm = () => ({ correctionRequestId: null, clientRequestId: recovery.newClientRequestId(), scheduleId: '', correctionType: 'MISSING_PUNCH', targetPunchType: 'IN', targetPunchSlotKey: '', targetScheduleSegmentSnapshotId: null, originalPunchEventId: '', requestedPunchTime: '', reason: '', rowVersion: null, status: 'DRAFT' })
 
 export default {
   name: 'MobileAttendanceCorrection',
   props: { todoBusinessId: { type: [String, Number], default: '' } },
   data() {
-    return { loading: false, scheduleLoading: false, busy: false, error: '', scheduleError: '', success: '', status: '', rows: [], schedules: [], punchEvents: [], showForm: false, form: emptyForm() }
+    return { recoveryStorageUnavailable: false, restoredInputRequired: false, recoveryAttempt: null, editorGeneration: 0, savedBusiness: null, loading: false, scheduleLoading: false, busy: false, error: '', scheduleError: '', success: '', status: '', rows: [], schedules: [], punchEvents: [], showForm: false, form: emptyForm() }
   },
   computed: {
     canSelf() { return checkPermi(['oa:attendance:correction:self']) },
@@ -148,21 +158,79 @@ export default {
         isSegmentPunchContext({ punchModeSnapshot: schedule.punchModeSnapshot })
     }
   },
-  watch: { todoBusinessId() { this.loadRows() } },
+  watch: {
+    todoBusinessId() { this.invalidateCorrectionEditor(); this.restoreRecovery(); this.loadRows() },
+    '$store.state.user.sessionRevision'() { this.invalidateCorrectionEditor(); this.restoreRecovery(); this.refresh() },
+    '$route.fullPath'() { this.invalidateCorrectionEditor(); this.restoreRecovery(); this.refresh() }
+  },
+  beforeDestroy() { this.correctionScope().deactivate(); if (typeof window !== 'undefined') window.removeEventListener('erp:dept-changed', this.correctionShopChanged) },
+  deactivated() { this.correctionScope().deactivate() },
+  activated() { this.correctionScope().activate(); this.restoreRecovery() },
   created() {
+    this.restoreRecovery()
+    if (typeof window !== 'undefined') window.addEventListener('erp:dept-changed', this.correctionShopChanged)
     if (this.canSelf) this.refresh()
     else this.loadRows()
   },
   methods: {
+    correctionIdentity() {
+      const user = this.$store && this.$store.state && this.$store.state.user || {}
+      const shop = getSelectedDeptContext() || {}
+      return { actor: String(user.id || this.$store && this.$store.getters && this.$store.getters.id || ''), session: user.sessionRevision || 0, shop: String(shop.deptId || '') }
+    },
+    correctionScope() {
+      if (!this._correctionScope) this._correctionScope = createUiOperationScope(() => ({ ...this.correctionIdentity(), generation: this.editorGeneration, focus: String(this.todoBusinessId || '') }))
+      return this._correctionScope
+    },
+    invalidateCorrectionEditor() {
+      this.correctionScope().invalidate(); this.editorGeneration += 1; this.busy = false
+      this.showForm = false; this.form = emptyForm(); this.savedBusiness = null; this.recoveryAttempt = null; this.restoredInputRequired = false; this.recoveryStorageUnavailable = false
+    },
+    correctionShopChanged() { this.invalidateCorrectionEditor(); this.restoreRecovery(); this.refresh() },
+    restoreRecovery() {
+      if (!this.canSelf || this.recoveryAttempt) return
+      this.recoveryAttempt = recovery.read(this.correctionIdentity())
+      if (this.recoveryAttempt) this.error = '上次补卡结果尚待核对，请先核对原申请；不会重复新建。'
+    },
+    rememberAttempt(attempt) {
+      this.recoveryAttempt = attempt
+      if (!attempt) this.restoredInputRequired = false
+      this.recoveryStorageUnavailable = !!attempt && !recovery.write(this.correctionIdentity(), attempt)
+      if (!attempt) recovery.write(this.correctionIdentity(), null)
+    },
+    requireCorrectionDetail(response, attempt) {
+      const row = dataOf(response)
+      const id = row && normalizePositiveDecimalId(row.correctionRequestId)
+      if (!id || attempt.id && id !== String(attempt.id) || !attempt.id && String(row.clientRequestId || '') !== attempt.clientRequestId)
+        throw new Error('服务端补卡身份与原申请不一致，请核对')
+      const owner = this.correctionIdentity()
+      if (row.userId != null && owner.actor && String(row.userId) !== owner.actor || row.shopId != null && owner.shop && String(row.shopId) !== owner.shop)
+        throw new Error('补卡所属员工或门店已变化，请核对')
+      if (!['DRAFT', 'RETURNED', 'SUBMITTING', 'PENDING', 'APPROVED', 'REJECTED', 'CANCELLED'].includes(String(row.status || '').toUpperCase()) || row.rowVersion == null)
+        throw new Error('服务端补卡状态不完整，请重试核对')
+      return { ...row, correctionRequestId: id }
+    },
+    mergeCorrection(row) {
+      this.form = Object.assign(emptyForm(), row, { clientRequestId: row.clientRequestId || this.form.clientRequestId, requestedPunchTime: String(row.requestedPunchTime || '').replace(' ', 'T').slice(0, 16) })
+      this.savedBusiness = recovery.businessOf(row)
+    },
+    finishCorrection(row, submitted) {
+      this.mergeCorrection(row); this.rememberAttempt(null)
+      this.success = submitted ? (row.status === 'SUBMITTING' ? '补卡提交处理中，可在原记录重试推进' : `补卡申请当前状态：${this.statusLabel(row.status)}`) : '补卡草稿已保存'
+      this.showForm = false
+      return this.loadRows()
+    },
     rowsOf(response) { const payload = dataOf(response); return Array.isArray(payload) ? payload : [] },
     loadEligibleSchedules() {
+      const scope = this.correctionScope(), token = scope.begin('schedules')
       this.scheduleLoading = true; this.scheduleError = ''
       const to = new Date(); const from = new Date(to); from.setDate(from.getDate() - 365)
-      return listAttendanceCorrectionEligibleSchedules({ dateFrom: dateOnly(from), dateTo: dateOnly(to) }).then(response => { this.schedules = this.rowsOf(response) })
+      return listAttendanceCorrectionEligibleSchedules({ dateFrom: dateOnly(from), dateTo: dateOnly(to) }).then(response => { if (scope.isCurrent(token)) this.schedules = this.rowsOf(response) })
         .catch(error => {
+          if (!scope.isCurrent(token)) return
           this.schedules = []
           this.scheduleError = `${attendanceErrorText(error, '可补卡排班加载失败')}；暂不能新建补卡，历史补卡记录仍可查看。`
-        }).finally(() => { this.scheduleLoading = false })
+        }).finally(() => { if (scope.isCurrent(token)) this.scheduleLoading = false })
     },
     refresh() {
       const schedules = this.canSelf && !this.approvalFocus
@@ -172,7 +240,9 @@ export default {
     },
     loadRows() {
       if (!this.canRead) return Promise.resolve()
-      this.loading = true; this.error = ''
+      const scope = this.correctionScope(), token = scope.begin('list', this.status)
+      this.loading = true
+      if (!this.recoveryAttempt) this.error = ''
       let request
       if (this.approvalFocus) request = getAttendanceCorrection(this.todoBusinessId).then(response => [dataOf(response)])
       else if (this.canSelf) request = listMyAttendanceCorrections({ status: this.status || undefined }).then(response => dataOf(response))
@@ -181,43 +251,56 @@ export default {
         if (!context.isStore || !context.deptId) { this.error = '请先切换到待审批申请所属门店'; this.loading = false; return Promise.resolve() }
         request = listShopAttendanceCorrections({ shopId: context.deptId, status: this.status || undefined }).then(response => dataOf(response))
       }
-      return request.then(rows => { this.rows = (Array.isArray(rows) ? rows : []).filter(Boolean) })
-        .catch(error => { this.rows = []; this.error = attendanceErrorText(error, '补卡记录加载失败') })
-        .finally(() => { this.loading = false })
+      return request.then(rows => { if (!scope.isCurrent(token, this.status)) return; this.rows = (Array.isArray(rows) ? rows : []).filter(Boolean) })
+        .catch(error => { if (scope.isCurrent(token, this.status)) { this.error = attendanceErrorText(error, '补卡记录加载失败') } })
+        .finally(() => { if (scope.isCurrent(token, this.status)) this.loading = false })
     },
     openNew() {
+      if (this.busy || this.recoveryAttempt) return
+      this.invalidateCorrectionEditor()
       if (!this.schedules.length) { this.scheduleError = '近一年内没有可用的已发布排班，不能新建补卡。'; return }
       this.form = emptyForm(); this.form.scheduleId = this.schedules[0].scheduleId; this.showForm = true; this.error = ''; this.success = ''; this.scheduleChanged()
     },
     openRow(row) {
+      const scope = this.correctionScope(), token = scope.begin('row', String(row.correctionRequestId))
       return getAttendanceCorrection(row.correctionRequestId).then(response => {
-        const detail = dataOf(response)
+        if (!scope.isCurrent(token)) return
+        const detail = this.requireCorrectionDetail(response, { id: String(row.correctionRequestId) })
         this.rows = this.rows.map(item => item.correctionRequestId === detail.correctionRequestId ? detail : item)
-      }).catch(error => { this.error = attendanceErrorText(error, '补卡详情加载失败') })
+      }).catch(error => { if (scope.isCurrent(token)) this.error = attendanceErrorText(error, '补卡详情加载失败') })
     },
     editRow(row) {
+      if (this.busy || this.recoveryAttempt) return Promise.resolve()
+      this.invalidateCorrectionEditor()
+      const scope = this.correctionScope(), token = scope.begin('edit', String(row.correctionRequestId))
       this.busy = true; this.error = ''
       return getAttendanceCorrection(row.correctionRequestId).then(response => {
-        const detail = dataOf(response) || {}
+        if (!scope.isCurrent(token)) return
+        const detail = this.requireCorrectionDetail(response, { id: String(row.correctionRequestId) })
+        if (!this.editableStatus(detail.status)) { this.success = `补卡申请当前状态：${this.statusLabel(detail.status)}`; return }
+        this.savedBusiness = recovery.businessOf(detail)
         this.form = Object.assign(emptyForm(), detail, { requestedPunchTime: String(detail.requestedPunchTime || '').slice(0, 16), targetPunchSlotKey: detail.targetPunchSlotKey || '', targetScheduleSegmentSnapshotId: detail.targetScheduleSegmentSnapshotId || null, originalPunchEventId: detail.originalPunchEventId || '' })
         this.showForm = true
-        return this.loadPunchEvents(detail.scheduleId).then(() => this.preserveOriginalEvent(detail))
-      }).catch(error => { this.error = attendanceErrorText(error, '补卡草稿加载失败') }).finally(() => { this.busy = false })
+        return this.loadPunchEvents(detail.scheduleId).then(() => { if (scope.isCurrent(token)) this.preserveOriginalEvent(detail) })
+      }).catch(error => { if (scope.isCurrent(token)) this.error = attendanceErrorText(error, '补卡草稿加载失败') }).finally(() => { if (scope.isCurrent(token)) this.busy = false })
     },
-    closeForm() { if (!this.busy) { this.showForm = false; this.form = emptyForm(); this.punchEvents = [] } },
+    closeForm() { if (!this.busy && !this.recoveryAttempt) { this.invalidateCorrectionEditor(); this.punchEvents = [] } },
     scheduleChanged() {
+      const scope = this.correctionScope(), token = scope.begin('schedule-change', String(this.form.scheduleId))
       this.form.originalPunchEventId = ''
       this.form.targetPunchSlotKey = ''
       this.form.targetScheduleSegmentSnapshotId = null
       return this.loadPunchEvents(this.form.scheduleId).then(() => {
+        if (!scope.isCurrent(token, String(this.form.scheduleId))) return
         if (this.usesSlotTargeting && this.selectableCorrectionTargets.length) this.form.targetPunchSlotKey = this.selectableCorrectionTargets[0].punchSlotKey
         this.targetSlotChanged()
       })
     },
     loadPunchEvents(scheduleId) {
+      const scope = this.correctionScope(), token = scope.begin('events', String(scheduleId))
       if (!scheduleId) { this.punchEvents = []; return Promise.resolve() }
-      return listAttendanceCorrectionEligiblePunchEvents(scheduleId).then(response => { this.punchEvents = this.rowsOf(response) })
-        .catch(error => { this.punchEvents = []; this.error = attendanceErrorText(error, '原打卡事件加载失败') })
+      return listAttendanceCorrectionEligiblePunchEvents(scheduleId).then(response => { if (scope.isCurrent(token, String(this.form.scheduleId))) this.punchEvents = this.rowsOf(response) })
+        .catch(error => { if (scope.isCurrent(token, String(this.form.scheduleId))) { this.punchEvents = []; this.error = attendanceErrorText(error, '原打卡事件加载失败') } })
     },
     preserveOriginalEvent(detail) {
       const source = detail || {}
@@ -282,27 +365,135 @@ export default {
       if (!String(this.form.reason || '').trim()) return '请填写更正原因'
       return ''
     },
-    saveDraft(shouldSubmit) {
+    async saveDraft(shouldSubmit) {
       if (this.busy) return
+      if (this.recoveryAttempt) return this.reconcileCorrection(true)
+      if (!this.showForm || !this.canSelf || !this.editableStatus(this.form.status)) return
       const invalid = this.validateForm(); if (invalid) { this.error = invalid; return }
+      const scope = this.correctionScope(), token = scope.begin('save')
+      const payload = { scheduleId: this.form.scheduleId, correctionType: this.form.correctionType, targetPunchType: this.form.targetPunchType,
+        targetPunchSlotKey: this.usesSlotTargeting ? this.form.targetPunchSlotKey : null,
+        targetScheduleSegmentSnapshotId: this.usesSlotTargeting ? this.form.targetScheduleSegmentSnapshotId : null,
+        originalPunchEventId: this.form.originalPunchEventId || null, requestedPunchTime: this.form.requestedPunchTime, reason: this.form.reason, rowVersion: this.form.rowVersion }
+      const id = normalizePositiveDecimalId(this.form.correctionRequestId)
+      if (this.form.correctionRequestId && !id) { this.error = '补卡编号无效，请重新从列表打开'; return }
+      const clientRequestId = this.form.clientRequestId || recovery.newClientRequestId()
+      if (!id) payload.clientRequestId = clientRequestId
       this.busy = true; this.error = ''; this.success = ''
-      const payload = { scheduleId: this.form.scheduleId, correctionType: this.form.correctionType, targetPunchType: this.form.targetPunchType, targetPunchSlotKey: this.usesSlotTargeting ? this.form.targetPunchSlotKey : null, targetScheduleSegmentSnapshotId: this.usesSlotTargeting ? this.form.targetScheduleSegmentSnapshotId : null, originalPunchEventId: this.form.originalPunchEventId || null, requestedPunchTime: this.form.requestedPunchTime, reason: this.form.reason, rowVersion: this.form.rowVersion }
-      const save = this.form.correctionRequestId ? updateAttendanceCorrectionDraft(this.form.correctionRequestId, payload) : createAttendanceCorrectionDraft(payload)
-      save.then(response => {
-        const draft = dataOf(response)
-        if (!draft || !draft.correctionRequestId) throw new Error('服务端未返回补卡草稿')
-        // Keep the server identity/version before submit so a failed submit can be
-        // retried against the same draft without creating a duplicate request.
-        this.form = Object.assign({}, this.form, draft, {
-          requestedPunchTime: String(draft.requestedPunchTime || this.form.requestedPunchTime || '').slice(0, 16)
-        })
-        return draft
-      }).then(draft => shouldSubmit ? submitAttendanceCorrection(draft.correctionRequestId, draft.rowVersion).then(response => dataOf(response)) : draft)
-        .then(result => {
-          if (!result || !result.correctionRequestId) throw new Error('服务端未返回补卡申请')
-          this.success = shouldSubmit ? '补卡申请已由服务端提交' : '补卡草稿已保存'; this.showForm = false; return this.loadRows()
-        }).catch(error => { this.error = attendanceErrorText(error, shouldSubmit ? '补卡提交失败' : '补卡草稿保存失败') })
-        .finally(() => { this.busy = false })
+      try {
+        const attempt = { stage: id ? 'UPDATE' : 'CREATE', id, clientRequestId, payload, shouldSubmit: !!shouldSubmit,
+          baseBusiness: this.savedBusiness, baseVersion: this.form.rowVersion, payloadHash: await recovery.fingerprint(payload) }
+        if (!scope.isCurrent(token)) return
+        this.rememberAttempt(attempt)
+        let row
+        try {
+          row = this.requireCorrectionDetail(id ? await updateAttendanceCorrectionDraft(id, payload) : await createAttendanceCorrectionDraft(payload), attempt)
+          if (!recovery.sameBusiness(row, payload)) throw new Error('服务端补卡内容与本次保存不同，请核对')
+        } catch (error) {
+          if (!scope.isCurrent(token)) return
+          return await this.recoverCorrectionAttempt(attempt, token, false, error)
+        }
+        if (!scope.isCurrent(token)) return
+        this.mergeCorrection(row)
+        if (shouldSubmit && this.editableStatus(row.status)) return await this.submitKnownCorrection(row, attempt, token)
+        return await this.finishCorrection(row, !this.editableStatus(row.status))
+      } catch (error) { if (scope.isCurrent(token)) this.error = `${attendanceErrorText(error, '补卡保存结果待核对')}；请核对原申请后继续` }
+      finally { if (scope.isCurrent(token)) this.busy = false }
+    },
+    async submitKnownCorrection(row, previous, token) {
+      const scope = this.correctionScope()
+      if (!scope.isCurrent(token)) return
+      const attempt = { ...previous, stage: 'SUBMIT', id: String(row.correctionRequestId), payload: recovery.businessOf(row), baseVersion: row.rowVersion, shouldSubmit: true }
+      this.rememberAttempt(attempt)
+      try {
+        const result = this.requireCorrectionDetail(await submitAttendanceCorrection(attempt.id, row.rowVersion), attempt)
+        if (!scope.isCurrent(token)) return
+        if (!recovery.sameBusiness(result, attempt.payload) || this.editableStatus(result.status)) throw new Error('补卡提交结果尚未确认')
+        return await this.finishCorrection(result, true)
+      } catch (error) {
+        if (!scope.isCurrent(token)) return
+        return await this.recoverCorrectionAttempt(attempt, token, false, error)
+      }
+    },
+    async reconcileCorrection(allowReplay) {
+      if (this.busy || !this.recoveryAttempt) return
+      const scope = this.correctionScope(), token = scope.begin('save'), attempt = this.recoveryAttempt
+      this.busy = true; this.error = ''
+      try {
+        if (this.restoredInputRequired) {
+          const invalid = this.validateForm(); if (invalid) throw new Error(invalid)
+          const payload = { ...recovery.businessOf(this.form), clientRequestId: attempt.clientRequestId, rowVersion: null }
+          ;['originalPunchEventId', 'targetScheduleSegmentSnapshotId', 'targetPunchSlotKey'].forEach(key => { if (!payload[key]) payload[key] = null })
+          const digest = await recovery.fingerprint(payload)
+          if (!scope.isCurrent(token)) return
+          if (!digest || digest !== attempt.payloadHash) throw new Error('填写内容与原保存摘要不一致，尚未发送，请按原内容核对')
+          attempt.payload = payload; attempt.restored = false; this.restoredInputRequired = false
+        }
+        return await this.recoverCorrectionAttempt(attempt, token, allowReplay === true, null)
+      }
+      catch (error) { if (scope.isCurrent(token)) this.error = `${attendanceErrorText(error, '补卡结果仍待核对')}；保留原申请标识，请稍后重试核对` }
+      finally { if (scope.isCurrent(token)) this.busy = false }
+    },
+    async recoverCorrectionAttempt(attempt, token, allowReplay, originalError) {
+      const scope = this.correctionScope(); if (!scope.isCurrent(token)) return
+      let row
+      try {
+        row = this.requireCorrectionDetail(attempt.id ? await getAttendanceCorrection(attempt.id) : await getAttendanceCorrectionByClientRequest(attempt.clientRequestId), attempt)
+      } catch (error) {
+        if (!scope.isCurrent(token)) return
+        const notFound = !attempt.id && /CORRECTION_CLIENT_REQUEST_NOT_FOUND/.test(attendanceErrorText(error, ''))
+        if (notFound && allowReplay && attempt.restored && attempt.stage === 'CREATE' && !attempt.payload) {
+          if (!attempt.payloadHash) throw new Error('原保存尚未找到，且当前设备没有可核对的内容摘要，请保留此标识联系管理员核对')
+          this.form = emptyForm(); this.form.clientRequestId = attempt.clientRequestId
+          this.showForm = true; this.restoredInputRequired = true
+          this.error = '尚未找到原申请，请按原内容填写后再次核对。内容摘要一致时只用原标识重放保存。'
+          return
+        }
+        if (notFound && originalError && definiteRejection(originalError)) { this.rememberAttempt(null); throw originalError }
+        if (notFound && allowReplay && attempt.stage === 'CREATE' && attempt.payload) {
+          row = this.requireCorrectionDetail(await createAttendanceCorrectionDraft(attempt.payload), attempt)
+        } else throw originalError || error
+      }
+      if (!scope.isCurrent(token)) return
+      if (attempt.payload && !recovery.sameBusiness(row, attempt.payload)) {
+        if (attempt.stage === 'UPDATE' && attempt.baseBusiness && recovery.sameBusiness(row, attempt.baseBusiness) && String(row.rowVersion) === String(attempt.baseVersion) && this.editableStatus(row.status)) {
+          if (originalError && definiteRejection(originalError)) { this.rememberAttempt(null); throw originalError }
+          if (allowReplay) row = this.requireCorrectionDetail(await updateAttendanceCorrectionDraft(attempt.id, attempt.payload), attempt)
+          else throw originalError || new Error('上次保存尚未确认，重试核对后可按原内容恢复')
+        } else throw new Error('服务端补卡内容已变化，已保留当前输入，请到原申请核对')
+      }
+      if (!scope.isCurrent(token)) return
+      if (attempt.payload && !recovery.sameBusiness(row, attempt.payload)) throw new Error('恢复结果与原补卡内容不一致')
+      if (attempt.restored) {
+        // After a reload we only read the original record. Never reconstruct or resubmit personal fields from storage.
+        const sameDigest = attempt.payloadHash && await recovery.fingerprint(row) === attempt.payloadHash
+        if (!scope.isCurrent(token)) return
+        this.mergeCorrection(row); this.rememberAttempt(null); this.showForm = this.editableStatus(row.status)
+        if (!sameDigest) this.error = '已找回服务端记录，但未确认上次修改内容一致，请核对后再编辑；不会自动提交。'
+        this.success = `已找回原申请，请核对服务端内容；当前状态：${this.statusLabel(row.status)}`
+        return this.loadRows()
+      }
+      if (!this.editableStatus(row.status)) return this.finishCorrection(row, true)
+      this.mergeCorrection(row)
+      if (attempt.stage === 'SUBMIT') {
+        if (allowReplay) return this.submitKnownCorrection(row, attempt, token)
+        if (originalError && definiteRejection(originalError)) this.rememberAttempt(null)
+        throw originalError || new Error('上次提交尚未确认，请核对后重试原申请提交')
+      }
+      if (attempt.shouldSubmit) return this.submitKnownCorrection(row, attempt, token)
+      return this.finishCorrection(row, false)
+    },
+    async retrySubmitting(row) {
+      if (this.busy || this.recoveryAttempt || !this.canSelf || row.status !== 'SUBMITTING') return
+      const scope = this.correctionScope(), token = scope.begin('save')
+      this.busy = true; this.error = ''
+      try {
+        const detail = this.requireCorrectionDetail(await getAttendanceCorrection(row.correctionRequestId), { id: String(row.correctionRequestId) })
+        if (!scope.isCurrent(token)) return
+        if (detail.status !== 'SUBMITTING') return await this.finishCorrection(detail, true)
+        return await this.submitKnownCorrection(detail, { clientRequestId: detail.clientRequestId || recovery.newClientRequestId(), payloadHash: await recovery.fingerprint(detail) }, token)
+      } catch (error) { if (scope.isCurrent(token)) this.error = attendanceErrorText(error, '原补卡推进失败，请重试核对') }
+      finally { if (scope.isCurrent(token)) this.busy = false }
     },
     editableStatus(value) { return ['DRAFT', 'RETURNED'].includes(String(value || '').toUpperCase()) },
     correctionLabel(value) { return { MISSING_PUNCH: '缺卡补录', WRONG_TIME: '时间更正', WRONG_TYPE: '打卡类型更正', OTHER: '其他更正' }[value] || value || '补卡' },
@@ -349,6 +540,7 @@ export default {
 </script>
 
 <style scoped>
+.correction-fields { display: grid; gap: 13px; min-width: 0; border: 0; padding: 0; margin: 0; }
 .correction-card { padding: 18px; border: 1px solid rgba(91,116,112,.12); border-radius: 20px; background: rgba(255,255,255,.94); box-shadow: 0 10px 28px rgba(32,57,73,.08); }
 .section-heading, .correction-row__top, .correction-row__actions { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .section-heading small { color: #4b817a; font-weight: 700; }.section-heading h2 { margin: 3px 0 0; font-size: 19px; }

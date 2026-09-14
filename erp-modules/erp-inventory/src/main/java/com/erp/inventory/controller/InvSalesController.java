@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import com.erp.common.core.utils.poi.ExcelUtil;
 import com.erp.common.core.web.domain.AjaxResult;
@@ -84,9 +85,9 @@ public class InvSalesController extends InvBaseController
     @IdempotentSubmit(timeout = 30)
     @Log(title = "销售管理", businessType = BusinessType.DELETE)
     @DeleteMapping("/{orderId}")
-    public AjaxResult cancel(@PathVariable("orderId") Long orderId, HttpServletRequest request)
+    public AjaxResult cancel(@PathVariable("orderId") Long orderId, @RequestParam("version") Long version, HttpServletRequest request)
     {
-        salesService.cancelSales(orderId, resolveShopDeptId(request));
+        salesService.cancelSales(orderId, resolveShopDeptId(request), version);
         return success();
     }
 

@@ -22,7 +22,7 @@ class AttendanceLeaveApprovalOutboxServiceTest
     {
         mapper = mock(AttendanceLeaveMapper.class);
         service = new AttendanceLeaveApprovalOutboxService(mapper,
-                new ObjectMapper());
+                new ObjectMapper(), legacyQuota());
     }
 
     @Test
@@ -67,6 +67,7 @@ class AttendanceLeaveApprovalOutboxServiceTest
         request.status = "SUBMITTING";
         when(mapper.selectApprovalOutboxByIdForUpdate(70L))
                 .thenReturn(locked);
+        when(mapper.selectApprovalOutboxById(70L)).thenReturn(locked);
         when(mapper.selectLeaveRequestByIdForUpdate(12L)).thenReturn(request);
         when(mapper.finalizeLeaveApprovalStart(12L, 2, 3L, 91L,
                 "tester")).thenReturn(1);
@@ -99,5 +100,14 @@ class AttendanceLeaveApprovalOutboxServiceTest
         value.setBusinessRound(2);
         value.setIdempotencyKey("OA_ATTENDANCE_LEAVE:12:2");
         return value;
+    }
+
+    private static com.erp.oa.attendance.leave.balance.AttendanceLeaveQuotaService legacyQuota()
+    {
+        return org.mockito.Mockito.mock(com.erp.oa.attendance.leave.balance.AttendanceLeaveQuotaService.class, invocation -> {
+            String method=invocation.getMethod().getName();
+            if("hydrate".equals(method) || "copyPolicy".equals(method))return invocation.getArgument(0);
+            return org.mockito.Answers.RETURNS_DEFAULTS.answer(invocation);
+        });
     }
 }

@@ -108,6 +108,7 @@ public class InvStockServiceImpl extends InvBaseService implements IInvStockServ
         BigDecimal availableQuantity = quantityOrZero(stock.getAvailableQuantity());
         assertAdjustmentBalance(beforeQuantity, availableQuantity, adjustQuantity);
         BigDecimal unitCost = stock.getCostPrice() == null ? BigDecimal.ZERO : stock.getCostPrice();
+        BigDecimal movementCost = null;
         int affectedRows;
         if (adjustQuantity.compareTo(BigDecimal.ZERO) > 0)
         {
@@ -117,8 +118,11 @@ public class InvStockServiceImpl extends InvBaseService implements IInvStockServ
         else
         {
             BigDecimal deductQuantity = adjustQuantity.abs();
+            InvStockCostAllocator.Allocation allocation = InvStockCostAllocator.allocate(stock, deductQuantity);
+            unitCost = allocation.unitCost();
+            movementCost = allocation.amount();
             affectedRows = stockMapper.deductInvStockWithCost(stockId, currentVersion, deductQuantity,
-                    deductQuantity.multiply(unitCost), SecurityUtils.getUsername());
+                    movementCost, SecurityUtils.getUsername());
         }
         if (affectedRows != 1)
         {
@@ -130,7 +134,8 @@ public class InvStockServiceImpl extends InvBaseService implements IInvStockServ
         {
             throw new ServiceException("库存调整结果不存在");
         }
-        insertManualAdjustmentLog(updated, beforeQuantity, adjustQuantity, reason, null);
+        insertManualAdjustmentLog(updated, beforeQuantity, adjustQuantity, reason, null,
+                movementCost == null ? updated.getCostPrice() : unitCost, movementCost);
         return updated;
     }
 
@@ -168,12 +173,16 @@ public class InvStockServiceImpl extends InvBaseService implements IInvStockServ
         {
             throw new ServiceException("请选择物料");
         }
+        if (itemResolver != null) itemResolver.lockReferences(java.util.List.of(
+                InventoryItemResolver.referenceKey(itemType, itemId, productId)));
         InventoryItemSnapshot item = resolveInventoryItem(itemType, itemId, productId);
         Long inventoryDeptId = resolveInventoryDeptId(shopDeptId, warehouseId, selectedShopDeptId);
         assertWritableInventoryDept(inventoryDeptId, selectedShopDeptId, "只能调整当前组织库存");
 
         InvStock stock = stockMapper.selectInvStockByItemShopWarehouseForUpdate(itemType, itemId, inventoryDeptId, inventoryDeptId);
         BigDecimal beforeQty = BigDecimal.ZERO;
+        BigDecimal movementCost = null;
+        BigDecimal movementUnitCost = null;
         if (stock == null)
         {
             if (adjustQuantity.compareTo(BigDecimal.ZERO) < 0)
@@ -230,7 +239,10 @@ public class InvStockServiceImpl extends InvBaseService implements IInvStockServ
             else
             {
                 BigDecimal deductQuantity = adjustQuantity.abs();
-                BigDecimal deductCost = deductQuantity.multiply(unitCost);
+                InvStockCostAllocator.Allocation allocation = InvStockCostAllocator.allocate(stock, deductQuantity);
+                movementUnitCost = allocation.unitCost();
+                BigDecimal deductCost = allocation.amount();
+                movementCost = deductCost;
                 int rows = stockMapper.deductInvStockWithCost(stock.getStockId(), stock.getVersion(), deductQuantity, deductCost,
                         SecurityUtils.getUsername());
                 if (rows == 0)
@@ -260,7 +272,8 @@ public class InvStockServiceImpl extends InvBaseService implements IInvStockServ
             }
         }
 
-        insertManualAdjustmentLog(stock, beforeQty, adjustQuantity, reason, request);
+        insertManualAdjustmentLog(stock, beforeQty, adjustQuantity, reason, request,
+                movementCost == null ? stock.getCostPrice() : movementUnitCost, movementCost);
     }
 
     private BigDecimal validateAdjustmentQuantity(BigDecimal quantity)
@@ -321,7 +334,8 @@ public class InvStockServiceImpl extends InvBaseService implements IInvStockServ
     }
 
     private void insertManualAdjustmentLog(InvStock stock, BigDecimal beforeQuantity,
-            BigDecimal adjustQuantity, String reason, InvStockAdjustRequest request)
+            BigDecimal adjustQuantity, String reason, InvStockAdjustRequest request,
+            BigDecimal movementUnitCost, BigDecimal movementCost)
     {
         InvStockLog log = new InvStockLog();
         log.setItemType(InvItemTypes.normalize(stock.getItemType()));
@@ -337,7 +351,8 @@ public class InvStockServiceImpl extends InvBaseService implements IInvStockServ
         log.setChangeQuantity(adjustQuantity);
         log.setBeforeQuantity(beforeQuantity);
         log.setAfterQuantity(stock.getCurrentQuantity());
-        log.setCostPrice(stock.getCostPrice());
+        log.setCostPrice(movementUnitCost);
+        log.setCostAmount(movementCost);
         applyStockLogMetadata(log, stock, request);
         log.setCreateBy(SecurityUtils.getUsername());
         log.setCreateTime(new Date());

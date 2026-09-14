@@ -61,11 +61,21 @@ final class InvTransferReceiptProcessor extends InvTransferWorkflowSupport
     void receiveTransferShipment(Long shipmentId,
             InvReceiveRequest receiveRequest, Long selectedShopDeptId)
     {
-        InvTransferShipment shipment = resources.transferShipmentMapper
-                .selectByIdForUpdate(shipmentId);
-        if (shipment == null)
+        InvTransferShipment locator = resources.transferShipmentMapper.selectById(shipmentId);
+        if (locator == null)
         {
             throw new ServiceException("发货批次不存在");
+        }
+        InvTransferOrder locked = resources.transferOrderMapper
+                .selectInvTransferOrderByIdForUpdate(locator.getTransferId());
+        if (locked == null)
+        {
+            throw new ServiceException("调拨单不存在");
+        }
+        InvTransferShipment shipment = resources.transferShipmentMapper.selectByIdForUpdate(shipmentId);
+        if (shipment == null || !java.util.Objects.equals(shipment.getTransferId(), locked.getTransferId()))
+        {
+            throw new ServiceException("发货批次归属已变化，请刷新后重试");
         }
         if (InvTransferShipmentWriteVersions.V2_DETAIL.equals(
                 shipment.getInventoryWriteVersion()))
@@ -76,12 +86,6 @@ final class InvTransferReceiptProcessor extends InvTransferWorkflowSupport
         if (!InvStatusConstants.PENDING_RECEIVE.equals(shipment.getStatus()))
         {
             throw new ServiceException("发货批次不是待收货状态");
-        }
-        InvTransferOrder locked = resources.transferOrderMapper
-                .selectInvTransferOrderByIdForUpdate(shipment.getTransferId());
-        if (locked == null)
-        {
-            throw new ServiceException("调拨单不存在");
         }
         assertTransferReceiveScope(locked, selectedShopDeptId);
         directionPolicy.validateReceipt(locked, selectedShopDeptId);
@@ -120,6 +124,13 @@ final class InvTransferReceiptProcessor extends InvTransferWorkflowSupport
 
         assertDiscrepancyCreationEnabled(explicitReceiveRequest,
                 receiveItemMap, shipmentDetails);
+
+        // Scope, shipment state and request shape are checked before reading any file node.
+        // Validate every supplied reference before the first inventory/discrepancy write.
+        for (InvReceiveItem item : receiveItemMap.values())
+        {
+            resources.evidenceService.validate(item.getAttachmentRefs());
+        }
 
         List<InvTransferDiscrepancyDetail> discrepancyDetails =
                 new ArrayList<>();

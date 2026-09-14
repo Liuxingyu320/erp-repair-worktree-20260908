@@ -34,9 +34,10 @@ export function createDriveFolder(data) {
   })
 }
 
-export function uploadDriveFile(file, spaceId, parentId, onUploadProgress, signal) {
+export function uploadDriveFile(file, spaceId, parentId, onUploadProgress, signal, operationId) {
   const data = new FormData()
   data.append('file', file)
+  if (operationId) data.append('operationId', operationId)
   data.append('spaceId', spaceId)
   data.append('parentId', parentId == null ? 0 : parentId)
   return request({
@@ -49,6 +50,10 @@ export function uploadDriveFile(file, spaceId, parentId, onUploadProgress, signa
     onUploadProgress,
     signal
   })
+}
+
+export function getDriveUploadReceipt(operationId) {
+  return request({ url: '/file/drive/uploads/' + encodeURIComponent(operationId), method: 'get', silentError: true })
 }
 
 export function renameDriveNode(nodeId, data) {

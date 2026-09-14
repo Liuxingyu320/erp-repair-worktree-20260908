@@ -37,6 +37,7 @@ public class HrOnboardingListVo implements Serializable
     private List<String> allowedActions = new ArrayList<>();
     private String currentAction;
 
+    @com.fasterxml.jackson.databind.annotation.JsonSerialize(using = com.fasterxml.jackson.databind.ser.std.ToStringSerializer.class)
     public Long getOnboardingId() { return onboardingId; }
     public void setOnboardingId(Long onboardingId) { this.onboardingId = onboardingId; }
     public String getOnboardingNo() { return onboardingNo; }

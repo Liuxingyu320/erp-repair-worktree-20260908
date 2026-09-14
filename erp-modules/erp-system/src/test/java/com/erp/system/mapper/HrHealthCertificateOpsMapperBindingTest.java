@@ -35,9 +35,9 @@ class HrHealthCertificateOpsMapperBindingTest
         String sql = normalize(boundSql.getSql());
 
         assertThat(sql).contains(
-                "c.review_status = 'pending_review'",
-                "c.current_flag = 'y'",
-                "c.expires_on between current_date()",
+                "c.review_status in ('pending_review', 'approval_pending')",
+                "h.current_flag = 'y'",
+                "c.expires_on between ?",
                 "and u.dept_id = ?",
                 "and d.dept_id in (10, 11)");
         assertThat(sql).doesNotContain("select *");

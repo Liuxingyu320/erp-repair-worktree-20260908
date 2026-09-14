@@ -50,6 +50,18 @@
           and (qc_result is null or qc_result = 'pending')
     </select>
 
+    <select id="selectByOrderIdForUpdate" resultMap="InvInboundRecordResult">
+        select inbound_id, purchase_order_id, purchase_detail_id, order_no, item_type, item_id,
+               product_id, shop_dept_id, warehouse_id, receipt_batch_id, receipt_batch_detail_id,
+               quality_inspection_id, quantity, inspected_quantity, accepted_quantity,
+               rejected_quantity, concession_quantity,
+               qc_result, qc_user, qc_time, qc_remark, create_by, create_time, remark
+        from inv_inbound_record
+        where purchase_order_id = #{orderId}
+        order by inbound_id asc
+        for update
+    </select>
+
     <select id="selectByBatchDetailIdForUpdate" resultMap="InvInboundRecordResult">
         select inbound_id, purchase_order_id, purchase_detail_id, order_no, item_type, item_id,
                product_id, shop_dept_id, warehouse_id, receipt_batch_id, receipt_batch_detail_id,

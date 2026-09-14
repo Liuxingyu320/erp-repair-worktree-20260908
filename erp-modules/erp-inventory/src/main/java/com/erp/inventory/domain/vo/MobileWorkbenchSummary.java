@@ -19,6 +19,22 @@ public class MobileWorkbenchSummary implements Serializable
     private Long transferReceiveCount;
     private Long deliveryNoticeCount;
     private Long transferDeliverCount;
+    private Long pendingStockCheckCount;
+    private Long pendingReturnCount;
+    private Long todaySalesCount;
+    private String todaySalesDate;
+    private String todaySalesStatus;
+
+    public Long getPendingStockCheckCount() { return pendingStockCheckCount; }
+    public void setPendingStockCheckCount(Long value) { this.pendingStockCheckCount = value; }
+    public Long getPendingReturnCount() { return pendingReturnCount; }
+    public void setPendingReturnCount(Long value) { this.pendingReturnCount = value; }
+    public Long getTodaySalesCount() { return todaySalesCount; }
+    public void setTodaySalesCount(Long value) { this.todaySalesCount = value; }
+    public String getTodaySalesDate() { return todaySalesDate; }
+    public void setTodaySalesDate(String value) { this.todaySalesDate = value; }
+    public String getTodaySalesStatus() { return todaySalesStatus; }
+    public void setTodaySalesStatus(String value) { this.todaySalesStatus = value; }
 
     public Long getSelectedDeptId()
     {

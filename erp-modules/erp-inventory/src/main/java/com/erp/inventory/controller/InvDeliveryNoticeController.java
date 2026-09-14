@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import com.erp.common.core.utils.poi.ExcelUtil;
 import com.erp.common.core.web.domain.AjaxResult;
@@ -50,10 +51,22 @@ public class InvDeliveryNoticeController extends InvBaseController
     @IdempotentSubmit(timeout = 30)
     @Log(title = "发货通知", businessType = BusinessType.INSERT)
     @PostMapping("/create/{salesOrderId}")
-    public AjaxResult create(@PathVariable("salesOrderId") Long salesOrderId, HttpServletRequest request)
+    public AjaxResult create(@PathVariable("salesOrderId") Long salesOrderId, @RequestParam("version") Long version, HttpServletRequest request)
     {
-        InvDeliveryNotice notice = deliveryNoticeService.createNotice(salesOrderId, resolveShopDeptId(request));
+        InvDeliveryNotice notice = deliveryNoticeService.createNotice(salesOrderId, resolveShopDeptId(request), version);
         return AjaxResult.success("生成发货通知成功", notice);
+    }
+
+    @RequiresPermissions({ "inv:deliveryNotice:add", "inv:sales:add" })
+    @IdempotentSubmit(timeout = 30)
+    @Log(title = "销售缺仓受控补全", businessType = BusinessType.UPDATE)
+    @PostMapping("/repair-warehouses/{salesOrderId}")
+    public AjaxResult repairWarehouses(@PathVariable("salesOrderId") Long salesOrderId,
+            @Validated @RequestBody com.erp.inventory.domain.dto.InvSalesWarehouseRepairRequest body,
+            HttpServletRequest request)
+    {
+        return AjaxResult.success("仓库已补全并生成发货通知",
+                deliveryNoticeService.repairMissingWarehousesAndCreateNotice(salesOrderId, body, resolveShopDeptId(request)));
     }
 
     @RequiresPermissions("inv:deliveryNotice:deliver")

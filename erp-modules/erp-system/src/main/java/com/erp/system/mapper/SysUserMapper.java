@@ -200,6 +200,11 @@ public interface SysUserMapper
             @Param("temporaryPasswordExpiresAt") java.util.Date temporaryPasswordExpiresAt,
             @Param("updateBy") String updateBy);
 
+    /** Atomic self-service credential transition, guarded by the previously verified password hash. */
+    int changeOwnPasswordIfCurrent(@Param("userId") Long userId,
+            @Param("expectedPasswordHash") String expectedPasswordHash,
+            @Param("passwordHash") String passwordHash, @Param("updateBy") String updateBy);
+
     /** User-owned password change: activate the credential and clear temporary expiry. */
     public int activateUserPassword(@Param("userId") Long userId,
             @Param("password") String password,

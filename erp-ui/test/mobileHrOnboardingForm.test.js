@@ -48,6 +48,7 @@ function loadSfc(file, dependencies) {
     window: dependencies && dependencies.__window,
     document: dependencies && dependencies.__document,
     require(request) {
+      if (request === "@/utils/positiveDecimalId") return require("../src/utils/positiveDecimalId")
       if (Object.prototype.hasOwnProperty.call(dependencies || {}, request)) return dependencies[request]
       throw new Error(`unexpected component dependency: ${request}`)
     }
@@ -373,7 +374,7 @@ async function run() {
   Object.assign(terminalTarget.model, plain(createPayload))
   const terminalSubmit = terminalTarget.submit()
   await flush()
-  assert.strictEqual(terminalTarget.savedOnboardingId, 88, "the saved record id must become a terminal state before navigation settles")
+  assert.strictEqual(terminalTarget.savedOnboardingId, "88", "the saved record id must become a terminal state before navigation settles")
   assert.strictEqual(terminalTarget.submitting, true, "save must remain busy while navigation is pending")
   terminalTarget.submit()
   assert.strictEqual(terminalCreateCalls.length, 1, "repeated save while navigation is pending must not reissue create")
@@ -381,7 +382,7 @@ async function run() {
   await terminalSubmit
   assert.ok(terminalTarget.navigationError.includes("保存成功但跳转失败"))
   assert.strictEqual(terminalTarget.submitting, false)
-  assert.strictEqual(terminalTarget.savedOnboardingId, 88)
+  assert.strictEqual(terminalTarget.savedOnboardingId, "88")
   assert.strictEqual(terminalPage.computed.formLocked.call(terminalTarget), true, "save controls must remain locked after navigation failure")
   const navigationRetry = terminalTarget.retryNavigation()
   terminalTarget.submit()
@@ -654,7 +655,7 @@ async function run() {
   editTarget.model.employeeName = "新姓名"
   await editTarget.submit()
   assert.strictEqual(updates.length, 1)
-  assert.deepStrictEqual(updates[0], [8, {
+  assert.deepStrictEqual(updates[0], ["8", {
     version: 4,
     employeeName: "新姓名"
   }],
@@ -672,7 +673,7 @@ async function run() {
   })
   const unchangedTarget = bind(unchangedPage, {
     mode: "edit",
-    recordId: 8,
+    recordId: "8",
     model: { version: "4", employeeName: "原姓名", targetDeptId: "11" },
     originalModel: { version: 4, employeeName: "原姓名", targetDeptId: 11 },
     $route: { path: "/mobile/hr/onboarding/8/edit", params: { id: "8" }, query: {}, fullPath: "unchanged-edit" },
@@ -680,7 +681,7 @@ async function run() {
     $refs: {}
   })
   await unchangedTarget.submit()
-  assert.deepStrictEqual(unchangedUpdates, [[8, { version: 4 }]],
+  assert.deepStrictEqual(unchangedUpdates, [["8", { version: 4 }]],
     "an unchanged edit must still issue the update request with version only")
 
   const maskTarget = bind(editPage, {
@@ -688,7 +689,7 @@ async function run() {
     $router: { replace() {}, back() {} }, $refs: {}
   })
   maskTarget.mode = "edit"
-  maskTarget.recordId = 8
+  maskTarget.recordId = "8"
   maskTarget.model = { version: 4, idNumber: "1101**********0000" }
   maskTarget.sensitiveDirty = { idNumber: true }
   await maskTarget.submit()
@@ -712,7 +713,7 @@ async function run() {
   secondDetail.resolve({ data: { onboardingId: 2, version: 2, employeeName: "新记录" } })
   firstDetail.resolve({ data: { onboardingId: 1, version: 1, employeeName: "旧记录" } })
   await flush()
-  assert.strictEqual(raceTarget.recordId, 2)
+  assert.strictEqual(raceTarget.recordId, "2")
   assert.strictEqual(raceTarget.model.employeeName, "新记录", "stale route detail must not overwrite the current record")
 
   const conflictRefresh = deferred()
@@ -743,6 +744,37 @@ async function run() {
   assert.strictEqual(conflictTarget.model.employeeName, "用户后续修改", "version refresh should preserve edits made while the latest masked detail was pending")
   assert.strictEqual(conflictTarget.model.targetDeptId, 2, "untouched fields should refresh from the latest masked detail")
   assert.ok(conflictTarget.conflictNotice && !conflictTarget.submitting, "conflict should require review, never silently resubmit")
+
+  for (const exactId of ["9007199254740992", "9007199254740993", "9223372036854775807"]) {
+    const readIds = [], writeIds = [], navigations = []
+    const page = loadPage({
+      createHrOnboarding() {},
+      updateHrOnboarding(id, data) { writeIds.push(id); return Promise.resolve({ data: { onboardingId: exactId, version: 2 } }) },
+      getHrOnboarding(id) { readIds.push(id); return Promise.resolve({ data: { onboardingId: exactId, version: 1, employeeName: "编号验证" } }) },
+      getHrOnboardingFormOptions() { return Promise.resolve({ data: {} }) }
+    })
+    const target = bind(page, {
+      $route: { path: `/mobile/hr/onboarding/${exactId}/edit`, params: { id: exactId }, query: {}, fullPath: exactId },
+      $router: { replace(location) { navigations.push(location.path); return Promise.resolve() }, back() {} }, $refs: {}
+    })
+    await target.initializeRoute(); await flush()
+    assert.strictEqual(target.recordId, exactId)
+    target.model.employeeName = "修改名称"
+    await target.submit()
+    assert.deepStrictEqual(readIds, [exactId])
+    assert.deepStrictEqual(writeIds, [exactId])
+    assert.deepStrictEqual(navigations, [`/mobile/hr/onboarding/${exactId}`])
+  }
+  for (const invalid of ["0", "9223372036854775808", "-1", "1e3", 9007199254740993]) {
+    let reads = 0
+    const page = loadPage({ createHrOnboarding() {}, updateHrOnboarding() {},
+      getHrOnboarding() { reads++; return Promise.resolve({ data: {} }) },
+      getHrOnboardingFormOptions() { return Promise.resolve({ data: {} }) } })
+    const target = bind(page, { $route: { path: "/mobile/hr/onboarding/invalid/edit", params: { id: invalid }, query: {}, fullPath: "invalid" },
+      $router: { replace() {}, back() {} }, $refs: {} })
+    await target.initializeRoute(); await flush()
+    assert.strictEqual(reads, 0, "unsafe identifiers must fail before HTTP")
+  }
 
   console.log("mobile HR onboarding form tests passed")
 }

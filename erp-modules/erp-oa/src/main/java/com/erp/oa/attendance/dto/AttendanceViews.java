@@ -43,6 +43,7 @@ public final class AttendanceViews
         public boolean completed;
         public boolean requiresRemainingWorkConfirmation;
         public Long punchEventId;
+        public Long correctionRequestId;
     }
 
     public static class RemainingWorkIntervalView

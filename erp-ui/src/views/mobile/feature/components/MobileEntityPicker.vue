@@ -1,6 +1,11 @@
 <template>
   <div class="mobile-entity-picker">
-    <input
+    <template v-if="entity === 'sales'">
+      <p v-if="value">{{ selectedOptionLabel || fallbackLabel || ('已选原单 ' + value) }}</p>
+      <button type="button" @click="toggleSalesSource">{{ open ? '收起原单查询' : '查找原销售单' }}</button>
+      <sales-return-source-picker v-if="open" :context-key="salesSourceContext + String(salesSourceEpoch)" @select="selectSalesSource" />
+    </template>
+    <input v-else
       ref="searchInput"
       :id="inputId || null"
       v-model.trim="keyword"
@@ -16,8 +21,8 @@
       @focus="open = true"
       @keydown.enter="handleSearchEnter"
     >
-    <button type="button" @click="searchOptions">{{ loading ? "搜索中" : "搜索" }}</button>
-    <div v-if="open" class="picker-options">
+    <button v-if="entity !== 'sales'" type="button" @click="searchOptions">{{ loading ? "搜索中" : "搜索" }}</button>
+    <div v-if="open && entity !== 'sales'" class="picker-options">
       <p v-if="loading" class="picker-state">正在加载可选数据...</p>
       <div v-else-if="loadError" class="picker-state picker-error" role="alert">
         <p>{{ loadError }}</p>
@@ -73,7 +78,7 @@ const MAX_MOBILE_OPTION_KEYWORD_LENGTH = 80
 
 export default {
   name: "MobileEntityPicker",
-  components: { MobileQuickCustomerForm },
+  components: { MobileQuickCustomerForm, SalesReturnSourcePicker: () => import("@/views/inventory/components/SalesReturnSourcePicker.vue") },
   props: {
     value: {
       type: [String, Number],
@@ -116,9 +121,12 @@ export default {
       loading: false,
       loadError: "",
       open: false,
-      selectedOptionLabel: "",
+      selectedOptionLabel: "", salesSourceForm: null, salesSourceFrozenContext: "", salesSourceEpoch: 0,
       maxKeywordLength: MAX_MOBILE_OPTION_KEYWORD_LENGTH,
       options: [],
+      entityRequestSequence: 0,
+      optionsRequestSequence: -1,
+      entityInactive: false,
       quickCustomerOpen: false,
       quickCustomerSaving: false,
       quickCustomerError: "",
@@ -133,6 +141,12 @@ export default {
     }
   },
   computed: {
+    entityDependencyKey() {
+      const form = this.formData || {}, field = this.field || {}
+      return JSON.stringify([field, form.orderId, form.supplierName, form.fromWarehouseId, form.fromDeptId,
+        form.warehouseId, form.shopDeptId, field.dependsOn && form[field.dependsOn]])
+    },
+    salesSourceContext() { return JSON.stringify([this.context, this.formData && this.formData.returnId, this.formData && this.formData.shopDeptId]) },
     searchAriaLabel() {
       return "搜索并选择" + (this.label || "数据")
     },
@@ -168,6 +182,12 @@ export default {
     }
   },
   watch: {
+    context: { deep: true, handler() { this.invalidateEntityOptions() } },
+    entity() { this.invalidateEntityOptions(); this.open = false },
+    entityDependencyKey() { this.invalidateEntityOptions() },
+    open(value) { if (!value && this.entity !== "sales") this.invalidateEntityOptions() },
+    "$store.state.user.sessionRevision"() { this.invalidateEntityOptions(); this.open = false },
+    formData(value, before) { if (value !== before) this.invalidateEntityOptions(); if (this.entity === "sales" && value !== before) { this.salesSourceEpoch += 1; this.open = false; this.salesSourceForm = null } },
     value(value) {
       if (value === undefined || value === null || String(value).trim() === "") {
         this.selectedOptionLabel = ""
@@ -189,6 +209,8 @@ export default {
     }
   },
   mounted() {
+    this._entityDeptChanged = () => { this.invalidateEntityOptions(); this.open = false }
+    if (typeof window !== "undefined") window.addEventListener("erp:dept-changed", this._entityDeptChanged)
     if (this.fallbackLabel) {
       this.keyword = this.fallbackLabel
       if (this.value !== undefined && this.value !== null && String(this.value).trim() !== "") {
@@ -198,11 +220,32 @@ export default {
     this.loadCustomerServiceCardCapabilities()
     this.searchOptions()
   },
+  beforeDestroy() {
+    this.entityInactive = true
+    this.invalidateEntityOptions()
+    this.customerCapabilityRequestSequence += 1
+    if (typeof window !== "undefined") window.removeEventListener("erp:dept-changed", this._entityDeptChanged)
+  },
+  deactivated() { this.entityInactive = true; this.invalidateEntityOptions(); this.open = false },
+  activated() { this.entityInactive = false },
   methods: {
+    entityQueryKey() {
+      const user = this.$store && this.$store.state && this.$store.state.user || {}
+      return JSON.stringify([this.context, this.entity, this.entityDependencyKey,
+        String(this.keyword || "").trim(), user.id, user.sessionRevision])
+    },
+    invalidateEntityOptions() {
+      this.entityRequestSequence += 1
+      this.optionsRequestSequence = -1
+      this.loading = false
+      this.options = []
+      this.loadError = ""
+    },
     ariaBoolean(value) {
       return value ? "true" : "false"
     },
     handleKeywordInput() {
+      this.invalidateEntityOptions()
       if (shouldClearEntitySelection(this.value, this.keyword, this.selectedOptionLabel)) {
         this.selectedOptionLabel = ""
         this.$emit("input", "")
@@ -236,22 +279,41 @@ export default {
       })
     },
     searchOptions() {
+      if (this.entity === "sales") { if (!this.open) this.toggleSalesSource(); return Promise.resolve() }
+      if (this.entityInactive) return Promise.resolve([])
+      const sequence = ++this.entityRequestSequence
+      const contextKey = this.entityQueryKey(), form = this.formData
+      const keyword = String(this.keyword || "").trim()
+      const current = () => !this.entityInactive && sequence === this.entityRequestSequence &&
+        form === this.formData && contextKey === this.entityQueryKey()
+      this.optionsRequestSequence = -1
       this.loadError = ""
       this.loading = true
-      fetchMobileEntityOptions(this.entity, {
-        keyword: this.keyword,
-        context: this.context,
-        field: this.field,
-        formData: this.formData
+      return fetchMobileEntityOptions(this.entity, {
+        keyword,
+        context: { ...this.context },
+        field: { ...this.field },
+        formData: { ...form }
       }).then(options => {
-        this.options = options
+        if (!current()) return []
+        this.options = Array.isArray(options) ? options : []
         this.hydrateKeywordFromOptions()
+        this._optionsQueryKey = this.entityQueryKey()
+        this._optionsForm = form
+        this.optionsRequestSequence = sequence
         this.open = true
+        this.loading = false
+        if (this.entity === "warehouse" && this.field.salesWarehouseDefault && !this.value && !keyword) {
+          const selected = options.find(option => String(option.value) === String(this.context.selectedDeptId)) ||
+            (options.length === 1 ? options[0] : null)
+          if (selected) this.selectOption(selected)
+        }
       }).catch(() => {
+        if (!current()) return []
         this.options = []
         this.loadError = this.entity === "customer" ? "加载客户失败，请重试" : "加载可选数据失败，请重试"
       }).finally(() => {
-        this.loading = false
+        if (current()) this.loading = false
       })
     },
     hasAnyPermission(permissions) {
@@ -295,7 +357,7 @@ export default {
         const option = mapCreatedCustomerOption(response && response.data)
         this.options = [option].concat(this.options.filter(item => String(item.value) !== String(option.value)))
         this.quickCustomerOpen = false
-        this.selectOption(option)
+        this.selectOption(option, "created-customer")
         this.$nextTick(this.focusSearchInputAfterQuickCreate)
       }).catch(error => {
         this.quickCustomerError = getQuickCustomerErrorMessage(error, "创建客户失败，请重试")
@@ -320,7 +382,20 @@ export default {
         this.keyword = option.label
       }
     },
-    selectOption(option) {
+    toggleSalesSource() {
+      this.open = !this.open
+      this.salesSourceForm = this.open ? this.formData : null
+      this.salesSourceFrozenContext = this.salesSourceContext
+      this.salesSourceEpoch += 1
+    },
+    selectSalesSource(row) {
+      if (this.entity !== "sales" || !this.open || this.salesSourceForm !== this.formData || this.salesSourceFrozenContext !== this.salesSourceContext) return
+      this.selectOption({ value: row.orderId, label: row.orderNo || row.orderId, meta: row.customerName, row }, "sales-source")
+    },
+    selectOption(option, source) {
+      if (source !== "sales-source" && source !== "created-customer" &&
+          (this.entityInactive || !this.open || this.loading || this.optionsRequestSequence !== this.entityRequestSequence ||
+            this._optionsQueryKey !== this.entityQueryKey() || this._optionsForm !== this.formData || !this.options.includes(option))) return
       this.selectedOptionLabel = option.label || ""
       this.$emit("input", option.value)
       this.$emit("select", option)

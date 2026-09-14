@@ -34,3 +34,20 @@ export function confirmSalesReturn(returnId) {
 export function cancelSalesReturn(returnId) {
   return request({ url: '/inventory/salesReturn/' + returnId, method: 'delete' })
 }
+
+export function getSalesReturnDraft(returnId, config) {
+  return request(Object.assign({ url: '/inventory/salesReturn/draft/' + returnId, method: 'get' }, config && config.silentError === true ? { silentError: true } : {}))
+}
+export function submitSalesReturnDraft(returnId) {
+  return request({ url: '/inventory/salesReturn/submit/' + returnId, method: 'post' })
+}
+export function listSalesReturnSourceOrders(query, config) {
+  return request(Object.assign({ url: '/inventory/salesReturn/source-orders', method: 'get', params: query }, config && config.silentError === true ? { silentError: true } : {}))
+}
+export function getSalesReturnSourceOrder(orderId, config) {
+  return request(Object.assign({ url: '/inventory/salesReturn/source-orders/' + orderId, method: 'get' }, config && config.silentError === true ? { silentError: true } : {}))
+}
+
+export function getSalesReturnActionContext(id, config) {
+  return request(Object.assign({ url: '/inventory/salesReturn/action-context/' + id, method: 'get' }, config && config.silentError === true ? { silentError: true } : {}))
+}

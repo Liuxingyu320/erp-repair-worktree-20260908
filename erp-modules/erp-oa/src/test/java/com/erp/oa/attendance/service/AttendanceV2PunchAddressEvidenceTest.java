@@ -88,6 +88,8 @@ class AttendanceV2PunchAddressEvidenceTest
                 .thenReturn(false);
         when(mapper.selectScheduleSegmentSnapshots(eq(31L), anyBoolean()))
                 .thenReturn(List.of(workSegment()));
+        ShopScopeService shopScope = mock(ShopScopeService.class);
+        when(shopScope.resolveRequiredShopDept(101L)).thenReturn(101L);
         service = new AttendanceV2Service(mapper, rules,
                 new AttendanceLocationAuditPolicy(
                         new AttendanceCoordinateTransformer(), properties),
@@ -95,7 +97,7 @@ class AttendanceV2PunchAddressEvidenceTest
                 new AttendanceGeoFence(),
                 addressResolver, new AttendanceChallengePolicy(), settlement,
                 evidenceStorage, properties, mock(AttendanceRuntimePolicy.class),
-                mock(ShopScopeService.class), gate,
+                shopScope, gate,
                 Clock.fixed(Instant.parse("2026-08-20T01:05:00Z"),
                         ZoneId.of("Asia/Shanghai")));
     }
@@ -150,7 +152,7 @@ class AttendanceV2PunchAddressEvidenceTest
         when(mapper.consumeChallenge(41L, 88L, NOW, 0L)).thenReturn(1);
         MultipartFile photo = mock(MultipartFile.class);
 
-        PunchResult result = service.punch(command(), photo);
+        PunchResult result = service.punch(command(), photo, 101L);
 
         assertThat(result.success).isTrue();
         assertThat(result.event.longitude)
@@ -192,7 +194,7 @@ class AttendanceV2PunchAddressEvidenceTest
         command.accuracyMeters = BigDecimal.TEN;
 
         assertThatThrownBy(() -> service.punch(command,
-                mock(MultipartFile.class)))
+                mock(MultipartFile.class), 101L))
                 .isInstanceOf(ServiceException.class)
                 .hasMessage("OUTSIDE_ATTENDANCE_GEOFENCE");
         verify(addressResolver, never()).resolve(any(), any(), any());
@@ -208,7 +210,7 @@ class AttendanceV2PunchAddressEvidenceTest
         command.accuracyMeters = new BigDecimal("50.01");
 
         assertThatThrownBy(() -> service.punch(command,
-                mock(MultipartFile.class)))
+                mock(MultipartFile.class), 101L))
                 .isInstanceOf(ServiceException.class)
                 .hasMessage("LOCATION_ACCURACY_INSUFFICIENT");
         verify(addressResolver, never()).resolve(any(), any(), any());
@@ -230,7 +232,7 @@ class AttendanceV2PunchAddressEvidenceTest
         stubPunchPrelude(challenge(), schedule);
 
         assertThatThrownBy(() -> service.punch(command(),
-                mock(MultipartFile.class)))
+                mock(MultipartFile.class), 101L))
                 .isInstanceOf(ServiceException.class)
                 .hasMessage("ATTENDANCE_GEOFENCE_NOT_CONFIGURED");
         verify(addressResolver, never()).resolve(any(), any(), any());
@@ -253,7 +255,7 @@ class AttendanceV2PunchAddressEvidenceTest
                         "浙江省杭州市拱墅区华润大厦", "CONTROLLED_TEST"));
 
         assertThatThrownBy(() -> service.punch(command(),
-                mock(MultipartFile.class)))
+                mock(MultipartFile.class), 101L))
                 .isInstanceOf(ServiceException.class)
                 .hasMessage("ATTENDANCE_SHOP_ORGANIZATION_PATH_UNAVAILABLE");
         verify(evidenceStorage, never()).store(anyString(), eq(DAY), any(),
@@ -279,11 +281,70 @@ class AttendanceV2PunchAddressEvidenceTest
                         "浙江省杭州市拱墅区华润大厦", "CONTROLLED_TEST"));
 
         assertThatThrownBy(() -> service.punch(command(),
-                mock(MultipartFile.class)))
+                mock(MultipartFile.class), 101L))
                 .isInstanceOf(ServiceException.class)
                 .hasMessage("ATTENDANCE_SHIFT_NAME_UNAVAILABLE");
         verify(evidenceStorage, never()).store(anyString(), eq(DAY), any(),
                 any());
+    }
+
+    @Test
+    void challengeExpiryMustUseDatabaseTimeAfterWaitingForItsRowLock()
+    {
+        var challenge = challenge();
+        var locked = new java.util.concurrent.atomic.AtomicBoolean(false);
+        stubPunchPrelude(challenge, schedule());
+        when(mapper.selectDatabaseNow()).thenAnswer(inv -> locked.get()
+                ? challenge.expiresAt.plusSeconds(1) : NOW);
+        when(mapper.selectChallengeByTokenForUpdate(TOKEN)).thenAnswer(inv -> {
+            locked.set(true);
+            return challenge;
+        });
+        assertThatThrownBy(() -> service.punch(command(), null, 101L))
+                .hasMessage("PUNCH_CHALLENGE_EXPIRED");
+        verify(mapper, never()).insertPunchEvent(any());
+        verify(evidenceStorage, never()).store(anyString(), any(), any(), any());
+    }
+
+    @Test
+    void absoluteCaptureTimesAreMappedToTheDatabaseClockAndStillExpire()
+    {
+        stubPunchPrelude(challenge(), schedule());
+        var clock = new com.erp.oa.attendance.domain.AttendanceModels.DatabaseClock();
+        clock.localTime = NOW;
+        clock.epochMillis = NOW.toInstant(java.time.ZoneOffset.ofHours(8)).toEpochMilli();
+        when(mapper.selectDatabaseClock()).thenReturn(clock);
+        for (String offset : List.of("Z", "+09:00", "-07:00"))
+        {
+            var absolute = java.time.Instant.ofEpochMilli(clock.epochMillis);
+            var encoded = absolute.atOffset(java.time.ZoneOffset.of(offset)).toString();
+            var command = command();
+            command.clientCaptureTime = NOW.minusDays(1);
+            command.clientCaptureTimestamp = encoded;
+            command.latitude = new BigDecimal("30.2841000");
+            command.longitude = new BigDecimal("120.1651000");
+            command.accuracyMeters = BigDecimal.TEN;
+            assertThatThrownBy(() -> service.punch(command, null, 101L))
+                    .hasMessage("OUTSIDE_ATTENDANCE_GEOFENCE");
+            assertThat(command.clientCaptureTime).isEqualTo(NOW);
+        }
+        for (int delta : new int[] { -600, 31 })
+        {
+            var command = command();
+            command.clientCaptureInstant = java.time.Instant.ofEpochMilli(clock.epochMillis).plusSeconds(delta);
+            assertThatThrownBy(() -> service.punch(command, null, 101L)).hasMessage("CLIENT_CAPTURE_TIME_STALE");
+        }
+        var invalid = command(); invalid.clientCaptureTimestamp = "invalid";
+        assertThatThrownBy(() -> service.punch(invalid, null, 101L)).hasMessage("CLIENT_CAPTURE_TIME_INVALID");
+        var consumed = challenge(); consumed.status = "CONSUMED";
+        when(mapper.selectChallengeByTokenForUpdate(TOKEN)).thenReturn(consumed);
+        assertThatThrownBy(() -> service.punch(invalid, null, 101L)).hasMessage("PUNCH_CHALLENGE_ALREADY_USED");
+        when(mapper.selectChallengeByTokenForUpdate(TOKEN)).thenReturn(challenge());
+        when(mapper.selectDatabaseClock()).thenReturn(null);
+        var missingClock = command();
+        missingClock.clientCaptureInstant = java.time.Instant.ofEpochMilli(clock.epochMillis);
+        assertThatThrownBy(() -> service.punch(missingClock, null, 101L)).hasMessage("ATTENDANCE_SERVER_TIME_UNAVAILABLE");
+        verify(mapper, never()).insertPunchEvent(any());
     }
 
     private PunchCommand command()

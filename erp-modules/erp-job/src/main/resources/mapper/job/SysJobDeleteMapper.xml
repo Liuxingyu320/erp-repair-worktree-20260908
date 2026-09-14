@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erp.job.mapper.SysJobDeleteMapper">
+    <resultMap id="Batch" type="com.erp.job.domain.SysJobDeleteBatch">
+        <id property="batchId" column="batch_id"/><result property="actorId" column="actor_id"/>
+        <result property="fingerprint" column="fingerprint"/>
+    </resultMap>
+    <resultMap id="Intent" type="com.erp.job.domain.SysJobDeleteIntent">
+        <id property="intentId" column="intent_id"/><result property="batchId" column="batch_id"/>
+        <result property="jobId" column="job_id"/><result property="jobGroup" column="job_group"/>
+        <result property="revision" column="revision"/><result property="status" column="status"/>
+        <result property="attempts" column="attempts"/><result property="errorCode" column="error_code"/>
+    </resultMap>
+    <insert id="insertBatchIfAbsent">
+        insert ignore into sys_job_delete_batch(batch_id,actor_id,fingerprint,create_time)
+        values(#{batchId},#{actorId},#{fingerprint},now(3))
+    </insert>
+    <select id="lockBatch" resultMap="Batch">select * from sys_job_delete_batch where batch_id=#{batchId} for update</select>
+    <select id="selectBatch" resultMap="Batch">select * from sys_job_delete_batch where batch_id=#{batchId}</select>
+    <insert id="insertIntent">
+        insert into sys_job_delete_intent(intent_id,batch_id,job_id,job_group,revision,status,attempts,create_time,update_time)
+        values(#{intentId},#{batchId},#{jobId},#{jobGroup},#{revision},'PENDING',0,now(3),now(3))
+    </insert>
+    <select id="selectBatchIntents" resultMap="Intent">select * from sys_job_delete_intent where batch_id=#{batchId} order by job_id</select>
+    <select id="selectBatchIntentsForUpdate" resultMap="Intent">select * from sys_job_delete_intent where batch_id=#{batchId} order by job_id for update</select>
+    <select id="selectPending" resultMap="Intent">
+        select * from sys_job_delete_intent where status in ('PENDING','RETRYING') order by update_time,intent_id limit #{limit}
+    </select>
+    <select id="lockIntent" resultMap="Intent">select * from sys_job_delete_intent where intent_id=#{intentId} for update</select>
+    <update id="updateResult">
+        update sys_job_delete_intent set status=#{status},error_code=#{errorCode},attempts=attempts+1,update_time=now(3)
+        where intent_id=#{intentId} and status in ('PENDING','RETRYING')
+    </update>
+</mapper>

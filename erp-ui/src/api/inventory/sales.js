@@ -21,11 +21,11 @@ export function listMySales(query) {
 }
 
 // 销售单详情
-export function getSalesDetail(orderId) {
-  return request({ url: '/inventory/sales/' + orderId, method: 'get' })
+export function getSalesDetail(orderId, options = {}) {
+  return request({ url: '/inventory/sales/' + orderId, method: 'get', silentError: options.silentError === true })
 }
 
 // 取消销售单
-export function cancelSales(orderId) {
-  return request({ url: '/inventory/sales/' + orderId, method: 'delete' })
+export function cancelSales(orderId, version) {
+  return request({ url: '/inventory/sales/' + orderId, method: 'delete', params: { version } })
 }

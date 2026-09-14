@@ -96,10 +96,9 @@ final class HrTransferPolicy
         requireText(request.getLegalEntityName(), "法律主体名称不能为空");
         requireMaxLength(request.getLegalEntityName(), 100,
                 "法律主体名称长度不能超过100个字符");
-        requireText(request.getSalaryVersion(), "薪资版本不能为空");
         requireMaxLength(request.getSalaryVersion(), 32,
                 "薪资版本长度不能超过32个字符");
-        validateSalary(request);
+        if (request.isAdjustSalary()) validateSalary(request);
         normalizeConfirmation(request.getRiskConfirmation());
     }
 
@@ -195,12 +194,14 @@ final class HrTransferPolicy
         snapshot.setLegalEntityId(request.getLegalEntityId());
         snapshot.setLegalEntityCode(request.getLegalEntityCode());
         snapshot.setLegalEntityName(request.getLegalEntityName());
-        snapshot.setBaseSalary(request.getBaseSalary());
-        snapshot.setPostSalary(request.getPostSalary());
-        snapshot.setFieldAllowance(request.getFieldAllowance());
-        snapshot.setPerformanceSalary(request.getPerformanceSalary());
-        snapshot.setSalaryTotal(request.getSalaryTotal());
-        snapshot.setSalaryVersion(request.getSalaryVersion());
+        if (request.isAdjustSalary())
+        {
+            snapshot.setBaseSalary(request.getBaseSalary());
+            snapshot.setPostSalary(request.getPostSalary());
+            snapshot.setFieldAllowance(request.getFieldAllowance());
+            snapshot.setPerformanceSalary(request.getPerformanceSalary());
+            snapshot.setSalaryTotal(request.getSalaryTotal());
+        }
         snapshot.setTransferEffectiveDate(request.getEffectiveDate());
     }
 
@@ -333,7 +334,7 @@ final class HrTransferPolicy
                         request.getLegalEntityCode())
                 && Objects.equals(trim(snapshot.getLegalEntityName()),
                         request.getLegalEntityName())
-                && moneyEquals(snapshot.getBaseSalary(),
+                && (!request.isAdjustSalary() || (moneyEquals(snapshot.getBaseSalary(),
                         request.getBaseSalary())
                 && moneyEquals(snapshot.getPostSalary(),
                         request.getPostSalary())
@@ -342,9 +343,7 @@ final class HrTransferPolicy
                 && moneyEquals(snapshot.getPerformanceSalary(),
                         request.getPerformanceSalary())
                 && moneyEquals(snapshot.getSalaryTotal(),
-                        request.getSalaryTotal())
-                && Objects.equals(trim(snapshot.getSalaryVersion()),
-                        request.getSalaryVersion());
+                        request.getSalaryTotal())));
     }
 
     boolean sameState(HrEmployeeSigningSnapshot current,
@@ -384,7 +383,9 @@ final class HrTransferPolicy
                         code(expected.getLegalEntityCode()))
                 && Objects.equals(trim(current.getLegalEntityName()),
                         trim(expected.getLegalEntityName()))
-                && !salaryChanged(current, expected);
+                && !salaryChanged(current, expected)
+                && Objects.equals(trim(current.getSalaryVersion()),
+                        trim(expected.getSalaryVersion()));
     }
 
     String replayMismatchDetail(HrEmployeeSigningSnapshot current,
@@ -560,7 +561,7 @@ final class HrTransferPolicy
                 && left.compareTo(right) < 0;
     }
 
-    private boolean salaryChanged(HrEmployeeSigningSnapshot before,
+    boolean salaryChanged(HrEmployeeSigningSnapshot before,
             HrEmployeeSigningSnapshot after)
     {
         return !moneyEquals(before.getBaseSalary(), after.getBaseSalary())
@@ -571,9 +572,7 @@ final class HrTransferPolicy
                 || !moneyEquals(before.getPerformanceSalary(),
                         after.getPerformanceSalary())
                 || !moneyEquals(before.getSalaryTotal(),
-                        after.getSalaryTotal())
-                || !Objects.equals(trim(before.getSalaryVersion()),
-                        trim(after.getSalaryVersion()));
+                        after.getSalaryTotal());
     }
 
     private BigDecimal nonNegative(BigDecimal value, String label)

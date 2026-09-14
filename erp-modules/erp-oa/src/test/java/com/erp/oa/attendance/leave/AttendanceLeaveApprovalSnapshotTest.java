@@ -26,7 +26,7 @@ class AttendanceLeaveApprovalSnapshotTest
                 mock(AttendanceLeaveApprovalOutboxService.class),
                 mock(AttendanceLeaveApprovalAfterCommitTrigger.class),
                 mock(RemoteApprovalService.class), shopScopeService,
-                mock(BusinessFeatureGate.class));
+                mock(BusinessFeatureGate.class), legacyQuota());
 
         LeaveRequest request = new LeaveRequest();
         request.leaveRequestId = 42L;
@@ -51,5 +51,14 @@ class AttendanceLeaveApprovalSnapshotTest
         assertThat(approval.getVariables())
                 .containsEntry("attachmentCount", 2)
                 .containsEntry("attachmentRequired", true);
+    }
+
+    private static com.erp.oa.attendance.leave.balance.AttendanceLeaveQuotaService legacyQuota()
+    {
+        return org.mockito.Mockito.mock(com.erp.oa.attendance.leave.balance.AttendanceLeaveQuotaService.class, invocation -> {
+            String method=invocation.getMethod().getName();
+            if("hydrate".equals(method) || "copyPolicy".equals(method))return invocation.getArgument(0);
+            return org.mockito.Answers.RETURNS_DEFAULTS.answer(invocation);
+        });
     }
 }

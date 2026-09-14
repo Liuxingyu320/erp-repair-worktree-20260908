@@ -141,6 +141,7 @@ const MOBILE_ROUTE_POLICY_BY_DEFINITION_PATH = Object.freeze({
   "/mobile/salary": selfPolicy,
   "/mobile/notice": selfPolicy,
   "/mobile/profile": selfPolicy,
+  "/mobile/messages": selfPolicy,
   "/mobile/system-user": adminPolicy,
   "/mobile/system-role": adminPolicy,
   "/mobile/system-post": adminPolicy,

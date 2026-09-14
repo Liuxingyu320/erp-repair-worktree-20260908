@@ -185,7 +185,7 @@ assert.ok(
 )
 assert.ok(
   customerPage.includes("detailRequestSeq") && customerPage.includes("photoRequestSeq") &&
-    customerPage.includes("listRequestSeq") && customerPage.includes('this.selected.status !== "0"'),
+    customerPage.includes("listRequestSeq") && /this\.selected\.status\s*!==\s*"0"/.test(customerPage),
   "mobile customer requests should ignore stale responses and archived cards should stay read-only"
 )
 assert.ok(

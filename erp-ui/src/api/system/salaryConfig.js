@@ -1,11 +1,12 @@
 import request from '@/utils/request'
 
 // 查询薪资方案列表
-export function listSalaryScheme(query) {
+export function listSalaryScheme(query, config) {
   return request({
     url: '/system/salaryConfig/list',
     method: 'get',
-    params: query
+    params: query,
+    silentError: !!(config && config.silentError)
   })
 }
 
@@ -97,10 +98,11 @@ export function rollbackSalaryRevision(revisionId, data) {
 }
 
 // 查询薪资方案档位
-export function listSalaryItems(schemeId) {
+export function listSalaryItems(schemeId, config) {
   return request({
     url: '/system/salaryConfig/' + schemeId + '/items',
-    method: 'get'
+    method: 'get',
+    silentError: !!(config && config.silentError)
   })
 }
 

@@ -83,7 +83,7 @@
           plain
           icon="el-icon-delete"
           size="mini"
-          :disabled="multiple || writeActionsDisabled"
+          :disabled="multiple || writeActionsDisabled || deletionPending"
           @click="handleDelete"
           v-hasPermi="['monitor:job:remove']"
         >删除</el-button>
@@ -114,6 +114,9 @@
     </div>
 
     <div class="table-card job-table-card">
+    <el-alert v-if="deletionReceipt" :title="deletionMessage" :type="deletionReceipt.status === 'COMPLETED' ? 'success' : 'warning'" :closable="false" show-icon>
+      <el-button v-if="deletionPending" type="text" :loading="deletionQuerying" @click="queryDeletion">查询删除结果</el-button>
+    </el-alert>
     <el-table v-loading="loading" :data="jobList" @selection-change="handleSelectionChange">
       <el-table-column type="selection" width="55" align="center" />
       <el-table-column label="任务编号" width="100" align="center" prop="jobId" />
@@ -276,9 +279,12 @@
 </template>
 
 <script>
-import { listJob, getJob, delJob, addJob, updateJob, runJob, changeJobStatus } from "@/api/monitor/job"
+import { listJob, getJob, deleteJobSnapshot, getJobDeletionReceipt, addJob, updateJob, runJob, changeJobStatus } from "@/api/monitor/job"
 import JobDetail from './detail'
 import Crontab from '@/components/Crontab'
+const { parseCronExpression } = require('@/utils/cronExpression')
+const { createUiOperationScope } = require('@/utils/uiOperationScope')
+const { newDeletionBatchId, normalizeDeletionReceipt, deletionLabel, saveDeletionReceipt, loadDeletionReceipt } = require('./deletionState')
 
 export default {
   components: { Crontab, JobDetail },
@@ -295,6 +301,9 @@ export default {
       submitLoading: false,
       // 选中数组
       ids: [],
+      selectedJobs: [],
+      deletionReceipt: null,
+      deletionQuerying: false,
       // 非单个禁用
       single: true,
       // 非多个禁用
@@ -340,6 +349,12 @@ export default {
     }
   },
   computed: {
+    jobActorContext() {
+      const user = this.$store && this.$store.state && this.$store.state.user || {}
+      return String(user.id || '') + ':' + String(user.sessionRevision || 0)
+    },
+    deletionPending() { return !!this.deletionReceipt && !['COMPLETED', 'REJECTED'].includes(this.deletionReceipt.status) },
+    deletionMessage() { return deletionLabel(this.deletionReceipt) },
     writeActionsDisabled() {
       return this.loading || !!this.jobListError || this.actionLoading || this.submitLoading
     },
@@ -351,7 +366,19 @@ export default {
       return parts.join(' · ')
     }
   },
+  watch: {
+    jobActorContext() {
+      this.ensureDeletionScope().invalidate()
+      this.actionLoading = false
+      this.deletionQuerying = false
+      this.deletionReceipt = loadDeletionReceipt(this.deletionActor())
+    }
+  },
+  activated() { this.ensureDeletionScope().activate() },
+  deactivated() { this.ensureDeletionScope().deactivate() },
+  beforeDestroy() { this.ensureDeletionScope().deactivate() },
   created() {
+    this.deletionReceipt = loadDeletionReceipt(this.deletionActor())
     this.getList()
   },
   methods: {
@@ -437,6 +464,7 @@ export default {
     // 多选框选中数据
     handleSelectionChange(selection) {
       this.ids = selection.map(item => item.jobId)
+      this.selectedJobs = selection.map(item => ({jobId: String(item.jobId), revision: item.revision}))
       this.single = selection.length != 1
       this.multiple = !selection.length
     },
@@ -457,26 +485,37 @@ export default {
       }
     },
     // 任务状态修改
-    handleStatusChange(row) {
+    async handleStatusChange(row) {
       if (this.writeActionsDisabled) return
-      let text = row.status === "0" ? "启用" : "停用"
+      const request = {jobId: String(row.jobId), status: row.status, revision: row.revision}
+      const text = request.status === '0' ? '启用' : '停用'
+      const scope = this.ensureDeletionScope(), token = scope.begin('status')
       this.actionLoading = true
-      this.$modal.confirm('确认要"' + text + '""' + row.jobName + '"任务吗？').then(() => {
-        return changeJobStatus(row.jobId, row.status)
-      }).then(() => {
-        this.$modal.msgSuccess(text + "成功")
-      }).catch(function() {
-        row.status = row.status === "0" ? "1" : "0"
-      }).finally(() => { this.actionLoading = false })
+      let submitted = false
+      try {
+        await this.$modal.confirm('确认要' + text + '“' + row.jobName + '”任务吗？')
+        if (!scope.isCurrent(token)) return
+        submitted = true
+        await changeJobStatus(request.jobId, request.status, request.revision)
+        if (!scope.isCurrent(token)) return
+        this.$modal.msgSuccess(text + '成功')
+        await this.getList()
+      } catch (error) {
+        if (!scope.isCurrent(token)) return
+        if (!submitted) row.status = request.status === '0' ? '1' : '0'
+        else await this.getList()
+      } finally {
+        if (scope.isCurrent(token)) this.actionLoading = false
+      }
     },
     /* 立即执行一次 */
     handleRun(row) {
       if (this.writeActionsDisabled) return
       this.actionLoading = true
       this.$modal.confirm('确认要立即执行一次"' + row.jobName + '"任务吗？').then(() => {
-        return runJob(row.jobId, row.jobGroup)
+        return runJob(row.jobId, row.jobGroup, row.revision)
       }).then(() => {
-        this.$modal.msgSuccess("执行成功")
+        this.$modal.msgSuccess("已请求执行，可在任务日志查看结果")
       }).catch(() => {}).finally(() => { this.actionLoading = false })
     },
     /** 任务详细信息 */
@@ -488,11 +527,17 @@ export default {
     },
     /** cron表达式按钮操作 */
     handleShowCron() {
+      if (this.form.cronExpression) {
+        const parsed = parseCronExpression(this.form.cronExpression)
+        if (!parsed.valid) { this.$modal.msgError(parsed.error); return }
+      }
       this.expression = this.form.cronExpression
       this.openCron = true
     },
     /** 确定后回传值 */
     crontabFill(value) {
+      const parsed = parseCronExpression(value)
+      if (!parsed.valid) { this.$modal.msgError(parsed.error); return }
       this.form.cronExpression = value
     },
     /** 任务日志列表查询 */
@@ -537,16 +582,63 @@ export default {
       })
     },
     /** 删除按钮操作 */
-    handleDelete(row) {
-      if (this.writeActionsDisabled) return
-      const jobIds = row.jobId || this.ids
+    ensureDeletionScope() {
+      if (!this.deletionScope) this.deletionScope = createUiOperationScope(() => this.jobActorContext)
+      return this.deletionScope
+    },
+    deletionActor() {
+      const user = this.$store && this.$store.state && this.$store.state.user || {}
+      return String(user.id || '')
+    },
+    setDeletionReceipt(receipt) {
+      this.deletionReceipt = receipt
+      saveDeletionReceipt(this.deletionActor(), receipt)
+    },
+    async handleDelete(row) {
+      if (this.writeActionsDisabled || this.deletionPending) return
+      const jobs = row && row.jobId != null ? [{jobId: String(row.jobId), revision: row.revision}] : this.selectedJobs.map(item => ({...item}))
+      if (!jobs.length || jobs.some(item => !item.revision)) { this.$modal.msgError('任务版本缺失，请刷新列表后重试'); return }
+      const scope = this.ensureDeletionScope(), token = scope.begin('delete')
       this.actionLoading = true
-      this.$modal.confirm('是否确认删除定时任务编号为"' + jobIds + '"的数据项？').then(() => {
-        return delJob(jobIds)
-      }).then(() => {
-        this.getList()
-        this.$modal.msgSuccess("删除成功")
-      }).catch(() => {}).finally(() => { this.actionLoading = false })
+      let batchId = null
+      try {
+        await this.$modal.confirm('是否确认删除这 ' + jobs.length + ' 个定时任务？')
+        if (!scope.isCurrent(token)) return
+        batchId = newDeletionBatchId()
+        this.setDeletionReceipt({batchId, status: 'UNKNOWN', items: []})
+        const response = await deleteJobSnapshot({batchId, jobs})
+        if (!scope.isCurrent(token)) return
+        this.setDeletionReceipt(normalizeDeletionReceipt(batchId, response && response.data))
+        await this.getList()
+      } catch (error) {
+        if (!scope.isCurrent(token) || error === 'cancel' || error === 'close') return
+        if (batchId && Number(error && error.code) === 409) {
+          this.setDeletionReceipt({batchId, status: 'REJECTED', items: []})
+          this.$modal.msgError(error.message || '任务已变化，请刷新后重新选择')
+          await this.getList()
+        } else if (batchId) {
+          this.setDeletionReceipt({batchId, status: 'UNKNOWN', items: []})
+          await this.queryDeletion()
+        } else this.$modal.msgError(error && error.message || '无法发起删除，请重试')
+      } finally {
+        if (scope.isCurrent(token)) this.actionLoading = false
+      }
+    },
+    async queryDeletion() {
+      const receipt = this.deletionReceipt
+      if (!receipt || this.deletionQuerying) return
+      const scope = this.ensureDeletionScope(), token = scope.begin('deleteQuery', receipt.batchId)
+      this.deletionQuerying = true
+      try {
+        const response = await getJobDeletionReceipt(receipt.batchId)
+        if (!scope.isCurrent(token, this.deletionReceipt && this.deletionReceipt.batchId)) return
+        this.setDeletionReceipt(normalizeDeletionReceipt(receipt.batchId, response && response.data))
+        if (this.deletionReceipt.status !== 'NOT_OBSERVED') await this.getList()
+      } catch (_) {
+        if (scope.isCurrent(token, this.deletionReceipt && this.deletionReceipt.batchId)) this.setDeletionReceipt({...receipt, status: 'UNKNOWN'})
+      } finally {
+        if (scope.isCurrent(token, this.deletionReceipt && this.deletionReceipt.batchId)) this.deletionQuerying = false
+      }
     },
     /** 导出按钮操作 */
     handleExport() {

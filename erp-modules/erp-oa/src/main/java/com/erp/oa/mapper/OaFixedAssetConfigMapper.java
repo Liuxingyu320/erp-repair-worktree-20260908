@@ -14,6 +14,7 @@ public interface OaFixedAssetConfigMapper
     BigDecimal sumAssetAmountByShop(Long shopDeptId);
 
     OaFixedAssetConfig selectOeItemSnapshot(Long oeItemId);
+    OaFixedAssetConfig selectOeItemSnapshotForUpdate(Long oeItemId);
 
     OaFixedAssetConfig selectActiveConfigByShopAndOeItem(@Param("shopDeptId") Long shopDeptId, @Param("oeItemId") Long oeItemId);
 

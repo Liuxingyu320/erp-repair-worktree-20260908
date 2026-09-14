@@ -4,6 +4,7 @@ const path = require("path")
 
 const { MOBILE_FORM_CONFIG } = require("../src/views/mobile/feature/mobileFormConfigs")
 const { validateMobileForm } = require("../src/views/mobile/feature/mobileValidation")
+const { createUiOperationScope } = require("../src/utils/uiOperationScope")
 
 const readSource = relativePath => fs.readFileSync(path.resolve(__dirname, relativePath), "utf8")
 
@@ -110,11 +111,15 @@ const detailResponse = id => ({
   }
 })
 const newFormHarness = {
+  purchaseScope: () => newFormScope,
+  invalidatePurchaseForm() {},
+  isFormDirty: () => false,
   form: null,
   open: false,
   $nextTick() {},
   markFormClean() {}
 }
+const newFormScope = createUiOperationScope()
 openPurchaseForm.call(newFormHarness, id => {
   detailCalls.push(id)
   return detailResponse(id)
@@ -123,11 +128,15 @@ assert.deepStrictEqual(detailCalls, [],
   "a MouseEvent-like argument must open a blank form without requesting /purchase/undefined")
 assert.strictEqual(newFormHarness.form.purchaseId, undefined)
 const existingFormHarness = {
+  purchaseScope: () => existingFormScope,
+  invalidatePurchaseForm() {},
+  isFormDirty: () => false,
   form: null,
   open: false,
   $nextTick() {},
   markFormClean() {}
 }
+const existingFormScope = createUiOperationScope()
 openPurchaseForm.call(existingFormHarness, id => {
   detailCalls.push(id)
   return detailResponse(id)

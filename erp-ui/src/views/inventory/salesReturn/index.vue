@@ -63,30 +63,17 @@
     </el-card>
 
     <!-- 新增/编辑对话框 -->
-    <el-dialog :title="formTitle" :visible.sync="dialogOpen" width="800px" append-to-body :close-on-click-modal="false" top="3vh">
+    <el-dialog title="查找可退原销售单" :visible.sync="sourcePickerOpen" width="min(720px, 96vw)" append-to-body :close-on-click-modal="false">
+      <sales-return-source-picker v-if="sourcePickerOpen && dialogOpen" :context-key="String(formEpoch)" @select="selectSourceOrder" />
+    </el-dialog>
+    <el-dialog :title="formTitle" :visible.sync="dialogOpen" :before-close="closeEditor" width="800px" append-to-body :close-on-click-modal="false" top="3vh">
       <el-form ref="formRef" :model="form" :rules="rules" label-width="100px">
         <el-row>
           <el-col :span="12">
             <el-form-item label="原销售单号" prop="salesOrderId">
-              <el-select
-                v-model="form.salesOrderId"
-                filterable
-                remote
-                reserve-keyword
-                :remote-method="querySalesOrders"
-                :loading="orderLoading"
-                :disabled="!!form.returnId"
-                placeholder="请选择原销售单"
-                style="width:100%"
-                @change="handleSalesOrderChange"
-              >
-                <el-option
-                  v-for="item in orderOptions"
-                  :key="item.orderId"
-                  :label="item.orderNo + (item.customerName ? ' / ' + item.customerName : '')"
-                  :value="item.orderId"
-                />
-              </el-select>
+              <el-input :value="form.salesOrderNo" readonly placeholder="请查找可退原销售单">
+                <el-button slot="append" :disabled="!!form.returnId || submitLoading" @click="openSourcePicker">查找原单</el-button>
+              </el-input>
             </el-form-item>
           </el-col>
           <el-col :span="12">
@@ -113,7 +100,13 @@
 
         <el-divider content-position="left">退货明细</el-divider>
         <el-button type="primary" size="small" icon="el-icon-refresh" :disabled="!form.salesOrderId || !!form.returnId" @click="reloadSalesOrderDetails" style="margin-bottom:8px">重新载入原单明细</el-button>
+        <p>勾选本次要退的商品，未勾选商品不参与退货。</p>
+        <el-button size="mini" :disabled="submitLoading" @click="fillAllReturnable">一键全退</el-button>
+        <el-button size="mini" :disabled="submitLoading" @click="clearReturnSelection">取消全部勾选</el-button>
         <el-table :data="form.details" size="small" border>
+          <el-table-column label="退货" width="64" fixed="left">
+            <template slot-scope="scope"><el-checkbox :value="isReturnSelected(scope.row)" :disabled="submitLoading" :aria-label="'选择退货：' + scope.row.productName" @change="value => $set(scope.row, 'returnSelected', value)" /></template>
+          </el-table-column>
           <el-table-column label="商品名称" prop="productName" min-width="140">
             <template slot-scope="scope">
               <span>{{ scope.row.productName }}</span>
@@ -134,9 +127,9 @@
               <span>{{ scope.row.unit }}</span>
             </template>
           </el-table-column>
-          <el-table-column label="数量" prop="quantity" width="100">
+          <el-table-column label="数量" prop="quantity" width="150">
             <template slot-scope="scope">
-              <el-input-number v-model="scope.row.quantity" :min="0" :max="scope.row.maxReturnQuantity" :precision="2" size="small" style="width:100%"/>
+              <el-input-number v-model="scope.row.quantity" :disabled="submitLoading || !isReturnSelected(scope.row)" :controls="false" :min="0" :max="scope.row.maxReturnQuantity" :precision="2" size="small" style="width:100%"/>
             </template>
           </el-table-column>
           <el-table-column label="单价" prop="unitPrice" width="110">
@@ -145,18 +138,18 @@
             </template>
           </el-table-column>
           <el-table-column label="金额" prop="amount" width="110" align="right">
-            <template slot-scope="scope">{{ formatMoney(toNumber(scope.row.quantity) * toNumber(scope.row.unitPrice)) }}</template>
+            <template slot-scope="scope">{{ formatMoney(isReturnSelected(scope.row) ? toNumber(scope.row.quantity) * toNumber(scope.row.unitPrice) : 0) }}</template>
           </el-table-column>
-          <el-table-column label="操作" width="60">
+          <el-table-column label="操作" width="80" fixed="right">
             <template slot-scope="scope">
-              <el-button type="text" size="mini" icon="el-icon-delete" class="text-danger" @click="removeDetail(scope.$index)"/>
+              <el-button type="text" size="mini" icon="el-icon-delete" class="text-danger" :disabled="submitLoading" @click="removeDetail(scope.$index)">删除</el-button>
             </template>
           </el-table-column>
         </el-table>
         <div style="text-align:right;margin-top:8px;font-size:14px">退货总金额：<b style="color:#F56C6C">{{ totalAmount }}</b></div>
       </el-form>
       <div slot="footer">
-        <el-button @click="dialogOpen = false">取消</el-button>
+        <el-button :disabled="submitLoading" @click="closeEditor()">取消</el-button>
         <el-button v-hasPermi="['inv:salesReturn:add']" type="primary" @click="doSave">保存草稿</el-button>
         <el-button v-hasPermi="['inv:salesReturn:submit']" type="success" @click="doSubmit">保存并提交</el-button>
       </div>
@@ -191,16 +184,17 @@
 </template>
 
 <script>
-import { listSalesReturn, getSalesReturn, saveSalesReturn, submitSalesReturn, confirmSalesReturn, cancelSalesReturn } from "@/api/inventory/salesReturn"
-import { listSales, getSalesDetail } from "@/api/inventory/sales"
-import { isSelectedStore } from "@/utils/shopContext"
+import { listSalesReturn, getSalesReturn, getSalesReturnActionContext, getSalesReturnDraft, getSalesReturnSourceOrder, saveSalesReturn, submitSalesReturn, submitSalesReturnDraft, confirmSalesReturn, cancelSalesReturn } from "@/api/inventory/salesReturn"
+import SalesReturnSourcePicker from "@/views/inventory/components/SalesReturnSourcePicker.vue"
+const { isReturnSelected, selectAllReturnRows } = require("@/utils/returnSelection")
+import { isSelectedStore, getSelectedDeptId } from "@/utils/shopContext"
 import { getBusinessEmptyText } from "@/utils/businessEmptyState"
 const { createTodoBusinessFocusMixin } = require("@/mixins/todoBusinessFocus")
 
 export default {
   mixins: [createTodoBusinessFocusMixin({
     featureKey: "salesReturn",
-    loadFocusedRow(returnId) { return getSalesReturn(returnId) },
+    loadFocusedRow(returnId) { return getSalesReturnActionContext(returnId, { silentError: true }) },
     actions: {
       confirmSalesReturn(row) {
         if (!row || row.status !== "submitted") return this.showTodoBusinessHandled()
@@ -209,8 +203,10 @@ export default {
     }
   })],
   name: "InvSalesReturn",
+  components: { SalesReturnSourcePicker },
   data() {
     return {
+      sourceLoading: false, sourceSequence: 0, sourcePickerOpen: false, formEpoch: 0, formReadSequence: 0, sourceError: "",
       loading: false, submitLoading: false, orderLoading: false, total: 0, list: [], orderOptions: [], dialogOpen: false, detailOpen: false,
       queryParams: { pageNum: 1, pageSize: 10, returnNo: undefined, salesOrderNo: undefined, customerName: undefined, status: undefined },
       form: { returnId: undefined, returnNo: "", salesOrderId: undefined, salesOrderNo: "", returnTitle: "", customerName: "", totalAmount: 0, returnDate: "", status: "draft", remark: "", details: [] },
@@ -232,11 +228,31 @@ export default {
     },
     formTitle() { return this.form.returnId ? "编辑销售退货单" : "新增销售退货单" },
     totalAmount() {
-      return this.form.details.reduce((sum, d) => sum + this.toNumber(d.quantity) * this.toNumber(d.unitPrice), 0).toFixed(2)
+      return this.form.details.filter(isReturnSelected).reduce((sum, d) => sum + this.toNumber(d.quantity) * this.toNumber(d.unitPrice), 0).toFixed(2)
     }
   },
   created() { this.getList() },
+  watch: {
+    dialogOpen(value) { if (!value) { this.sourcePickerOpen = false; this.sourceSequence += 1; this.sourceLoading = false } },
+    "$store.getters.id"() { this.invalidateSourceContext() },
+    "$route.fullPath"() { this.invalidateSourceContext() }
+  },
+  beforeDestroy() { this.invalidateSourceContext() },
+  deactivated() { this.invalidateSourceContext() },
   methods: {
+    isReturnSelected,
+    fillAllReturnable() { if (!this.submitLoading) this.form.details = selectAllReturnRows(this.form.details) },
+    clearReturnSelection() { if (!this.submitLoading) this.form.details.forEach(row => this.$set(row, "returnSelected", false)) },
+    sourceScope() { return JSON.stringify([getSelectedDeptId(), this.$store && this.$store.getters && this.$store.getters.id, this.$route && this.$route.fullPath]) },
+    invalidateSourceContext() { this.formReadSequence += 1; this.sourceSequence += 1; this.sourceLoading = false; this.sourcePickerOpen = false; this.dialogOpen = false },
+    closeEditor(done) { if (this.submitLoading) return; this.invalidateSourceContext(); if (typeof done === "function") done() },
+    openSourcePicker() { if (this.dialogOpen && !this.form.returnId && !this.submitLoading && this.ensureStoreContext()) this.sourcePickerOpen = true },
+    selectSourceOrder(order) {
+      if (!this.dialogOpen || !this.sourcePickerOpen || this.form.returnId || this.submitLoading) return
+      this.sourcePickerOpen = false
+      this.form.salesOrderId = order.orderId
+      return this.loadSalesOrder(order.orderId)
+    },
     ensureStoreContext() {
       if (this.isStoreContext) {
         return true
@@ -258,10 +274,23 @@ export default {
       }).finally(() => { this.loading = false })
     },
     openForm(row) {
+      if (this.submitLoading) return
+      this.sourceSequence += 1
+      this.formEpoch += 1
+      const readSequence = ++this.formReadSequence, scope = this.sourceScope()
+      this.sourcePickerOpen = false
+      this.sourceLoading = false
+      this.sourceError = ""
       if (!this.ensureStoreContext()) return
       if (row) {
-        getSalesReturn(row.returnId).then(res => {
-          this.form = Object.assign({}, res.data, { returnDate: res.data.returnDate || this.defaultReturnDate() })
+        return getSalesReturnDraft(row.returnId).then(res => {
+          if (readSequence !== this.formReadSequence || scope !== this.sourceScope()) return
+          this.form = Object.assign({}, res.data, {
+            returnDate: res.data.returnDate || this.defaultReturnDate(),
+            details: (res.data.details || []).map(item => Object.assign({}, item, {
+              maxReturnQuantity: this.toNumber(item.returnableQuantity)
+            }))
+          })
           if (this.form.salesOrderId) {
             this.orderOptions = [{ orderId: this.form.salesOrderId, orderNo: this.form.salesOrderNo, customerName: this.form.customerName }]
           }
@@ -269,7 +298,6 @@ export default {
         })
       } else {
         this.form = { returnId: undefined, returnNo: "", salesOrderId: undefined, salesOrderNo: "", returnTitle: "", customerName: "", totalAmount: 0, returnDate: this.defaultReturnDate(), status: "draft", remark: "", details: [] }
-        this.querySalesOrders("")
         this.dialogOpen = true
       }
       this.$nextTick(() => { this.$refs.formRef && this.$refs.formRef.clearValidate() })
@@ -279,18 +307,10 @@ export default {
       getSalesReturn(row.returnId).then(res => { this.detailForm = res.data || { details: [] } })
     },
     removeDetail(idx) { this.form.details.splice(idx, 1) },
-    querySalesOrders(keyword) {
-      if (!this.isStoreContext) {
-        this.orderOptions = []
-        return
-      }
-      this.orderLoading = true
-      listSales({ pageNum: 1, pageSize: 20, orderNo: keyword || undefined }).then(res => {
-        this.orderOptions = (res.rows || []).filter(item => item.status !== "draft" && item.status !== "cancelled")
-      }).finally(() => { this.orderLoading = false })
-    },
     handleSalesOrderChange(orderId) {
       if (!orderId) {
+        this.sourceSequence += 1
+        this.sourceLoading = false
         this.form.salesOrderNo = ""
         this.form.details = []
         return
@@ -303,34 +323,51 @@ export default {
       }
     },
     loadSalesOrder(orderId) {
-      getSalesDetail(orderId).then(res => {
+      const sequence = ++this.sourceSequence, form = this.form, scope = this.sourceScope(), epoch = this.formEpoch
+      const previousAutoTitle = "销售退货-" + (this.form.salesOrderNo || "")
+      this.sourceLoading = true
+      this.sourceError = ""
+      this.form.details = []
+      return getSalesReturnSourceOrder(orderId).then(res => {
+        if (sequence !== this.sourceSequence || !this.dialogOpen || this.form !== form || epoch !== this.formEpoch ||
+            scope !== this.sourceScope() || String(this.form.salesOrderId) !== String(orderId)) return
         const order = res.data || {}
-        this.form.salesOrderId = order.orderId
+        if (String(order.orderId) !== String(orderId) || !Array.isArray(order.details)) throw Error("原单明细响应不完整")
         this.form.salesOrderNo = order.orderNo
         this.form.customerName = order.customerName
-        if (!this.form.returnTitle) {
+        if (!this.form.returnTitle || this.form.returnTitle === previousAutoTitle) {
           this.form.returnTitle = "销售退货-" + (order.orderNo || "")
         }
         this.form.details = this.buildReturnDetails(order.details || [])
-        if (!this.form.details.length) {
-          this.$modal.msgWarning("该销售单暂无可退明细")
+        if (!this.form.details.length) this.$modal.msgWarning("该销售单暂无可退明细")
+      }).catch(error => {
+        if (sequence === this.sourceSequence && this.form === form && scope === this.sourceScope()) {
+          this.sourceError = error && error.message ? error.message : "原单明细加载失败，请重试"
+          this.$modal.msgError(this.sourceError)
         }
+      }).finally(() => {
+        if (sequence === this.sourceSequence) this.sourceLoading = false
       })
     },
     buildReturnDetails(details) {
       return details.map(item => {
-        const maxReturnQuantity = this.toNumber(item.deliveredQuantity)
+        const maxReturnQuantity = this.toNumber(item.returnableQuantity)
         return {
           salesDetailId: item.detailId,
+          itemType: item.itemType || "product",
+          itemId: item.itemId || item.productId,
+          itemCode: item.itemCode || item.sku,
+          itemName: item.itemName || item.productName,
           productId: item.productId,
           productName: item.productName,
           sku: item.sku,
           spec: item.spec,
           unit: item.unit,
-          quantity: Math.min(1, maxReturnQuantity),
+          quantity: 0,
+          returnSelected: false,
           maxReturnQuantity: maxReturnQuantity,
           unitPrice: this.toNumber(item.unitPrice),
-          amount: Math.min(1, maxReturnQuantity) * this.toNumber(item.unitPrice),
+          amount: 0,
           returnedQuantity: 0
         }
       }).filter(item => item.maxReturnQuantity > 0)
@@ -356,20 +393,28 @@ export default {
       })
     },
     buildPayload() {
+      if (this.sourceError) { this.$modal.msgError(this.sourceError); return null }
+      if (this.sourceLoading) {
+        this.$modal.msgWarning("请等待原单明细加载完成")
+        return null
+      }
       if (!this.form.details || !this.form.details.length) {
         this.$modal.msgError("请先选择原销售单并保留至少一条退货明细")
         return null
       }
-      const details = this.form.details.map(item => {
-        const quantity = this.toNumber(item.quantity)
+      const selected = this.form.details.filter(isReturnSelected)
+      if (!selected.length) { this.$modal.msgError("请勾选本次要退的商品"); return null }
+      const details = selected.map(item => {
+        const quantity = Number(item.quantity)
         const unitPrice = this.toNumber(item.unitPrice)
-        return Object.assign({}, item, {
+        const { returnSelected, ...detail } = item
+        return Object.assign({}, detail, {
           quantity: quantity,
           unitPrice: unitPrice,
           amount: quantity * unitPrice
         })
       })
-      const invalid = details.find(item => !item.productId || item.quantity <= 0)
+      const invalid = details.find(item => !(item.itemId || item.productId) || !item.salesDetailId || !Number.isFinite(item.quantity) || item.quantity <= 0 || item.quantity > this.toNumber(item.maxReturnQuantity))
       if (invalid) {
         this.$modal.msgError("退货明细商品和数量不能为空")
         return null
@@ -381,9 +426,14 @@ export default {
     },
     handleSubmit(row) {
       if (!this.ensureStoreContext()) return
-      this.$modal.confirm("确认提交该退货单？").then(() => {
-        getSalesReturn(row.returnId).then(res => { submitSalesReturn(res.data).then(() => { this.$modal.msgSuccess("提交成功"); this.getList() }) })
-      })
+      if (this.submitLoading) return
+      const returnId = row.returnId, scope = this.sourceScope()
+      return this.$modal.confirm("确认提交该退货单？").then(() => {
+        if (scope !== this.sourceScope() || this.submitLoading) return
+        this.submitLoading = true
+        return submitSalesReturnDraft(returnId).then(() => { this.$modal.msgSuccess("提交成功"); this.getList() })
+          .finally(() => { this.submitLoading = false })
+      }).catch(error => ({ failed: true, error }))
     },
     handleConfirm(row) {
       if (!this.ensureStoreContext()) return

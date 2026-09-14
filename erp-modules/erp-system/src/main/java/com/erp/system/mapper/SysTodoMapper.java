@@ -15,7 +15,8 @@ public interface SysTodoMapper
             @Param("query") TodoQuery query,
             @Param("enabledTypes") Set<String> enabledTypes,
             @Param("currentScopeDeptIds") List<Long> currentScopeDeptIds,
-            @Param("authorizedScopeDeptIds") List<Long> authorizedScopeDeptIds);
+            @Param("authorizedScopeDeptIds") List<Long> authorizedScopeDeptIds,
+            @Param("asOfDate") java.time.LocalDate asOfDate);
 
     List<SysHealthCertificateTodoCandidate> selectHealthCertificateTodoCandidates(
             @Param("query") TodoQuery query,

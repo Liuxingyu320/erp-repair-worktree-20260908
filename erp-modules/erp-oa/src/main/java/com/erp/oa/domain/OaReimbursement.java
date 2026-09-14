@@ -37,6 +37,13 @@ public class OaReimbursement extends BaseEntity
     private Long approvalInstanceId;
     private Integer approvalRound;
     private Long rowVersion;
+    // Request-only optimistic command boundary; intentionally not persisted by the mapper.
+    private Integer expectedBaseRound;
+    private Long expectedVersion;
+    public Integer getExpectedBaseRound() { return expectedBaseRound; }
+    public void setExpectedBaseRound(Integer value) { expectedBaseRound = value; }
+    public Long getExpectedVersion() { return expectedVersion; }
+    public void setExpectedVersion(Long value) { expectedVersion = value; }
     private String lastApprovalEventKey;
     private Integer invoiceCount;
 

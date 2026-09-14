@@ -58,6 +58,17 @@
         order by b.arrived_time asc, b.batch_id asc
     </select>
 
+    <select id="selectByOrderIdForUpdate" resultMap="InvReceiptBatchResult">
+        select batch_id, batch_no, purchase_order_id, order_no, warehouse_id,
+               supplier_batch_no, delivery_note_no, arrived_time, status,
+               received_user_id, received_by, total_quantity, pending_quantity,
+               create_by, create_time, update_by, update_time, remark
+        from inv_receipt_batch
+        where purchase_order_id = #{orderId}
+        order by batch_id asc
+        for update
+    </select>
+
     <select id="countPendingByOrderId" resultType="int">
         select count(1)
         from inv_receipt_batch

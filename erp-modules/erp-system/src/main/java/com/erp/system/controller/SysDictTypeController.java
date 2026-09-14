@@ -33,6 +33,7 @@ import com.erp.system.service.ISysDictTypeService;
 @RequestMapping("/dict/type")
 public class SysDictTypeController extends BaseController
 {
+    @Autowired private com.erp.system.service.support.DictCacheCoordinator dictCache;
     @Autowired
     private ISysDictTypeService dictTypeService;
 
@@ -75,10 +76,10 @@ public class SysDictTypeController extends BaseController
     {
         if (!dictTypeService.checkDictTypeUnique(dict))
         {
-            return error("新增字典'" + dict.getDictName() + "'失败，字典类型已存在");
+            return AjaxResult.error(409, "新增字典'" + dict.getDictName() + "'失败，字典类型已存在");
         }
         dict.setCreateBy(SecurityUtils.getUsername());
-        return toAjax(dictTypeService.insertDictType(dict));
+        return dictCache.attachOutcome(toAjax(dictTypeService.insertDictType(dict)));
     }
 
     /**
@@ -91,10 +92,10 @@ public class SysDictTypeController extends BaseController
     {
         if (!dictTypeService.checkDictTypeUnique(dict))
         {
-            return error("修改字典'" + dict.getDictName() + "'失败，字典类型已存在");
+            return AjaxResult.error(409, "修改字典'" + dict.getDictName() + "'失败，字典类型已存在");
         }
         dict.setUpdateBy(SecurityUtils.getUsername());
-        return toAjax(dictTypeService.updateDictType(dict));
+        return dictCache.attachOutcome(toAjax(dictTypeService.updateDictType(dict)));
     }
 
     /**
@@ -106,7 +107,7 @@ public class SysDictTypeController extends BaseController
     public AjaxResult remove(@PathVariable Long[] dictIds)
     {
         dictTypeService.deleteDictTypeByIds(dictIds);
-        return success();
+        return dictCache.attachOutcome(success());
     }
 
     /**

@@ -20,6 +20,12 @@ public interface InvTransferOrderMapper
             @Param("updateBy") String updateBy);
     int updateInvTransferOrder(InvTransferOrder order);
     int deleteInvTransferOrderById(Long transferId);
+    List<Long> selectShipmentIdsForDeletionForUpdate(@Param("transferId") Long transferId);
+    List<Long> selectDiscrepancyIdsForDeletionForUpdate(@Param("transferId") Long transferId);
+    List<Long> selectReservationIdsForDeletionForUpdate(@Param("transferId") Long transferId);
+    int deleteDraftIfVersionMatches(@Param("transferId") Long transferId,
+            @Param("expectedStatus") String expectedStatus,
+            @Param("expectedVersion") Long expectedVersion);
     InvTransferOrder selectByPurchaseId(@Param("purchaseId") Long purchaseId);
     InvTransferOrder selectBySourceBusinessTypeIdWarehouse(@Param("sourceBusinessType") String sourceBusinessType,
             @Param("sourceBusinessId") Long sourceBusinessId,

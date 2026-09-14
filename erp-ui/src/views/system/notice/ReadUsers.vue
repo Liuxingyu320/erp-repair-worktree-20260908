@@ -21,12 +21,15 @@
       </el-form-item>
       <el-form-item style="float: right; margin-right: 0;">
         <span class="read-stat">
-          已读 <strong>{{ total }}</strong> / {{ recipientCount }} 人（{{ readRate }}）
+          <template v-if="summaryReady">总体已读 <strong>{{ readCount }}</strong> / {{ recipientCount }} 人（{{ readRate }}）</template>
+          <template v-else>总体阅读统计暂不可用</template>
         </span>
       </el-form-item>
     </el-form>
     </div>
     <div class="table-card read-users-table-card">
+    <el-alert v-if="loadError" :title="loadError" type="error" :closable="false" />
+    <p>筛选结果 {{ total }} 人</p>
     <el-table v-loading="loading" :data="userList" size="small" stripe height="340px">
       <el-table-column type="index" label="序号" width="55" align="center" />
       <el-table-column label="姓名" prop="nickName" align="center" :show-overflow-tooltip="true" />
@@ -43,6 +46,8 @@
 </template>
 
 <script>
+import { getSelectedDeptId } from "@/utils/shopContext"
+const { createUiOperationScope } = require("@/utils/uiOperationScope")
 import { listNoticeReadUsers } from "@/api/system/notice"
 
 export default {
@@ -54,6 +59,9 @@ export default {
       noticeId: undefined,
       noticeTitle: "",
       recipientCount: 0,
+      readCount: 0,
+      summaryReady: false,
+      loadError: "",
       total: 0,
       userList: [],
       queryParams: {
@@ -64,11 +72,21 @@ export default {
       }
     }
   },
+  watch: { actorContextKey() { this.handleClose() } },
+  created() { window.addEventListener("erp:dept-changed", this.handleClose) },
+  deactivated() { this.handleClose(); this.readScope().deactivate() },
+  activated() { this.readScope().activate() },
+  beforeDestroy() { window.removeEventListener("erp:dept-changed", this.handleClose); this.readScope().deactivate() },
   methods: {
+    readScope() {
+      if (!this._readScope) this._readScope = createUiOperationScope(() => ({ actor: this.actorContextKey, dept: getSelectedDeptId() }))
+      return this._readScope
+    },
     open(row) {
+      this.handleClose()
       this.noticeId = row.noticeId
       this.noticeTitle = row.noticeTitle
-      this.recipientCount = Number(row.recipientCount) || 0
+      this.recipientCount = 0
       this.queryParams.noticeId = row.noticeId
       this.queryParams.searchValue = undefined
       this.queryParams.pageNum = 1
@@ -76,13 +94,23 @@ export default {
       this.getList()
     },
     getList() {
+      const params = { ...this.queryParams }, scope = this.readScope(), token = scope.begin("readers", params)
+      const current = () => this.visible && scope.isCurrent(token) && String(this.noticeId) === String(params.noticeId)
       this.loading = true
-      listNoticeReadUsers(this.queryParams).then(res => {
-        this.userList = res.rows
-        this.total = res.total
-      }).finally(() => {
-        this.loading = false
-      })
+      this.userList = []
+      this.total = 0
+      this.summaryReady = false
+      this.loadError = ""
+      return listNoticeReadUsers(params, { silentError: true }).then(res => {
+        if (!current()) return
+        this.userList = res.rows || []
+        this.total = Number(res.total) || 0
+        const summary = res.summary
+        this.summaryReady = Boolean(summary && Number.isFinite(Number(summary.readCount)) && Number.isFinite(Number(summary.recipientCount)))
+        this.readCount = this.summaryReady ? Number(summary.readCount) : 0
+        this.recipientCount = this.summaryReady ? Number(summary.recipientCount) : 0
+      }).catch(error => { if (current()) this.loadError = error && error.message || "阅读情况加载失败，请重试搜索" })
+        .finally(() => { if (current()) this.loading = false })
     },
     handleQuery() {
       this.queryParams.pageNum = 1
@@ -93,6 +121,13 @@ export default {
       this.handleQuery()
     },
     handleClose() {
+      this.readScope().invalidate()
+      this.visible = false
+      this.loading = false
+      this.summaryReady = false
+      this.readCount = 0
+      this.recipientCount = 0
+      this.loadError = ""
       this.userList = []
       this.total = 0
       this.queryParams.searchValue = undefined
@@ -102,9 +137,13 @@ export default {
     }
   },
   computed: {
+    actorContextKey() {
+      const store = this.$store || {}
+      return String((store.getters || {}).id || "") + ":" + String(((store.state || {}).user || {}).sessionRevision || 0)
+    },
     readRate() {
-      if (this.recipientCount <= 0) return "0%"
-      return `${Math.round(this.total * 100 / this.recipientCount)}%`
+      if (this.recipientCount <= 0) return "无接收人"
+      return `${Math.round(this.readCount * 100 / this.recipientCount)}%`
     }
   }
 }

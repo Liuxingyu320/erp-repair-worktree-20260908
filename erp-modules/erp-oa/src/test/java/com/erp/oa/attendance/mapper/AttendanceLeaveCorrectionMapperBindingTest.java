@@ -307,6 +307,23 @@ class AttendanceLeaveCorrectionMapperBindingTest
                         "find_in_set(scope_dept.dept_id, target_dept.ancestors)");
     }
 
+    @Test
+    void correctionEligibilityExcludesOnlyScopedApprovedTypeReplacements() throws Exception
+    {
+        var configuration = parse("mapper/oa/AttendanceCorrectionMapper.xml");
+        Map<String, Object> params = Map.of("scheduleId", 31L, "userId", 9L, "punchType", "IN", "punchSlotKey", "SEGMENT:1031:IN");
+        for (String method : java.util.List.of("selectSchedulePunchEvents", "countAcceptedPunchEvents", "countAcceptedPunchEventsForSlot"))
+        {
+            String query = sql(configuration, AttendanceCorrectionMapper.class, method, params);
+            assertThat(query).contains("not exists", "moved.original_punch_event_id = e.punch_event_id",
+                    "moved.schedule_id = e.schedule_id", "moved.user_id = e.user_id", "moved.shop_id = e.shop_id",
+                    "moved.business_date = e.business_date", "moved.status = 'APPROVED'",
+                    "moved.correction_type = 'WRONG_TYPE'", "moved.target_punch_type != e.punch_type");
+        }
+        assertThat(sql(configuration, AttendanceCorrectionMapper.class, "selectPunchEventRef", Map.of("punchEventId", 902L)))
+                .doesNotContain("not exists");
+    }
+
     private Configuration parse(String resource) throws Exception
     {
         Configuration configuration = new Configuration();

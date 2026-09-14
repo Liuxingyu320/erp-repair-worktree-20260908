@@ -377,6 +377,9 @@ class OaSignPlanVersionServiceImplTest
         existing.setVersionId(501L);
         existing.setPlanId(PLAN_ID);
         existing.setVersionNo(2);
+        existing.setPublishStatus("PUBLISHED");
+        existing.setMatchingStatus("ENABLED");
+        when(fixture.mapper.lockPublishedVersionsByPlanId(PLAN_ID)).thenReturn(List.of(existing));
         when(fixture.mapper.selectByPlanIdAndVersionHash(anyLong(), anyString())).thenReturn(existing);
         when(fixture.mapper.selectTemplatesByVersionId(501L)).thenReturn(List.of());
 
@@ -948,6 +951,9 @@ class OaSignPlanVersionServiceImplTest
         version.setVersionId(501L);
         version.setShopDeptId(0L);
         version.setMatchingStatus("ENABLED");
+        version.setPlanId(PLAN_ID);
+        version.setPublishStatus("PUBLISHED");
+        when(fixture.mapper.lockPublishedVersionsByPlanId(PLAN_ID)).thenReturn(List.of(version));
         when(fixture.mapper.lockPlanVersionById(501L)).thenReturn(version);
         when(fixture.mapper.selectPlanVersionById(501L)).thenReturn(version);
         when(fixture.mapper.disableForNewMatching(501L)).thenReturn(1);
@@ -989,6 +995,138 @@ class OaSignPlanVersionServiceImplTest
 
         verify(fixture.mapper).lockPlanVersionById(501L);
     }
+
+    @Test
+    void previewAndExplicitConfirmationRestoreOnlyTheNamedHistoricalVersion()
+    {
+        RestoreFixture restore = restoreFixture();
+        var preview = restore.fixture.service.previewPublish(PLAN_ID, SHOP_ID);
+        assertThat(preview.action()).isEqualTo("RESTORED");
+        assertThat(preview.restoreVersionId()).isEqualTo(501L);
+        assertThat(preview.activeVersions()).extracting(com.erp.oa.domain.vo.OaSignPlanPublishPreview.ActiveVersion::versionId)
+                .containsExactly(502L);
+        var result = restore.fixture.service.confirmPublish(PLAN_ID,
+                new com.erp.oa.domain.dto.OaSignPlanPublishRequest(preview.previewToken(), 501L), SHOP_ID);
+        assertThat(result.getAction()).isEqualTo("RESTORED");
+        assertThat(result.getVersionId()).isEqualTo(501L);
+        assertThat(result.getMatchingStatus()).isEqualTo("ENABLED");
+        assertThat(result.getPreviousActiveVersionIds()).containsExactly(502L);
+        assertThat(restore.oldVersion.getPublishedBy()).isEqualTo("original publisher");
+        assertThat(restore.oldVersion.getPublishedTime()).isEqualTo(new java.util.Date(1234));
+        verify(restore.fixture.mapper, never()).insertPlanVersion(any());
+        verify(restore.fixture.mapper, never()).batchInsertPlanVersionTemplates(any());
+        InOrder ordered = inOrder(restore.fixture.mapper);
+        ordered.verify(restore.fixture.mapper).lockPlanById(PLAN_ID);
+        ordered.verify(restore.fixture.mapper).lockPublishedVersionsByPlanId(PLAN_ID);
+        ordered.verify(restore.fixture.mapper).lockPlanTemplateBindings(PLAN_ID);
+        ordered.verify(restore.fixture.mapper).enableForNewMatching(501L);
+        ordered.verify(restore.fixture.mapper).disableOtherPublishedMatchingVersions(PLAN_ID, 501L);
+    }
+
+    @Test
+    void legacyPublishCannotSilentlyRestoreDisabledContent()
+    {
+        RestoreFixture restore = restoreFixture();
+        assertThatThrownBy(() -> restore.fixture.service.publish(PLAN_ID, SHOP_ID))
+                .hasMessageContaining("明确确认恢复");
+        verify(restore.fixture.mapper, never()).enableForNewMatching(anyLong());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = { "content", "active", "target", "sourceDisabled", "templateDisabled" })
+    void changedPreviewConditionsRejectBeforeActivation(String change)
+    {
+        RestoreFixture restore = restoreFixture();
+        var preview = restore.fixture.service.previewPublish(PLAN_ID, SHOP_ID);
+        if ("content".equals(change)) restore.fixture.plan.setPlanName("changed source");
+        if ("active".equals(change)) restore.activeVersion.setMatchingStatus("DISABLED");
+        if ("target".equals(change)) restore.oldVersion.setVersionId(503L);
+        if ("sourceDisabled".equals(change)) restore.fixture.plan.setStatus("1");
+        if ("templateDisabled".equals(change)) restore.fixture.bindings.get(0).getTemplate().setStatus("1");
+        assertThatThrownBy(() -> restore.fixture.service.confirmPublish(PLAN_ID,
+                new com.erp.oa.domain.dto.OaSignPlanPublishRequest(preview.previewToken(), 501L), SHOP_ID))
+                .isInstanceOf(ServiceException.class);
+        verify(restore.fixture.mapper, never()).enableForNewMatching(anyLong());
+        verify(restore.fixture.mapper, never()).disableOtherPublishedMatchingVersions(anyLong(), anyLong());
+    }
+
+    @ParameterizedTest
+    @ValueSource(longs = { 502L, 999L })
+    void tamperedRestoreTargetDoesNotActivateAnyVersion(long suppliedId)
+    {
+        RestoreFixture restore = restoreFixture();
+        var preview = restore.fixture.service.previewPublish(PLAN_ID, SHOP_ID);
+        assertThatThrownBy(() -> restore.fixture.service.confirmPublish(PLAN_ID,
+                new com.erp.oa.domain.dto.OaSignPlanPublishRequest(preview.previewToken(), suppliedId), SHOP_ID))
+                .hasMessageContaining("重新预览");
+        verify(restore.fixture.mapper, never()).enableForNewMatching(anyLong());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = { "enableCount", "disableCount", "readback" })
+    void inconsistentMutationCannotProduceSuccessReceipt(String failure)
+    {
+        RestoreFixture restore = restoreFixture();
+        var preview = restore.fixture.service.previewPublish(PLAN_ID, SHOP_ID);
+        if ("enableCount".equals(failure)) when(restore.fixture.mapper.enableForNewMatching(501L)).thenReturn(0);
+        if ("disableCount".equals(failure)) when(restore.fixture.mapper.disableOtherPublishedMatchingVersions(PLAN_ID, 501L)).thenReturn(0);
+        if ("readback".equals(failure)) when(restore.fixture.mapper.selectPlanVersionById(501L)).thenReturn(null);
+        assertThatThrownBy(() -> restore.fixture.service.confirmPublish(PLAN_ID,
+                new com.erp.oa.domain.dto.OaSignPlanPublishRequest(preview.previewToken(), 501L), SHOP_ID))
+                .isInstanceOf(ServiceException.class);
+        // Mockito verifies failure detection; actual transaction rollback is an isolated-MySQL gate.
+    }
+
+    @Test
+    void lostSuccessResponseRequiresRefreshAndFreshPreviewReturnsUnchanged()
+    {
+        RestoreFixture restore = restoreFixture();
+        var preview = restore.fixture.service.previewPublish(PLAN_ID, SHOP_ID);
+        var request = new com.erp.oa.domain.dto.OaSignPlanPublishRequest(preview.previewToken(), 501L);
+        restore.fixture.service.confirmPublish(PLAN_ID, request, SHOP_ID);
+        assertThatThrownBy(() -> restore.fixture.service.confirmPublish(PLAN_ID, request, SHOP_ID))
+                .hasMessageContaining("重新预览");
+        var refreshed = restore.fixture.service.previewPublish(PLAN_ID, SHOP_ID);
+        assertThat(refreshed.action()).isEqualTo("UNCHANGED");
+        var receipt = restore.fixture.service.confirmPublish(PLAN_ID,
+                new com.erp.oa.domain.dto.OaSignPlanPublishRequest(refreshed.previewToken(), null), SHOP_ID);
+        assertThat(receipt.getAction()).isEqualTo("UNCHANGED");
+        verify(restore.fixture.mapper).enableForNewMatching(501L);
+    }
+
+    private RestoreFixture restoreFixture()
+    {
+        Fixture fixture = fixture(validPlan(), List.of(binding(validTemplate(10L, "ONBOARD_LABOR_CONTRACT"), 20)));
+        OaSignPlanVersion old = new OaSignPlanVersion();
+        old.setVersionId(501L); old.setVersionNo(1); old.setPlanId(PLAN_ID); old.setPublishStatus("PUBLISHED");
+        old.setMatchingStatus("DISABLED"); old.setShopDeptId(0L);
+        old.setPublishedBy("original publisher"); old.setPublishedTime(new java.util.Date(1234));
+        OaSignPlanVersion active = new OaSignPlanVersion();
+        active.setVersionId(502L); active.setVersionNo(2); active.setPlanId(PLAN_ID);
+        active.setPublishStatus("PUBLISHED"); active.setMatchingStatus("ENABLED");
+        when(fixture.mapper.lockPublishedVersionsByPlanId(PLAN_ID)).thenReturn(List.of(old, active));
+        when(fixture.mapper.selectByPlanIdAndVersionHash(anyLong(), anyString())).thenAnswer(call -> {
+            old.setVersionHash(call.getArgument(1)); return old;
+        });
+        when(fixture.mapper.selectPlanVersionById(501L)).thenReturn(old);
+        when(fixture.mapper.enableForNewMatching(501L)).thenAnswer(call -> { old.setMatchingStatus("ENABLED"); return 1; });
+        when(fixture.mapper.disableOtherPublishedMatchingVersions(PLAN_ID, 501L)).thenAnswer(call -> {
+            active.setMatchingStatus("DISABLED"); return 1;
+        });
+        OaSignPlanPublishPreviewStore store = mock(OaSignPlanPublishPreviewStore.class);
+        ReflectionTestUtils.setField(fixture.service, "previewStore", store);
+        var ticket = new java.util.concurrent.atomic.AtomicReference<OaSignPlanPublishPreviewStore.Ticket>();
+        when(store.issue(anyLong(), anyLong(), anyString(), any(), any(), org.mockito.ArgumentMatchers.anyBoolean()))
+                .thenAnswer(call -> {
+                    ticket.set(new OaSignPlanPublishPreviewStore.Ticket(call.getArgument(0), call.getArgument(1),
+                            call.getArgument(2), List.copyOf(call.getArgument(3)), call.getArgument(4), call.getArgument(5), Long.MAX_VALUE));
+                    return new OaSignPlanPublishPreviewStore.Issued("00000000-0000-0000-0000-000000000001", Long.MAX_VALUE);
+                });
+        when(store.require(anyString(), anyLong())).thenAnswer(call -> ticket.get());
+        return new RestoreFixture(fixture, old, active);
+    }
+
+    private record RestoreFixture(Fixture fixture, OaSignPlanVersion oldVersion, OaSignPlanVersion activeVersion) {}
 
     private Fixture fixture(OaSignPlan plan, List<OaSignPlanTemplate> bindings)
     {

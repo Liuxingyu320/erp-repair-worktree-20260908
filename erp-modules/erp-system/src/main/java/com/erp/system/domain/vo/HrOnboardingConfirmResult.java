@@ -23,8 +23,10 @@ public class HrOnboardingConfirmResult implements Serializable
     private boolean replayed;
     private List<String> riskCodes = new ArrayList<>();
 
+    @com.fasterxml.jackson.databind.annotation.JsonSerialize(using = com.fasterxml.jackson.databind.ser.std.ToStringSerializer.class)
     public Long getOnboardingId() { return onboardingId; }
     public void setOnboardingId(Long onboardingId) { this.onboardingId = onboardingId; }
+    @com.fasterxml.jackson.databind.annotation.JsonSerialize(using = com.fasterxml.jackson.databind.ser.std.ToStringSerializer.class)
     public Long getUserId() { return userId; }
     public void setUserId(Long userId) { this.userId = userId; }
     public String getEmployeeNo() { return employeeNo; }

@@ -9,6 +9,7 @@ public class SecuritySessionInvalidationOutbox
     private String eventType;
     private Long userId;
     private String reasonCode;
+    private String retainedSessionDigest;
     private String status;
     private int attempts;
     private Date availableAt;
@@ -29,6 +30,8 @@ public class SecuritySessionInvalidationOutbox
     public void setUserId(Long userId) { this.userId = userId; }
     public String getReasonCode() { return reasonCode; }
     public void setReasonCode(String reasonCode) { this.reasonCode = reasonCode; }
+    public String getRetainedSessionDigest() { return retainedSessionDigest; }
+    public void setRetainedSessionDigest(String value) { this.retainedSessionDigest = value; }
     public String getStatus() { return status; }
     public void setStatus(String status) { this.status = status; }
     public int getAttempts() { return attempts; }

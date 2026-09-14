@@ -70,6 +70,7 @@ function bind(component, initial = {}) {
     visible: true,
     employee: employee(),
     options: options(),
+    $store: { getters: { permissions: ["hr:employee:salary:edit"] } },
     $emit(name, value) { emitted.push({ name, value }) },
     $modal: { msgSuccess() {} },
     ...initial
@@ -154,6 +155,7 @@ async function run() {
 
   const componentRedistribution = bind(component)
   await componentRedistribution.openDialog()
+  componentRedistribution.model.adjustSalary = true
   componentRedistribution.model.baseSalary += 100
   componentRedistribution.model.postSalary -= 100
   componentRedistribution.syncSalaryTotal()
@@ -168,6 +170,7 @@ async function run() {
   target.model.jobGradeCode = "P4"
   target.model.directSupervisorId = 66
   target.model.workLocation = "上海市浦东新区"
+  target.model.adjustSalary = true
   target.model.baseSalary = 6000
   target.model.postSalary = 2000
   target.model.fieldAllowance = 500

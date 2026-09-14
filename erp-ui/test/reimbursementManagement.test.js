@@ -122,7 +122,7 @@ assert.ok(
 
 assert.ok(
   desktop.includes("导出 Excel＋发票") &&
-    desktop.includes("三张 Excel 工作表") &&
+    fs.readFileSync(path.join(__dirname, "../src/mixins/reimbursementExportRecovery.js"), "utf8").includes("三张 Excel 工作表") &&
     desktop.includes("疑似重复发票") &&
     desktop.includes("云端识别") &&
     desktop.includes("本地识别") &&
@@ -139,8 +139,8 @@ assert.ok(
     desktop.includes("未重复识别或生成明细") &&
     desktop.includes("ensureDraftForInvoiceUpload") &&
     desktop.includes("deleteStarted") &&
-    desktop.includes("recoverReimbursementDeleteFailure") &&
-    desktop.includes("responseMessage(value)") &&
+    desktop.includes("mergeReimbursementInvoiceDeletion") &&
+    desktop.includes("responseMessage(error)") &&
     desktop.includes("hasValidatedSelectedDeptContext") &&
     desktop.includes("请先选择门店或仓库，再上传发票") &&
     desktop.includes("beforeInvoiceUpload") &&
@@ -172,8 +172,8 @@ assert.ok(
     mobile.includes("uploadedInvoice.idempotentReplay") &&
     mobile.includes("未重复识别或生成明细") &&
     mobile.includes("deleteStarted") &&
-    mobile.includes("recoverReimbursementDeleteFailure") &&
-    mobile.includes("reimbursementErrorMessage(value)") &&
+    mobile.includes("mergeReimbursementInvoiceDeletion") &&
+    mobile.includes("reimbursementErrorMessage(error)") &&
     mobile.includes("deletingInvoiceId") &&
     mobile.includes("uploadWorkActive") &&
     mobile.includes("retryToken !== this.uploadQueueToken") &&

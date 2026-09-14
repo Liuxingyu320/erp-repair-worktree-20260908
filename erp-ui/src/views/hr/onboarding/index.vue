@@ -102,10 +102,11 @@ import HrOnboardingImportDialog from "./components/HrOnboardingImportDialog"
 import { isOnboardingVersionConflict } from "./onboardingFieldConfig"
 import { checkPermi } from "@/utils/permission"
 import { getHrEmployee } from "@/api/hr/employee"
+import { getSelectedDeptId } from "@/utils/shopContext"
+const { createUiOperationScope } = require("@/utils/uiOperationScope")
 
-const positiveId = value => /^\d+$/.test(String(value || "")) && Number.isSafeInteger(Number(value)) && Number(value) > 0
-  ? Number(value)
-  : undefined
+const { normalizePositiveDecimalId } = require("@/utils/positiveDecimalId")
+const positiveId = value => normalizePositiveDecimalId(value) || undefined
 const defaultQuery = (route = {}) => ({
   pageNum: 1,
   pageSize: 10,
@@ -158,15 +159,22 @@ export default {
     }
   },
   created() {
+    if (typeof window !== "undefined") window.addEventListener("erp:dept-changed", this.handleContextChanged)
     this.applyRouteDeepLink()
     this.loadFormOptions()
     this.loadList()
   },
   beforeDestroy() {
+    if (typeof window !== "undefined") window.removeEventListener("erp:dept-changed", this.handleContextChanged)
+    this.operationScope().deactivate()
     this.listRequestSequence += 1
     this.detailRequestSequence += 1
   },
+  deactivated() { this.operationScope().deactivate(); this.actionLoading = false },
+  activated() { this.operationScope().activate() },
   watch: {
+    "$store.state.user.sessionRevision"() { this.handleContextChanged() },
+    "$route.fullPath"() { this.operationScope().invalidate(); this.actionLoading = false },
     confirmVisible(value) {
       this.handleConfirmVisibilityChange(value)
     },
@@ -186,6 +194,20 @@ export default {
     }
   },
   methods: {
+    operationScope() {
+      if (!this._operationScope) this._operationScope = createUiOperationScope(() => {
+        const user = this.$store && this.$store.state && this.$store.state.user || {}
+        return { actor: String(user.id || ""), session: user.sessionRevision || 0,
+          dept: String(getSelectedDeptId() || ""), route: this.$route && this.$route.fullPath }
+      })
+      return this._operationScope
+    },
+    handleContextChanged() {
+      this.operationScope().invalidate()
+      this.clearSelection()
+      this.editVisible = false; this.confirmVisible = false
+      return this.loadList()
+    },
     loadFormOptions() {
       return getHrOnboardingFormOptions()
         .then(response => { this.formOptions = response.data || {} })
@@ -200,12 +222,12 @@ export default {
           if (requestSequence !== this.listRequestSequence) return
           this.rows = Array.isArray(response.rows) ? response.rows : []
           this.total = Number(response.total) || 0
-          if (this.selectedOnboardingId && !this.rows.some(row => row.onboardingId === this.selectedOnboardingId)) {
+          if (this.selectedOnboardingId && !this.rows.some(row => positiveId(row.onboardingId) === this.selectedOnboardingId)) {
             this.clearSelection()
           }
           const routeId = this.pendingRouteOnboardingId
           this.pendingRouteOnboardingId = undefined
-          const routeRow = routeId && this.rows.find(row => Number(row.onboardingId) === routeId)
+          const routeRow = routeId && this.rows.find(row => positiveId(row.onboardingId) === routeId)
           if (routeRow) return this.selectOnboarding(routeRow)
           if (this.canSelect && this.rows.length && !this.selectedOnboardingId) return this.autoSelectFirstRow()
         })
@@ -239,8 +261,7 @@ export default {
     },
     validRouteOnboardingId() {
       const raw = this.$route && this.$route.query ? this.$route.query.onboardingId : undefined
-      const value = Number(raw)
-      return Number.isSafeInteger(value) && value > 0 && String(value) === String(raw) ? value : undefined
+      return positiveId(Array.isArray(raw) ? raw[0] : raw)
     },
     removeRouteOnboardingId() {
       if (!this.$route || !this.$route.query || this.$route.query.onboardingId === undefined || !this.$router) return
@@ -256,15 +277,20 @@ export default {
       return this.loadList()
     },
     selectOnboarding(row) {
-      if (!this.canQuery || !this.canSelect || !row || !row.onboardingId) return
-      this.selectedOnboardingId = row.onboardingId
+      if (!this.canQuery || !this.canSelect || !row || !positiveId(row.onboardingId)) return
+      this.operationScope().invalidate("state-action")
+      this.operationScope().invalidate("state-confirm")
+      this.actionLoading = false
+      this.selectedOnboardingId = positiveId(row.onboardingId)
       this.detail = null
-      return this.loadDetail(row.onboardingId)
+      return this.loadDetail(positiveId(row.onboardingId))
     },
     autoSelectFirstRow() {
       return this.rows.length ? this.selectOnboarding(this.rows[0]) : Promise.resolve(null)
     },
     loadDetail(onboardingId) {
+      onboardingId = positiveId(onboardingId)
+      if (!onboardingId) return Promise.resolve(null)
       const requestSequence = ++this.detailRequestSequence
       this.detailLoading = true
       this.detailError = ""
@@ -272,7 +298,9 @@ export default {
       return getHrOnboarding(onboardingId)
         .then(response => {
           if (requestSequence !== this.detailRequestSequence || onboardingId !== this.selectedOnboardingId) return
-          this.detail = response.data || null
+          const detail = response.data || null
+          if (detail && positiveId(detail.onboardingId) !== onboardingId) throw new Error("入职记录响应不匹配")
+          this.detail = detail
           if (!this.detail) this.detailError = "未找到该入职记录，记录可能已被删除或超出当前数据范围"
           if (this.detail) return this.loadLinkedEmployeeProfile(this.detail, requestSequence, onboardingId)
           return null
@@ -289,8 +317,8 @@ export default {
         })
     },
     loadLinkedEmployeeProfile(detail, requestSequence, onboardingId) {
-      const linkedUserId = Number(detail && detail.linkedUserId)
-      if (!Number.isSafeInteger(linkedUserId) || linkedUserId <= 0 || !checkPermi(["hr:employee:query"])) {
+      const linkedUserId = positiveId(detail && detail.linkedUserId)
+      if (!linkedUserId || !checkPermi(["hr:employee:query"])) {
         return Promise.resolve(null)
       }
       return getHrEmployee(detail.linkedUserId).then(response => {
@@ -308,6 +336,9 @@ export default {
       if (this.selectedOnboardingId) this.loadDetail(this.selectedOnboardingId)
     },
     clearSelection() {
+      this.operationScope().invalidate("state-action")
+      this.operationScope().invalidate("state-confirm")
+      this.actionLoading = false
       this.detailRequestSequence += 1
       this.selectedOnboardingId = undefined
       this.detail = null
@@ -319,7 +350,7 @@ export default {
       this.createVisible = true
     },
     handleCreated(created) {
-      const onboardingId = created && created.onboardingId
+      const onboardingId = positiveId(created && created.onboardingId)
       this.createVisible = false
       return this.loadList().then(() => {
         if (onboardingId) return this.selectOnboarding({ onboardingId })
@@ -328,7 +359,7 @@ export default {
     },
     handleRecordChanged(updated) {
       this.editVisible = false
-      if (updated && updated.onboardingId === this.selectedOnboardingId) this.detail = updated
+      if (updated && positiveId(updated.onboardingId) === this.selectedOnboardingId) this.detail = updated
       return this.loadList().then(() => {
         if (this.selectedOnboardingId) return this.loadDetail(this.selectedOnboardingId)
         return null
@@ -350,7 +381,7 @@ export default {
       this.confirmRefreshPending = false
       const activeId = this.selectedOnboardingId
       return this.loadList().then(() => {
-        if (activeId && this.selectedOnboardingId === activeId && this.rows.some(row => row.onboardingId === activeId)) {
+        if (activeId && this.selectedOnboardingId === activeId && this.rows.some(row => positiveId(row.onboardingId) === activeId)) {
           return this.loadDetail(activeId)
         }
         return null
@@ -362,9 +393,10 @@ export default {
       return this.refreshAfterVersionConflict(onboardingId)
     },
     refreshAfterVersionConflict(onboardingId) {
-      const activeId = onboardingId || this.selectedOnboardingId
+      const activeId = positiveId(onboardingId || this.selectedOnboardingId)
+      if (activeId !== this.selectedOnboardingId) return Promise.resolve(null)
       return this.loadList().then(() => {
-        if (activeId && this.rows.some(row => row.onboardingId === activeId)) {
+        if (activeId && activeId === this.selectedOnboardingId && this.rows.some(row => positiveId(row.onboardingId) === activeId)) {
           this.selectedOnboardingId = activeId
           return this.loadDetail(activeId)
         }
@@ -376,19 +408,29 @@ export default {
     },
     performStateAction(request, payload, successMessage) {
       if (!this.detail || this.actionLoading) return Promise.resolve(null)
-      const onboardingId = this.detail.onboardingId
+      const onboardingId = positiveId(this.detail.onboardingId)
+      if (!onboardingId || onboardingId !== this.selectedOnboardingId || payload.version !== this.detail.version) return Promise.resolve(null)
+      const scope = this.operationScope()
+      const target = { onboardingId, version: payload.version }
+      const operation = scope.begin("state-action", target)
+      const current = () => scope.isCurrent(operation, { onboardingId: this.selectedOnboardingId,
+        version: this.detail && this.detail.version })
+      const stillSelected = () => scope.isCurrent(operation) && onboardingId === this.selectedOnboardingId
       this.actionLoading = true
-      return request(onboardingId, payload)
+      return request(onboardingId, { ...payload })
         .then(response => {
+          if (!current()) return null
           const updated = response && response.data ? response.data : response
-          if (updated && updated.onboardingId === onboardingId) this.detail = updated
+          if (!updated || positiveId(updated.onboardingId) !== onboardingId) throw new Error("操作结果暂未确认，请刷新当前记录核对")
+          this.detail = updated
           if (this.$message) this.$message.success(successMessage)
           return this.loadList().then(() => {
-            if (this.selectedOnboardingId === onboardingId) return this.loadDetail(onboardingId)
+            if (stillSelected()) return this.loadDetail(onboardingId)
             return updated
           })
         })
         .catch(error => {
+          if (!stillSelected()) return null
           if (isOnboardingVersionConflict(error)) {
             if (this.$message) this.$message.warning("入职单已更新，正在加载最新版本")
             return this.refreshAfterVersionConflict(onboardingId)
@@ -396,7 +438,7 @@ export default {
           if (this.$message) this.$message.error((error && error.message) || "操作失败，请刷新后重试")
           return null
         })
-        .finally(() => { this.actionLoading = false })
+        .finally(() => { if (stillSelected()) this.actionLoading = false })
     },
     handleAction(value) {
       const action = typeof value === "string" ? value : value && value.key
@@ -420,15 +462,19 @@ export default {
         return this.performStateAction(restoreHrOnboarding, { version }, "已恢复入职单")
       }
       if (action === "CANCEL") {
+        const target = { onboardingId: positiveId(this.detail.onboardingId), version }
+        const scope = this.operationScope(), confirmation = scope.begin("state-confirm", target)
         return this.$prompt("请输入取消原因", "取消入职", {
           confirmButtonText: "确认取消",
           cancelButtonText: "暂不取消",
           inputType: "textarea",
           inputValidator: input => Boolean(input && input.trim()),
           inputErrorMessage: "取消原因不能为空"
-        }).then(({ value: reason }) => this.performStateAction(
-          cancelHrOnboarding, { version, reason: reason.trim() }, "已取消入职单"
-        )).catch(() => null)
+        }).then(({ value: reason }) => {
+          if (!scope.isCurrent(confirmation, { onboardingId: this.selectedOnboardingId,
+              version: this.detail && this.detail.version }) || !this.actionAllowed("CANCEL")) return null
+          return this.performStateAction(cancelHrOnboarding, { version, reason: reason.trim() }, "已取消入职单")
+        }).catch(() => null)
       }
       return Promise.resolve(null)
     }

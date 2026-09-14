@@ -94,7 +94,7 @@
           plain
           icon="el-icon-delete"
           size="mini"
-          :disabled="multiple || selectedContainsBuiltIn"
+          :disabled="multiple || selectedContainsBuiltIn || !listReady || loading"
           @click="handleDelete"
           v-hasPermi="['system:config:remove']"
         >删除</el-button>
@@ -124,7 +124,9 @@
     </div>
 
     <div class="table-card config-table-card">
-    <el-table v-loading="loading" :data="configList" @selection-change="handleSelectionChange">
+    <el-alert v-if="listError" :title="listError" type="error" :closable="false" />
+    <el-button v-if="listError" size="mini" @click="getList">重试当前查询</el-button>
+    <el-table ref="configTable" v-loading="loading" :data="configList" @selection-change="handleSelectionChange">
       <el-table-column type="selection" width="55" align="center" />
       <el-table-column label="参数主键" align="center" prop="configId" />
       <el-table-column label="参数名称" align="center" prop="configName" :show-overflow-tooltip="true" />
@@ -205,12 +207,25 @@
         </el-form-item>
         <el-form-item label="参数键值" prop="configValue">
           <el-input
+            v-if="form.sensitive"
             v-model="form.configValue"
             :type="form.sensitive ? 'password' : 'textarea'"
             :show-password="form.sensitive"
             :disabled="form.sensitive && !form.updateSensitiveValue"
             :placeholder="form.sensitive ? (form.updateSensitiveValue ? '请输入新的敏感值' : '留空表示保持原值') : '请输入参数键值'"
           />
+          <template v-else-if="configValueType === 'boolean'">
+            <el-switch v-if="hasBooleanValue" v-model="booleanConfigValue" active-text="开启" inactive-text="关闭" active-value="true" inactive-value="false" />
+            <el-radio-group v-else v-model="form.configValue"><el-radio label="true">开启</el-radio><el-radio label="false">关闭</el-radio></el-radio-group>
+          </template>
+          <el-select v-else-if="configValueType === 'enum' && enumOptions.length" v-model="form.configValue" placeholder="请选择参数值" class="config-value-control">
+            <el-option v-for="option in enumOptions" :key="option" :label="option" :value="option" />
+          </el-select>
+          <el-input v-else-if="configValueType === 'integer' || configValueType === 'decimal'" v-model="form.configValue" type="number" :step="configValueType === 'integer' ? '1' : 'any'" :min="numericRules.min" :max="numericRules.max" :placeholder="valuePlaceholder">
+            <template v-if="valueUnit" slot="append">{{ valueUnit }}</template>
+          </el-input>
+          <el-input v-else v-model="form.configValue" type="textarea" :rows="configValueType === 'json' ? 5 : 2" :placeholder="valuePlaceholder" />
+          <div v-if="!form.sensitive && numericRangeHint" class="sensitive-value-tip">{{ numericRangeHint }}</div>
         </el-form-item>
         <el-form-item label="系统内置" prop="configType">
           <el-radio-group v-model="form.configType" :disabled="form.configId != null && form.configType === 'Y'">
@@ -235,6 +250,8 @@
 
 <script>
 import { listConfig, getConfig, delConfig, addConfig, updateConfig, refreshCache, listConfigDescriptors } from "@/api/system/config"
+import { getSelectedDeptId } from "@/utils/shopContext"
+const { createUiOperationScope } = require("@/utils/uiOperationScope")
 import { confirmExportAction } from "@/utils/exportConfirm"
 
 export default {
@@ -244,6 +261,8 @@ export default {
     return {
       // 遮罩层
       loading: true,
+      listReady: false,
+      listError: "",
       // 选中数组
       ids: [],
       // 非单个禁用
@@ -308,15 +327,17 @@ export default {
         ],
         configValue: [
           { validator: (rule, value, callback) => {
-            if (this.form.sensitive && !this.form.updateSensitiveValue) return callback()
-            if (value == null || String(value).trim() === "") return callback(new Error("参数键值不能为空"))
-            callback()
-          }, trigger: "blur" }
+            this.validateConfigValue(rule, value, callback)
+          }, trigger: ["blur", "change"] }
         ]
       }
     }
   },
   computed: {
+    actorContextKey() {
+      const store = this.$store || {}
+      return String((store.getters || {}).id || "") + ":" + String(((store.state || {}).user || {}).sessionRevision || 0)
+    },
     descriptorByKey() {
       return (this.configDescriptors || []).find(item => item.configKey === this.form.configKey)
     },
@@ -335,6 +356,30 @@ export default {
     configValueType() {
       return this.form.valueType || "string"
     },
+    hasBooleanValue() {
+      return /^(true|false)$/i.test(String(this.form.configValue == null ? "" : this.form.configValue).trim())
+    },
+    booleanConfigValue: {
+      get() { return String(this.form.configValue).trim().toLowerCase() },
+      set(value) { this.$set(this.form, "configValue", value) }
+    },
+    numericRules() {
+      const result = {}
+      String(this.form.validationRule || "").split(";").forEach(part => {
+        const match = /^\s*(min|max)\s*=\s*([+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?)\s*$/.exec(part)
+        if (match) result[match[1]] = match[2]
+      })
+      return result
+    },
+    numericRangeHint() {
+      if (!["integer", "decimal"].includes(this.configValueType)) return ""
+      const { min, max } = this.numericRules
+      return min != null && max != null ? "范围：" + min + " 至 " + max : min != null ? "不得小于 " + min : max != null ? "不得大于 " + max : ""
+    },
+    valueUnit() {
+      const match = /单位(?:为|是|：|:)?\s*([^，。；;]+)/.exec(this.form.descriptorDescription || "")
+      return match ? match[1].trim() : ""
+    },
     enumOptions() {
       const match = String(this.form.validationRule || "").split(";").find(part => part.trim().startsWith("enum="))
       return match ? match.slice(match.indexOf("=") + 1).split(",").map(item => item.trim()).filter(Boolean) : []
@@ -351,24 +396,68 @@ export default {
       return ""
     }
   },
+  watch: { actorContextKey() { this.handleConfigContextChanged() } },
   created() {
-    listConfigDescriptors().then(response => {
-      this.configDescriptors = response.data || []
-    }).catch(() => {
-      this.configDescriptors = []
-    })
+    window.addEventListener("erp:dept-changed", this.handleConfigContextChanged)
+    this.loadDescriptors()
     this.getList()
   },
+  activated() {
+    this.configScope().activate()
+    if (this._refreshConfigOnActivate) { this._refreshConfigOnActivate = false; this.loadDescriptors(); this.getList() }
+  },
+  deactivated() {
+    this.configScope().deactivate()
+    this.loading = false
+    this.listReady = false
+    this.open = false
+    this._refreshConfigOnActivate = true
+  },
+  beforeDestroy() {
+    window.removeEventListener("erp:dept-changed", this.handleConfigContextChanged)
+    this.configScope().deactivate()
+  },
   methods: {
+    configScope() {
+      if (!this._configScope) this._configScope = createUiOperationScope(() => ({ actor: this.actorContextKey, dept: getSelectedDeptId(), route: this.$route && this.$route.path }))
+      return this._configScope
+    },
+    handleConfigContextChanged() {
+      this.configScope().invalidate()
+      this.configList = []
+      this.configDescriptors = []
+      this.open = false
+      this.listReady = false
+      this.loading = false
+      this.handleSelectionChange([])
+      if ((this.$store.getters || {}).id) { this.loadDescriptors(); this.getList() }
+    },
+    loadDescriptors() {
+      const scope = this.configScope(), token = scope.begin("descriptors")
+      return listConfigDescriptors().then(response => {
+        if (scope.isCurrent(token)) this.configDescriptors = response.data || []
+      }).catch(() => { if (scope.isCurrent(token)) this.configDescriptors = [] })
+    },
     /** 查询参数列表 */
     getList() {
+      const query = this.addDateRange(JSON.parse(JSON.stringify(this.queryParams)), [...this.dateRange])
+      const scope = this.configScope(), token = scope.begin("list", query)
+      this._configListToken = token
       this.loading = true
-      listConfig(this.addDateRange(this.queryParams, this.dateRange)).then(response => {
-          this.configList = response.rows
-          this.total = response.total
-          this.loading = false
-        }
-      )
+      this.listReady = false
+      this.listError = ""
+      this.configList = []
+      this.total = 0
+      this.handleSelectionChange([])
+      if (this.$refs.configTable) this.$refs.configTable.clearSelection()
+      return listConfig(query, { silentError: true }).then(response => {
+        if (!scope.isCurrent(token)) return
+        this.configList = Array.isArray(response.rows) ? response.rows : []
+        this.total = Number(response.total) || 0
+        this.listReady = true
+      }).catch(error => {
+        if (scope.isCurrent(token)) this.listError = error && error.message || "查询失败，请重试"
+      }).finally(() => { if (scope.isCurrent(token)) this.loading = false })
     },
     // 取消按钮
     cancel() {
@@ -447,7 +536,8 @@ export default {
       })
     },
     /** 删除按钮操作 */
-    handleDelete(row) {
+    handleDelete(row = {}) {
+      if (!this.listReady || this.loading || !this.configScope().isCurrent(this._configListToken)) return
       if (row && row.configType === "Y") {
         this.$modal.msgWarning("系统内置参数不能删除")
         return
@@ -456,10 +546,13 @@ export default {
         this.$modal.msgWarning("所选项目包含系统内置参数，不能删除")
         return
       }
-      const configIds = row.configId || this.ids
-      this.$modal.confirm('是否确认删除参数编号为"' + configIds + '"的数据项？').then(function() {
+      const configIds = row.configId ? [row.configId] : [...this.ids]
+      const scope = this.configScope(), token = scope.begin("delete", configIds)
+      return this.$modal.confirm('是否确认删除参数编号为"' + configIds + '"的数据项？').then(() => {
+        if (!scope.isCurrent(token)) return false
         return delConfig(configIds)
-      }).then(() => {
+      }).then(result => {
+        if (result === false || !scope.isCurrent(token)) return
         this.getList()
         this.$modal.msgSuccess("删除成功")
       }).catch(() => {})
@@ -494,13 +587,15 @@ export default {
       this.form.groupCode = descriptor.groupCode
       this.form.valueType = descriptor.valueType
       this.form.sensitiveFlag = descriptor.sensitive ? "Y" : "N"
+      this.$set(this.form, "sensitive", Boolean(descriptor.sensitive))
+      this.$set(this.form, "updateSensitiveValue", false)
       this.form.validationRule = descriptor.validationRule || ""
       this.form.displayOrder = descriptor.displayOrder
       this.form.descriptorDescription = descriptor.description
       if (this.form.sensitiveFlag === "Y") this.form.configValue = ""
     },
     validateConfigValue(rule, value, callback) {
-      if (this.form.sensitiveFlag === "Y" && (!value || value === "******")) {
+      if (this.form.sensitive && !this.form.updateSensitiveValue) {
         callback()
         return
       }
@@ -508,13 +603,27 @@ export default {
         callback(new Error("参数键值不能为空"))
         return
       }
-      if (this.configValueType === "integer" && !/^-?\d+$/.test(String(value).trim())) {
+      if (this.form.sensitive) { callback(); return }
+      if (this.configValueType === "boolean" && !/^(true|false)$/i.test(String(value).trim())) {
+        callback(new Error("请选择开启或关闭"))
+        return
+      }
+      if (this.configValueType === "enum" && this.enumOptions.length && !this.enumOptions.includes(String(value))) {
+        callback(new Error("请选择列表中的参数值"))
+        return
+      }
+      if (this.configValueType === "integer" && !/^[+-]?\d+$/.test(String(value).trim())) {
         callback(new Error("请输入合法整数"))
         return
       }
-      if (this.configValueType === "decimal" && !/^-?(?:\d+\.?\d*|\.\d+)$/.test(String(value).trim())) {
+      if (this.configValueType === "decimal" && !/^[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?$/.test(String(value).trim())) {
         callback(new Error("请输入合法数值"))
         return
+      }
+      if (["integer", "decimal"].includes(this.configValueType)) {
+        const numeric = Number(value), { min, max } = this.numericRules
+        if (min != null && numeric < Number(min)) { callback(new Error("参数值不能小于 " + min)); return }
+        if (max != null && numeric > Number(max)) { callback(new Error("参数值不能大于 " + max)); return }
       }
       if (this.configValueType === "json") {
         try {
@@ -573,5 +682,9 @@ export default {
   color: #909399;
   font-size: 12px;
   line-height: 1.5;
+}
+
+.config-value-control {
+  width: 100%;
 }
 </style>

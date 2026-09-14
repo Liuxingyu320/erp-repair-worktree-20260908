@@ -118,14 +118,14 @@ assert.ok(
 
 assert.ok(
   selectShopSource.includes("listShopTree({ silentError: true") &&
-    selectShopSource.includes("获取可选组织失败，请稍后重试"),
+    selectShopSource.includes("获取可选组织失败，已保留原选择，请点击刷新重试") && selectShopSource.includes('v-if="treeError"'),
   "mobile-critical shop selection should silence the global request toast and keep one page-level retryable error"
 )
 
 assert.ok(
   selectShopSource.includes("mobileNoBusinessAccess") &&
     selectShopSource.includes("当前账号暂无移动端可用门店或仓库权限") &&
-    selectShopSource.includes(":disabled=\"mobileNoBusinessAccess\""),
+    selectShopSource.includes(":disabled=\"mobileNoBusinessAccess || !treeReady || loading\""),
   "mobile organization selection should show a clear no-mobile-business-access state instead of looping on select-shop"
 )
 

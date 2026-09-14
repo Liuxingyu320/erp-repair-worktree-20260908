@@ -105,6 +105,34 @@
         where source_day_result_id = #{sourceDayResultId}
     </select>
 
+    <sql id="overtimeTransferProjection">
+ SELECT t.source_day_result_id,
+ SUM(CASE WHEN t.action='APPLY' THEN t.transfer_minutes WHEN t.action='REVERSE' THEN -t.transfer_minutes ELSE 0 END) transferred_minutes,
+ SUM(CASE WHEN t.action='APPLY' AND reversed.transfer_id IS NULL AND
+  (d.day_result_id IS NULL OR d.settled_at IS NULL OR NOT(d.row_version &lt;=> t.source_version)
+   OR NOT(d.schedule_id &lt;=> t.source_schedule_id) OR NOT(d.user_id &lt;=> t.user_id) OR NOT(d.shop_id &lt;=> t.shop_id)
+   OR NOT(d.business_date &lt;=> t.source_business_date) OR NOT(d.worked_minutes &lt;=> t.source_worked_minutes)
+   OR NOT(d.scheduled_minutes &lt;=> t.source_scheduled_minutes) OR NOT(d.settled_at &lt;=> t.source_settled_at)
+   OR COALESCE(s.status,'')&lt;&gt;'PUBLISHED' OR NOT(s.user_id &lt;=> t.user_id) OR NOT(s.shop_id &lt;=> t.shop_id)
+   OR NOT(s.business_date &lt;=> t.source_business_date)) THEN 1 ELSE 0 END) invalid_count
+ FROM oa_attendance_overtime_transfer t
+ LEFT JOIN oa_attendance_overtime_transfer reversed ON reversed.original_transfer_id=t.transfer_id AND reversed.action='REVERSE'
+ LEFT JOIN oa_attendance_day_result d ON d.day_result_id=t.source_day_result_id
+ LEFT JOIN oa_attendance_schedule s ON s.schedule_id=d.schedule_id
+ GROUP BY t.source_day_result_id
+    </sql>
+    <select id="selectNetSourceTransferred" resultType="int">
+      SELECT COALESCE(SUM(CASE WHEN action='APPLY' THEN transfer_minutes WHEN action='REVERSE' THEN -transfer_minutes ELSE 0 END),0)
+      FROM oa_attendance_overtime_transfer WHERE source_day_result_id=#{sourceDayResultId}
+    </select>
+    <select id="countInvalidSourceTransfers" resultType="int">
+      SELECT COALESCE(SUM(invalid_count),0) FROM (<include refid="overtimeTransferProjection"/>) sources WHERE source_day_result_id=#{sourceDayResultId}
+    </select>
+    <select id="lockMonthDayResults" resultType="long">
+      SELECT day_result_id FROM oa_attendance_day_result WHERE shop_id=#{shopId} AND business_date BETWEEN #{dateFrom} AND #{dateTo}
+      ORDER BY day_result_id FOR UPDATE
+    </select>
+
     <select id="selectNetTargetOffset" resultType="int">
         select coalesce(sum(case
                  when adjustment_action = 'APPLY' then adjustment_minutes
@@ -125,9 +153,10 @@
                         - coalesce(d.scheduled_minutes, 0), 0)
                     rawOvertimeMinutes,
                coalesce(c.used_minutes, 0) usedMinutes,
+               coalesce(ot.transferred_minutes,0) transferredMinutes,
                greatest(coalesce(d.worked_minutes, 0)
                         - coalesce(d.scheduled_minutes, 0), 0)
-                    - coalesce(c.used_minutes, 0) availableMinutes
+                    - coalesce(c.used_minutes, 0) - coalesce(ot.transferred_minutes,0) availableMinutes
         from oa_attendance_day_result d
         left join (
             select source_day_result_id,
@@ -138,13 +167,15 @@
             from oa_attendance_time_credit_adjustment
             group by source_day_result_id
         ) c on c.source_day_result_id = d.day_result_id
+        LEFT JOIN (<include refid="overtimeTransferProjection"/>) ot ON ot.source_day_result_id=d.day_result_id
         where d.shop_id = #{shopId}
           and d.user_id = #{userId}
           and d.business_date between #{monthStart} and #{targetDate}
           and d.settled_at is not null
+          AND COALESCE(ot.invalid_count,0)=0
           and greatest(coalesce(d.worked_minutes, 0)
                        - coalesce(d.scheduled_minutes, 0), 0)
-                &gt; coalesce(c.used_minutes, 0)
+                &gt; coalesce(c.used_minutes, 0) + coalesce(ot.transferred_minutes,0)
         order by d.business_date, d.day_result_id
     </select>
 

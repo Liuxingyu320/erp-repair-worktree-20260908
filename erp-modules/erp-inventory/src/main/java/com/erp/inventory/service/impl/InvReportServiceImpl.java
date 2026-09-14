@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 import com.erp.common.core.exception.ServiceException;
 import com.erp.inventory.domain.InvStock;
 import com.erp.inventory.domain.vo.InvReportProductOption;
+import com.erp.inventory.domain.vo.InvReportItemOption;
 import com.erp.inventory.domain.vo.InvReportSummary;
 import com.erp.inventory.mapper.InvReportMapper;
 import com.erp.inventory.service.IInvReportService;
@@ -51,9 +52,47 @@ public class InvReportServiceImpl extends InvBaseService implements IInvReportSe
         return reportMapper.selectReportProductOptions(query);
     }
 
+    @Override
+    public List<InvReportItemOption> selectItemOptions(String itemType, String keyword, Integer limit,
+            Long selectedShopDeptId)
+    {
+        InvStock query = new InvStock();
+        query.setItemType(itemType);
+        prepareReportQuery(query, selectedShopDeptId);
+        String normalized = normalizeKeyword(keyword);
+        query.getParams().put("keyword", normalized == null ? null
+                : normalized.replace("!", "!!").replace("%", "!%").replace("_", "!_"));
+        query.getParams().put("optionLimit", normalizeOptionLimit(limit));
+        return reportMapper.selectReportItemOptions(query);
+    }
+
+    private void normalizeMaterialFilter(InvStock query)
+    {
+        String type = query.getItemType() == null ? null : query.getItemType().trim();
+        if (type != null && type.isEmpty()) type = null;
+        if (type != null && !Set.of("product", "oe", "gift").contains(type))
+            throw new ServiceException("报表物料类型无效");
+        if (query.getProductId() != null)
+        {
+            if (query.getProductId() <= 0 || (type != null && !"product".equals(type))
+                    || (query.getItemId() != null && !query.getProductId().equals(query.getItemId())))
+                throw new ServiceException("报表商品与物料筛选不一致");
+            type = "product";
+            query.setItemId(query.getProductId());
+        }
+        if (query.getItemId() != null && (query.getItemId() <= 0 || type == null))
+            throw new ServiceException("报表物料编号必须同时指定有效类型");
+        // Existing categoryId is the product-category contract. Do not apply an equal OE/gift ID.
+        if (query.getCategoryId() != null && (query.getCategoryId() <= 0
+                || (type != null && !"product".equals(type))))
+            throw new ServiceException("商品分类不能用于其他物料类型");
+        query.setItemType(type);
+    }
+
     private InvStock prepareReportQuery(InvStock stock, Long selectedShopDeptId)
     {
         InvStock query = stock == null ? new InvStock() : stock;
+        normalizeMaterialFilter(query);
         validateBusinessDateRange(query);
         normalizeWarningStatus(query);
         query.setSelectedWarehouseId(selectedShopDeptId);

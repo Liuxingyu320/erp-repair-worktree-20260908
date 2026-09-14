@@ -117,6 +117,7 @@ final class OaSignPackageFileLifecycle
     {
         if (!TransactionSynchronizationManager.isSynchronizationActive())
         {
+            log.warn("签名PDF未进入事务回滚回调；调用者必须在同步失败时回收本次生成文件");
             return;
         }
         List<SignedPdfResult> snapshot = List.copyOf(results);
@@ -199,6 +200,9 @@ final class OaSignPackageFileLifecycle
             }
             catch (RuntimeException cleanupFailure)
             {
+                log.error("SIGN_FILE_CLEANUP_PENDING archive={} expectedHash={} signature={} signatureHash={}",
+                        result.getArchiveRelativePath(), result.getSignedPdfHash(),
+                        result.getSignatureArchiveRelativePath(), result.getSignatureHash(), cleanupFailure);
                 if (originalFailure != null)
                 {
                     originalFailure.addSuppressed(cleanupFailure);

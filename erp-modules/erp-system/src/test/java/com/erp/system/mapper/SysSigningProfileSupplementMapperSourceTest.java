@@ -14,6 +14,7 @@ class SysSigningProfileSupplementMapperSourceTest
     void mappersBindIdempotencyLockAndClosedProfileUpdate() throws Exception
     {
         Configuration configuration = new Configuration();
+        HealthCertificateMapperFragments.register(configuration);
         parse(configuration, "mapper/system/SysSignProfileSupplementAuditMapper.xml");
         parse(configuration, "mapper/system/SysUserProfileMapper.xml");
 

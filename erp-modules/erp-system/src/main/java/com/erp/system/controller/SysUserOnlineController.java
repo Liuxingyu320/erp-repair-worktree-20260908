@@ -75,10 +75,13 @@ public class SysUserOnlineController extends BaseController
             Collection<String> keys = scanResult.getKeys();
             if (keys != null)
             {
-                for (String key : keys)
+                List<String> keyList = new ArrayList<>(keys);
+                List<LoginUser> users = tokenService.getLoginUsersForDisplay(keyList);
+                for (int i = 0; i < keyList.size(); i++)
                 {
+                    String key = keyList.get(i);
                     String tokenId = extractTokenId(key);
-                    LoginUser user = tokenId == null ? null : tokenService.getLoginUserByCacheKey(key);
+                    LoginUser user = tokenId == null ? null : users.get(i);
                     if (user == null)
                     {
                         invalidSessionCount++;

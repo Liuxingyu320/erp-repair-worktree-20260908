@@ -107,12 +107,12 @@ assert.ok(!/\{\{[^}]*resolvedAddress/.test(mobileTemplate), 'readable address te
   .forEach(fragment => assert.ok(!mobilePage.includes(fragment), `mobile attendance must not expose obsolete site detail: ${fragment}`))
 assert.ok(mobilePage.includes('<mobile-attendance-leave') && mobilePage.includes('<mobile-attendance-correction'), 'mobile attendance must use real leave and correction panels')
 assert.ok(mobileLeave.includes('createAttendanceLeaveDraft(payload)') && mobileLeave.includes('submitAttendanceLeave(draft.leaveRequestId, draft.rowVersion)'), 'mobile leave must persist a server draft before submit')
-assert.ok(mobileLeave.includes('clientRequestId: newClientRequestId()') && mobileLeave.includes('payload.clientRequestId = this.form.clientRequestId'), 'mobile leave retries must reuse one stable clientRequestId until the server draft identity is returned')
-assert.ok(mobileLeave.includes('.catch(error => this.recoverSubmittedLeave(draft, error))') && mobileLeave.includes("['DRAFT', 'RETURNED'].includes(status)") && mobileLeave.includes('getAttendanceLeaveByClientRequest(clientRequestId)'), 'ambiguous leave submit failures must reconcile authoritative state before retrying a draft update')
+assert.ok(mobileLeave.includes('clientRequestId: newClientRequestId()') && mobileLeave.includes('payload.clientRequestId = operation.clientRequestId') && mobileLeave.includes('this.saveAttempt = attempt') && mobileLeave.includes('createAttendanceLeaveDraft(attempt.payload)'), 'mobile leave retries must reuse one stable clientRequestId until the server draft identity is returned')
+assert.ok(mobileLeave.includes('.catch(error => this.recoverSubmittedLeave(draft, error, operation))') && mobileLeave.includes("['DRAFT', 'RETURNED'].includes(status)") && mobileLeave.includes('getAttendanceLeaveByClientRequest(clientRequestId)'), 'ambiguous leave submit failures must reconcile authoritative state before retrying a draft update')
 assert.ok(mobileLeave.includes("detail.status || '').toUpperCase() === 'CANCELLED'") && mobileLeave.includes('撤回请求已提交，等待审批服务确认'), 'withdraw UI must not claim cancellation before the approval callback changes server status')
 assert.ok(mobileLeave.includes('uploadAttendanceLeaveAttachment') && mobileLeave.includes('getAttendanceLeaveAttachmentContent'), 'mobile leave must use private attachment APIs')
 assert.ok(mobileCorrection.includes('listAttendanceCorrectionEligibleSchedules') && mobileCorrection.includes('listAttendanceCorrectionEligiblePunchEvents'), 'correction forms must select immutable server schedules/events')
-assert.ok(mobileCorrection.includes('createAttendanceCorrectionDraft(payload)') && mobileCorrection.includes('submitAttendanceCorrection(draft.correctionRequestId, draft.rowVersion)'), 'mobile correction must persist a server draft before submit')
+assert.ok(mobileCorrection.includes('createAttendanceCorrectionDraft(payload)') && mobileCorrection.includes('submitAttendanceCorrection(attempt.id, row.rowVersion)') && mobileCorrection.includes('this.mergeCorrection(row)') && mobileCorrection.includes('getAttendanceCorrectionByClientRequest(attempt.clientRequestId)'), 'mobile correction must persist a server draft before submit')
 assert.ok(mobileCorrection.includes('v-model="form.targetPunchSlotKey"') && mobileCorrection.includes('targetPunchSlotKey: this.usesSlotTargeting ? this.form.targetPunchSlotKey : null') && mobileCorrection.includes('targetScheduleSegmentSnapshotId: this.usesSlotTargeting ? this.form.targetScheduleSegmentSnapshotId : null'), 'segmented correction must submit both immutable punch-slot identifiers')
 assert.ok(mobileCorrection.includes('v-else v-model="form.targetPunchType"'), 'continuous shifts must retain the legacy IN/OUT correction choice')
 assert.ok(mobileCorrection.includes('this.form.targetPunchSlotKey && this.form.targetScheduleSegmentSnapshotId') && mobileCorrection.includes('targetSegmentLabelSnapshot'), 'editing an old segmented draft must preserve its immutable slot even outside the eligible schedule range')
@@ -259,7 +259,7 @@ assert.ok(weeklySchedule.includes('未选择考勤地点') && weeklySchedule.inc
 assert.ok(weeklySchedule.includes('listAttendanceEmployeeOptions({ shopId,') && weeklySchedule.includes('keyword: this.employeeKeyword'), 'weekly scheduling must use the searchable shop-scoped attendance employee option endpoint')
 assert.ok(!weeklySchedule.includes('@/api/system/user'), 'attendance scheduling must not depend on system user-management permissions')
 assert.ok(weeklySchedule.includes("String(row.status || 'DRAFT').toUpperCase() === 'DRAFT'"), 'publishing must exclude schedules that are already immutable/published')
-assert.ok(weeklySchedule.includes('deleteAttendanceSchedule(existing.scheduleId, existing.rowVersion)'), 'clearing a draft cell must persist through the draft-only delete contract')
+assert.ok(weeklySchedule.includes('scheduleId: existing.scheduleId') && weeklySchedule.includes('rowVersion: existing.rowVersion') && weeklySchedule.includes('deleteAttendanceSchedule(deletion.scheduleId, deletion.rowVersion)'), 'clearing a draft cell must persist through the captured draft-only ID and version delete contract')
 assert.ok(dayResultPage.includes('listAttendanceDayResults(params)') && dayResultPage.includes('getAttendanceDayResultPreflight'), 'day-result management must query real scoped results and preflight')
 assert.ok(dayResultPage.includes('this.refreshPreflight().then') && dayResultPage.includes('settleAttendanceDayResults({'), 'day settlement must refresh preflight before invoking the settlement command')
 assert.ok(dayResultPage.includes("v-hasPermi=\"['oa:attendance:day:settle']\"") && dayResultPage.includes('recalculate: Boolean(recalculate)'), 'settlement and explicit recalculation must remain permission-gated and distinct')
@@ -296,5 +296,22 @@ const availableRouteSet = new Set(['/oa/attendance-v2', '/mobile/attendance'])
   assert.strictEqual(mobile.location.query.tab, tab)
   assert.strictEqual(mobile.location.query.businessId, '1001')
 })
+
+
+
+// A stalled upload/evidence connection must eventually hand control back to
+// the pending-result/retry UI. Exercise the exported API configuration.
+{
+  const vm = require('vm')
+  const apiRuntime = {
+    request: config => config,
+    FormData: class { append() {} }
+  }
+  vm.runInNewContext(api.replace(/import[^\n]+\n/, '').replace(/export function/g, 'function').replace(/export\s*\{[^}]+\}/g, ''), apiRuntime)
+  const upload = apiRuntime.submitAttendancePunch({})
+  const evidence = apiRuntime.getPunchEvidenceContent(1)
+  assert.ok(upload.timeout > 0 && upload.timeout < 180000, 'upload must time out before a new challenge window is needed')
+  assert.ok(evidence.timeout > 0 && evidence.timeout < 180000, 'private evidence must not hold page loading forever')
+}
 
 console.log('attendance V2 frontend contract tests passed')

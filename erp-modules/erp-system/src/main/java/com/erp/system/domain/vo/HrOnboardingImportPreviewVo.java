@@ -23,6 +23,7 @@ public class HrOnboardingImportPreviewVo
     private List<RowVo> rows = new ArrayList<>();
     private List<Map<String, Object>> errors = new ArrayList<>();
 
+    @com.fasterxml.jackson.databind.annotation.JsonSerialize(using = com.fasterxml.jackson.databind.ser.std.ToStringSerializer.class)
     public Long getBatchId() { return batchId; } public void setBatchId(Long v) { batchId=v; }
     public String getBatchNo() { return batchNo; } public void setBatchNo(String v) { batchNo=v; }
     public String getFileName() { return fileName; } public void setFileName(String v) { fileName=v; }
@@ -51,7 +52,8 @@ public class HrOnboardingImportPreviewVo
         private String employeeCategory; private String expectedEntryDateText;
         private String emergencyContactPhoneMasked;
         private String resultCode; private String resultMessage; private Long resultOnboardingId;
-        public Long getRowId(){return rowId;} public void setRowId(Long v){rowId=v;}
+        @com.fasterxml.jackson.databind.annotation.JsonSerialize(using = com.fasterxml.jackson.databind.ser.std.ToStringSerializer.class)
+    public Long getRowId(){return rowId;} public void setRowId(Long v){rowId=v;}
         public Integer getSourceRowNumber(){return sourceRowNumber;} public void setSourceRowNumber(Integer v){sourceRowNumber=v;}
         public String getCategory(){return category;} public void setCategory(String v){category=v;}
         public String getRowStatus(){return rowStatus;} public void setRowStatus(String v){rowStatus=v;}
@@ -64,8 +66,10 @@ public class HrOnboardingImportPreviewVo
         public String getWarningCodes(){return warningCodes;} public void setWarningCodes(String v){warningCodes=v;}
         public String getErrorCodes(){return errorCodes;} public void setErrorCodes(String v){errorCodes=v;}
         public String getCandidateSummary(){return candidateSummary;} public void setCandidateSummary(String v){candidateSummary=v;}
-        public Long getCandidateUserId(){return candidateUserId;} public void setCandidateUserId(Long v){candidateUserId=v;}
-        public Long getCandidateOnboardingId(){return candidateOnboardingId;} public void setCandidateOnboardingId(Long v){candidateOnboardingId=v;}
+        @com.fasterxml.jackson.databind.annotation.JsonSerialize(using = com.fasterxml.jackson.databind.ser.std.ToStringSerializer.class)
+    public Long getCandidateUserId(){return candidateUserId;} public void setCandidateUserId(Long v){candidateUserId=v;}
+        @com.fasterxml.jackson.databind.annotation.JsonSerialize(using = com.fasterxml.jackson.databind.ser.std.ToStringSerializer.class)
+    public Long getCandidateOnboardingId(){return candidateOnboardingId;} public void setCandidateOnboardingId(Long v){candidateOnboardingId=v;}
         public String getCompanyName(){return companyName;} public void setCompanyName(String v){companyName=v;}
         public String getDeptLevel1Name(){return deptLevel1Name;} public void setDeptLevel1Name(String v){deptLevel1Name=v;}
         public String getDeptLevel2Name(){return deptLevel2Name;} public void setDeptLevel2Name(String v){deptLevel2Name=v;}
@@ -77,6 +81,7 @@ public class HrOnboardingImportPreviewVo
         public String getEmergencyContactPhoneMasked(){return emergencyContactPhoneMasked;} public void setEmergencyContactPhoneMasked(String v){emergencyContactPhoneMasked=v;}
         public String getResultCode(){return resultCode;} public void setResultCode(String v){resultCode=v;}
         public String getResultMessage(){return resultMessage;} public void setResultMessage(String v){resultMessage=v;}
-        public Long getResultOnboardingId(){return resultOnboardingId;} public void setResultOnboardingId(Long v){resultOnboardingId=v;}
+        @com.fasterxml.jackson.databind.annotation.JsonSerialize(using = com.fasterxml.jackson.databind.ser.std.ToStringSerializer.class)
+    public Long getResultOnboardingId(){return resultOnboardingId;} public void setResultOnboardingId(Long v){resultOnboardingId=v;}
     }
 }

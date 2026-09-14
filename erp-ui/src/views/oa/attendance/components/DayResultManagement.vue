@@ -1,5 +1,6 @@
 <template>
   <section class="attendance-module day-result-management">
+    <overtime-transfer-dialog :open="overtimeTransferOpen" :source="overtimeTransferSource" @close="overtimeTransferOpen = false" @changed="handleLoad" />
     <el-alert
       v-if="!validStore"
       title="请先切换到需要查看或结算考勤的门店"
@@ -165,7 +166,8 @@
               size="mini"
               @click="openTimeCredit(scope.row)"
             >加班抵扣</el-button>
-            <span v-if="!hasRemainingWorkIssue(scope.row) && !hasTimeCreditAction(scope.row)">-</span>
+            <el-button v-if="scope.row.settledAt" v-hasPermi="['oa:attendance:leave:balance:convert']" type="text" size="mini" @click="overtimeTransferSource = scope.row; overtimeTransferOpen = true">核定转休</el-button>
+            <span v-if="!hasRemainingWorkIssue(scope.row) && !hasTimeCreditAction(scope.row) && !scope.row.settledAt">-</span>
           </template>
         </el-table-column>
         <el-table-column label="结算时间" width="145"><template slot-scope="scope">{{ dateTime(scope.row.settledAt) }}</template></el-table-column>
@@ -399,9 +401,11 @@ const ISSUE_LABELS = Object.freeze({
 
 export default {
   name: 'AttendanceDayResultManagement',
+  components: { OvertimeTransferDialog: () => import('./OvertimeTransferDialog.vue') },
   props: { shopContext: { type: Object, default: () => ({}) } },
   data() {
     return {
+      overtimeTransferOpen: false, overtimeTransferSource: {},
       loading: false,
       employeeLoading: false,
       settling: false,

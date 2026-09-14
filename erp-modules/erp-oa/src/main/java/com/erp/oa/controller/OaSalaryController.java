@@ -99,6 +99,17 @@ public class OaSalaryController extends OaBaseController
         return success(salaryService.calculateSalary(shopDeptId, salaryMonth, resolveShopDeptId(request)));
     }
 
+    /** Personal export always derives the user from the authenticated session. */
+    @RequiresPermissions("oa:salary:export")
+    @Log(title = "我的工资记录", businessType = BusinessType.EXPORT)
+    @PostMapping("/export/my")
+    public void exportMy(HttpServletResponse response, OaSalaryRecord record, HttpServletRequest request)
+    {
+        List<OaSalaryRecord> list = salaryService.selectMyRecords(record, resolveShopDeptId(request));
+        ExcelUtil<OaSalaryRecord> util = new ExcelUtil<>(OaSalaryRecord.class);
+        util.exportExcel(response, list, "我的工资记录");
+    }
+
     @RequiresPermissions("oa:salary:export")
     @Log(title = "工资记录", businessType = BusinessType.EXPORT)
     @PostMapping("/export")

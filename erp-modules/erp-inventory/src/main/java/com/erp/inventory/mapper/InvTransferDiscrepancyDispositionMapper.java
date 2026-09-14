@@ -17,4 +17,8 @@ public interface InvTransferDiscrepancyDispositionMapper
     List<InvTransferDiscrepancyDisposition> selectByRequestId(
             @Param("discrepancyId") Long discrepancyId,
             @Param("requestId") String requestId);
+
+    List<InvTransferDiscrepancyDisposition> selectByRequestIdForUpdate(
+            @Param("discrepancyId") Long discrepancyId,
+            @Param("requestId") String requestId);
 }

@@ -341,6 +341,7 @@ const MOBILE_FORM_CONFIG = {
   sales: {
     title: "销售单",
     idKey: "orderId",
+    passthroughFields: ["version"],
     createLabel: "新建销售",
     submitModes: [
       { label: "保存草稿", action: "save" },
@@ -350,15 +351,20 @@ const MOBILE_FORM_CONFIG = {
       { key: "customerId", label: "客户", type: "entity-picker", entity: "customer", required: true, requiredUnless: { key: "customerName" }, fallbackLabelKey: "customerName", quickCreate: true },
       {
         key: "warehouseId",
-        label: "出库仓库",
+        label: "默认出库仓库（仅填空行）",
         type: "entity-picker",
         entity: "warehouse",
         purpose: "deliverySource",
-        required: true
+        salesWarehouseDefault: true,
+        required: false
       },
       { key: "orderTitle", label: "销售标题", required: true },
       { key: "orderDate", label: "销售日期", type: "date" },
-      createLineItemsField("销售明细", { allowedItemTypes: ["product", "gift"] }),
+      Object.assign(createLineItemsField("销售明细", { allowedItemTypes: ["product", "gift"] }), {
+        itemFields: createLineItemsField("销售明细", { allowedItemTypes: ["product", "gift"] }).itemFields.concat([
+          { key: "warehouseId", label: "出库仓库", type: "entity-picker", entity: "warehouse", purpose: "deliverySource", inheritFormField: "warehouseId" }
+        ])
+      }),
       { key: "remark", label: "备注", type: "textarea" }
     ]
   },
@@ -397,7 +403,7 @@ const MOBILE_FORM_CONFIG = {
       { key: "returnTitle", label: "退货主题", required: true, maxlength: 128 },
       { key: "customerName", label: "客户", type: "readonly", required: true },
       { key: "shopDeptId", label: "退货门店", type: "context-dept", required: true },
-      createReturnLineItemsField(),
+      Object.assign(createReturnLineItemsField(), { selectionScoped: true }),
       { key: "remark", label: "备注", type: "textarea" }
     ]
   },
@@ -421,7 +427,7 @@ const MOBILE_FORM_CONFIG = {
         { label: "运输", value: "transport" },
         { label: "其他", value: "other" }
       ] },
-      createReturnLineItemsField(),
+      Object.assign(createReturnLineItemsField(), { selectionScoped: true }),
       { key: "remark", label: "备注", type: "textarea" }
     ]
   },
@@ -492,7 +498,7 @@ const MOBILE_FORM_CONFIG = {
       { key: "oeItemId", label: "固定资产OE", type: "entity-picker", entity: "fixedAssetOe", required: true },
       { key: "repairQuantity", label: "坏掉数量", type: "number", required: true },
       { key: "faultDescription", label: "破损说明", type: "textarea", required: true },
-      { key: "imageUrls", label: "图片/附件", type: "image-upload", limit: 5, fileSize: 5, accept: "image/*", capture: "environment" },
+      { key: "imageUrls", label: "图片/附件", type: "image-upload", action: "/oa/fixedAsset/repair/image/upload", limit: 5, fileSize: 5, accept: "image/*", capture: "environment", deleteOnRemove: false },
       { key: "remark", label: "备注", type: "textarea" }
     ]
   }

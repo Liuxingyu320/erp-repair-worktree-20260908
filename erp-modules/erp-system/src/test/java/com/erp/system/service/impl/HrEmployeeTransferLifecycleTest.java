@@ -69,6 +69,15 @@ class HrEmployeeTransferLifecycleTest
     @BeforeEach
     void setUp()
     {
+        var servletRequest = new org.springframework.mock.web.MockHttpServletRequest();
+        servletRequest.addHeader(com.erp.common.core.constant.SecurityConstants.AUTHORIZATION_HEADER, "Bearer test-transfer");
+        org.springframework.web.context.request.RequestContextHolder.setRequestAttributes(
+                new org.springframework.web.context.request.ServletRequestAttributes(servletRequest));
+        var login = new com.erp.system.api.model.LoginUser();
+        login.setUserid(88L);
+        login.setPermissions(Set.of("hr:employee:transfer", "hr:employee:salary:edit"));
+        com.erp.common.core.context.SecurityContextHolder.set(
+                com.erp.common.core.constant.SecurityConstants.LOGIN_USER, login);
         configMapper = mock(SysConfigMapper.class);
         profileMapper = mock(SysUserProfileMapper.class);
         actionMapper = mock(SysHrLifecycleActionMapper.class);
@@ -81,9 +90,16 @@ class HrEmployeeTransferLifecycleTest
         service = new HrLifecycleServiceImpl(configMapper, profileMapper, actionMapper,
                 outboxMapper, mock(SysHrRenewalGuardMapper.class), postMapper,
                 deptMapper, userMapper, userPostMapper, userShopService,
-                JsonMapper.builder().findAndAddModules().build());
+                JsonMapper.builder().findAndAddModules().build(), org.mockito.Mockito.mock(com.erp.system.service.impl.HrSalarySourceService.class));
         ReflectionTestUtils.setField(service, "clock", Clock.fixed(
                 Instant.parse("2026-12-31T16:30:00Z"), ZoneId.of("UTC")));
+    }
+
+    @org.junit.jupiter.api.AfterEach
+    void clearLogin()
+    {
+        com.erp.common.core.context.SecurityContextHolder.remove();
+        org.springframework.web.context.request.RequestContextHolder.resetRequestAttributes();
     }
 
     @Test
@@ -462,6 +478,59 @@ class HrEmployeeTransferLifecycleTest
         when(outboxMapper.insertOutbox(any())).thenReturn(1);
     }
 
+    @Test
+    void ordinaryTransferKeepsServerSalaryAndDoesNotMoveSalarySource()
+    {
+        stubFreshTransfer();
+        HrEmployeeTransferRequest request = validRequest();
+        request.setAdjustSalary(false); // Existing client amounts must not overwrite the locked profile.
+        assertThat(confirm(request, 88L)).isEqualTo(801L);
+        var snapshot = ArgumentCaptor.forClass(HrEmployeeSigningSnapshot.class);
+        verify(profileMapper).updateTransferProfile(snapshot.capture(), eq("配置HR"));
+        assertThat(snapshot.getValue().getSalaryTotal()).isEqualByComparingTo("9000.00");
+        assertThat(snapshot.getValue().getSalaryVersion()).isEqualTo("CURRENT-2026");
+        org.mockito.Mockito.verifyNoInteractions((HrSalarySourceService) ReflectionTestUtils.getField(service, "salarySources"));
+        verify(outboxMapper).insertOutbox(any());
+    }
+
+    @Test
+    void unchangedAdjustmentKeepsSalarySourceEvenWithDifferentClientVersion()
+    {
+        stubFreshTransfer();
+        HrEmployeeTransferRequest request = validRequest();
+        HrEmployeeSigningSnapshot before = currentSnapshot();
+        request.setBaseSalary(before.getBaseSalary()); request.setPostSalary(before.getPostSalary());
+        request.setFieldAllowance(before.getFieldAllowance()); request.setPerformanceSalary(before.getPerformanceSalary());
+        request.setSalaryTotal(before.getSalaryTotal()); request.setSalaryVersion("UNTRUSTED-NEW");
+        assertThat(confirm(request, 88L)).isEqualTo(801L);
+        var snapshot = ArgumentCaptor.forClass(HrEmployeeSigningSnapshot.class);
+        verify(profileMapper).updateTransferProfile(snapshot.capture(), eq("配置HR"));
+        assertThat(snapshot.getValue().getSalaryVersion()).isEqualTo("CURRENT-2026");
+        org.mockito.Mockito.verifyNoInteractions((HrSalarySourceService) ReflectionTestUtils.getField(service, "salarySources"));
+    }
+
+    @Test
+    void actualAdjustmentStillUsesExistingSalarySourceService()
+    {
+        stubFreshTransfer();
+        assertThat(confirm(validRequest(), 88L)).isEqualTo(801L);
+        verify((HrSalarySourceService) ReflectionTestUtils.getField(service, "salarySources"))
+                .recordChange(eq(9L), eq("TRANSFER"), eq(801L), any(), any(), eq(LocalDate.of(2027, 1, 1)), eq(88L), eq("配置HR"));
+    }
+
+    @Test
+    void replayCannotHideARecordedSalaryAdjustmentByOmittingTheFlag() throws Exception
+    {
+        HrEmployeeTransferRequest request = validRequest();
+        when(configMapper.selectConfiguredSignHrUserId()).thenReturn(88L);
+        when(profileMapper.selectSigningSnapshotByUserIdForUpdate(9L)).thenReturn(transferredSnapshot(request));
+        when(actionMapper.selectByRequestIdForUpdate(request.getRequestId())).thenReturn(completedTransferAction(request));
+        request.setAdjustSalary(false);
+        assertThatThrownBy(() -> confirm(request, 88L)).hasMessageContaining("payload不一致");
+        verify(profileMapper, never()).updateTransferProfile(any(), any());
+        verify(outboxMapper, never()).insertOutbox(any());
+    }
+
     private void stubTransferBeforeWrites()
     {
         when(configMapper.selectConfiguredSignHrUserId()).thenReturn(88L);
@@ -620,7 +689,7 @@ class HrEmployeeTransferLifecycleTest
         snapshot.setFieldAllowance(request.getFieldAllowance());
         snapshot.setPerformanceSalary(request.getPerformanceSalary());
         snapshot.setSalaryTotal(request.getSalaryTotal());
-        snapshot.setSalaryVersion(request.getSalaryVersion());
+        // A transfer preserves the server-owned display version.
         snapshot.setTransferEffectiveDate(request.getEffectiveDate());
         return snapshot;
     }
@@ -641,6 +710,7 @@ class HrEmployeeTransferLifecycleTest
     private HrEmployeeTransferRequest validRequest()
     {
         HrEmployeeTransferRequest request = new HrEmployeeTransferRequest();
+        request.setAdjustSalary(true);
         request.setRequestId("transfer-request-1");
         request.setEffectiveDate(LocalDate.of(2027, 1, 1));
         request.setTargetDeptId(30L);

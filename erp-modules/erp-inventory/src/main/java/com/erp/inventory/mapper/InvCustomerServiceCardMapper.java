@@ -1,6 +1,7 @@
 package com.erp.inventory.mapper;
 
 import java.util.Date;
+import com.erp.inventory.domain.vo.InvCustomerServiceRecordQuery;
 import java.util.List;
 import org.apache.ibatis.annotations.Param;
 import com.erp.inventory.domain.InvCustomerServiceChangeLog;
@@ -36,6 +37,9 @@ public interface InvCustomerServiceCardMapper
     Long selectRecordIdByRequestKey(@Param("customerId") Long customerId,
             @Param("requestKey") String requestKey);
     List<InvCustomerServiceRecord> selectRecords(Long customerId);
+    Long selectRecordSnapshotMaxId(InvCustomerServiceRecordQuery query);
+    long countRecordHistory(InvCustomerServiceRecordQuery query);
+    List<InvCustomerServiceRecord> selectRecordHistoryPage(InvCustomerServiceRecordQuery query);
     int touchLastVisit(@Param("customerId") Long customerId,
             @Param("serviceDate") Date serviceDate,
             @Param("updateBy") String updateBy);

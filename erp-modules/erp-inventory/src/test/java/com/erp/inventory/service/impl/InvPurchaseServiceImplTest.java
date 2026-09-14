@@ -10,10 +10,12 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.AfterEach;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
+import java.util.function.Supplier;
 import com.erp.common.core.exception.ServiceException;
 import com.erp.common.core.context.SecurityContextHolder;
 import com.erp.inventory.constant.InvStatusConstants;
@@ -99,7 +101,7 @@ class InvPurchaseServiceImplTest
         InvPurchaseServiceImpl service = purchaseService(Map.of(10L, "STORE"));
         InvReceiveRequest request = receiveRequest(10L);
 
-        assertThatThrownBy(() -> service.receivePurchase(1L, request, 10L))
+        assertThatThrownBy(() -> service.receivePurchase(1L, request, 10L, "receive-ut-store"))
                 .isInstanceOf(ServiceException.class)
                 .hasMessageContaining("请选择仓库");
     }
@@ -114,7 +116,7 @@ class InvPurchaseServiceImplTest
         ReflectionTestUtils.setField(service, "purchaseDetailMapper", new EmptyPurchaseDetailMapper());
         InvReceiveRequest request = receiveRequest(10L);
 
-        assertThatThrownBy(() -> service.receivePurchase(1L, request, 20L))
+        assertThatThrownBy(() -> service.receivePurchase(1L, request, 20L, "receive-ut-store-stock"))
                 .isInstanceOf(ServiceException.class)
                 .hasMessageContaining("收货仓库必须为当前仓库");
     }
@@ -129,7 +131,7 @@ class InvPurchaseServiceImplTest
         ReflectionTestUtils.setField(service, "purchaseDetailMapper", new EmptyPurchaseDetailMapper());
         InvReceiveRequest request = receiveRequest(30L);
 
-        assertThatThrownBy(() -> service.receivePurchase(1L, request, 20L))
+        assertThatThrownBy(() -> service.receivePurchase(1L, request, 20L, "receive-ut-other-wh"))
                 .isInstanceOf(ServiceException.class)
                 .hasMessageContaining("收货仓库必须为当前仓库");
     }
@@ -150,7 +152,7 @@ class InvPurchaseServiceImplTest
         InvReceiveRequest request = receiveRequest(20L);
         request.setArrivedTime(null);
 
-        assertThatThrownBy(() -> service.receivePurchase(1L, request, 20L))
+        assertThatThrownBy(() -> service.receivePurchase(1L, request, 20L, "receive-ut-no-time"))
                 .isInstanceOf(ServiceException.class)
                 .hasMessageContaining("实际到货时间不能为空");
         verifyNoInteractions(detailMapper);
@@ -297,7 +299,6 @@ class InvPurchaseServiceImplTest
         ReflectionTestUtils.setField(service, "purchaseOrderMapper", new FakePurchaseOrderMapper(existing));
         ReflectionTestUtils.setField(service, "purchaseDetailMapper", new EmptyPurchaseDetailMapper());
         FakeProductMapper productMapper = new FakeProductMapper(outsideProduct);
-        ReflectionTestUtils.setField(service, "productMapper", productMapper);
         InventoryItemResolver itemResolver = new InventoryItemResolver();
         ReflectionTestUtils.setField(itemResolver, "productMapper", productMapper);
         ReflectionTestUtils.setField(service, "itemResolver", itemResolver);
@@ -467,12 +468,17 @@ class InvPurchaseServiceImplTest
             return 1;
         }).when(receiptBatchDetailMapper).insertInvReceiptBatchDetail(org.mockito.ArgumentMatchers.any());
         ReflectionTestUtils.setField(service, "receiptBatchDetailMapper", receiptBatchDetailMapper);
+        ReflectionTestUtils.setField(service, "qualityCommandExecutor", passthroughExecutor());
 
         Date actualArrival = new Date(1_752_637_800_000L);
         InvReceiveRequest receiveRequest = receiveRequest(20L, 501L,
                 "4.00");
         receiveRequest.setArrivedTime(actualArrival);
-        service.receivePurchase(1L, receiveRequest, 20L);
+        com.erp.inventory.domain.dto.InvPurchaseReceiveResult result =
+                service.receivePurchase(1L, receiveRequest, 20L, "receive-bind-01");
+        assertThat(result.getRequestId()).isEqualTo("receive-bind-01");
+        assertThat(result.getReceiptBatchId()).isEqualTo(601L);
+        assertThat(result.getReceivedQuantity()).isEqualByComparingTo("4.00");
 
         assertThat(inboundRecordMapper.insertedRecords).hasSize(1);
         assertThat(ReflectionTestUtils.getField(inboundRecordMapper.insertedRecords.get(0), "purchaseDetailId"))
@@ -676,6 +682,14 @@ class InvPurchaseServiceImplTest
         product.setPurchasePrice(new BigDecimal(purchasePrice));
         product.setStatus("0");
         return product;
+    }
+
+    private static InvQualityCommandExecutor passthroughExecutor()
+    {
+        InvQualityCommandExecutor executor = mock(InvQualityCommandExecutor.class);
+        when(executor.execute(any(), any(), any(), any(), any(), any(), any()))
+                .thenAnswer(call -> ((Supplier<?>) call.getArgument(6)).get());
+        return executor;
     }
 
     private static InvPurchaseServiceImpl purchaseService(Map<Long, String> deptTypes)
@@ -1031,6 +1045,12 @@ class InvPurchaseServiceImplTest
         public List<InvInboundRecord> selectPendingInvInboundRecordByOrderId(Long orderId)
         {
             return Collections.emptyList();
+        }
+
+        @Override
+        public List<InvInboundRecord> selectByOrderIdForUpdate(Long orderId)
+        {
+            return insertedRecords;
         }
 
         @Override

@@ -1,6 +1,7 @@
 <template>
   <div>
-    <el-tabs type="border-card">
+    <el-alert v-if="parseError || textOnly" :title="parseError || '此规则保留原文，请在任务表单使用文本编辑；保存时由服务端校验'" :type="parseError ? 'error' : 'info'" :closable="false" />
+    <el-tabs v-if="!textOnly && !parseError" type="border-card">
       <el-tab-pane label="秒" v-if="shouldHide('second')">
         <CrontabSecond
           @update="updateCrontabValue"
@@ -104,7 +105,7 @@
       <CrontabResult :ex="crontabValueString"></CrontabResult>
 
       <div class="pop_btn">
-        <el-button size="small" type="primary" @click="submitFill">确定</el-button>
+        <el-button size="small" type="primary" :disabled="Boolean(parseError)" @click="submitFill">确定</el-button>
         <el-button size="small" type="warning" @click="clearCron">重置</el-button>
         <el-button size="small" @click="hidePopup">取消</el-button>
       </div>
@@ -122,11 +123,17 @@ import CrontabWeek from "./week.vue"
 import CrontabYear from "./year.vue"
 import CrontabResult from "./result.vue"
 
+const { parseCronExpression, serializeCronModel } = require("@/utils/cronExpression")
+
 export default {
   data() {
     return {
       tabTitles: ["秒", "分钟", "小时", "日", "月", "周", "年"],
       tabActive: 0,
+      parseError: "",
+      textOnly: false,
+      originalExpression: "",
+      edited: false,
       myindex: 0,
       crontabValueObj: {
         second: "*",
@@ -147,31 +154,25 @@ export default {
       return true
     },
     resolveExp() {
-      // 反解析 表达式
-      if (this.expression) {
-        let arr = this.expression.split(" ")
-        if (arr.length >= 6) {
-          //6 位以上是合法表达式
-          let obj = {
-            second: arr[0],
-            min: arr[1],
-            hour: arr[2],
-            day: arr[3],
-            month: arr[4],
-            week: arr[5],
-            year: arr[6] ? arr[6] : "",
-          }
-          this.crontabValueObj = {
-            ...obj,
-          }
-          for (let i in obj) {
-            if (obj[i]) this.changeRadio(i, obj[i])
-          }
-        }
-      } else {
-        // 没有传入的表达式 则还原
-        this.clearCron()
-      }
+      if (!this.expression) { this.clearCron(); return }
+      const parsed = parseCronExpression(this.expression)
+      this.originalExpression = this.expression
+      this.edited = false
+      this.parseError = parsed.error
+      this.textOnly = !parsed.editable
+      if (!parsed.valid) return
+      this.hydrateCron(parsed.model)
+    },
+    hydrateCron(model) {
+      const revision = (this._hydrationRevision || 0) + 1
+      this._hydrationRevision = revision
+      this._hydrating = true
+      this.crontabValueObj = { ...model }
+      this.$nextTick(() => {
+        if (this._hydrationRevision !== revision) return
+        Object.keys(model).forEach(key => this.changeRadio(key, model[key]))
+        this.$nextTick(() => { if (this._hydrationRevision === revision) this._hydrating = false })
+      })
     },
     // tab切换值
     tabCheck(index) {
@@ -179,12 +180,10 @@ export default {
     },
     // 由子组件触发，更改表达式组成的字段值
     updateCrontabValue(name, value, from) {
-      "updateCrontabValue", name, value, from
+      if (this._hydrating || this.textOnly || this.parseError) return
+      this.edited = true
       this.crontabValueObj[name] = value
-      if (from && from !== name) {
-        console.log(`来自组件 ${from} 改变了 ${name} ${value}`)
-        this.changeRadio(name, value)
-      }
+      if (from && from !== name) this.changeRadio(name, value)
     },
     // 赋值到组件
     changeRadio(name, value) {
@@ -201,15 +200,15 @@ export default {
           let indexArr = value.split("-")
           isNaN(indexArr[0])
             ? (this.$refs[refName].cycle01 = 0)
-            : (this.$refs[refName].cycle01 = indexArr[0])
-          this.$refs[refName].cycle02 = indexArr[1]
+            : (this.$refs[refName].cycle01 = Number(indexArr[0]))
+          this.$refs[refName].cycle02 = Number(indexArr[1])
           insValue = 2
         } else if (value.indexOf("/") > -1) {
           let indexArr = value.split("/")
           isNaN(indexArr[0])
             ? (this.$refs[refName].average01 = 0)
-            : (this.$refs[refName].average01 = indexArr[0])
-          this.$refs[refName].average02 = indexArr[1]
+            : (this.$refs[refName].average01 = Number(indexArr[0]))
+          this.$refs[refName].average02 = Number(indexArr[1])
           insValue = 3
         } else {
           insValue = 4
@@ -224,21 +223,21 @@ export default {
           let indexArr = value.split("-")
           isNaN(indexArr[0])
             ? (this.$refs[refName].cycle01 = 0)
-            : (this.$refs[refName].cycle01 = indexArr[0])
-          this.$refs[refName].cycle02 = indexArr[1]
+            : (this.$refs[refName].cycle01 = Number(indexArr[0]))
+          this.$refs[refName].cycle02 = Number(indexArr[1])
           insValue = 3
         } else if (value.indexOf("/") > -1) {
           let indexArr = value.split("/")
           isNaN(indexArr[0])
             ? (this.$refs[refName].average01 = 0)
-            : (this.$refs[refName].average01 = indexArr[0])
-          this.$refs[refName].average02 = indexArr[1]
+            : (this.$refs[refName].average01 = Number(indexArr[0]))
+          this.$refs[refName].average02 = Number(indexArr[1])
           insValue = 4
         } else if (value.indexOf("W") > -1) {
           let indexArr = value.split("W")
           isNaN(indexArr[0])
             ? (this.$refs[refName].workday = 0)
-            : (this.$refs[refName].workday = indexArr[0])
+            : (this.$refs[refName].workday = Number(indexArr[0]))
           insValue = 5
         } else if (value === "L") {
           insValue = 6
@@ -255,21 +254,19 @@ export default {
           let indexArr = value.split("-")
           isNaN(indexArr[0])
             ? (this.$refs[refName].cycle01 = 0)
-            : (this.$refs[refName].cycle01 = indexArr[0])
-          this.$refs[refName].cycle02 = indexArr[1]
+            : (this.$refs[refName].cycle01 = Number(indexArr[0]))
+          this.$refs[refName].cycle02 = Number(indexArr[1])
           insValue = 3
         } else if (value.indexOf("#") > -1) {
           let indexArr = value.split("#")
-          isNaN(indexArr[0])
-            ? (this.$refs[refName].average01 = 1)
-            : (this.$refs[refName].average01 = indexArr[0])
-          this.$refs[refName].average02 = indexArr[1]
+          this.$refs[refName].average01 = Number(indexArr[1])
+          this.$refs[refName].average02 = Number(indexArr[0])
           insValue = 4
         } else if (value.indexOf("L") > -1) {
           let indexArr = value.split("L")
           isNaN(indexArr[0])
             ? (this.$refs[refName].weekday = 1)
-            : (this.$refs[refName].weekday = indexArr[0])
+            : (this.$refs[refName].weekday = Number(indexArr[0]))
           insValue = 5
         } else {
           this.$refs[refName].checkboxList = value.split(",")
@@ -281,8 +278,14 @@ export default {
         } else if (value == "*") {
           insValue = 2
         } else if (value.indexOf("-") > -1) {
+          const parts = value.split("-")
+          this.$refs[refName].cycle01 = Number(parts[0])
+          this.$refs[refName].cycle02 = Number(parts[1])
           insValue = 3
         } else if (value.indexOf("/") > -1) {
+          const parts = value.split("/")
+          this.$refs[refName].average01 = Number(parts[0])
+          this.$refs[refName].average02 = Number(parts[1])
           insValue = 4
         } else {
           this.$refs[refName].checkboxList = value.split(",")
@@ -294,6 +297,8 @@ export default {
     // 表单选项的子组件校验数字格式（通过-props传递）
     checkNumber(value, minLimit, maxLimit) {
       // 检查必须为整数
+      value = Number(value)
+      if (!Number.isFinite(value)) return minLimit
       value = Math.floor(value)
       if (value < minLimit) {
         value = minLimit
@@ -308,43 +313,22 @@ export default {
     },
     // 填充表达式
     submitFill() {
+      const parsed = parseCronExpression(this.crontabValueString)
+      if (!parsed.valid) { this.parseError = parsed.error; return }
       this.$emit("fill", this.crontabValueString)
       this.hidePopup()
     },
     clearCron() {
-      // 还原选择项
-      ("准备还原")
-      this.crontabValueObj = {
-        second: "*",
-        min: "*",
-        hour: "*",
-        day: "*",
-        month: "*",
-        week: "?",
-        year: "",
-      }
-      for (let j in this.crontabValueObj) {
-        this.changeRadio(j, this.crontabValueObj[j])
-      }
+      this.parseError = ""
+      this.textOnly = false
+      this.edited = true
+      this.originalExpression = ""
+      this.hydrateCron({ second: "*", min: "*", hour: "*", day: "*", month: "*", week: "?", year: "" })
     },
   },
   computed: {
-    crontabValueString: function() {
-      let obj = this.crontabValueObj
-      let str =
-        obj.second +
-        " " +
-        obj.min +
-        " " +
-        obj.hour +
-        " " +
-        obj.day +
-        " " +
-        obj.month +
-        " " +
-        obj.week +
-        (obj.year == "" ? "" : " " + obj.year)
-      return str
+    crontabValueString() {
+      return !this.edited && this.originalExpression ? this.originalExpression : serializeCronModel(this.crontabValueObj)
     },
   },
   components: {

@@ -1,6 +1,11 @@
 package com.erp.system.service;
 
 import java.util.List;
+import com.erp.system.domain.dto.SysUserNotificationPageQuery;
+import com.erp.system.domain.dto.SysUserNotificationReadAllRequest;
+import com.erp.system.domain.vo.SysUserNotificationPageResult;
+import com.erp.system.domain.vo.SysUserNotificationReadAllResult;
+
 import com.erp.system.api.domain.UserNotificationCommand;
 import com.erp.system.api.domain.UserNotificationResult;
 import com.erp.system.domain.SysUserDeviceToken;
@@ -14,6 +19,10 @@ public interface ISysUserNotificationService
     UserNotificationResult publish(UserNotificationCommand command);
 
     List<SysUserNotification> selectUserNotifications(Long userId);
+
+    SysUserNotificationPageResult page(Long userId, SysUserNotificationPageQuery query);
+
+    SysUserNotificationReadAllResult markAllRead(Long userId, SysUserNotificationReadAllRequest request);
 
     long countUnread(Long userId);
 

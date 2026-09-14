@@ -202,6 +202,7 @@
       :visible.sync="adminActionVisible"
       :operation="adminOperation"
       :loading="adminActionLoading"
+      :error="adminActionError"
       @confirm="submitAdminAction"
     />
   </section>
@@ -220,6 +221,14 @@ import {
 } from '@/api/approval/monitor'
 import AdminActionDialog from './AdminActionDialog'
 import { businessCodeLabel, entityId, formatApprovalLoadError, statusLabel, statusType, toArray, unwrapData, unwrapRows } from './approvalUi'
+import { getSelectedDeptId } from '@/utils/shopContext'
+
+function decimalId(value) {
+  if (typeof value !== 'string' && typeof value !== 'number') return ''
+  if (typeof value === 'number' && !Number.isSafeInteger(value)) return ''
+  const id = String(value).trim().replace(/^0+/, '')
+  return /^[1-9]\d*$/.test(id) && (id.length < 19 || (id.length === 19 && id <= '9223372036854775807')) ? id : ''
+}
 
 export default {
   name: 'ApprovalRuntimeMonitor',
@@ -248,6 +257,7 @@ export default {
       legacyDisabledActions: ['终止', '改派', '回调重试'],
       adminActionVisible: false,
       adminActionLoading: false,
+      adminActionError: '', adminEpoch: 0, detailReadEpoch: 0, pageInactive: false,
       adminOperation: { type: '', target: null }
     }
   },
@@ -293,6 +303,18 @@ export default {
   created() {
     this.loadLegacyTemplates()
     this.load()
+  },
+  mounted() { window.addEventListener('erp:dept-changed', this.invalidateAdminContext) },
+  watch: {
+    '$route.fullPath'() { this.invalidateAdminContext() },
+    '$store.getters.id'() { this.invalidateAdminContext() }
+  },
+  activated() { this.pageInactive = false },
+  deactivated() { this.pageInactive = true; this.invalidateAdminContext() },
+  beforeDestroy() {
+    this.pageInactive = true
+    this.invalidateAdminContext()
+    window.removeEventListener('erp:dept-changed', this.invalidateAdminContext)
   },
   methods: {
     statusLabel,
@@ -488,6 +510,10 @@ export default {
       return candidates.map(item => item.userName || item.candidateName || item.userId).filter(Boolean).join('、') || '-'
     },
     openDetail(row) {
+      this.adminEpoch += 1
+      this.adminActionVisible = false
+      this.adminActionLoading = false
+      const epoch = ++this.detailReadEpoch, scope = this.adminScope()
       const legacy = this.isLegacy(row)
       const request = legacy
         ? getLegacyApprovalInstance(row.businessCode, entityId(row, ['legacyInstanceId', 'id']))
@@ -497,26 +523,44 @@ export default {
       this.detail = null
       this.detailVisible = true
       this.detailLoading = true
-      return request.then(response => { this.detail = unwrapData(response) }).finally(() => { this.detailLoading = false })
+      return request.then(response => {
+        if (!this.pageInactive && epoch === this.detailReadEpoch && scope === this.adminScope()) this.detail = unwrapData(response)
+      }).finally(() => { if (epoch === this.detailReadEpoch) this.detailLoading = false })
     },
     isLegacyAdminTarget(target) {
       if (target && target.engineMode) return this.isLegacy(target)
       return this.isLegacyDetail
     },
     openAdminAction(type, target) {
+      if (this.pageInactive || this.adminActionLoading) return
       if (this.isLegacyAdminTarget(target)) {
         this.$modal.msgWarning('旧实例由原业务处理')
         return
       }
       let candidates = []
+      let recovery = null
       if (type === 'reassign') {
+        target = { ...target, instanceId: target.instanceId || (this.detailInstance || {}).instanceId,
+          businessRound: (this.detailInstance || {}).businessRound,
+          businessNo: (this.detailInstance || {}).businessNo || target.businessNo }
+        if (!decimalId(target.taskId || target.id) || !decimalId(target.instanceId) || !decimalId(this.$store.getters.id)) {
+          this.$modal.msgWarning('审批任务或账号上下文不完整，请重新打开实例')
+          return
+        }
+        try { recovery = this.readReassignRecovery(target) } catch (error) {
+          this.$modal.msgWarning(error.message)
+          return
+        }
         candidates = this.pendingCandidates(target)
-        if (!candidates.length) {
+        if (recovery) candidates = [recovery.source]
+        if (!recovery && !candidates.length) {
           this.$modal.msgWarning('当前任务没有可改派的待办候选人，请刷新实例详情')
           return
         }
       }
-      this.adminOperation = { type, target, candidates }
+      this.adminEpoch += 1
+      this.adminActionError = ''
+      this.adminOperation = { type, target: { ...target }, candidates, recovery, contextKey: this.adminContextKey(type, target) }
       this.adminActionVisible = true
     },
     pendingCandidates(task) {
@@ -532,7 +576,87 @@ export default {
       const random = Math.random().toString(36).slice(2, 10).toUpperCase()
       return `${String(type || 'ACTION').toUpperCase()}:${targetId}:${Date.now()}:${random}`.slice(0, 128)
     },
+    adminScope() { return `${String(this.$store.getters.id || '')}:${String(getSelectedDeptId() || '')}` },
+    adminContextKey(type, target) {
+      return JSON.stringify([this.adminScope(), type, String(target.instanceId || ''), String(target.nodeId || ''),
+        String(entityId(target, type === 'reassign' ? ['taskId', 'id'] : ['instanceId', 'outboxId', 'id']) || ''), String(target.businessRound || '')])
+    },
+    invalidateAdminContext() {
+      this.adminEpoch += 1
+      this.detailReadEpoch += 1
+      this.adminActionVisible = false
+      this.adminActionLoading = false
+      this.detailVisible = false
+      this.detailLoading = false
+      this.detail = null
+    },
+    reassignStorageKey(target) {
+      return `erp:approval-reassign:v1:${this.adminScope()}:${decimalId(target.taskId || target.id)}`
+    },
+    readReassignRecovery(target) {
+      const text = window.sessionStorage.getItem(this.reassignStorageKey(target))
+      if (!text) return null
+      const command = JSON.parse(text)
+      if (command.contextKey !== this.adminContextKey('reassign', target) || !command.body || !command.recipient
+        || !command.source || !decimalId(command.body.fromCandidateId) || !decimalId(command.body.toUserId)
+        || decimalId(command.source.candidateId) !== command.body.fromCandidateId
+        || decimalId(command.recipient.userId) !== command.body.toUserId
+        || typeof command.body.reason !== 'string' || command.body.reason.trim().length < 2 || command.body.reason.length > 500
+        || typeof command.body.requestId !== 'string' || !command.body.requestId || command.body.requestId.length > 128) {
+        throw new Error('存在上下文不一致的改派恢复记录，请先核对原审批实例')
+      }
+      return command
+    },
+    submitReassignAction(payload) {
+      const target = this.adminOperation.target || {}
+      const contextKey = this.adminContextKey('reassign', target)
+      if (!this.adminActionVisible || this.pageInactive || this.adminActionLoading
+        || payload.contextKey !== contextKey || contextKey !== this.adminOperation.contextKey) return Promise.resolve()
+      const epoch = this.adminEpoch, key = this.reassignStorageKey(target)
+      let command
+      try {
+        command = this.readReassignRecovery(target)
+        if (!command) {
+          const fromCandidateId = decimalId(payload.fromCandidateId), toUserId = decimalId(payload.toUserId)
+          const source = this.pendingCandidates(target).find(item => decimalId(item.candidateId) === fromCandidateId)
+          if (!source || !toUserId || !payload.recipient || decimalId(payload.recipient.userId) !== toUserId) throw new Error('请选择当前任务的候选人和接收人')
+          command = { contextKey, target: { ...target }, source: { ...source, candidateId: fromCandidateId },
+            recipient: { ...payload.recipient, userId: toUserId },
+            body: { fromCandidateId, toUserId, reason: payload.reason, requestId: this.adminRequestId('reassign', target) } }
+          window.sessionStorage.setItem(key, JSON.stringify(command))
+        } else if (command.body.fromCandidateId !== decimalId(payload.fromCandidateId)
+          || command.body.toUserId !== decimalId(payload.toUserId) || command.body.reason !== payload.reason) {
+          throw new Error('上次改派结果待确认，请使用原接收人和原因重试')
+        }
+      } catch (error) {
+        this.adminActionError = error.message || '无法保存改派恢复记录，请稍后重试'
+        return Promise.resolve()
+      }
+      this.adminActionLoading = true
+      this.adminActionError = ''
+      const current = () => !this.pageInactive && epoch === this.adminEpoch && contextKey === this.adminContextKey('reassign', target)
+      return reassignApprovalTask(decimalId(target.taskId || target.id), { ...command.body }).then(() => {
+        try { window.sessionStorage.removeItem(key) } catch (error) { /* Replaying the retained original command remains idempotent. */ }
+        if (!current()) return
+        this.$modal.msgSuccess('改派已提交')
+        this.adminActionVisible = false
+        return Promise.all([this.load(), this.detailVisible && this.detailSourceRow ? this.openDetail(this.detailSourceRow) : Promise.resolve()])
+          .catch(() => this.$modal.msgWarning('改派已提交，列表刷新失败，请手动刷新核对'))
+      }, error => {
+        const status = error.response && Number(error.response.status)
+        const definiteRejection = status >= 200 && status < 500 && status !== 408
+        if (definiteRejection) {
+          try { window.sessionStorage.removeItem(key) } catch (ignored) { /* Keep the original retry identity if storage is unavailable. */ }
+        }
+        if (!current()) return
+        if (!definiteRejection) this.$set(this.adminOperation, 'recovery', command)
+        this.adminActionError = definiteRejection ? (error.message || '改派被拒绝，请刷新核对')
+          : '改派结果暂未确认，已保留原接收人和原因；请重试原改派核实结果'
+      }).finally(() => { if (epoch === this.adminEpoch) this.adminActionLoading = false })
+    },
     submitAdminAction(payload) {
+      if (payload.type === 'reassign') return this.submitReassignAction(payload)
+      if (this.adminActionLoading) return Promise.resolve()
       const target = payload.target || {}
       if (this.isLegacyAdminTarget(target)) {
         this.$modal.msgWarning('旧实例由原业务处理')
@@ -543,13 +667,6 @@ export default {
       this.adminActionLoading = true
       if (payload.type === 'terminate') {
         request = terminateApprovalInstance(entityId(target, ['instanceId', 'id']), { reason: payload.reason, requestId })
-      } else if (payload.type === 'reassign') {
-        request = reassignApprovalTask(entityId(target, ['taskId', 'id']), {
-          fromCandidateId: Number(payload.fromCandidateId),
-          toUserId: Number(payload.toUserId),
-          reason: payload.reason,
-          requestId
-        })
       } else {
         request = replayApprovalCallback(entityId(target, ['outboxId', 'callbackId', 'id']), { reason: payload.reason, requestId })
       }

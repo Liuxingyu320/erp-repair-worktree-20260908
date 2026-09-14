@@ -84,6 +84,11 @@ class OaReimbursementExportServiceImplTest
         OaReimbursementExportRequest request =
                 new OaReimbursementExportRequest();
         request.setReimbursementIds(List.of(17L));
+        request.setRequestId("workbook-command-1");
+        com.erp.oa.domain.OaReimbursementExportCommand command = new com.erp.oa.domain.OaReimbursementExportCommand();
+        when(mapper.claimExportCommand(eq(9L), eq(request.getRequestId()), any())).thenAnswer(call -> { command.setPayloadHash(call.getArgument(2)); return 1; });
+        when(mapper.lockExportCommand(9L, request.getRequestId())).thenReturn(command);
+        when(mapper.completeExportCommand(eq(9L), eq(request.getRequestId()), any(), eq(91L))).thenReturn(1);
 
         OaReimbursementExportBatch batch =
                 service.createExport(request, 20L);
@@ -134,6 +139,77 @@ class OaReimbursementExportServiceImplTest
                         .isEqualTo(88.60d);
             }
         }
+    }
+
+    @Test
+    void durableSameCommandReturnsOriginalArchiveAndChangedPayloadIsRejected()
+    {
+        com.erp.oa.domain.OaReimbursementExportCommand claim = new com.erp.oa.domain.OaReimbursementExportCommand();
+        claim.setActorId(9L); claim.setRequestId("export-command-1");
+        when(mapper.claimExportCommand(eq(9L), eq("export-command-1"), any()))
+                .thenAnswer(call -> { if (claim.getPayloadHash() == null) claim.setPayloadHash(call.getArgument(2)); return 1; });
+        when(mapper.lockExportCommand(9L, "export-command-1")).thenReturn(claim);
+        when(mapper.completeExportCommand(eq(9L), eq("export-command-1"), any(), eq(91L)))
+                .thenAnswer(call -> { claim.setBatchId(91L); return 1; });
+        OaReimbursementExportRequest request = new OaReimbursementExportRequest();
+        request.setRequestId("export-command-1"); request.setReimbursementIds(List.of(17L));
+        OaReimbursementExportBatch original = service.createExport(request, 20L);
+        when(mapper.selectExportByCommand(9L, "export-command-1")).thenReturn(original);
+        assertThat(service.createExport(request, 20L)).isSameAs(original);
+        org.mockito.Mockito.verify(mapper, org.mockito.Mockito.times(1)).insertExportBatch(any());
+        org.mockito.Mockito.verify(mapper, org.mockito.Mockito.times(1)).markExported(any(), any());
+        request.setReimbursementIds(List.of(17L, 18L));
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.createExport(request, 20L)).hasMessageContaining("不同的报销集合或组织");
+        assertThat(service.exportByRequestId("export-command-1")).isSameAs(original);
+        assertThat(original.getArchiveStatus()).isEqualTo("AVAILABLE");
+    }
+
+    @Test
+    void historyDefaultsToActorAndMissingArchiveIsExplicitWithoutRebuilding()
+    {
+        OaReimbursementExportBatch missing = new OaReimbursementExportBatch();
+        missing.setBatchId(91L); missing.setCreatedByUserId(9L);
+        missing.setArchivePath("exports/missing.zip");
+        when(mapper.selectExportHistory(9L)).thenReturn(List.of(missing));
+        assertThat(service.exportHistory(false)).containsExactly(missing);
+        assertThat(missing.getArchiveStatus()).isEqualTo("UNAVAILABLE");
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.exportHistory(true)).hasMessageContaining("仅管理员");
+        org.mockito.Mockito.verify(mapper, org.mockito.Mockito.never()).selectExportHistory(null);
+        org.mockito.Mockito.verify(mapper, org.mockito.Mockito.never()).insertExportBatch(any());
+        assertThat(service.exportByRequestId("not-observed")).isNull();
+    }
+
+    @Test
+    void selectedSetPreconditionsAreExplicitRejectionsButReceiptFailuresStayUnknown()
+    {
+        var request = new OaReimbursementExportRequest();
+        request.setRequestId("explicit-rejection"); request.setReimbursementIds(List.of(17L, 17L));
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.createExport(request, 20L))
+                .isInstanceOf(com.erp.common.core.exception.ServiceException.class)
+                .satisfies(error -> assertThat(((com.erp.common.core.exception.ServiceException) error).getCode()).isEqualTo(409));
+        org.mockito.Mockito.verify(mapper, org.mockito.Mockito.never()).claimExportCommand(any(), any(), any());
+        request.setReimbursementIds(List.of(17L));
+        var command = new com.erp.oa.domain.OaReimbursementExportCommand();
+        when(mapper.claimExportCommand(eq(9L), eq(request.getRequestId()), any()))
+                .thenAnswer(call -> {command.setPayloadHash(call.getArgument(2));return 1;});
+        when(mapper.lockExportCommand(9L, request.getRequestId())).thenReturn(command);
+        when(mapper.selectFinanceListByIds(anyList(), anyList())).thenReturn(List.of());
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.createExport(request, 20L))
+                .hasMessageContaining("所选报销单")
+                .satisfies(error -> assertThat(((com.erp.common.core.exception.ServiceException) error).getCode()).isEqualTo(409));
+        org.mockito.Mockito.verify(mapper, org.mockito.Mockito.never()).insertExportBatch(any());
+        when(mapper.selectFinanceListByIds(anyList(), anyList())).thenReturn(List.of(claim));
+        when(mapper.completeExportCommand(eq(9L), eq(request.getRequestId()), any(), eq(91L))).thenReturn(0);
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.createExport(request, 20L))
+                .hasMessageContaining("回执")
+                .satisfies(error -> {
+                    var failure = (com.erp.common.core.exception.ServiceException) error;
+                    assertThat(failure.getCode()).isNull();
+                    var body = new com.erp.common.security.handler.GlobalExceptionHandler()
+                            .handleServiceException(failure, new MockHttpServletRequest());
+                    assertThat(body.get("code")).isEqualTo(500);
+                });
+        org.mockito.Mockito.verify(mapper).insertExportBatch(any());
     }
 
     private void arrangeApprovedClaim()

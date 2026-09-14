@@ -192,7 +192,9 @@ assert.ok(
 assert.ok(
   oaPurchaseApprovalSource.includes("hasValidPurchaseId ? '重试' : '返回待办'") &&
     oaPurchaseApprovalSource.includes('this.$router.replace("/mobile/todo")') &&
-    oaPurchaseApprovalSource.includes("OA_PURCHASE:${this.approvalTaskId}:${action}:v1") &&
+    oaPurchaseApprovalSource.includes('executeAction(action) { return this.runApprovalCommand(action) }') &&
+    fs.readFileSync(path.resolve(__dirname, '../src/mixins/approvalCommandRecovery.js'), 'utf8').includes('requestId: command.requestId') &&
+    fs.readFileSync(path.resolve(__dirname, '../src/mixins/approvalCommandRecovery.js'), 'utf8').includes('retryApprovalCommand') &&
     !oaPurchaseApprovalSource.includes("OA_PURCHASE:${this.approvalTaskId}:${action}:${Date.now()}"),
   "missing purchase context should return to todo and approval retries should keep a stable request id"
 )

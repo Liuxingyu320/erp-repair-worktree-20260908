@@ -27,8 +27,16 @@ assertIncludes('trigger && document.contains(trigger)', "closing should restore 
 assertIncludes('this.captureUserDialogTrigger("addUserButton")', "add flow should capture its invoking button before the async option request")
 assertIncludes("this.removeUserDialogFocusGuard()", "component teardown should remove the document focus guard")
 
-const captureIndex = source.indexOf('this.captureUserDialogTrigger("addUserButton")')
-const requestIndex = source.indexOf("getUser().then", captureIndex)
-assert.ok(captureIndex >= 0 && requestIndex > captureIndex, "the trigger must be captured before loading dialog options")
+const handleAddStart = source.indexOf("handleAdd()")
+const handleAddEnd = source.indexOf("handleUpdate(", handleAddStart)
+const handleAdd = handleAddStart >= 0 && handleAddEnd > handleAddStart
+  ? source.slice(handleAddStart, handleAddEnd)
+  : ""
+const captureIndex = handleAdd.indexOf('this.captureUserDialogTrigger("addUserButton")')
+const requestMatch = handleAdd.match(/\bgetUser\s*\(/)
+assert.ok(
+  captureIndex >= 0 && requestMatch && requestMatch.index > captureIndex,
+  "the trigger must be captured before loading dialog options"
+)
 
 console.log("userDialogFocusManagement tests passed")

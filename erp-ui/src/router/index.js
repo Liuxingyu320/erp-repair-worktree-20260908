@@ -62,6 +62,17 @@ export const constantRoutes = [
   },
   ...mobileRouteDefinitions,
   {
+    path: '/sign-package-handoff',
+    component: Layout,
+    hidden: true,
+    children: [{
+      path: '',
+      name: 'SignPackageHandoff',
+      component: () => import('@/views/signPackageHandoff/index'),
+      meta: { title: '手机继续签约', noCache: true }
+    }]
+  },
+  {
     path: '/complete-profile',
     component: () => import('@/views/profile-completion/index'),
     hidden: true,

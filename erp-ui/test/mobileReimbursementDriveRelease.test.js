@@ -4,6 +4,7 @@ const assert = require("assert")
 const childProcess = require("child_process")
 const fs = require("fs")
 const path = require("path")
+const { withReleaseSourceFixture } = require("./helpers/releaseSourceFixture")
 
 const uiRoot = path.resolve(__dirname, "..")
 const root = path.resolve(uiRoot, "..")
@@ -33,19 +34,6 @@ entries.forEach(relative => {
     `${relative} must exist as a regular release source file`
   )
 })
-
-const tracked = new Set(
-  childProcess.execFileSync(
-    "git",
-    ["-C", root, "ls-files", "--cached"],
-    { encoding: "utf8" }
-  ).split(/\r?\n/).filter(Boolean)
-)
-const untracked = entries.filter(relative => !tracked.has(relative))
-assert.ok(
-  manifest.status === "development" || untracked.length === 0,
-  "only a development source manifest may include files not yet tracked by Git"
-)
 
 const requiredOutboxFiles = [
   "erp-modules/erp-oa/src/main/java/com/erp/oa/controller/OaReimbursementApprovalStartOutboxController.java",
@@ -119,36 +107,31 @@ assert.strictEqual(
   "the fresh-database bootstrap must include reimbursement exactly once"
 )
 
-const validator = path.join(
-  root,
-  "scripts/verify-mobile-reimbursement-drive-release.sh"
-)
-childProcess.execFileSync("bash", [validator, "--source"], {
-  cwd: root,
-  encoding: "utf8"
+const validatorRelative = "scripts/verify-mobile-reimbursement-drive-release.sh"
+withReleaseSourceFixture(root, [
+  ...entries, ...migrationPaths, ...manifest.migration.prerequisites,
+  path.relative(root, manifestPath), path.relative(root, listPath), validatorRelative,
+  "docker/mysql/bootstrap-files.list", "docker/.env.example",
+  "docker/docker-compose.yml", "docker/docker-compose.ecs-host.yml"
+], fixture => {
+  const verify = mode => childProcess.spawnSync("bash", [path.join(fixture.root, validatorRelative), mode], {
+    cwd: fixture.root, encoding: "utf8", env: fixture.env
+  })
+  const output = result => `${result.stdout}${result.stderr}`
+  const source = verify("--source")
+  assert.strictEqual(source.status, 0, output(source))
+  assert.match(output(source), /MOBILE_REIMBURSEMENT_DRIVE_RELEASE_SOURCE_OK/)
+  const untracked = verify("--candidate")
+  assert.notStrictEqual(untracked.status, 0)
+  assert.match(output(untracked), /candidate release files are not tracked in the Git index/)
+  fixture.commit()
+  const clean = verify("--candidate")
+  assert.strictEqual(clean.status, 0, output(clean))
+  assert.match(output(clean), /MOBILE_REIMBURSEMENT_DRIVE_RELEASE_CANDIDATE_PRECHECK_OK/)
+  fs.appendFileSync(path.join(fixture.root, entries[0]), "\n")
+  const dirty = verify("--candidate")
+  assert.notStrictEqual(dirty.status, 0)
+  assert.match(output(dirty), /candidate release requires a clean worktree/)
 })
-
-const worktreeDirty = childProcess.execFileSync(
-  "git",
-  ["-C", root, "status", "--porcelain=v1", "--untracked-files=all", "--"],
-  { encoding: "utf8" }
-).trim().length > 0
-const candidate = childProcess.spawnSync("bash", [validator, "--candidate"], {
-  cwd: root,
-  encoding: "utf8"
-})
-if (untracked.length > 0 || worktreeDirty) {
-  assert.notStrictEqual(
-    candidate.status,
-    0,
-    "candidate precheck must reject untracked release files or a dirty worktree"
-  )
-} else {
-  assert.strictEqual(
-    candidate.status,
-    0,
-    `candidate precheck unexpectedly failed: ${candidate.stderr}`
-  )
-}
 
 console.log("mobile reimbursement/drive release contract tests passed")

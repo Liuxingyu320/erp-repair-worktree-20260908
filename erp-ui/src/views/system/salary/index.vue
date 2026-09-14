@@ -1,8 +1,9 @@
 <template>
   <div class="app-container system-management-page salary-config-page">
+    <legacy-salary-notice />
     <system-page-header
-      title="薪资权限配置"
-      description="管理薪资方案、档位明细、员工绑定及角色可见范围。"
+      title="历史薪资方案"
+      description="只读查询旧方案、档位及绑定；新合同不再采用这些金额。"
       icon="el-icon-wallet"
       tip="薪资数据属于敏感信息，请按最小权限原则配置。"
     />
@@ -33,11 +34,12 @@
             <el-button size="small" icon="el-icon-refresh" @click="resetSchemeQuery">重置</el-button>
           </div>
           <div class="salary-actions">
-            <el-button type="primary" size="small" icon="el-icon-plus" @click="handleAddScheme" v-hasPermi="['system:salary:add']">新增方案</el-button>
+
             <el-button size="small" icon="el-icon-download" @click="handleExportScheme" v-hasPermi="['system:salary:export']">导出</el-button>
           </div>
         </div>
 
+        <el-alert v-if="schemeLoadError" :title="schemeLoadError" type="error" :closable="false" />
         <el-table
           v-loading="schemeLoading"
           :data="schemeList"
@@ -63,9 +65,9 @@
           <el-table-column label="操作" width="280" align="center" fixed="right">
             <template slot-scope="scope">
               <el-button type="text" size="mini" icon="el-icon-tickets" @click.stop="selectScheme(scope.row)">档位</el-button>
-              <el-button type="text" size="mini" icon="el-icon-edit" @click.stop="handleEditScheme(scope.row)" v-hasPermi="['system:salary:edit']">编辑</el-button>
+
               <el-button type="text" size="mini" icon="el-icon-time" @click.stop="handleShowRevisions(scope.row)" v-hasPermi="['system:salary:query']">版本</el-button>
-              <el-button type="text" size="mini" icon="el-icon-delete" @click.stop="handleDeleteScheme(scope.row)" v-hasPermi="['system:salary:remove']">删除</el-button>
+
             </template>
           </el-table-column>
         </el-table>
@@ -86,10 +88,11 @@
           </div>
           <div class="salary-actions">
             <el-button size="small" icon="el-icon-refresh" :disabled="!selectedScheme" @click="loadSchemeItems">刷新档位</el-button>
-            <el-button type="primary" size="small" icon="el-icon-plus" :disabled="!selectedScheme" @click="handleAddSchemeItem" v-hasPermi="['system:salary:add']">新增档位</el-button>
+
           </div>
         </div>
 
+        <el-alert v-if="itemLoadError" :title="itemLoadError" type="error" :closable="false" />
         <el-table
           v-loading="itemLoading"
           :data="currentSchemeItems"
@@ -110,8 +113,8 @@
           <el-table-column label="操作" width="190" align="center" fixed="right">
             <template slot-scope="scope">
               <el-button type="text" size="mini" icon="el-icon-view" @click="handleViewSchemeItem(scope.row)">详情</el-button>
-              <el-button type="text" size="mini" icon="el-icon-edit" @click="handleEditSchemeItem(scope.row)" v-hasPermi="['system:salary:edit']">编辑</el-button>
-              <el-button type="text" size="mini" icon="el-icon-delete" @click="handleDeleteSchemeItem(scope.row)" v-hasPermi="['system:salary:remove']">删除</el-button>
+
+
             </template>
           </el-table-column>
         </el-table>
@@ -140,13 +143,7 @@
                 <el-option label="有社保" value="有社保" />
               </el-select>
             </div>
-            <el-button
-              type="primary"
-              size="small"
-              icon="el-icon-plus"
-              @click="handleAdd"
-              v-hasPermi="['system:salary:role']"
-            >新增</el-button>
+
           </div>
 
           <el-table
@@ -176,20 +173,8 @@
             <el-table-column label="备注" prop="remark" min-width="160" show-overflow-tooltip />
             <el-table-column label="操作" width="130" align="center" fixed="right">
               <template slot-scope="scope">
-                <el-button
-                  type="text"
-                  size="mini"
-                  icon="el-icon-edit"
-                  @click="handleEdit(scope.row)"
-                  v-hasPermi="['system:salary:role']"
-                >编辑</el-button>
-                <el-button
-                  type="text"
-                  size="mini"
-                  icon="el-icon-delete"
-                  @click="handleUnbindRule(scope.row)"
-                  v-hasPermi="['system:salary:role']"
-                >移除</el-button>
+
+
               </template>
             </el-table-column>
           </el-table>
@@ -254,7 +239,7 @@
       </el-form>
       <div slot="footer" class="dialog-footer">
         <el-button @click="schemeOpen = false">取 消</el-button>
-        <el-button type="primary" :loading="schemeSaving" @click="handleSaveScheme" v-hasPermi="['system:salary:add','system:salary:edit']">保 存</el-button>
+
       </div>
     </el-dialog>
 
@@ -331,7 +316,7 @@
       </el-form>
       <div slot="footer" class="dialog-footer">
         <el-button @click="itemOpen = false">取 消</el-button>
-        <el-button type="primary" :loading="itemSaving" @click="handleSaveSchemeItem" v-hasPermi="['system:salary:add','system:salary:edit']">保 存</el-button>
+
       </div>
     </el-dialog>
 
@@ -469,12 +454,7 @@
       </el-form>
       <div slot="footer" class="dialog-footer">
         <el-button @click="open = false">取 消</el-button>
-        <el-button
-          type="primary"
-          :loading="saving"
-          @click="handleSaveRule"
-          v-hasPermi="['system:salary:role']"
-        >保 存</el-button>
+
       </div>
     </el-dialog>
 
@@ -502,13 +482,7 @@
           <el-table-column label="时间" prop="createTime" width="160"><template slot-scope="scope">{{ parseTime(scope.row.createTime) }}</template></el-table-column>
           <el-table-column label="操作" width="105" fixed="right">
             <template slot-scope="scope">
-              <el-button
-                type="text"
-                size="mini"
-                :disabled="!revisionScheme || Number(scope.row.version) === Number(revisionScheme.version)"
-                @click="handleRollbackRevision(scope.row)"
-                v-hasPermi="['system:salary:edit']"
-              >恢复为新版本</el-button>
+
             </template>
           </el-table-column>
         </el-table>
@@ -518,6 +492,9 @@
 </template>
 
 <script>
+import { getSelectedDeptId } from "@/utils/shopContext"
+const { createUiOperationScope } = require("@/utils/uiOperationScope")
+import LegacySalaryNotice from "@/views/hr/components/LegacySalaryNotice"
 import {
   listSalaryScheme,
   getSalaryScheme,
@@ -547,6 +524,7 @@ const SOCIAL_TYPES = {
 const DEFAULT_REGION = "默认"
 
 export default {
+  components: { LegacySalaryNotice },
   name: "SystemSalaryConfig",
   data() {
     return {
@@ -555,6 +533,9 @@ export default {
       saving: false,
       schemeLoading: false,
       itemLoading: false,
+      itemLoadError: "",
+      itemLoadedSchemeId: "",
+      schemeLoadError: "",
       schemeSaving: false,
       itemSaving: false,
       open: false,
@@ -609,6 +590,10 @@ export default {
     }
   },
   computed: {
+    actorContextKey() {
+      const store = this.$store || {}, getters = store.getters || {}
+      return JSON.stringify([String(getters.id || ""), ((store.state || {}).user || {}).sessionRevision || 0, getters.permissions || []])
+    },
     userMap() {
       return this.userOptions.reduce((map, user) => {
         map[user.userId] = user
@@ -742,11 +727,32 @@ export default {
       return this.ruleForm.relationId ? "编辑员工薪资绑定" : "新增员工薪资绑定"
     }
   },
+  watch: { actorContextKey() { this.resetSchemeReadContext() } },
+  activated() { this.schemeScope().activate(); if (this._refreshSchemesOnActivate) { this._refreshSchemesOnActivate = false; this.getSchemeList() } },
+  deactivated() { this.schemeScope().deactivate(); this.schemeItems = []; this.itemLoading = false; this.schemeLoading = false; this._refreshSchemesOnActivate = true },
+  beforeDestroy() { window.removeEventListener("erp:dept-changed", this.resetSchemeReadContext); this.schemeScope().deactivate() },
   created() {
+    window.addEventListener("erp:dept-changed", this.resetSchemeReadContext)
     this.initPage()
     this.getSchemeList()
   },
   methods: {
+    schemeScope() {
+      if (!this._schemeScope) this._schemeScope = createUiOperationScope(() => ({ actor: this.actorContextKey, dept: getSelectedDeptId(), route: this.$route && this.$route.path }))
+      return this._schemeScope
+    },
+    resetSchemeReadContext() {
+      this.schemeScope().invalidate()
+      this.selectedScheme = null
+      this.schemeList = []
+      this.schemeItems = []
+      this.itemLoadedSchemeId = ""
+      this.itemLoading = false
+      this.schemeLoading = false
+      this.itemOpen = false
+      this.schemeOpen = false
+      if ((this.$store.getters || {}).id) this.getSchemeList()
+    },
     defaultSchemeForm() {
       return {
         schemeId: undefined,
@@ -795,21 +801,24 @@ export default {
       }
     },
     getSchemeList() {
+      const scope = this.schemeScope(), params = { ...this.schemeQueryParams }, token = scope.begin("schemes", params)
+      scope.invalidate("items")
       this.schemeLoading = true
-      return listSalaryScheme(this.schemeQueryParams).then(response => {
+      this.schemeLoadError = ""
+      this.schemeItems = []
+      this.itemLoadedSchemeId = ""
+      this.itemLoading = false
+      return listSalaryScheme(params, { silentError: true }).then(response => {
+        if (!scope.isCurrent(token)) return
         const rows = response.rows || []
         this.schemeList = rows
-        this.schemeTotal = response.total || rows.length
-        const selectedId = this.selectedScheme ? Number(this.selectedScheme.schemeId) : undefined
-        this.selectedScheme = rows.find(row => Number(row.schemeId) === selectedId) || rows[0] || null
-        if (this.selectedScheme) {
-          return this.loadSchemeItems()
-        }
-        this.schemeItems = []
-        return Promise.resolve()
-      }).finally(() => {
-        this.schemeLoading = false
-      })
+        this.schemeTotal = Number(response.total) || 0
+        const selectedId = this.selectedScheme ? String(this.selectedScheme.schemeId) : ""
+        this.selectedScheme = rows.find(row => String(row.schemeId) === selectedId) || rows[0] || null
+        return this.loadSchemeItems()
+      }).catch(error => {
+        if (scope.isCurrent(token)) { this.schemeList = []; this.schemeTotal = 0; this.schemeLoadError = error && error.message || "薪资方案读取失败，请重试" }
+      }).finally(() => { if (scope.isCurrent(token)) this.schemeLoading = false })
     },
     refreshSchemeOptions() {
       return salarySchemeOptions().then(response => {
@@ -939,16 +948,21 @@ export default {
       this.loadSchemeItems()
     },
     loadSchemeItems() {
-      if (!this.selectedScheme || !this.selectedScheme.schemeId) {
-        this.schemeItems = []
-        return Promise.resolve()
-      }
+      const scope = this.schemeScope(), schemeId = this.selectedScheme && String(this.selectedScheme.schemeId || ""), token = scope.begin("items", schemeId)
+      this.schemeItems = []
+      this.itemLoadedSchemeId = ""
+      this.itemLoadError = ""
+      this.itemLoading = false
+      if (!schemeId) return Promise.resolve()
       this.itemLoading = true
-      return listSalaryItems(this.selectedScheme.schemeId).then(response => {
+      const current = () => scope.isCurrent(token, this.selectedScheme && String(this.selectedScheme.schemeId || ""))
+      return listSalaryItems(schemeId, { silentError: true }).then(response => {
+        if (!current()) return
         this.schemeItems = response.data || []
-      }).finally(() => {
-        this.itemLoading = false
-      })
+        this.itemLoadedSchemeId = schemeId
+      }).catch(error => {
+        if (current()) this.itemLoadError = error && error.message || "档位加载失败，请重试"
+      }).finally(() => { if (current()) this.itemLoading = false })
     },
     handleAddSchemeItem() {
       if (!this.selectedScheme) {

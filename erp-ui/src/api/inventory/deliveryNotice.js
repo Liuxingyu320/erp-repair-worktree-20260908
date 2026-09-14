@@ -11,8 +11,8 @@ export function getDeliveryNotice(noticeId) {
 }
 
 // 生成发货通知
-export function createDeliveryNotice(salesOrderId) {
-  return request({ url: '/inventory/deliveryNotice/create/' + salesOrderId, method: 'post' })
+export function createDeliveryNotice(salesOrderId, version) {
+  return request({ url: '/inventory/deliveryNotice/create/' + salesOrderId, method: 'post', params: { version } })
 }
 
 // 执行发货
@@ -21,6 +21,11 @@ export function deliverDeliveryNotice(noticeId, data) {
 }
 
 // 取消发货通知
-export function cancelDeliveryNotice(noticeId) {
-  return request({ url: '/inventory/deliveryNotice/' + noticeId, method: 'delete' })
+export function cancelDeliveryNotice(noticeId, options) {
+  return request({ url: '/inventory/deliveryNotice/' + noticeId, method: 'delete', silentError: options && options.silentError === true })
+}
+
+// Controlled historical repair: caller submits only reviewed empty-line assignments.
+export function repairSalesWarehouses(salesOrderId, data, options = {}) {
+  return request({ url: '/inventory/deliveryNotice/repair-warehouses/' + salesOrderId, method: 'post', data, silentError: options.silentError === true })
 }

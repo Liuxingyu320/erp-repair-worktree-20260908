@@ -257,6 +257,8 @@
       :show-onboard-contract-actions="signDataImportActionsEnabled"
       @export="handleExportSingle"
       @edit="handleEditProfile"
+      @regularize="openLifecycle($event, 'REGULARIZE')"
+      @renewal="openLifecycle($event, 'RENEWAL')"
       @transfer="openTransfer"
       @offboard="openOffboarding"
       @onboard-contract="openDetailSignDataImport"
@@ -271,6 +273,8 @@
       :missing-fields="editDetail && Array.isArray(editDetail.missingRequiredFields) ? editDetail.missingRequiredFields : (editDetail && Array.isArray(editDetail.missingProfileFields) ? editDetail.missingProfileFields : [])"
       @save="handleSaveProfile"
     />
+
+    <hr-employee-lifecycle-dialog :visible.sync="lifecycleOpen" :employee-id="lifecycleEmployeeId" :scenario="lifecycleScenario" @confirmed="handleLifecycleConfirmed" />
 
     <hr-employee-transfer-dialog
       :visible.sync="transferOpen"
@@ -337,12 +341,9 @@ import { loadHrEmployeePreferences, saveHrEmployeePreferences } from "@/utils/hr
 
 const HrOffboardingDialog = () => import("./HrOffboardingDialog")
 
-function normalizePositiveDecimalId(value) {
-  if (value === undefined || value === null) return ""
-  const text = String(value).trim()
-  if (!/^\d+$/.test(text)) return ""
-  return text.replace(/^0+/, "")
-}
+import { getSelectedDeptId } from "@/utils/shopContext"
+const { createUiOperationScope } = require("@/utils/uiOperationScope")
+const { normalizePositiveDecimalId } = require("@/utils/positiveDecimalId")
 
 export default {
   name: "HrEmployeeList",
@@ -351,6 +352,7 @@ export default {
     HrProfileDetailDrawer,
     HrProfileEditDrawer,
     HrEmployeeTransferDialog,
+    HrEmployeeLifecycleDialog: () => import("./HrEmployeeLifecycleDialog"),
     HrOffboardingDialog,
     HrSignDataImportDialog
   },
@@ -410,6 +412,9 @@ export default {
   },
   data() {
     return {
+      lifecycleOpen: false,
+      lifecycleEmployeeId: "",
+      lifecycleScenario: "REGULARIZE",
       loading: false,
       listError: "",
       activeTask: this.mode === "completeness" ? "incomplete" : "all",
@@ -430,6 +435,7 @@ export default {
       editDetail: null,
       editOpen: false,
       saveLoading: false,
+      profileEditGeneration: 0,
       initializeLoadingUserId: undefined,
       transferOpen: false,
       transferEmployee: null,
@@ -526,6 +532,7 @@ export default {
     }
   },
   created() {
+    if (typeof window !== "undefined") window.addEventListener("erp:dept-changed", this.invalidateProfileEditor)
     this.restorePreferences()
     this.applyInitialFilters(this.initialFilters)
     const initialEmployeeId = normalizePositiveDecimalId(this.initialEmployeeId)
@@ -540,7 +547,13 @@ export default {
     this.loadFormOptions()
     this.getList()
   },
+  beforeDestroy() {
+    if (typeof window !== "undefined") window.removeEventListener("erp:dept-changed", this.invalidateProfileEditor)
+    this.profileOperationScope().deactivate()
+  },
+  deactivated() { this.profileOperationScope().deactivate(); this.editOpen = false; this.saveLoading = false },
   activated() {
+    this.profileOperationScope().activate()
     const employeeId = normalizePositiveDecimalId(this.initialEmployeeId)
     if (!employeeId || normalizePositiveDecimalId(this.queryParams.userId) === employeeId) {
       return Promise.resolve(null)
@@ -548,6 +561,9 @@ export default {
     return this.openRouteEmployee(employeeId, this.initialAction)
   },
   watch: {
+    editOpen(value) { if (!value) { this.profileOperationScope().invalidate("profile-save"); this.saveLoading = false } },
+    "$store.state.user.sessionRevision"() { this.invalidateProfileEditor() },
+    "$route.fullPath"() { this.invalidateProfileEditor() },
     initialEmployeeId(value, previous) {
       if (value !== previous) this.openRouteEmployee(value, this.initialAction)
     },
@@ -580,6 +596,20 @@ export default {
     }
   },
   methods: {
+    profileOperationScope() {
+      if (!this._profileOperationScope) this._profileOperationScope = createUiOperationScope(() => {
+        const user = this.$store && this.$store.state && this.$store.state.user || {}
+        return { actor: String(user.id || this.$store && this.$store.getters && this.$store.getters.id || ""),
+          session: user.sessionRevision || 0, dept: String(getSelectedDeptId() || "") }
+      })
+      return this._profileOperationScope
+    },
+    invalidateProfileEditor() {
+      this.profileOperationScope().invalidate()
+      this.profileEditGeneration++
+      this.editOpen = false
+      this.saveLoading = false
+    },
     preferenceContext() {
       const getters = this.$store && this.$store.getters ? this.$store.getters : {}
       let storage = null
@@ -953,6 +983,18 @@ export default {
         this.detailLoading = false
       })
     },
+    openLifecycle(row, scenario) {
+      const id = normalizePositiveDecimalId(row && row.userId)
+      if (!id) return
+      this.lifecycleEmployeeId = id
+      this.lifecycleScenario = scenario
+      this.lifecycleOpen = true
+    },
+    handleLifecycleConfirmed(result) {
+      this.getList()
+      if (this.detail && this.samePositiveDecimalId(this.detail.userId, result.userId)) this.refreshDetail()
+      if (this.$store && this.$store.dispatch) this.$store.dispatch("todo/refreshSummaries").catch(() => null)
+    },
     refreshDetail() {
       if (this.detail) {
         this.openDetail(this.detail)
@@ -977,42 +1019,50 @@ export default {
       })
     },
     handleEditProfile(row) {
+      this.profileOperationScope().invalidate()
+      this.profileEditGeneration++
+      this.saveLoading = false
       this.editDetail = row || this.detail
       this.editOpen = true
     },
     handleInitializeProfile(row) {
       const employeeId = normalizePositiveDecimalId(row && row.userId)
       if (!employeeId) return Promise.resolve(null)
+      const scope = this.profileOperationScope(), operation = scope.begin("profile-open", employeeId)
+      const current = () => scope.isCurrent(operation)
       const employeeName = row.employeeName || row.nickName || row.userName || `用户 ${employeeId}`
       if (row.profileInitialized === true) {
         return getHrEmployee(employeeId).then(response => {
-          this.editDetail = this.employeeWithExactId(response.data, employeeId, row)
-          this.editOpen = true
+          if (!current()) return null
+          this.handleEditProfile(this.employeeWithExactId(response.data, employeeId, row))
           return this.editDetail
         })
       }
       return this.$modal.confirm(`将为“${employeeName}”建立空白员工档案，建立后请继续补齐业务必填资料。`)
         .then(() => {
+          if (!current()) return null
           this.initializeLoadingUserId = employeeId
           return initializeHrEmployeeProfile(employeeId)
         })
         .then(response => {
+          if (!current() || !response) return null
+          this.initializeLoadingUserId = undefined
           const detail = this.employeeWithExactId(response.data, employeeId, { ...row, profileInitialized: true })
           this.$modal.msgSuccess("员工档案已建立，请继续补齐资料")
           this.detail = detail
           this.detailOpen = false
-          this.editDetail = detail
-          this.editOpen = true
+          this.handleEditProfile(detail)
           this.getList()
           return detail
         })
         .catch(error => {
+          if (!current()) return null
           if (error === "cancel" || error === "close") return null
           const message = error && error.response && error.response.data && error.response.data.msg
           this.$modal.msgError(message || "员工档案建立失败，请重试")
           return null
         })
-        .finally(() => { this.initializeLoadingUserId = undefined })
+        .finally(() => { if (current()) this.initializeLoadingUserId = undefined })
     },
     openTransfer(row) {
       const employeeId = normalizePositiveDecimalId(row && row.userId)
@@ -1070,25 +1120,32 @@ export default {
       return Promise.all([listRefresh, detailRefresh, todoRefresh])
     },
     handleSaveProfile(payload) {
+      const employeeId = normalizePositiveDecimalId(payload && payload.userId)
+      if (this.saveLoading || !this.editOpen || !employeeId || employeeId !== normalizePositiveDecimalId(this.editDetail && this.editDetail.userId)) return Promise.resolve(null)
+      const scope = this.profileOperationScope(), generation = this.profileEditGeneration
+      const editor = this.$refs.editDrawer
+      const operation = scope.begin("profile-save", { employeeId, generation })
+      const current = () => this.editOpen && scope.isCurrent(operation, {
+        employeeId: normalizePositiveDecimalId(this.editDetail && this.editDetail.userId), generation: this.profileEditGeneration })
+      const frozenPayload = JSON.parse(JSON.stringify({ ...payload, userId: employeeId }))
       this.saveLoading = true
-      updateHrEmployee(payload.userId, payload).then(() => {
+      return updateHrEmployee(employeeId, frozenPayload).then(() => {
+        if (!current()) return null
         this.$modal.msgSuccess("档案已保存")
+        this.saveLoading = false
         this.editOpen = false
         this.getList()
-        if (payload.userId) {
-          const employeeId = normalizePositiveDecimalId(payload.userId)
-          return getHrEmployee(employeeId || payload.userId).then(response => {
-            this.detail = this.employeeWithExactId(response.data, employeeId, this.detail)
-          })
-        }
-        return null
+        const readback = scope.begin("profile-readback"), detailSequence = this.detailRequestSequence
+        return getHrEmployee(employeeId).then(response => {
+          if (!scope.isCurrent(readback) || this.editOpen || generation !== this.profileEditGeneration ||
+              detailSequence !== this.detailRequestSequence ||
+              (this.detail && normalizePositiveDecimalId(this.detail.userId) !== employeeId)) return null
+          this.detail = this.employeeWithExactId(response.data, employeeId, this.detail)
+          return this.detail
+        }).catch(() => null)
       }).catch(error => {
-        if (this.$refs.editDrawer && this.$refs.editDrawer.applyServerErrors) {
-          this.$refs.editDrawer.applyServerErrors(error)
-        }
-      }).finally(() => {
-        this.saveLoading = false
-      })
+        if (current() && editor === this.$refs.editDrawer && editor && editor.applyServerErrors) editor.applyServerErrors(error)
+      }).finally(() => { if (current()) this.saveLoading = false })
     },
     handleTemplate() {
       this.download(LEGACY_HR_EMPLOYEE_IMPORT_TEMPLATE_ACTION.replace(/^\/system\//, "system/"), {}, this.exportFileName("员工档案导入模板"))

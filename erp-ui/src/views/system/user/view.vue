@@ -19,6 +19,9 @@
     </div>
 
     <div v-loading="loading" class="drawer-content">
+      <el-alert v-if="loadError" :title="loadError" type="error" :closable="false" />
+      <el-alert v-if="piiError" :title="piiError" type="warning" :closable="false" />
+      <el-button v-if="loadError || piiError" size="mini" @click="retryDetail">重新加载</el-button>
       <template v-if="info && info.userId">
         <section class="profile-hero">
           <div class="profile-avatar" aria-hidden="true">{{ userInitial }}</div>
@@ -113,6 +116,10 @@
 
 <script>
 import { getUser, getUserPii } from '@/api/system/user'
+import { getSelectedDeptId } from '@/utils/shopContext'
+const { createUiOperationScope } = require('@/utils/uiOperationScope')
+// Matches the dedicated SysUserPiiUpdateRequest response contract.
+const PII_FIELDS = new Set(["email", "phonenumber", "sex", "birthDate", "idType", "idNumber", "bloodType", "registeredResidence", "currentAddress", "firstEducation", "firstDegree", "firstGraduationDate", "firstGraduationSchool", "firstMajor", "highestEducation", "highestDegree", "highestGraduationDate", "highestGraduationSchool", "highestMajor", "politicalStatus", "maritalStatus", "nationality", "foreignNationalFlag", "ethnicity", "healthStatus", "emergencyContact", "emergencyContactRelation", "emergencyContactPhone", "officePhone", "workLocation", "householdType", "socialSecurityLocation", "housingFundLocation", "bankName", "bankAccount"])
 import { signingOptionsForKey, signingProfileLabel } from '@/views/hr/components/signingProfileOptions'
 
 export default {
@@ -122,6 +129,9 @@ export default {
     return {
       visible: false,
       loading: false,
+      loadError: '',
+      piiError: '',
+      targetUserId: '',
       info: {},
       piiVisible: false,
       postOptions: [],
@@ -129,6 +139,10 @@ export default {
     }
   },
   computed: {
+    actorContextKey() {
+      const store = this.$store || {}, getters = store.getters || {}
+      return JSON.stringify([String(getters.id || ''), ((store.state || {}).user || {}).sessionRevision || 0, getters.permissions || []])
+    },
     userInitial() {
       const chars = Array.from(String(this.info.nickName || this.info.userName || '用').trim())
       return chars[0] || '用'
@@ -222,38 +236,88 @@ export default {
       ]
     }
   },
+  watch: {
+    actorContextKey() { this.handleClose() },
+    visible(value) { if (!value) this.clearDetail() }
+  },
+  created() { window.addEventListener('erp:dept-changed', this.handleClose) },
+  activated() { this.detailScope().activate() },
+  deactivated() { this.handleClose(); this.detailScope().deactivate() },
+  beforeDestroy() {
+    window.removeEventListener('erp:dept-changed', this.handleClose)
+    this.detailScope().deactivate()
+    this.clearDetail()
+  },
   methods: {
-    open(userId) {
-      this.visible = true
-      this.loading = true
-      this.piiVisible = false
+    detailScope() {
+      if (!this._detailScope) this._detailScope = createUiOperationScope(() => ({ actor: this.actorContextKey, dept: getSelectedDeptId() }))
+      return this._detailScope
+    },
+    clearDetail() {
+      this.detailScope().invalidate()
+      this.loading = false
       this.info = {}
-      getUser(userId).then(res => {
-        this.info = res.data || {}
+      this.postOptions = []
+      this.roleOptions = []
+      this.piiVisible = false
+      this.loadError = ''
+      this.piiError = ''
+      this.targetUserId = ''
+    },
+    retryDetail() { if (this.targetUserId) return this.open(this.targetUserId) },
+    async open(userId) {
+      this.clearDetail()
+      const target = String(userId || '')
+      this.visible = true
+      this.targetUserId = target
+      if (!/^[1-9]\d{0,18}$/.test(target) || (typeof userId === 'number' && !Number.isSafeInteger(userId))) {
+        this.loadError = '用户编号无效，请重新选择'
+        return
+      }
+      const scope = this.detailScope(), token = scope.begin('detail', target)
+      const current = () => this.visible && scope.isCurrent(token, this.targetUserId)
+      this.loading = true
+      let base
+      try {
+        const res = await getUser(target, { silentError: true })
+        if (!current()) return
+        if (!res.data || String(res.data.userId) !== target) throw new Error('用户资料已变化，请重新加载')
+        base = { ...res.data, profile: { ...(res.data.profile || {}) }, postIds: res.postIds || [], roleIds: res.roleIds || [] }
+        this.info = base
         this.postOptions = res.posts || []
         this.roleOptions = res.roles || []
-        this.info.postIds = res.postIds || []
-        this.info.roleIds = res.roleIds || []
+      } catch (error) {
+        if (current()) { this.loadError = error && error.message || '用户资料加载失败，请重试'; this.loading = false }
+        return
+      }
+      try {
         if (this.$auth && this.$auth.hasPermi('system:user:pii:read')) {
-          return getUserPii(userId, 'BUSINESS_PROCESSING').then(piiRes => {
-            const pii = piiRes.data || {}
-            const baseFields = new Set(['userId', 'userName', 'nickName', 'email', 'phonenumber', 'sex'])
-            const profile = { ...(this.info.profile || {}) }
-            Object.keys(pii).forEach(field => {
-              if (baseFields.has(field)) this.$set(this.info, field, pii[field])
-              else profile[field] = pii[field]
-            })
-            this.$set(this.info, 'profile', profile)
-            this.piiVisible = true
+          const piiRes = await getUserPii(target, 'BUSINESS_PROCESSING', { silentError: true })
+          if (!current()) return
+          const pii = piiRes.data || {}
+          if (String(pii.userId) !== target || String(base.userId) !== target) throw new Error('敏感资料归属已变化，请重新加载')
+          const info = { ...base, profile: { ...base.profile } }
+          const baseFields = new Set(['email', 'phonenumber', 'sex'])
+          Object.keys(pii).forEach(field => {
+            if (!PII_FIELDS.has(field)) return
+            if (baseFields.has(field)) info[field] = pii[field]
+            else info.profile[field] = pii[field]
           })
+          this.info = info
+          this.piiVisible = true
         }
-        return null
-      }).finally(() => {
-        this.loading = false
-      })
+      } catch (error) {
+        if (current()) {
+          const code = error && (error.code || (error.response && (error.response.status || (error.response.data || {}).code)))
+          this.piiError = Number(code) === 403 ? '无权查看敏感资料' : '敏感资料加载失败，请重试'
+        }
+      } finally {
+        if (current()) this.loading = false
+      }
     },
     handleClose() {
       this.visible = false
+      this.clearDetail()
     },
     syncDrawerAccessibility() {
       const component = this.$refs.userDetailDrawer

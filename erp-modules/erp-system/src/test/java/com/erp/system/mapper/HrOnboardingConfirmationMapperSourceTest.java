@@ -150,6 +150,7 @@ class HrOnboardingConfirmationMapperSourceTest
     private Configuration parse(String resource) throws Exception
     {
         Configuration configuration = new Configuration();
+        HealthCertificateMapperFragments.register(configuration);
         configuration.getTypeAliasRegistry().registerAlias("SysDept", SysDept.class);
         configuration.getTypeAliasRegistry().registerAlias("SysRole", SysRole.class);
         configuration.getTypeAliasRegistry().registerAlias("SysUser", SysUser.class);

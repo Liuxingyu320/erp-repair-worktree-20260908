@@ -11,6 +11,8 @@ import com.erp.system.domain.vo.SysNoticeReadUserVo;
  */
 public interface ISysNoticeReadService
 {
+    com.erp.system.domain.vo.SysNoticeReadPage selectReadUsersPage(Long noticeId, String searchValue);
+
     /**
      * 标记已读（幂等，重复调用不报错）
      *

@@ -10,6 +10,10 @@ import com.erp.job.domain.SysJob;
  */
 public interface SysJobMapper
 {
+    SysJob selectJobByIdForUpdate(Long jobId);
+    List<SysJob> selectReconcilePage(@org.apache.ibatis.annotations.Param("afterId") Long afterId,
+            @org.apache.ibatis.annotations.Param("limit") int limit);
+
     /**
      * 查询调度任务日志集合
      * 

@@ -40,17 +40,19 @@ export function withdrawPurchase(purchaseId, data) {
   })
 }
 
-export function listMyPurchases(params) {
+export function listMyPurchases(params, config = {}) {
   return request({
     url: '/oa/purchase/my',
     method: 'get',
-    params
+    params,
+    silentError: config.silentError === true
   })
 }
 
-export function getPurchaseDetail(purchaseId) {
+export function getPurchaseDetail(purchaseId, config = {}) {
   return request({
     url: '/oa/purchase/' + purchaseId,
-    method: 'get'
+    method: 'get',
+    silentError: config.silentError === true
   })
 }

@@ -51,7 +51,7 @@ assert.ok(
 )
 
 const submitStart = source.indexOf("submitReceive()")
-const validatedStart = source.indexOf("submitValidatedReceive()", submitStart)
+const validatedStart = source.indexOf("submitValidatedReceive(operation)", submitStart)
 assert.ok(
   submitStart > -1 && validatedStart > submitStart &&
     source.slice(submitStart, validatedStart).includes("formRef.validate"),

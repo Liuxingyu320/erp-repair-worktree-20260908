@@ -124,6 +124,44 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         )
     </insert>
 
+    <!-- 仅供已校验组织范围的合同服务内部比对，不向浏览器提供档案身份证。 -->
+    <select id="selectScopedEmployeeIdentity" resultType="OaLaborContract">
+        select u.user_id as employeeId, u.dept_id as employeeDeptId,
+               coalesce(nullif(u.nick_name, ''), u.user_name) as employeeName,
+               p.id_number as employeeIdCard
+        from sys_user u
+        inner join sys_dept d on d.dept_id = u.dept_id
+        left join sys_user_profile p on p.user_id = u.user_id
+        where u.user_id = #{employeeId} and u.del_flag = '0'
+          and d.del_flag = '0'
+          and (d.dept_id = #{shopDeptId} or find_in_set(#{shopDeptId}, d.ancestors))
+    </select>
+
+    <!-- All legacy writers lock only the contract row, not joined template/dept rows. -->
+    <select id="selectOaLaborContractByIdForUpdate" resultMap="OaLaborContractResult">
+        select c.* from oa_labor_contract c where c.contract_id = #{contractId} for update
+    </select>
+
+    <update id="markSigned">
+        update oa_labor_contract
+        set status = 'signed', archive_file_url = #{contract.archiveFileUrl},
+            pdf_file_url = #{contract.pdfFileUrl}, signature_file_url = #{contract.signatureFileUrl},
+            archive_file_hash = #{contract.archiveFileHash}, certificate_file_url = #{contract.certificateFileUrl},
+            certificate_file_hash = #{contract.certificateFileHash}, contract_file_hash = #{contract.contractFileHash},
+            signer_ip = #{contract.signerIp}, signer_user_agent = #{contract.signerUserAgent},
+            signed_time = #{contract.signedTime}, update_by = #{contract.updateBy}, update_time = sysdate()
+        where contract_id = #{contract.contractId} and status = 'pending_sign'
+          and document_version = #{expectedVersion} and preview_file_hash = #{expectedHash}
+    </update>
+
+    <update id="markVoided">
+        update oa_labor_contract
+        set status = 'voided', voided_time = #{contract.voidedTime},
+            update_by = #{contract.updateBy}, update_time = sysdate()
+        where contract_id = #{contract.contractId} and status = #{expectedStatus}
+          and status in ('draft', 'pending_sign')
+    </update>
+
     <update id="updateOaLaborContract" parameterType="OaLaborContract">
         update oa_labor_contract
         <set>
@@ -142,8 +180,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="socialType != null">social_type = #{socialType},</if>
             <if test="contractStartDate != null">contract_start_date = #{contractStartDate},</if>
             <if test="contractEndDate != null">contract_end_date = #{contractEndDate},</if>
-            <if test="probationStartDate != null">probation_start_date = #{probationStartDate},</if>
-            <if test="probationEndDate != null">probation_end_date = #{probationEndDate},</if>
+            <if test="probationStartDateSpecified">probation_start_date = #{probationStartDate},</if>
+            <if test="probationEndDateSpecified">probation_end_date = #{probationEndDate},</if>
             <if test="baseSalary != null">base_salary = #{baseSalary},</if>
             <if test="managementAllowance != null">management_allowance = #{managementAllowance},</if>
             <if test="overtimePay != null">overtime_pay = #{overtimePay},</if>

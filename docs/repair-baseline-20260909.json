@@ -1,0 +1,162 @@
+{
+  "original": "/Users/liuxingyu/Desktop/ERP-NEW_阿里云线上源码备份_2026-09-08_3a6fe91a2/修复工作副本_2026-09-08",
+  "implementation": "/Users/liuxingyu/Desktop/ERP-NEW_阿里云线上源码备份_2026-09-08_3a6fe91a2/问题修复实施_20260909",
+  "head": "76b69e3dd808e4f9c526474e2ddaab84e12bd5d1",
+  "preserved_original_changes": [
+    {
+      "status": " M",
+      "path": "erp-modules/erp-oa/src/main/java/com/erp/oa/attendance/controller/AttendanceV2Controller.java",
+      "sha256": "7a7830cd1981a5a52160fa158d7d3e0a3309bc931d723b0f4a4b095fdd9f5094"
+    },
+    {
+      "status": " M",
+      "path": "erp-modules/erp-oa/src/main/java/com/erp/oa/attendance/domain/AttendanceModels.java",
+      "sha256": "efab3cccc5798fd05e36132d4382eead71e1987866fd6459096cf3c2e8e058fa"
+    },
+    {
+      "status": " M",
+      "path": "erp-modules/erp-oa/src/main/java/com/erp/oa/attendance/dto/AttendanceRequests.java",
+      "sha256": "15dc3d2905730b4134dfe2dcca4ec56103bde8a80bc46f16bdd72587603460da"
+    },
+    {
+      "status": " M",
+      "path": "erp-modules/erp-oa/src/main/java/com/erp/oa/attendance/dto/AttendanceViews.java",
+      "sha256": "84e143e8230e7a5815737b9d7ca56d8e2397ae9639731403895370c11cc6014f"
+    },
+    {
+      "status": " M",
+      "path": "erp-modules/erp-oa/src/main/java/com/erp/oa/attendance/mapper/AttendanceV2Mapper.java",
+      "sha256": "af4cd97ca8e75db51785bdb749d5b30d3fa751cbe1159dd7aabc3a126ae8ee6d"
+    },
+    {
+      "status": " M",
+      "path": "erp-modules/erp-oa/src/main/java/com/erp/oa/attendance/service/AttendanceRemainingWorkService.java",
+      "sha256": "b1bc8620ae8c490a01071e17057f3895f4dc1be5c85ca20b90c7eec30351e6eb"
+    },
+    {
+      "status": " M",
+      "path": "erp-modules/erp-oa/src/main/java/com/erp/oa/attendance/service/AttendanceV2Service.java",
+      "sha256": "3b37d1d4e2776ba9eb99b21807cfbfc599458dbcc54133885cdce5311c20e228"
+    },
+    {
+      "status": " M",
+      "path": "erp-modules/erp-oa/src/main/java/com/erp/oa/attendance/support/AttendanceDaySettlementCalculator.java",
+      "sha256": "c0a7ce04e6a50a3434ee9f4f99755c4135b95c900491bfc693d8a0b740f47cbf"
+    },
+    {
+      "status": " M",
+      "path": "erp-modules/erp-oa/src/main/resources/mapper/oa/AttendanceCorrectionMapper.xml",
+      "sha256": "8381f68ed64a5950d9af422789d24aed9fd7bbeaf6abac38b95934da79b7e91d"
+    },
+    {
+      "status": " M",
+      "path": "erp-modules/erp-oa/src/main/resources/mapper/oa/AttendanceV2Mapper.xml",
+      "sha256": "52a4ea39c0522b443ec4f91bf7005cf3475c845bab469bcb4fd2ed706b3d77dd"
+    },
+    {
+      "status": " M",
+      "path": "erp-modules/erp-oa/src/test/java/com/erp/oa/attendance/mapper/AttendanceLeaveCorrectionMapperBindingTest.java",
+      "sha256": "fca2b05cbd8df71ff40c273ddcfb65ce26c1a0b00dc36a418f08c04ef5d8bddc"
+    },
+    {
+      "status": " M",
+      "path": "erp-modules/erp-oa/src/test/java/com/erp/oa/attendance/mapper/AttendanceV2MapperBindingTest.java",
+      "sha256": "1537baa577fd5df805fcd6ee84b7837a07bb6e09b66e328b6b5583e8bfca62e9"
+    },
+    {
+      "status": " M",
+      "path": "erp-modules/erp-oa/src/test/java/com/erp/oa/attendance/service/AttendanceDaySettlementServiceTest.java",
+      "sha256": "25fefa32290f2c374e97deacd7b1fffcc93beea4d07dadc1e6a65d8d6cbbd58d"
+    },
+    {
+      "status": " M",
+      "path": "erp-modules/erp-oa/src/test/java/com/erp/oa/attendance/service/AttendanceV2PunchAddressEvidenceTest.java",
+      "sha256": "69df1ace9a0898dee73931769a35dea76b7c9943266dfd1d4589e79d79e290b2"
+    },
+    {
+      "status": " M",
+      "path": "erp-modules/erp-oa/src/test/java/com/erp/oa/attendance/service/AttendanceV2SegmentPunchStateMachineTest.java",
+      "sha256": "9d7296ce5a08b42f4548db2b4a48fc438fd5b64e528aa1123ad404f22c4995c2"
+    },
+    {
+      "status": " M",
+      "path": "erp-modules/erp-oa/src/test/java/com/erp/oa/attendance/service/AttendanceV2ServiceScopeTest.java",
+      "sha256": "b562c6351a28877ac89bf78d9b3d28c0b1c0e247d4c8a7999d68e35baec76d23"
+    },
+    {
+      "status": " M",
+      "path": "erp-ui/src/api/oa/attendanceV2.js",
+      "sha256": "801d96bfc32e5d4d0dc139a505ccbe7f6593a936f8999ce5057ccfeaf8d298d9"
+    },
+    {
+      "status": " M",
+      "path": "erp-ui/src/views/mobile/attendance/attendancePunchPolicy.js",
+      "sha256": "ad3df17e4b7b564095545e6124bef6fe8c35c44982712df82a86455ecdfa35de"
+    },
+    {
+      "status": " M",
+      "path": "erp-ui/src/views/mobile/attendance/index.vue",
+      "sha256": "540dfb5288eb28c32f2cb8364c943efcc860ede66603d13d6a3615eea8b24f42"
+    },
+    {
+      "status": " M",
+      "path": "erp-ui/src/views/mobile/attendance/mobileAttendancePunchAttempt.js",
+      "sha256": "d35600fe8b37f2fdd191fead1d55587046517b66742b0a9e273935131dfe9e69"
+    },
+    {
+      "status": " M",
+      "path": "erp-ui/test/attendanceEvidencePreview.test.js",
+      "sha256": "831fdd039cc47bde576704badbc26e46e677e72be679e6094e150422b6266819"
+    },
+    {
+      "status": " M",
+      "path": "erp-ui/test/attendanceV2Contract.test.js",
+      "sha256": "1870186fff4cafe56e36c7c6b690f57da226e8dfcee008a59a73c6f139076f93"
+    },
+    {
+      "status": " M",
+      "path": "erp-ui/test/mobileAttendancePunchAttempt.test.js",
+      "sha256": "3d7fa3c77b1825ec8e86eecd4307591942a7fa3f90dd17c19de33ad7196454f6"
+    },
+    {
+      "status": " M",
+      "path": "erp-ui/test/mobileReimbursementDriveRelease.test.js",
+      "sha256": "b109a6fda6789601fe6593efb90f2d60e586ecfa04d1427c1a5192fd0fcb81d4"
+    },
+    {
+      "status": " M",
+      "path": "erp-ui/test/signOriginalPlacementExportRelease.test.js",
+      "sha256": "7c869f0df24d0bb1c5bfce533b75a5350ab12dba4913b49d7fcda7d075a123b7"
+    },
+    {
+      "status": "??",
+      "path": "docs/三轮检查问题汇总与修复方案-20260909.md",
+      "sha256": "5cfcdfa3a6c630bff5fae3328216011526491eac6e8845051849882be9b492de"
+    },
+    {
+      "status": "??",
+      "path": "erp-modules/erp-oa/src/main/java/com/erp/oa/attendance/support/AttendancePunchRejectionPolicy.java",
+      "sha256": "12088dbf94c1f33bda8c237b92541eae6d9b68bad4df48a6680d26eafdafc234"
+    },
+    {
+      "status": "??",
+      "path": "erp-modules/erp-oa/src/test/java/com/erp/oa/attendance/controller/AttendancePunchRejectionContractTest.java",
+      "sha256": "3be13172302c07c6b249195c51e178453622ee4d70c2db0530afcd82d5ee91eb"
+    },
+    {
+      "status": "??",
+      "path": "erp-modules/erp-oa/src/test/java/com/erp/oa/attendance/service/AttendanceRemainingWorkServiceTest.java",
+      "sha256": "083977c62cf97a34e3c6177fb3b11f2bdfa3a89f2384dec6f5329efc292072a8"
+    },
+    {
+      "status": "??",
+      "path": "erp-ui/test/attendanceCaptureTime.test.js",
+      "sha256": "b92132fa40f0d9598828036592202e43f006c6d57bf89e060a47640edd0e25aa"
+    },
+    {
+      "status": "??",
+      "path": "erp-ui/test/helpers/",
+      "sha256": null
+    }
+  ]
+}

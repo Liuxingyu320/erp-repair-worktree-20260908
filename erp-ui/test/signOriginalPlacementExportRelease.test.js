@@ -2,6 +2,7 @@ const assert = require("assert")
 const fs = require("fs")
 const path = require("path")
 const { execFileSync, spawnSync } = require("child_process")
+const { withReleaseSourceFixture } = require("./helpers/releaseSourceFixture")
 
 const root = path.resolve(__dirname, "../..")
 const manifestPath = path.join(root,
@@ -179,20 +180,25 @@ assert.match(routePolicySelfTest.stdout,
 const verifierText = fs.readFileSync(verifier, "utf8")
 assert.match(verifierText, /sha256\(path\) != recorded/,
   "the immutable historical verifier must retain pinned content-hash enforcement")
-const sourceGate = spawnSync("bash", [verifier, "--source"], {
-  cwd: root,
-  encoding: "utf8"
+withReleaseSourceFixture(root, [
+  ...sources, ...manifest.pinnedBuildInputs.files.map(item => item.file),
+  path.relative(root, sourceListPath), path.relative(root, migrationListPath),
+  path.relative(root, manifestPath), path.relative(root, verifier), path.relative(root, wrapper)
+], fixture => {
+  fixture.commit()
+  const verify = () => spawnSync("bash", [path.join(fixture.root, path.relative(root, verifier)), "--source"], {
+    cwd: fixture.root, encoding: "utf8", env: fixture.env
+  })
+  // The clean fixture cannot impersonate the historical dirty candidate.
+  // Keep the immutable production verifier and its recorded hashes untouched.
+  const sourceGate = verify()
+  assert.notStrictEqual(sourceGate.status, 0)
+  assert.match(`${sourceGate.stdout}${sourceGate.stderr}`,
+    /\[FAIL\] (?:pinned build input|pinned build-input git status) drift: pom\.xml/)
+  fs.appendFileSync(path.join(fixture.root, "pom.xml"), "\n<!-- test-only content drift -->\n")
+  const hashDrift = verify()
+  assert.notStrictEqual(hashDrift.status, 0)
+  assert.match(`${hashDrift.stdout}${hashDrift.stderr}`, /\[FAIL\] pinned build input drift: pom\.xml/)
 })
-const sourceGateOutput = `${sourceGate.stdout}${sourceGate.stderr}`
-if (sourceGate.status === 0) {
-  assert.match(sourceGateOutput, /SIGN_ORIGINAL_PLACEMENT_RELEASE_SOURCE_OK files=\d+/)
-  assert.match(sourceGateOutput, /status=development deployable=false/)
-  assert.match(sourceGateOutput, /SIGN_ORIGINAL_PLACEMENT_RELEASE_STATIC_OK/)
-} else {
-  // This manifest intentionally attests a dirty candidate that cannot be reconstructed from
-  // its baseline commit. A later integration branch must be rejected, not made to impersonate it.
-  assert.match(sourceGateOutput,
-    /\[FAIL\] (?:pinned build input|pinned build-input git status|source hash|source git status) drift: /)
-}
 
 console.log(`sign original placement release contract passed (files=${sources.length})`)

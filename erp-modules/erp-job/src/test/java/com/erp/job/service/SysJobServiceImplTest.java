@@ -36,10 +36,12 @@ class SysJobServiceImplTest
 
         SysJob request = new SysJob();
         request.setJobId(7L);
+        request.setRevision("revision-1");
         request.setJobGroup("DEFAULT");
 
         SysJob stored = new SysJob();
         stored.setJobId(7L);
+        stored.setRevision("revision-1");
         stored.setJobName("测试任务");
         stored.setJobGroup("DEFAULT");
         stored.setInvokeTarget("ryTask.ryNoParams");
@@ -47,7 +49,7 @@ class SysJobServiceImplTest
         stored.setMisfirePolicy(ScheduleConstants.MISFIRE_DO_NOTHING);
         stored.setConcurrent("1");
         stored.setStatus(ScheduleConstants.Status.NORMAL.getValue());
-        when(jobMapper.selectJobById(7L)).thenReturn(stored);
+        when(jobMapper.selectJobByIdForUpdate(7L)).thenReturn(stored);
 
         JobKey jobKey = ScheduleUtils.getJobKey(7L, "DEFAULT");
         when(scheduler.checkExists(jobKey)).thenReturn(false, false, true);

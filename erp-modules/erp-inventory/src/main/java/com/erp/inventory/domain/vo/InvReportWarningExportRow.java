@@ -10,13 +10,19 @@ public class InvReportWarningExportRow implements Serializable
 {
     private static final long serialVersionUID = 1L;
 
-    @Excel(name = "商品编码")
+    @Excel(name = "物料编码")
     private String productCode;
 
-    @Excel(name = "商品名称")
+    @Excel(name = "物料类型")
+    private String itemType;
+
+    @Excel(name = "分类类型")
+    private String categoryType;
+
+    @Excel(name = "物料名称")
     private String productName;
 
-    @Excel(name = "商品分类")
+    @Excel(name = "物料分类")
     private String categoryName;
 
     @Excel(name = "规格")
@@ -65,11 +71,15 @@ public class InvReportWarningExportRow implements Serializable
     {
         InvStock source = stock == null ? new InvStock() : stock;
         InvReportWarningExportRow row = new InvReportWarningExportRow();
-        row.setProductCode(source.getProductCode());
-        row.setProductName(source.getProductName());
-        row.setCategoryName(firstText(source.getCategoryFullPath(), source.getCategoryName()));
-        row.setSpec(source.getSpec());
-        row.setUnit(source.getUnit());
+        String type = source.getItemType() == null ? "product" : source.getItemType();
+        String typeName = switch(type) { case "oe" -> "OE"; case "gift" -> "礼盒"; default -> "商品"; };
+        row.setItemType(typeName);
+        row.setCategoryType(typeName);
+        row.setProductCode(firstText(source.getItemCode(), source.getProductCode()));
+        row.setProductName(firstText(source.getItemName(), source.getProductName()));
+        row.setCategoryName(firstText(firstText(source.getItemCategoryFullPath(), source.getItemCategoryName()), firstText(source.getCategoryFullPath(), source.getCategoryName())));
+        row.setSpec(firstText(source.getItemSpec(), source.getSpec()));
+        row.setUnit(firstText(source.getItemUnit(), source.getUnit()));
         row.setInventoryOrganizationName(firstText(
                 source.getWarehouseName(), source.getShopDeptName()));
         row.setBatchNo(source.getBatchNo());
@@ -83,7 +93,7 @@ public class InvReportWarningExportRow implements Serializable
         BigDecimal safety = defaultZero(source.getSafetyStockMin());
         row.setCurrentQuantity(current);
         row.setAvailableQuantity(available);
-        row.setSafetyStockMin(safety);
+        row.setSafetyStockMin(source.getSafetyStockMin());
         if (safety.signum() <= 0)
         {
             row.setWarningGap(null);
@@ -125,6 +135,10 @@ public class InvReportWarningExportRow implements Serializable
         return second == null ? null : second.trim();
     }
 
+    public String getItemType() { return itemType; }
+    public void setItemType(String itemType) { this.itemType = itemType; }
+    public String getCategoryType() { return categoryType; }
+    public void setCategoryType(String categoryType) { this.categoryType = categoryType; }
     public String getProductCode() { return productCode; }
     public void setProductCode(String productCode) { this.productCode = productCode; }
     public String getProductName() { return productName; }

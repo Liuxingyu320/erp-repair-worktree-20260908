@@ -79,7 +79,9 @@ public class ScheduleUtils
         // 判断是否存在
         if (scheduler.checkExists(getJobKey(jobId, jobGroup)))
         {
-            // 防止创建时存在数据问题 先移除，然后在执行创建操作
+            if (com.erp.job.service.SysJobSchedulerReconciler.ownedDefinition(
+                    scheduler.getJobDetail(getJobKey(jobId,jobGroup)),getJobKey(jobId,jobGroup)) == null)
+                throw new SchedulerException("Refusing to replace an unrelated scheduler job");
             scheduler.deleteJob(getJobKey(jobId, jobGroup));
         }
 

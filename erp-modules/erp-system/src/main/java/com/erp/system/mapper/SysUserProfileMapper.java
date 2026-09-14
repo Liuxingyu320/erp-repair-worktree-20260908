@@ -15,6 +15,7 @@ import java.util.Map;
  */
 public interface SysUserProfileMapper
 {
+    SysUserProfile selectSalaryProfileForUpdate(@org.apache.ibatis.annotations.Param("userId") Long userId);
     /**
      * 通过用户ID查询员工档案
      *
@@ -73,6 +74,10 @@ public interface SysUserProfileMapper
 
     /** Update only fields that an employee may maintain during profile completion. */
     public int updateProfileCompletionFields(SysUserProfile profile);
+
+    /** Date-only regularization preserves every position and payroll column. */
+    int updateRegularizationDateOnly(@Param("employeeId") Long employeeId,
+            @Param("effectiveDate") java.time.LocalDate effectiveDate, @Param("updateBy") String updateBy);
 
     /** 锁定员工、档案及其稳定组织岗位信息后读取签约快照。 */
     HrEmployeeSigningSnapshot selectSigningSnapshotByUserIdForUpdate(Long userId);

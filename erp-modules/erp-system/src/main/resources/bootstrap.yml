@@ -39,6 +39,27 @@ system:
   profile-completion:
     gate-enabled: ${PROFILE_COMPLETION_GATE_ENABLED:true}
 
+erp:
+  push:
+    in-app:
+      enabled: ${IN_APP_MOBILE_PUSH_ENABLED:false}
+      dispatch-delay-ms: ${IN_APP_MOBILE_PUSH_DISPATCH_DELAY_MS:30000}
+
+push:
+  fcm:
+    enabled: ${PUSH_FCM_ENABLED:false}
+    project-id: ${FIREBASE_PROJECT_ID:}
+  apns:
+    enabled: ${PUSH_APNS_ENABLED:false}
+    auth-mode: ${APNS_AUTH_MODE:token}
+    team-id: ${APNS_TEAM_ID:}
+    key-id: ${APNS_KEY_ID:}
+    bundle-id: ${APNS_BUNDLE_ID:com.erp.mobile}
+    private-key-path: ${APNS_PRIVATE_KEY_PATH:}
+    certificate-path: ${APNS_CERTIFICATE_PATH:}
+    certificate-password: ${APNS_CERTIFICATE_PASSWORD:}
+    environment: ${APNS_ENVIRONMENT:production}
+
 ---
 # 本地无 Nacos 启动配置：--spring.profiles.active=local
 server:
@@ -112,15 +133,3 @@ springdoc:
     contact:
       name: ERP
       url: https://erp.vip
-
-push:
-  fcm:
-    enabled: ${PUSH_FCM_ENABLED:false}
-    project-id: ${FIREBASE_PROJECT_ID:}
-  apns:
-    enabled: ${PUSH_APNS_ENABLED:false}
-    team-id: ${APNS_TEAM_ID:}
-    key-id: ${APNS_KEY_ID:}
-    bundle-id: ${APNS_BUNDLE_ID:com.erp.mobile}
-    private-key-path: ${APNS_PRIVATE_KEY_PATH:}
-    environment: ${APNS_ENVIRONMENT:production}

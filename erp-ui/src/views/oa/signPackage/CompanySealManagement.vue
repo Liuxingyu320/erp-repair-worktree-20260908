@@ -103,6 +103,8 @@
         <el-alert title="这里只维护合同用印章。经办人选定公司后，只能选择该公司名下处于有效期内的启用印章。" type="warning" show-icon :closable="false" />
         <el-button type="primary" size="small" icon="el-icon-plus" @click="openSeal()" v-hasPermi="['oa:signSeal:edit']">新增印章</el-button>
       </div>
+      <el-alert v-if="sealListError" :title="sealListError" type="error" :closable="false" show-icon />
+      <el-button v-if="sealListError" size="small" :disabled="sealLoading" @click="loadSeals">重试当前公司</el-button>
       <el-table v-loading="sealLoading" :data="seals" border size="small" empty-text="该公司尚未配置合同印章">
         <el-table-column label="印章名称" prop="sealName" min-width="180" />
         <el-table-column label="默认印章" width="90">
@@ -124,9 +126,10 @@
     </el-dialog>
 
     <el-dialog :title="sealForm.sealId ? '编辑印章' : '新增印章'" :visible.sync="sealOpen" width="640px" append-to-body>
+      <el-alert v-if="sealError" :title="sealError" type="error" :closable="false" show-icon />
       <el-form ref="sealForm" :model="sealForm" :rules="sealRules" label-width="110px" size="small">
         <el-form-item label="所属公司">
-          <el-input :value="selectedCompany ? selectedCompany.legalEntityName : ''" disabled />
+          <el-input :value="sealForm.legalEntityName || ''" disabled />
         </el-form-item>
         <el-form-item label="印章名称" prop="sealName">
           <el-input v-model.trim="sealForm.sealName" maxlength="100" placeholder="例如：劳动合同专用章" />
@@ -171,6 +174,9 @@
 <script>
 import { createLegalEntity, listLegalEntities, updateLegalEntity } from '@/api/system/legalEntity'
 import { listCompanySeals, saveCompanySeal } from '@/api/oa/signPackage'
+import { getSelectedSignScopeDeptId } from '@/utils/signScopeContext'
+const { createUiOperationScope } = require('@/utils/uiOperationScope')
+const { normalizePositiveDecimalId } = require('@/utils/positiveDecimalId')
 
 export default {
   name: 'CompanySealManagement',
@@ -189,6 +195,8 @@ export default {
       selectedCompany: null,
       sealListOpen: false,
       sealLoading: false,
+      sealListError: "",
+      sealError: "",
       seals: [],
       sealOpen: false,
       sealSaving: false,
@@ -202,7 +210,25 @@ export default {
   created() {
     this.loadCompanies()
   },
+  beforeDestroy() { this.operationScope().deactivate() },
+  deactivated() { this.operationScope().deactivate(); this.sealListOpen = false; this.sealOpen = false },
+  activated() { this.operationScope().activate() },
+  watch: {
+    sealListOpen(value) { if (!value) { this.operationScope().invalidate("seal-list"); this.closeSealEditor(); this.seals = [] } },
+    sealOpen(value) { if (!value) this.operationScope().invalidate("seal-edit") },
+    "$store.state.user.sessionRevision"() { this.operationScope().invalidate(); this.sealListOpen = false; this.closeSealEditor() },
+    "$route.fullPath"() { this.operationScope().invalidate(); this.sealListOpen = false; this.closeSealEditor() }
+  },
   methods: {
+    operationScope() {
+      if (!this._operationScope) this._operationScope = createUiOperationScope(() => {
+        const user = this.$store && this.$store.state && this.$store.state.user || {}
+        return { actor: String(user.id || ""), session: user.sessionRevision || 0,
+          dept: String(getSelectedSignScopeDeptId() || "") }
+      })
+      return this._operationScope
+    },
+    closeSealEditor() { this.operationScope().invalidate("seal-edit"); this.sealOpen = false; this.sealSaving = false },
     goDeptBinding() {
       this.$router.push('/system/dept')
     },
@@ -237,41 +263,80 @@ export default {
       })
     },
     openSeals(company) {
-      this.selectedCompany = company
+      const companyId = normalizePositiveDecimalId(company && company.legalEntityId)
+      if (!companyId) return Promise.resolve(null)
+      this.operationScope().invalidate("seal-list")
+      this.closeSealEditor()
+      this.selectedCompany = { ...company, legalEntityId: companyId }
+      this.seals = []
       this.sealListOpen = true
-      this.loadSeals()
+      return this.loadSeals()
     },
     loadSeals() {
-      if (!this.selectedCompany) return Promise.resolve()
+      const companyId = normalizePositiveDecimalId(this.selectedCompany && this.selectedCompany.legalEntityId)
+      if (!companyId || !this.sealListOpen) return Promise.resolve(null)
+      const scope = this.operationScope(), operation = scope.begin("seal-list", companyId)
+      const current = () => this.sealListOpen && scope.isCurrent(operation,
+        normalizePositiveDecimalId(this.selectedCompany && this.selectedCompany.legalEntityId))
       this.sealLoading = true
-      return listCompanySeals(this.selectedCompany.legalEntityId, false).then(response => {
-        this.seals = response.data || []
-      }).finally(() => {
-        this.sealLoading = false
-      })
+      this.seals = []
+      this.sealListError = ""
+      return listCompanySeals(companyId, false).then(response => {
+        if (!current()) return null
+        const rows = response && response.data
+        if (!Array.isArray(rows) || rows.some(row => normalizePositiveDecimalId(row.legalEntityId) !== companyId))
+          throw new Error("印章所属公司未确认，请重新加载当前公司")
+        this.seals = rows
+        return rows
+      }).catch(error => {
+        if (current()) this.sealListError = error && error.message || "该公司印章加载失败，请重试"
+        return null
+      }).finally(() => { if (current()) this.sealLoading = false })
     },
     openSeal(row) {
-      this.sealForm = Object.assign({
-        legalEntityId: this.selectedCompany.legalEntityId,
-        legalEntityName: this.selectedCompany.legalEntityName,
-        isDefault: this.seals.length ? 'N' : 'Y',
-        status: '0'
-      }, row || {})
+      const companyId = normalizePositiveDecimalId(this.selectedCompany && this.selectedCompany.legalEntityId)
+      if (!this.sealListOpen || !companyId || this.sealLoading || this.sealListError) return
+      if (row && (normalizePositiveDecimalId(row.legalEntityId) !== companyId ||
+          !this.seals.some(seal => String(seal.sealId) === String(row.sealId)))) {
+        this.sealListError = "印章不属于当前公司，请重新加载后选择"
+        return
+      }
+      this.operationScope().invalidate("seal-edit")
+      this.sealSaving = false
+      this.sealError = ""
+      this.sealForm = { isDefault: this.seals.length ? 'N' : 'Y', status: '0', ...(row || {}),
+        legalEntityId: companyId, legalEntityName: this.selectedCompany.legalEntityName }
       this.sealOpen = true
-      this.$nextTick(() => this.$refs.sealForm && this.$refs.sealForm.clearValidate())
+      const operation = this.operationScope().begin("seal-edit", { companyId, sealId: String(this.sealForm.sealId || "") })
+      this.$nextTick(() => {
+        if (this.sealOpen && this.operationScope().isCurrent(operation) && this.$refs.sealForm) this.$refs.sealForm.clearValidate()
+      })
     },
     saveSeal() {
-      this.$refs.sealForm.validate(valid => {
-        if (!valid) return
-        this.sealSaving = true
-        saveCompanySeal(this.sealForm).then(() => {
+      if (this.sealSaving || !this.sealOpen || !this.$refs.sealForm) return Promise.resolve(null)
+      const payload = { ...this.sealForm }
+      const companyId = normalizePositiveDecimalId(payload.legalEntityId)
+      if (!companyId || companyId !== normalizePositiveDecimalId(this.selectedCompany && this.selectedCompany.legalEntityId)) return Promise.resolve(null)
+      const target = { companyId, sealId: String(payload.sealId || "") }
+      const scope = this.operationScope(), operation = scope.begin("seal-edit", target)
+      const current = () => this.sealOpen && scope.isCurrent(operation, {
+        companyId: normalizePositiveDecimalId(this.sealForm.legalEntityId), sealId: String(this.sealForm.sealId || "") }) &&
+        companyId === normalizePositiveDecimalId(this.selectedCompany && this.selectedCompany.legalEntityId)
+      this.sealSaving = true
+      this.sealError = ""
+      return new Promise(resolve => this.$refs.sealForm.validate(valid => {
+        if (!current()) { resolve(null); return }
+        if (!valid) { this.sealSaving = false; resolve(null); return }
+        saveCompanySeal(payload).then(response => {
+          if (!current()) return null
           this.$modal.msgSuccess('印章信息已保存')
-          this.sealOpen = false
-          this.loadSeals()
-        }).finally(() => {
-          this.sealSaving = false
-        })
-      })
+          this.closeSealEditor()
+          return this.loadSeals()
+        }).catch(error => {
+          if (current()) this.sealError = error && error.message || "印章保存结果待核对，请保留当前输入后重试"
+          return null
+        }).finally(() => { if (current()) this.sealSaving = false }).then(resolve)
+      }))
     }
   }
 }

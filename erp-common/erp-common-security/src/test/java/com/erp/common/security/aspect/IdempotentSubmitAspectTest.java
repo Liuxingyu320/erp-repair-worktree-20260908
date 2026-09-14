@@ -266,14 +266,14 @@ class IdempotentSubmitAspectTest
         private final List<String> releasedKeys = new ArrayList<>();
 
         @Override
-        public boolean tryAcquire(String key, long timeoutSeconds)
+        public String tryAcquire(String key, long timeoutSeconds)
         {
             keys.add(key);
-            return lockedKeys.add(key);
+            return lockedKeys.add(key) ? "test-owner" : null;
         }
 
         @Override
-        public void release(String key)
+        public void release(String key, String owner)
         {
             releasedKeys.add(key);
             lockedKeys.remove(key);

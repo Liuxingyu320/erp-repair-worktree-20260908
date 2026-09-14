@@ -29,6 +29,7 @@ import com.erp.system.service.ISysDeptService;
 import com.erp.system.service.ISysRoleService;
 import com.erp.system.service.ISysUserService;
 import com.erp.system.service.support.UserSessionInvalidationService;
+import com.erp.system.service.support.RoleAssignmentGuard;
 
 /**
  * 角色 业务层处理
@@ -375,8 +376,9 @@ public class SysRoleServiceImpl implements ISysRoleService
     public int updateRoleStatus(SysRole role)
     {
         configMapper.lockSignHrState();
-        List<Long> affectedUserIds = userRoleMapper.selectUserIdsByRoleId(role.getRoleId());
         int rows = roleMapper.updateRole(role);
+        // Hold the same role row lock as assignments before reading affected members.
+        List<Long> affectedUserIds = userRoleMapper.selectUserIdsByRoleId(role.getRoleId());
         configMapper.syncSignHrPermissions();
         if (rows > 0)
         {
@@ -614,23 +616,15 @@ public class SysRoleServiceImpl implements ISysRoleService
         validateAuthUserScope(roleId, userIds);
         checkAuthUserScope(roleId, userIds);
         configMapper.lockSignHrState();
-        // 新增用户与角色管理
-        List<SysUserRole> list = new ArrayList<SysUserRole>();
-        for (Long userId : userIds)
-        {
-            SysUserRole ur = new SysUserRole();
-            ur.setUserId(userId);
-            ur.setRoleId(roleId);
-            list.add(ur);
-        }
-        int rows = userRoleMapper.batchUserRole(list);
+        int rows = RoleAssignmentGuard.addUsers(roleMapper, userRoleMapper, roleId, userIds);
         if (rows > 0)
         {
             configMapper.syncSignHrPermissions();
             userSessionInvalidationService.recordAll(Arrays.asList(userIds),
                     UserSessionInvalidationService.ROLE_GRANTS_CHANGED);
         }
-        return rows;
+        // Re-selecting existing members is a successful no-op, including a disabled role.
+        return Math.max(rows, 1);
     }
 
     private void validateAuthUserScope(Long roleId, Long... userIds)

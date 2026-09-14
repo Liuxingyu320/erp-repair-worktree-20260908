@@ -93,7 +93,7 @@ class InvTransferDiscrepancyProcessorTest
     }
 
     @Test
-    @DisplayName("短少补发只释放已发数量且不给源仓加库存")
+    @DisplayName("短少补发先补足预留再释放已发数量，不给源仓增加实物库存")
     void reshipReleasesDeliveredQuantityWithoutReturningStock()
     {
         harness.addDetail(11L, 111L, "10", "8", "2", "0", "0", "5.00");
@@ -109,6 +109,15 @@ class InvTransferDiscrepancyProcessorTest
                 released.capture());
         assertThat(released.getValue().getDeliveredQuantity())
                 .isEqualByComparingTo("2");
+        verify(harness.reservationService).reserveForReshipments(eq(harness.order),
+                eq(harness.transferDetails), eq(Map.of(1011L, new BigDecimal("2"))), eq("operator"));
+        org.mockito.InOrder lockOrder = org.mockito.Mockito.inOrder(harness.orderMapper,
+                harness.discrepancyMapper, harness.reservationService, harness.detailMapper);
+        lockOrder.verify(harness.orderMapper).selectInvTransferOrderByIdForUpdate(900L);
+        lockOrder.verify(harness.discrepancyMapper).selectByIdForUpdate(1L);
+        lockOrder.verify(harness.reservationService).reserveForReshipments(any(), any(), any(), any());
+        lockOrder.verify(harness.discrepancyMapper).resolve(anyLong(), anyLong(), any(), any(), any(), any(), anyLong(), any());
+        lockOrder.verify(harness.detailMapper).decreaseDeliveredQuantity(any());
         verify(harness.stockMapper, never()).insertInvStock(any());
         verify(harness.stockMapper, never()).addInvStockWithCost(
                 anyLong(), anyLong(), any(), any(), any());
@@ -116,6 +125,36 @@ class InvTransferDiscrepancyProcessorTest
             assertThat(row.getInventoryImpact()).isEqualTo("NO_STOCK_CHANGE");
             assertThat(row.getAmount()).isEqualByComparingTo("10.00");
         });
+    }
+
+    @Test
+    @DisplayName("补发库存不足时先拒绝，不终结差异或减少已发量")
+    void reshipReservationFailureLeavesDispositionPending()
+    {
+        harness.addDetail(11L, 111L, "10", "8", "2", "0", "0", "5.00");
+        org.mockito.Mockito.doThrow(new ServiceException("补发可用库存不足"))
+                .when(harness.reservationService).reserveForReshipments(any(), any(), any(), any());
+        assertThatThrownBy(() -> harness.processor.resolveTransferDiscrepancy(1L,
+                harness.request("reship-no-stock", 0L, harness.item(11L, "SHORTAGE", "RESHIP", "2")), 202L))
+                .hasMessageContaining("补发可用库存不足");
+        verify(harness.discrepancyMapper, never()).resolve(anyLong(), anyLong(), any(), any(), any(), any(), anyLong(), any());
+        verify(harness.detailMapper, never()).decreaseDeliveredQuantity(any());
+        assertThat(harness.dispositions).isEmpty();
+        assertThat(harness.discrepancy.getVersion()).isZero();
+    }
+
+    @Test
+    @DisplayName("补发精确重放不二次冻结，也不二次减少已发量")
+    void reshipReplayDoesNotReserveTwice()
+    {
+        harness.addDetail(11L, 111L, "10", "8", "2", "0", "0", "5.00");
+        InvTransferDiscrepancyResolveRequest request = harness.request("reship-repeat", 0L,
+                harness.item(11L, "SHORTAGE", "RESHIP", "2"));
+        harness.processor.resolveTransferDiscrepancy(1L, request, 202L);
+        harness.processor.resolveTransferDiscrepancy(1L, request, 202L);
+        verify(harness.reservationService, times(1)).reserveForReshipments(any(), any(), any(), any());
+        verify(harness.detailMapper, times(1)).decreaseDeliveredQuantity(any());
+        assertThat(harness.dispositions).hasSize(1);
     }
 
     @Test
@@ -563,6 +602,7 @@ class InvTransferDiscrepancyProcessorTest
         private final List<InvTransferShipment> shipments = new ArrayList<>();
         private final List<InvTransferDiscrepancyDisposition> dispositions =
                 new ArrayList<>();
+        private final InvTransferReservationService reservationService = mock(InvTransferReservationService.class);
         private final InvTransferDiscrepancyProcessor processor;
 
         Harness()
@@ -571,6 +611,7 @@ class InvTransferDiscrepancyProcessorTest
                     .thenReturn(order);
             when(orderMapper.selectInvTransferOrderByIdForUpdate(900L))
                     .thenReturn(order);
+            when(discrepancyMapper.selectById(1L)).thenReturn(discrepancy);
             when(discrepancyMapper.selectByIdForUpdate(1L))
                     .thenReturn(discrepancy);
             when(discrepancyMapper.selectDetails(1L))
@@ -597,6 +638,13 @@ class InvTransferDiscrepancyProcessorTest
                         return 1;
                     });
             when(dispositionMapper.selectByRequestId(anyLong(), any()))
+                    .thenAnswer(invocation -> dispositions.stream()
+                            .filter(row -> invocation.<Long>getArgument(0)
+                                    .equals(row.getDiscrepancyId()))
+                            .filter(row -> invocation.<String>getArgument(1)
+                                    .equals(row.getRequestId()))
+                            .toList());
+            when(dispositionMapper.selectByRequestIdForUpdate(anyLong(), any()))
                     .thenAnswer(invocation -> dispositions.stream()
                             .filter(row -> invocation.<Long>getArgument(0)
                                     .equals(row.getDiscrepancyId()))
@@ -645,7 +693,7 @@ class InvTransferDiscrepancyProcessorTest
                             shipmentDetailMapper, stockMapper,
                             stockLogMapper, mock(InvNumberSequenceMapper.class),
                             statusLogMapper, null, null, deptScopeMapper, null,
-                            mock(InvTransferReservationService.class));
+                            reservationService, mock(InvTransferEvidenceService.class));
             processor = new InvTransferDiscrepancyProcessor(resources,
                     new InvTransferDirectionPolicy(deptScopeMapper, null));
         }
@@ -729,7 +777,7 @@ class InvTransferDiscrepancyProcessorTest
             item.setDecision(decision);
             item.setQuantity(decimal(quantity));
             item.setNote("逐项核对");
-            item.setAttachmentRefs("node-1");
+            item.setAttachmentRefs("drive:1");
             return item;
         }
 

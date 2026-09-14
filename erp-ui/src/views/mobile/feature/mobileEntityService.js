@@ -1,3 +1,4 @@
+import { listPurchaseSuppliers, listPurchaseProducts, listPurchaseOeItems, listPurchaseGifts } from "@/api/inventory/purchase"
 import { listSales } from "@/api/inventory/sales"
 import { listPurchase } from "@/api/inventory/purchase"
 import { listProduct } from "@/api/inventory/product"
@@ -45,6 +46,23 @@ function createQuery(keyword, options) {
 
 function fetchMobileEntityOptions(entity, options = {}) {
   const keyword = normalizeMobileOptionKeyword(options.keyword)
+
+  if (options.context && options.context.featureKey === "purchase") {
+    const purchaseCatalog = {
+      supplier: [listPurchaseSuppliers, mapSupplierOption], product: [listPurchaseProducts, mapProductOption],
+      oe: [listPurchaseOeItems, mapOeOption], gift: [listPurchaseGifts, mapGiftOption]
+    }[entity]
+    if (purchaseCatalog) {
+      const query = createQuery(keyword, options)
+      if (entity === "supplier") { delete query.keyword; query.supplierName = keyword || undefined }
+      if (entity === "product" || entity === "oe") {
+        const supplierName = options.formData && options.formData.supplierName
+        if (supplierName) query.supplierName = supplierName
+      }
+      return purchaseCatalog[0](query, SILENT_OPTION_REQUEST)
+        .then(response => normalizeRows(response).map(purchaseCatalog[1]))
+    }
+  }
 
   if (entity === "product") {
     return fetchCompactEntityOptions("product", keyword, options).catch(() => {

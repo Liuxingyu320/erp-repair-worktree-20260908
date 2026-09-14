@@ -318,7 +318,12 @@ function clearAttendancePunchAttempt(owner, options = {}) {
   }
 }
 
-function explicitRejection(error) {
+function explicitRejection(error, attempt) {
+  const payload = error && error.response && error.response.data
+  if (payload && payload.businessCode === 'ATTENDANCE_PUNCH_REJECTED') {
+    return Number(payload.code) === 422 && Boolean(attempt) &&
+      text(payload.clientRequestId) === attempt.requestId
+  }
   const status = Number(error && error.response && error.response.status || error && error.status)
   return [400, 401, 403, 404, 409, 412, 422].includes(status)
 }
@@ -420,7 +425,7 @@ async function runAttendancePunch(input, dependencies = {}, options = {}) {
     const settled = writeVerified({ ...attempt, status: 'settled', outcome: 'accepted' }, options)
     return { status: 'accepted', dispatched: 1, attempt: settled, response }
   } catch (error) {
-    if (explicitRejection(error)) {
+    if (explicitRejection(error, attempt)) {
       try {
         const settled = writeVerified({ ...attempt, status: 'settled', outcome: 'not-accepted' }, options)
         return { status: 'not-accepted', dispatched: 1, attempt: settled, error }

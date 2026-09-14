@@ -1,0 +1,546 @@
+{
+  "createdAt": "2026-09-14T05:39:37.056269+00:00",
+  "scope": "Authorized local integration of all five worktree snapshots",
+  "sources": {
+    "review": {
+      "path": "/Users/liuxingyu/Desktop/ERP-NEW_阿里云线上源码备份_2026-09-08_3a6fe91a2/修复工作副本_2026-09-08",
+      "head": "76b69e3dd808e4f9c526474e2ddaab84e12bd5d1",
+      "commit": "da2993a7ef6cbe9af948156b75838efc6b3b88f7",
+      "ref": "refs/codex/consolidation-20260914/review"
+    },
+    "project": {
+      "path": "/Users/liuxingyu/Desktop/ERP-NEW_阿里云线上源码备份_2026-09-08_3a6fe91a2/问题修复实施_20260909",
+      "head": "76b69e3dd808e4f9c526474e2ddaab84e12bd5d1",
+      "commit": "b70d44fe3bb0cfaac049c7a032b1e374094de7da",
+      "ref": "refs/codex/consolidation-20260914/project"
+    },
+    "grok": {
+      "path": "/Users/liuxingyu/Desktop/ERP-NEW_阿里云线上源码备份_2026-09-08_3a6fe91a2/Grok实施工作副本_20260912",
+      "head": "76b69e3dd808e4f9c526474e2ddaab84e12bd5d1",
+      "commit": "b7d5e05c1fda2eef15ad4416514e49026692147f",
+      "ref": "refs/codex/consolidation-20260914/grok"
+    },
+    "mobile": {
+      "path": "/Users/liuxingyu/Desktop/ERP-NEW_阿里云线上源码备份_2026-09-08_3a6fe91a2/手机App封装工作副本_2026-09-12",
+      "head": "76b69e3dd808e4f9c526474e2ddaab84e12bd5d1",
+      "commit": "7a427d466b8a5b1b24d1ba1760640c4ab975b452",
+      "ref": "refs/codex/consolidation-20260914/mobile"
+    },
+    "joint": {
+      "path": "/Users/liuxingyu/Desktop/ERP-NEW_阿里云线上源码备份_2026-09-08_3a6fe91a2/联合方案实施工作副本_20260913",
+      "head": "76b69e3dd808e4f9c526474e2ddaab84e12bd5d1",
+      "commit": "476097299783b8b9eaa77429cc20d7a180020498",
+      "ref": "refs/codex/consolidation-20260914/joint"
+    }
+  },
+  "sourceEntries": 2162,
+  "uniqueSourcePaths": 1133,
+  "reconciliation": {
+    "reviewed-superseded": 52,
+    "identical": 1895,
+    "contained-with-later-fixes": 64,
+    "inherited-then-joint-repair": 84,
+    "renamed-in-joint": 3,
+    "three-way-merged": 6,
+    "inherited-review-superseded": 45,
+    "manual-merge": 2,
+    "merged-with-mobile-or-cleanup": 11
+  },
+  "backend": {
+    "tests": 5056,
+    "skipped": 27,
+    "passed": 5029,
+    "failures": 0,
+    "errors": 0
+  },
+  "frontend": {
+    "testFiles": 388,
+    "failedFiles": 0,
+    "focusedIntegrationTests": 31,
+    "focusedFailures": 0
+  },
+  "mysqlNotificationPaging": {
+    "5.7.44": {
+      "passed": 18,
+      "failed": 0,
+      "skipped": 0
+    },
+    "8.0.36": {
+      "passed": 18,
+      "failed": 0,
+      "skipped": 0
+    }
+  },
+  "python": {
+    "employeeImporter": 32,
+    "signedIpaVerifier": 11,
+    "failed": 0
+  },
+  "productionBuild": true,
+  "nativeAssetsMatchBuild": true,
+  "productionDeployed": false,
+  "devicePushAccepted": false,
+  "evidenceRoot": "/Users/liuxingyu/Desktop/ERP-NEW_阿里云线上源码备份_2026-09-08_3a6fe91a2/修复工作副本_2026-09-08/output/consolidation-20260914",
+  "recoveryBundleSha256": "03406b6cf47ae104c7d3c1d5484b098c7e85a2028fe634757ac8bcae38f958cc",
+  "conflictDecisions": [
+    {
+      "source": "review",
+      "path": "docker/mysql/bootstrap-files.list",
+      "sourceSha256": "cb2d4c7195641b84420939f6772733293885a0c3d9346d9690560a630469a4ae",
+      "finalSha256": "be6670fe1357c1d1006f99e210761cefea711f6fd8b630cc8238f1ab63ed2351",
+      "disposition": "reviewed-superseded",
+      "reason": "保留库存与工资迁移顺序，联合方案新增迁移和手机推送迁移均已纳入。"
+    },
+    {
+      "source": "review",
+      "path": "docs/三轮检查问题汇总与修复方案-20260909.md",
+      "sourceSha256": "5cfcdfa3a6c630bff5fae3328216011526491eac6e8845051849882be9b492de",
+      "finalSha256": "fe826fedc380190c7bd03b4be5ab97e4e6416e7d714da62039caf718a593f6d6",
+      "disposition": "reviewed-superseded",
+      "reason": "保留后续修复状态和最终已确认业务规则；旧文档版本可从来源快照恢复。"
+    },
+    {
+      "source": "review",
+      "path": "erp-modules/erp-oa/src/main/java/com/erp/oa/mapper/OaSignSalarySourceMapper.java",
+      "sourceSha256": "0a1a4f8b03b2c75618a3f48283683adce94c779022eff0afc194762c0415ac1c",
+      "finalSha256": "0d0e3794f7058b096303f73116988529c6aa1b0656608916a6f755f3f5388546",
+      "disposition": "reviewed-superseded",
+      "reason": "原工资来源治理全部保留；后续增加历史合同工资独立证据、来源绑定和历史补签不覆盖现行工资。"
+    },
+    {
+      "source": "review",
+      "path": "erp-modules/erp-oa/src/main/java/com/erp/oa/service/impl/OaLaborContractServiceImpl.java",
+      "sourceSha256": "2b4d82f8b1d653e34f9a2c8cc39a27030e02e9133170c9699251994779361bdf",
+      "finalSha256": "dca47c6ae8fc99914a27b10da74646ecad088c90df0f53e78c6edd8b9caaf058",
+      "disposition": "reviewed-superseded",
+      "reason": "旧工资写入禁用仍保留，签约读取增加合同独占行锁。"
+    },
+    {
+      "source": "review",
+      "path": "erp-modules/erp-oa/src/main/java/com/erp/oa/service/impl/OaSalaryServiceImpl.java",
+      "sourceSha256": "c84aa67b85228cf1d6eb1c4e5b44499b11164d7204e213016be0d61029441733",
+      "finalSha256": "20e10cb9c611d7ffda254c1b6e5fc65c18a9cf8fa1a8cde519cd32190b8a0d7e",
+      "disposition": "reviewed-superseded",
+      "reason": "旧工资写入禁用仍保留，并加入调休来源需要的 READ_COMMITTED 写事务保护。"
+    },
+    {
+      "source": "review",
+      "path": "erp-modules/erp-oa/src/main/java/com/erp/oa/service/impl/OaSignSalarySourceService.java",
+      "sourceSha256": "463de4f18d4a4998e36a876ee77b2b53f06ae2510edcd32fa46062929555791d",
+      "finalSha256": "9063896fc5f89cc5d3ea23f225d9a8d305f4b3f8484bedf1d2f85eb2be368cd9",
+      "disposition": "reviewed-superseded",
+      "reason": "原工资来源治理全部保留；后续增加历史合同工资独立证据、来源绑定和历史补签不覆盖现行工资。"
+    },
+    {
+      "source": "review",
+      "path": "erp-modules/erp-oa/src/main/resources/mapper/oa/OaSignSalarySourceMapper.xml",
+      "sourceSha256": "b8a17b7a771cca070c8178c50c5eddf51301e8136417f0331b9ababeed3e38db",
+      "finalSha256": "ac465d7e00656b132d64dff9dd90100b5421ac42f96c5ca568b3604474dc261b",
+      "disposition": "reviewed-superseded",
+      "reason": "原工资来源治理全部保留；后续增加历史合同工资独立证据、来源绑定和历史补签不覆盖现行工资。"
+    },
+    {
+      "source": "review",
+      "path": "erp-modules/erp-oa/src/test/java/com/erp/oa/service/impl/OaSignSalarySourceMySqlIT.java",
+      "sourceSha256": "bdb3bbde9c2c16680c5a6f597c2e68c0fa27b716427f537b33bb97270d8191a9",
+      "finalSha256": "0b3aa2fd2ca37cef3344080df444c44623d9b2c349d67e4e5422752ccf023766",
+      "disposition": "reviewed-superseded",
+      "reason": "保留后续接口、事务锁和异步上下文所需测试装配及新增断言；原场景由对应现行回归覆盖。"
+    },
+    {
+      "source": "review",
+      "path": "erp-modules/erp-oa/src/test/java/com/erp/oa/service/impl/OaSignSalarySourceServiceTest.java",
+      "sourceSha256": "2dfaba746777a03b90bd0ee7376d2ed4aa12ca035e3fa0181fba1c6472ba2ace",
+      "finalSha256": "7721e2581b881775bd9e7fdfceeed72f1e4b9b7a36369c1900921743f0e661a5",
+      "disposition": "reviewed-superseded",
+      "reason": "保留后续接口、事务锁和异步上下文所需测试装配及新增断言；原场景由对应现行回归覆盖。"
+    },
+    {
+      "source": "review",
+      "path": "erp-modules/erp-system/src/main/java/com/erp/system/mapper/HrSalarySourceMapper.java",
+      "sourceSha256": "dd880b1993ba7e9c08751a9d1660d9d531441e04b694ffc0eb0552ba389f6f16",
+      "finalSha256": "f4204b8675e1ec4f987cefe873fdec0ab315c68dc7f826584777e4dbab7ad8f6",
+      "disposition": "reviewed-superseded",
+      "reason": "原工资来源治理全部保留；后续增加历史合同工资独立证据、来源绑定和历史补签不覆盖现行工资。"
+    },
+    {
+      "source": "review",
+      "path": "erp-modules/erp-system/src/main/java/com/erp/system/service/impl/HrLifecycleServiceImpl.java",
+      "sourceSha256": "34cc5c88f626ee9955ce82362da3215184cd2a2dda7ad34d0d66f5396a94ae64",
+      "finalSha256": "661f1f63fc9a5fa739f83a0def1db3bfd96946d7c9f0c99520b7bf582ca3f267",
+      "disposition": "reviewed-superseded",
+      "reason": "保留工资来源审计，按最终规则仅在实际调薪时写来源；保留转正仅改日期及续签上下文。"
+    },
+    {
+      "source": "review",
+      "path": "erp-modules/erp-system/src/main/java/com/erp/system/service/impl/HrOnboardSalaryArchiveService.java",
+      "sourceSha256": "94d46767f2f707ce537360d0ffc24640c03bf71ea08d1d3e64060dcfa0329a99",
+      "finalSha256": "9e2925cf059cb7733d014f4e3ffee81390b2274272bd542511ba07fcbd0ce589",
+      "disposition": "reviewed-superseded",
+      "reason": "原工资来源治理全部保留；后续增加历史合同工资独立证据、来源绑定和历史补签不覆盖现行工资。"
+    },
+    {
+      "source": "review",
+      "path": "erp-modules/erp-system/src/main/java/com/erp/system/service/impl/HrSalarySourceService.java",
+      "sourceSha256": "e3d04616ad36be6ae70b59517285f672022ffa43d86c4a76083ff064d405e5ab",
+      "finalSha256": "da480b11088696b1a3a965d615103b2f48cfacee2fd1db714cb412386190f0a1",
+      "disposition": "reviewed-superseded",
+      "reason": "原工资来源治理全部保留；后续增加历史合同工资独立证据、来源绑定和历史补签不覆盖现行工资。"
+    },
+    {
+      "source": "review",
+      "path": "erp-modules/erp-system/src/main/resources/mapper/system/HrOnboardSalaryArchiveMapper.xml",
+      "sourceSha256": "6a2de164d4c1a393c637b78e4f99f1a7a2511a3b4923c2a0eadc01fe14979eb9",
+      "finalSha256": "3cb9c941e18982adde80cc4096cf646aefc793afa03a96c58ae6ee968aeeebf0",
+      "disposition": "reviewed-superseded",
+      "reason": "原工资来源治理全部保留；后续增加历史合同工资独立证据、来源绑定和历史补签不覆盖现行工资。"
+    },
+    {
+      "source": "review",
+      "path": "erp-modules/erp-system/src/main/resources/mapper/system/HrSalarySourceMapper.xml",
+      "sourceSha256": "39751e2a40e352cf31b280713ab61a23d82b3b0c98c918719e0e6b4723eb4c90",
+      "finalSha256": "5f3f9213f4ff52191165edc2606fa6bfe8f31206d08d09aaea48f719f57f70f0",
+      "disposition": "reviewed-superseded",
+      "reason": "原工资来源治理全部保留；后续增加历史合同工资独立证据、来源绑定和历史补签不覆盖现行工资。"
+    },
+    {
+      "source": "review",
+      "path": "erp-modules/erp-system/src/test/java/com/erp/system/service/impl/HrOnboardSalaryArchiveServiceTest.java",
+      "sourceSha256": "3225819223dbc293683c37b9d65b342e4fdb9c3733fd1890d462d77d6bb480d6",
+      "finalSha256": "2ab131d6b2174bc657aae9a5c55774e9b6d44c9b1c762f6bc41da47e5176b0ed",
+      "disposition": "reviewed-superseded",
+      "reason": "保留后续接口、事务锁和异步上下文所需测试装配及新增断言；原场景由对应现行回归覆盖。"
+    },
+    {
+      "source": "review",
+      "path": "erp-modules/erp-system/src/test/java/com/erp/system/service/impl/HrSalarySourceServiceTest.java",
+      "sourceSha256": "7069c65de4e27008f8cda1cca850feea74c4ab1d39f504ad1bf86083eae30d58",
+      "finalSha256": "3178ff1f9642f29357c3a83663ae06b73a93d494a13c740954c7c048890d7c07",
+      "disposition": "reviewed-superseded",
+      "reason": "保留后续接口、事务锁和异步上下文所需测试装配及新增断言；原场景由对应现行回归覆盖。"
+    },
+    {
+      "source": "review",
+      "path": "erp-ui/src/views/hr/components/HrSignDataImportDialog.vue",
+      "sourceSha256": "11068a73a3a5118575aa4d49f61d07e45f69bcd66bcee5763cb8756cf6248ebe",
+      "finalSha256": "196633e7ba54b194872e3f7da08fe7fe90a8c9a2d38272c4897b6c607b55ad8a",
+      "disposition": "reviewed-superseded",
+      "reason": "保留生成前工资同步，增加批次代次、逐行结果与汇总一致性校验及部分失败反馈。"
+    },
+    {
+      "source": "review",
+      "path": "erp-ui/src/views/oa/salary/index.vue",
+      "sourceSha256": "f20f27b1672ea3cf581e97e960d3c28ead3e3f7dd690d38220b6dd32c2ee4cb3",
+      "finalSha256": "eafe6cfc57e196a6f3bbd7434c6d4f2341fac00ba1cad2355714513e42f21467",
+      "disposition": "reviewed-superseded",
+      "reason": "保留历史工资提示与只读入口，追加组织上下文和异步操作保护。"
+    },
+    {
+      "source": "review",
+      "path": "erp-ui/src/views/system/salary/index.vue",
+      "sourceSha256": "8863d50e85a27aee773c0567a28fccf8ce42d4dffcff617c0de9eaade6a0dfca",
+      "finalSha256": "28f7ff95fa1845086f4217e696323163689a9205bb4160afe43bfbc5eaf2392b",
+      "disposition": "reviewed-superseded",
+      "reason": "保留历史工资提示与只读入口，追加组织上下文和异步操作保护。"
+    },
+    {
+      "source": "project",
+      "path": "docker/mysql/bootstrap-files.list",
+      "sourceSha256": "06ad6bd8dd9d002c784974f507f988fcd880ad488120d4bd58c89d2bfa48e494",
+      "finalSha256": "be6670fe1357c1d1006f99e210761cefea711f6fd8b630cc8238f1ab63ed2351",
+      "disposition": "reviewed-superseded",
+      "reason": "保留库存与工资迁移顺序，联合方案新增迁移和手机推送迁移均已纳入。"
+    },
+    {
+      "source": "project",
+      "path": "docs/使用流程确认清单-20260912.md",
+      "sourceSha256": "5b4704579e7955b2e550e154ee0f5f40883d320570816f711806300df0a5750f",
+      "finalSha256": "a2dfe854a4952416e60bb7ae455b9755d21dcc063145fe4b3374249793e6259b",
+      "disposition": "reviewed-superseded",
+      "reason": "保留后续修复状态和最终已确认业务规则；旧文档版本可从来源快照恢复。"
+    },
+    {
+      "source": "project",
+      "path": "erp-modules/erp-inventory/src/main/java/com/erp/inventory/domain/InvStockCheckDetail.java",
+      "sourceSha256": "1b8ccc4ed89b32467e4a57b34cbaa72a3eb79a96c91254e472118819b411be52",
+      "finalSha256": "34537aa015930575c3e7fd900365ce6e2aeb5717a1b46251e7d3cc6e4ea6b109",
+      "disposition": "reviewed-superseded",
+      "reason": "保留原盘点身份字段并新增快照版本及失效后参考值；旧版本不可覆盖重新核对规则。"
+    },
+    {
+      "source": "project",
+      "path": "erp-modules/erp-inventory/src/main/java/com/erp/inventory/service/impl/InvPurchaseReturnServiceImpl.java",
+      "sourceSha256": "1b104fb9722596b9b1732f8fdbe9f52ff9691cfb7def9da3cf8505faf302a3ec",
+      "finalSha256": "0da794fda8de586d80dfaba5e30aca92b975043dc0eb9cd1e6baf48d01368dce",
+      "disposition": "reviewed-superseded",
+      "reason": "保留基于锁定入库事实与预留量的退货校验，替代逐行非锁定历史计数。"
+    },
+    {
+      "source": "project",
+      "path": "erp-modules/erp-inventory/src/main/java/com/erp/inventory/service/impl/InvPurchaseServiceImpl.java",
+      "sourceSha256": "2f8de8ffe5c7fe7aeb7a27e8b3ad466c9e75ccf12eaada80143dcd107f975ef2",
+      "finalSha256": "9f0ac025328e9d911cc0fd377a4c4e469a58bdb5ca7b3f7260f586c55cec27c9",
+      "disposition": "reviewed-superseded",
+      "reason": "保留逐批质检和持久收货命令；旧整单扫描待检批次逻辑已被后续按勾选行处理替代。"
+    },
+    {
+      "source": "project",
+      "path": "erp-modules/erp-inventory/src/main/java/com/erp/inventory/service/impl/InvSalesReturnServiceImpl.java",
+      "sourceSha256": "3c03f69bb74a5bffe9ca6a7896f63bfc7f424f58d058b3d72d2fd2300dc76385",
+      "finalSha256": "5a3496607b0e7c4b37e175ad88dadfe67fe06254bfedd67ddb79087e6f2978f4",
+      "disposition": "reviewed-superseded",
+      "reason": "原逐明细及历史未关联行退货额度校验已移至 validateLockedReturnQuantity，保留原单分页选择。"
+    },
+    {
+      "source": "project",
+      "path": "erp-modules/erp-inventory/src/test/java/com/erp/inventory/service/impl/InvDeliveryNoticeServiceImplTest.java",
+      "sourceSha256": "1ab4dc2ecbed08f6a79c42f5a684c09a193a6ee80d878c718eb687c8b8121b59",
+      "finalSha256": "379e8a21ec5d3eab679ce75470e5f62259498464a845f0ab937620fb7db42497",
+      "disposition": "reviewed-superseded",
+      "reason": "保留后续接口、事务锁和异步上下文所需测试装配及新增断言；原场景由对应现行回归覆盖。"
+    },
+    {
+      "source": "project",
+      "path": "erp-modules/erp-inventory/src/test/java/com/erp/inventory/service/impl/InvPurchaseReturnServiceImplTest.java",
+      "sourceSha256": "1cc7570de2e067398f2a5a1367ddae6c386b1be8b5c091215bc15e3d6df5e6c2",
+      "finalSha256": "4f34efc6a7ba9abafc687ad01194780b94ffde71ed4bc571fce6cb930088110a",
+      "disposition": "reviewed-superseded",
+      "reason": "保留后续接口、事务锁和异步上下文所需测试装配及新增断言；原场景由对应现行回归覆盖。"
+    },
+    {
+      "source": "project",
+      "path": "erp-modules/erp-inventory/src/test/java/com/erp/inventory/service/impl/InvStockCheckAdjustmentServiceTest.java",
+      "sourceSha256": "a28c69b5b68ed0ba1677643692a68bc75985f4bf5d2e3030b8f4c4c455e9b68f",
+      "finalSha256": "f5ccc202a040b750c0ba38051f9ec9b9b368db0b0740b054df6054dd71280751",
+      "disposition": "reviewed-superseded",
+      "reason": "保留后续接口、事务锁和异步上下文所需测试装配及新增断言；原场景由对应现行回归覆盖。"
+    },
+    {
+      "source": "project",
+      "path": "erp-modules/erp-inventory/src/test/java/com/erp/inventory/service/impl/InvStockCheckServiceImplTest.java",
+      "sourceSha256": "e846a3d9ea62cd56f979bb43a74bd0a5a3c373e9af268a56c809eb0a6368037c",
+      "finalSha256": "945afb339d824a4f49697c1abbfe98c646e772a4b1d62e2010c8d0bbd321f125",
+      "disposition": "reviewed-superseded",
+      "reason": "保留后续接口、事务锁和异步上下文所需测试装配及新增断言；原场景由对应现行回归覆盖。"
+    },
+    {
+      "source": "project",
+      "path": "erp-modules/erp-oa/src/main/java/com/erp/oa/service/impl/OaLaborContractServiceImpl.java",
+      "sourceSha256": "64e127ef06e85d71fabec488a00b938ebea235ad59b95d0deefe7a979413172e",
+      "finalSha256": "dca47c6ae8fc99914a27b10da74646ecad088c90df0f53e78c6edd8b9caaf058",
+      "disposition": "reviewed-superseded",
+      "reason": "保留员工权威身份校验和人工核对审计，合并历史工资写入禁用及后续签署行锁。"
+    },
+    {
+      "source": "project",
+      "path": "erp-ui/src/api/inventory/purchase.js",
+      "sourceSha256": "6ba8930b70f1b06d4b44c9126d58dfda43d387927271f0e8d5a870a6f7fd5d5d",
+      "finalSha256": "d8da9339ab9822b6a33103cf39efd0bb1d6af30295680e8552af424f956f1626",
+      "disposition": "reviewed-superseded",
+      "reason": "原接口保留，追加按操作权限读取的草稿、原单、收货上下文及 silentError 参数。"
+    },
+    {
+      "source": "project",
+      "path": "erp-ui/src/api/inventory/purchaseReturn.js",
+      "sourceSha256": "bc1825f4b4a193fbe8844186a98256229c796c31c677036c980785f632750739",
+      "finalSha256": "87bda1b6fd062d1cd01c36713785e06e33f108a31dda0bcca12fa5ca7ec15e6a",
+      "disposition": "reviewed-superseded",
+      "reason": "原接口保留，追加按操作权限读取的草稿、原单、收货上下文及 silentError 参数。"
+    },
+    {
+      "source": "project",
+      "path": "erp-ui/src/components/FileUpload/index.vue",
+      "sourceSha256": "29ad56f845f6ed6bef2539a926800b9281efd6fc9b26eb81ee60085448ddf1e5",
+      "finalSha256": "a83d8db4d5dea51c123780b27369f7c67855bb841402ab618000c9edb91923a2",
+      "disposition": "reviewed-superseded",
+      "reason": "保留上传顺序与图片库行为；后续加入逐文件进度、取消、重试和销毁隔离，避免关闭其他页面的全局遮罩。"
+    },
+    {
+      "source": "project",
+      "path": "erp-ui/src/components/ImageUpload/index.vue",
+      "sourceSha256": "65dfc17263c7634101a83fd38434d6b45583b7c89ebebf28d1d891c1196776e9",
+      "finalSha256": "ce79f3c8e589c66cf46b39258b6a84208dc583cf92831b24ae90f57e5c493624",
+      "disposition": "reviewed-superseded",
+      "reason": "保留上传顺序与图片库行为；后续加入逐文件进度、取消、重试和销毁隔离，避免关闭其他页面的全局遮罩。"
+    },
+    {
+      "source": "project",
+      "path": "erp-ui/src/utils/reimbursementSmartFill.js",
+      "sourceSha256": "b47aca6d3ac773810613a52810d4a4b7e0f6b8d57b41e2a8a947831286cac06c",
+      "finalSha256": "81f935e4817e73e228a9d5a6f8e5f4ebe3502d6554958b345ca28a648544573c",
+      "disposition": "reviewed-superseded",
+      "reason": "保留本地草稿与删除合并，后续补充冻结保存载荷、版本冲突保护、权威回包校验及离页隔离。"
+    },
+    {
+      "source": "project",
+      "path": "erp-ui/src/views/inventory/gift/index.vue",
+      "sourceSha256": "83230df72b3e578f47e6905e5e11b0466c19497ae53879df4db8167a1ef7cd78",
+      "finalSha256": "f05446ac3625cf2f6c02b1a2dc34af172fc46b6ddfaab852d564f895bb71e52a",
+      "disposition": "reviewed-superseded",
+      "reason": "保留图片字段与编辑功能，使用后续编辑代次、目标身份和独立详情代次防止串单。"
+    },
+    {
+      "source": "project",
+      "path": "erp-ui/src/views/inventory/oe/index.vue",
+      "sourceSha256": "e25f29b8cffb091f8bab3f9295d3288c32a330361c1adc9d0cded28742abf7ef",
+      "finalSha256": "365ef437c0b368828df99f62eada298434526ed4b01352b49f949b74f9a7ff22",
+      "disposition": "reviewed-superseded",
+      "reason": "保留图片字段与编辑功能，使用后续编辑代次、目标身份和独立详情代次防止串单。"
+    },
+    {
+      "source": "project",
+      "path": "erp-ui/src/views/inventory/purchase/index.vue",
+      "sourceSha256": "7668f75571570501dc5bd02b7ff0416a3d83061ade0e3ca77a64c643add68657",
+      "finalSha256": "e79300d3f0a7b9fb04556f19916be18879ce244440ae13a8bb0e9f3f797eea8d",
+      "disposition": "reviewed-superseded",
+      "reason": "保留采购草稿和质检，后续引入收货回执恢复、采购专岗上下文与跨页勾选。"
+    },
+    {
+      "source": "project",
+      "path": "erp-ui/src/views/inventory/purchaseReturn/index.vue",
+      "sourceSha256": "997aa12059e2051de3c3d1364fdfc7622a9111485653b566f24664a88509e3f8",
+      "finalSha256": "c5c40473c47e70d347ac3ba36154ffc6b0aa18bc79f3bc6a3cc83cd6cf8f99d1",
+      "disposition": "reviewed-superseded",
+      "reason": "保留采购退货，后续增加仅提交勾选项及操作权限上下文。"
+    },
+    {
+      "source": "project",
+      "path": "erp-ui/src/views/inventory/salesReturn/index.vue",
+      "sourceSha256": "a6e94b09be7aa9efc91e192ce700a1a2582cff677cadf19cbd5e69c9a89bdc44",
+      "finalSha256": "46588405e7b56295cac8f1b59417a72d13130e17814c2367855c2c7f758528fb",
+      "disposition": "reviewed-superseded",
+      "reason": "保留销售退货原明细数量，后续加入专用原单选择器、表单代次和响应身份校验。"
+    },
+    {
+      "source": "project",
+      "path": "erp-ui/src/views/mobile/feature/components/MobileActionDialog.vue",
+      "sourceSha256": "934c7585172dad344e43286337eee81e99e5562169a8d180ee99c07072ee066a",
+      "finalSha256": "bad92b12804ec1196b31787e9659dd3ae8bf4249334b813b6ed6b30492db0240",
+      "disposition": "reviewed-superseded",
+      "reason": "保留原盘点身份字段并新增快照版本及失效后参考值；旧版本不可覆盖重新核对规则。"
+    },
+    {
+      "source": "project",
+      "path": "erp-ui/src/views/mobile/feature/components/MobileFormSheet.vue",
+      "sourceSha256": "2eb63ea784a555c686675a389f45a6cc1c82d9a52fe61e08f222363fb32ea741",
+      "finalSha256": "f00a237653517ec0c6e1a98bfe65bb8b2bb4fd3ddbf9bd939ea13fc413a3ffe8",
+      "disposition": "reviewed-superseded",
+      "reason": "保留移动表单原单加载，使用退货专用接口并阻止附件未完成时保存。"
+    },
+    {
+      "source": "project",
+      "path": "erp-ui/src/views/mobile/feature/mobileActionPayloads.js",
+      "sourceSha256": "36f9bb64f8e60774344bd033e9df740f977369fa3f361aba1999c3d1d59ffeb0",
+      "finalSha256": "52df1f8dfa47e2e1322bf161c13081a01281064acf16f9bc0ec6e7b9cbd8e674",
+      "disposition": "reviewed-superseded",
+      "reason": "保留原盘点身份字段并新增快照版本及失效后参考值；旧版本不可覆盖重新核对规则。"
+    },
+    {
+      "source": "project",
+      "path": "erp-ui/src/views/mobile/oa/reimbursement/index.vue",
+      "sourceSha256": "d3e56ee9b73f3e50b9e803644766ec8d49f8e5985ed7be17299e89fe403fb59c",
+      "finalSha256": "220c62ed4e559832ce55ebc3ec04f909b0d514552351a86ff7389adef09014e8",
+      "disposition": "reviewed-superseded",
+      "reason": "保留本地草稿与删除合并，后续补充冻结保存载荷、版本冲突保护、权威回包校验及离页隔离。"
+    },
+    {
+      "source": "project",
+      "path": "erp-ui/src/views/oa/fixedAsset/repair/index.vue",
+      "sourceSha256": "0454da06b25fb3934baa34adf11df74d7da42c72d7178120a8b03a78e630bfda",
+      "finalSha256": "618aea936dd953427b45e94fabbe62786179646f46f91102faf441c8baf0f89a",
+      "disposition": "reviewed-superseded",
+      "reason": "保留报修图片，并使用有业务权限与归属校验的专用上传入口。"
+    },
+    {
+      "source": "project",
+      "path": "erp-ui/src/views/oa/reimbursement/index.vue",
+      "sourceSha256": "d1a0db7f49306525d461c2d58072b3f9c70cbcff6a9a28624d31b1971c79ecb9",
+      "finalSha256": "0232d2deefa45f1b2139bc6ebf74262be519c64c15de7f3385c2c95642a9d277",
+      "disposition": "reviewed-superseded",
+      "reason": "保留本地草稿与删除合并，后续补充冻结保存载荷、版本冲突保护、权威回包校验及离页隔离。"
+    },
+    {
+      "source": "project",
+      "path": "erp-ui/test/fixedAssetFeature.test.js",
+      "sourceSha256": "8d4b4d2c11d411914e4955575d6309491174e41256b0e375a7a8e6be82a040df",
+      "finalSha256": "148c5e948d6f744ca402ae72a4c39cdf28a7f06dfed5d6bb4f9df9d63cb5c559",
+      "disposition": "reviewed-superseded",
+      "reason": "保留后续接口、事务锁和异步上下文所需测试装配及新增断言；原场景由对应现行回归覆盖。"
+    },
+    {
+      "source": "project",
+      "path": "erp-ui/test/formDraftIntegrity.test.js",
+      "sourceSha256": "dfa3e0bf654fe511aba58a05ae3153fd5ae77d19dccc0f62a17b659e532e06f7",
+      "finalSha256": "0791a9c35a1c00142a5e9cf9b5706e9d483177b2e6ae3817c32b166e625533f4",
+      "disposition": "reviewed-superseded",
+      "reason": "保留后续接口、事务锁和异步上下文所需测试装配及新增断言；原场景由对应现行回归覆盖。"
+    },
+    {
+      "source": "project",
+      "path": "erp-ui/test/imageUploadGalleryLifecycle.test.js",
+      "sourceSha256": "2d898e20e7567b8859697b540345ce4f11f6e5127948f994dc814e7521b51b9f",
+      "finalSha256": "6ea77d250b7a1b6d884de73b00628877c8f942e7e9aeeb6d97e9057249d26bef",
+      "disposition": "reviewed-superseded",
+      "reason": "保留后续接口、事务锁和异步上下文所需测试装配及新增断言；原场景由对应现行回归覆盖。"
+    },
+    {
+      "source": "project",
+      "path": "erp-ui/test/mobileRepairActualWiring.test.js",
+      "sourceSha256": "ee2d508b7e6214f5fbc98d2874ee1a2e0fe04aa33476c3c35f13859195142c63",
+      "finalSha256": "026b0177ae6a9e0d72f885d83bb89f78cf089cf33c49b5f1b02999ec864ce105",
+      "disposition": "reviewed-superseded",
+      "reason": "保留后续接口、事务锁和异步上下文所需测试装配及新增断言；原场景由对应现行回归覆盖。"
+    },
+    {
+      "source": "project",
+      "path": "erp-ui/test/salesReturnRepairBehavior.test.js",
+      "sourceSha256": "08a3bca0e0f2ed734ec93c64313c0caf5e4ed6ff99cbb5151c775d2411a50d57",
+      "finalSha256": "109196354e0cbd5db8834e1668a58b61e0f4b3111a59d06ed16556189f4ee1f0",
+      "disposition": "reviewed-superseded",
+      "reason": "保留后续接口、事务锁和异步上下文所需测试装配及新增断言；原场景由对应现行回归覆盖。"
+    },
+    {
+      "source": "grok",
+      "path": "erp-modules/erp-oa/src/test/java/com/erp/oa/attendance/leave/balance/AttendanceLeaveBalanceMysqlTest.java",
+      "sourceSha256": "ed0795ff50c932136867e24e38f12bb0e2874052d5ff671d5c36895bf109cc45",
+      "finalSha256": null,
+      "disposition": "renamed-in-joint",
+      "resolvedPath": "erp-modules/erp-oa/src/test/java/com/erp/oa/attendance/leave/balance/AttendanceLeaveBalanceMySqlIT.java",
+      "reason": "联合方案已将容器集成测试改为 MySqlIT 后缀，保留测试内容并防止默认单测误启动容器。"
+    },
+    {
+      "source": "grok",
+      "path": "erp-modules/erp-oa/src/test/java/com/erp/oa/attendance/leave/balance/AttendanceLeaveQuotaMysqlTest.java",
+      "sourceSha256": "97505bcc8930dc8186e5b5a21b8f855de7dd1e45187616598e0728cffbfca4b4",
+      "finalSha256": null,
+      "disposition": "renamed-in-joint",
+      "resolvedPath": "erp-modules/erp-oa/src/test/java/com/erp/oa/attendance/leave/balance/AttendanceLeaveQuotaMySqlIT.java",
+      "reason": "联合方案已将容器集成测试改为 MySqlIT 后缀，保留测试内容并防止默认单测误启动容器。"
+    },
+    {
+      "source": "grok",
+      "path": "erp-modules/erp-oa/src/test/java/com/erp/oa/attendance/leave/balance/AttendanceOvertimeTransferMysqlTest.java",
+      "sourceSha256": "de1e35a32ceafc5165fd3c6f82c0e77f66afb3076f5710e58b159c2d1ded3d57",
+      "finalSha256": null,
+      "disposition": "renamed-in-joint",
+      "resolvedPath": "erp-modules/erp-oa/src/test/java/com/erp/oa/attendance/leave/balance/AttendanceOvertimeTransferMySqlIT.java",
+      "reason": "联合方案已将容器集成测试改为 MySqlIT 后缀，保留测试内容并防止默认单测误启动容器。"
+    },
+    {
+      "source": "mobile",
+      "path": "erp-ui/src/services/pushRoute.js",
+      "sourceSha256": "b42b287e2c1f3ad232b83ea12f1a4498fe262434dc2b5afdf9a1ed46d4d70409",
+      "finalSha256": "3c5522aa364efc955f7f54125ab3603fc08423444b1d19097a215df04a8c878a",
+      "disposition": "manual-merge",
+      "reason": "保留 PC 签署交接与列表分页/操作代次，合入手机路由、健康证提醒、原生事件刷新及同页跳转去重。"
+    },
+    {
+      "source": "mobile",
+      "path": "erp-ui/src/views/system/userNotification/index.vue",
+      "sourceSha256": "eea09cb640417e16406f7601d809be3e55fada799450ed53ca75daa685035ea9",
+      "finalSha256": "9ccd8f7aaba2f769de9d27bad17edfccde156238b939e2af9aae260fa30171c9",
+      "disposition": "manual-merge",
+      "reason": "保留 PC 签署交接与列表分页/操作代次，合入手机路由、健康证提醒、原生事件刷新及同页跳转去重。"
+    }
+  ]
+}

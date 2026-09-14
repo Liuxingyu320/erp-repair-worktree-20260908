@@ -134,7 +134,7 @@
 
           <section v-if="profile.metrics && profile.metrics.length" class="glass-card hero-card mobile-system-panel metrics-panel">
             <div class="metric-panel">
-              <div v-for="metric in profile.metrics" :key="metric.label" class="metric-cell">
+              <div v-for="metric in profile.metrics" :key="metric.key" class="metric-cell" :title="metric.hint">
                 <div class="metric-label">{{ metric.label }}</div>
                 <div class="metric-value">
                   <strong class="mobile-metric-value">{{ metric.value }}</strong>
@@ -179,6 +179,7 @@ const {
   resolveMobileWorkbenchSummaryState,
   resolveMobileWorkbenchTodos
 } = require("../mobileExperience")
+const { createUiOperationScope } = require("@/utils/uiOperationScope")
 const {
   applyWorkbenchSummaryToMetrics,
   createWorkbenchSummaryQuery,
@@ -231,6 +232,7 @@ export default {
     return {
       selectedDeptName: this.formatDeptLabel(context),
       selectedDeptId: context && context.deptId ? context.deptId : null,
+      summaryContextRevision: 0,
       workbenchSummary: null,
       summaryLoading: false,
       summaryLoaded: false,
@@ -430,16 +432,48 @@ export default {
       })
     }
   },
+  watch: {
+    "$store.getters.id"() { this.reloadWorkbenchContext() },
+    "$store.getters.token"() { this.reloadWorkbenchContext() },
+    userPermissions() { this.reloadWorkbenchContext() },
+    contextType() { this.reloadWorkbenchContext() }
+  },
   created() {
+    this._workbenchContextChanged = () => this.reloadWorkbenchContext()
+    window.addEventListener("erp:dept-changed", this._workbenchContextChanged)
     startMobileViewportSync()
     this.loadWorkbenchSummary()
     this.$store.dispatch("todo/refreshSummaries").catch(() => {})
     this.loadNoticeCount()
   },
   beforeDestroy() {
+    window.removeEventListener("erp:dept-changed", this._workbenchContextChanged)
+    this.workbenchOperationScope().deactivate()
     stopMobileViewportSync()
   },
+  deactivated() { this.workbenchOperationScope().deactivate() },
+  activated() {
+    this.workbenchOperationScope().activate()
+    this.reloadWorkbenchContext()
+  },
   methods: {
+    workbenchOperationScope() {
+      if (!this._workbenchOperationScope) this._workbenchOperationScope = createUiOperationScope(() => ({
+        actorId: String(this.$store.getters.id || ""),
+        deptId: String((getSelectedDeptContext() || {}).deptId || ""),
+        contextType: this.contextType,
+        revision: this.summaryContextRevision
+      }))
+      return this._workbenchOperationScope
+    },
+    reloadWorkbenchContext() {
+      this.summaryContextRevision += 1
+      this.workbenchOperationScope().invalidate()
+      this.workbenchSummary = null
+      this.noticeUnreadCount = null
+      this.loadWorkbenchSummary()
+      this.loadNoticeCount()
+    },
     countFor(category) {
       const value = Number(this.todoCounts && this.todoCounts[category])
       const count = Number.isFinite(value) ? Math.max(0, value) : 0
@@ -488,17 +522,23 @@ export default {
       })
     },
     loadNoticeCount() {
+      const scope = this.workbenchOperationScope()
+      const operation = scope.begin("notice")
       return listNoticeTop().then(response => {
+        if (!scope.isCurrent(operation)) return
         const rows = response && Array.isArray(response.data) ? response.data : []
         const unread = response && response.unreadCount !== undefined
           ? Number(response.unreadCount)
           : rows.filter(item => item && !item.isRead).length
         this.noticeUnreadCount = Number.isFinite(unread) ? Math.max(0, unread) : null
       }).catch(() => {
+        if (!scope.isCurrent(operation)) return
         this.noticeUnreadCount = null
       })
     },
     loadWorkbenchSummary() {
+      const scope = this.workbenchOperationScope()
+      const operation = scope.begin("summary")
       const context = getSelectedDeptContext()
       this.selectedDeptId = context && context.deptId ? context.deptId : null
       this.selectedDeptName = this.formatDeptLabel(context)
@@ -509,19 +549,25 @@ export default {
         this.summaryError = null
         return
       }
+      this.workbenchSummary = null
       this.summaryLoading = true
       this.summaryLoaded = false
       this.summaryError = null
       const query = createWorkbenchSummaryQuery(context)
       return getMobileWorkbenchSummary(query).then(response => {
+        if (!scope.isCurrent(operation)) return null
+        const result = response && response.data
+        if (result && (String(result.selectedDeptId) !== String(context.deptId) || result.selectedDeptType !== context.deptType)) throw new Error("工作台组织已变化，请刷新")
         this.workbenchSummary = response && response.data ? response.data : null
         this.summaryLoaded = true
         return this.workbenchSummary
       }).catch(error => {
+        if (!scope.isCurrent(operation)) return null
         this.workbenchSummary = null
         this.summaryError = error
         return null
       }).finally(() => {
+        if (!scope.isCurrent(operation)) return
         this.summaryLoading = false
       })
     },

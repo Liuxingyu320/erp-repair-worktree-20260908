@@ -217,6 +217,55 @@ class TransferSignScenarioRuleTest
         verify(versionMapper, never()).selectTemplatesByVersionId(55L);
     }
 
+    @Test
+    void unchangedSalaryRetainsOtherTransferDocumentsWithoutSalaryNotice()
+    {
+        stubPublishedPlan("{\"organizationChanged\":true}", 301L, true);
+        HrSignBusinessEvent event = event(today(), false);
+        preserveSalary(event);
+        OaSignDraftDecision decision = rule.decide(event);
+        assertThat(decision.getAction()).isEqualTo(OaSignDraftDecision.Action.CREATE_DRAFT);
+        assertThat(decision.getDraftPackage().getRemark()).doesNotContain("薪资");
+    }
+
+    @Test
+    void unchangedSalaryWithOnlySalaryTemplateIsNoAction()
+    {
+        stubPublishedPlan("{\"organizationChanged\":true}", 301L, true);
+        when(versionMapper.selectTemplatesByVersionId(55L)).thenReturn(List.of(salaryTemplate(true)));
+        HrSignBusinessEvent event = event(today(), false);
+        preserveSalary(event);
+        assertThat(rule.decide(event).getAction()).isEqualTo(OaSignDraftDecision.Action.NO_ACTION);
+    }
+
+    @Test
+    void actualAdjustmentWithoutSalaryTemplateRequiresPlanCorrection()
+    {
+        stubPublishedPlan("{\"organizationChanged\":true}", 301L, true);
+        when(versionMapper.selectTemplatesByVersionId(55L)).thenReturn(List.of(template(true)));
+        OaSignDraftDecision decision = rule.decide(event(today(), false));
+        assertThat(decision.getAction()).isEqualTo(OaSignDraftDecision.Action.NEEDS_DATA);
+        assertThat(decision.getReasonCodes()).contains("SALARY_CONFIRMATION_TEMPLATE_MISSING");
+    }
+
+    private void preserveSalary(HrSignBusinessEvent event)
+    {
+        HrEmployeeSigningSnapshot before = event.getBeforeSnapshot(), after = event.getAfterSnapshot();
+        after.setBaseSalary(before.getBaseSalary()); after.setPostSalary(before.getPostSalary());
+        after.setFieldAllowance(before.getFieldAllowance()); after.setPerformanceSalary(before.getPerformanceSalary());
+        after.setSalaryTotal(before.getSalaryTotal());
+        after.setSalaryVersion("VERSION-ONLY-CHANGE");
+    }
+
+    private OaSignPlanVersionTemplate salaryTemplate(boolean employeeSignRequired)
+    {
+        OaSignPlanVersionTemplate value = template(employeeSignRequired);
+        value.setId(72L); value.setTemplateId(7002L); value.setSortOrder(2);
+        value.setTemplateType(OaSignTemplateType.TRANSFER_SALARY_CONFIRM);
+        value.setTemplateName("调岗薪资确认书");
+        return value;
+    }
+
     private void stubPublishedPlan(String ruleJson, Long legalEntityId,
             boolean employeeSignRequired)
     {
@@ -233,7 +282,7 @@ class TransferSignScenarioRuleTest
         when(versionMapper.selectPublishedMatchingCandidates(
                 "TRANSFER", 30L, legalEntityId)).thenReturn(List.of(version));
         when(versionMapper.selectTemplatesByVersionId(55L))
-                .thenReturn(List.of(template(employeeSignRequired)));
+                .thenReturn(List.of(template(employeeSignRequired), salaryTemplate(employeeSignRequired)));
     }
 
     private OaSignPlanVersionTemplate template(boolean employeeSignRequired)

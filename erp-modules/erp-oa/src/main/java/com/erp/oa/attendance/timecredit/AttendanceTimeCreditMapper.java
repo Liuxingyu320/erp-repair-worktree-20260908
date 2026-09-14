@@ -22,6 +22,10 @@ public interface AttendanceTimeCreditMapper
     Integer selectNetSourceUsed(
             @Param("sourceDayResultId") Long sourceDayResultId);
 
+    Integer selectNetSourceTransferred(@Param("sourceDayResultId") Long sourceDayResultId);
+    int countInvalidSourceTransfers(@Param("sourceDayResultId") Long sourceDayResultId);
+    List<Long> lockMonthDayResults(@Param("shopId") Long shopId, @Param("dateFrom") LocalDate dateFrom, @Param("dateTo") LocalDate dateTo);
+
     Integer selectNetTargetOffset(
             @Param("targetDayResultId") Long targetDayResultId);
 

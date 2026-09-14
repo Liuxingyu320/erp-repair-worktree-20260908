@@ -84,6 +84,7 @@ class SysUserManageMapperSourceTest
     private Configuration parse() throws Exception
     {
         Configuration configuration = new Configuration();
+        HealthCertificateMapperFragments.register(configuration);
         configuration.getTypeAliasRegistry().registerAlias("SysUser", SysUser.class);
         configuration.getTypeAliasRegistry().registerAlias("SysDept", SysDept.class);
         configuration.getTypeAliasRegistry().registerAlias("SysRole", SysRole.class);

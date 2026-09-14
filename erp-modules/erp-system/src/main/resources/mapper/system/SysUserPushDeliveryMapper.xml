@@ -75,6 +75,18 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
           and version = #{version}
     </update>
 
+    <update id="markSkipped">
+        update sys_user_push_delivery
+        set status = 'SKIPPED',
+            last_result = #{lastResult},
+            last_error = null,
+            version = version + 1,
+            updated_time = sysdate()
+        where delivery_id = #{deliveryId}
+          and status = 'SENDING'
+          and version = #{version}
+    </update>
+
     <update id="markRetry">
         update sys_user_push_delivery
         set status = 'RETRY',

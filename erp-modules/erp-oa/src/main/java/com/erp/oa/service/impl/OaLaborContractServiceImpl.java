@@ -39,6 +39,10 @@ import com.erp.system.api.model.LoginUser;
 @Service
 public class OaLaborContractServiceImpl implements IOaLaborContractService
 {
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.erp.common.security.service.LegacySalaryWriteGuard legacySalaryWrites =
+            new com.erp.common.security.service.LegacySalaryWriteGuard();
+
     static final String STATUS_DRAFT = "draft";
     static final String STATUS_PENDING_SIGN = "pending_sign";
     static final String STATUS_SIGNED = "signed";
@@ -83,6 +87,7 @@ public class OaLaborContractServiceImpl implements IOaLaborContractService
     @Transactional(rollbackFor = Exception.class)
     public OaLaborContractTemplate saveTemplate(OaLaborContractTemplate template)
     {
+        legacySalaryWrites.reject();
         documentService.assertTemplateContainsRequiredPlaceholders(template.getTemplateFileUrl());
         if (StringUtils.isBlank(template.getStatus()))
         {
@@ -109,6 +114,7 @@ public class OaLaborContractServiceImpl implements IOaLaborContractService
     @Transactional(rollbackFor = Exception.class)
     public OaCompanySealConfig saveSealConfig(OaCompanySealConfig config)
     {
+        legacySalaryWrites.reject();
         if (StringUtils.isBlank(config.getStatus()))
         {
             config.setStatus("0");
@@ -136,13 +142,14 @@ public class OaLaborContractServiceImpl implements IOaLaborContractService
     @Transactional(rollbackFor = Exception.class)
     public OaLaborContract saveContract(OaLaborContract contract, Long selectedShopDeptId)
     {
+        legacySalaryWrites.reject();
         if (contract.getContractId() == null)
         {
             validateIdentityFields(contract);
             Long shopDeptId = shopScopeService.resolveRequiredShopDept(
                     selectedShopDeptId != null && selectedShopDeptId > 0 ? selectedShopDeptId : contract.getShopDeptId());
             validateTemplate(contract.getTemplateId());
-            validateEmployeeDeptInShopScope(contract, shopDeptId);
+            validateEmployeeIdentity(contract, shopDeptId, true);
             contract.setShopDeptId(shopDeptId);
             if (StringUtils.isBlank(contract.getStatus()))
             {
@@ -163,7 +170,7 @@ public class OaLaborContractServiceImpl implements IOaLaborContractService
         }
         else
         {
-            OaLaborContract db = assertAndGetScopedContract(contract.getContractId(), selectedShopDeptId);
+            OaLaborContract db = assertAndGetScopedContractForUpdate(contract.getContractId(), selectedShopDeptId);
             if (STATUS_SIGNED.equals(db.getStatus()))
             {
                 throw new ServiceException("已签署合同不允许修改");
@@ -177,13 +184,20 @@ public class OaLaborContractServiceImpl implements IOaLaborContractService
             {
                 validateTemplate(contract.getTemplateId());
             }
-            validateEmployeeDeptInShopScope(contract, db.getShopDeptId());
+            validateEmployeeIdentity(contract, db.getShopDeptId(), true);
             contract.setStatus(STATUS_DRAFT);
             contract.setShopDeptId(db.getShopDeptId());
             contract.setTotalSalary(calculateTotalSalary(contract));
             contract.setUpdateBy(SecurityUtils.getUsername());
-            contractMapper.updateOaLaborContract(contract);
+            requireOneChanged(contractMapper.updateOaLaborContract(contract));
             recordEvent(contract.getContractId(), "update", "更新劳动合同草稿", null, null, null);
+        }
+        if (contract.isIdentityManuallyVerified())
+        {
+            recordEvent(contract.getContractId(), "identity_verify",
+                    "经办人核对员工本人证件：" + StringUtils.trim(contract.getIdentityVerificationNote())
+                            .replaceAll("[1-9]\\d{16}[0-9Xx]", "[证件号已隐藏]"),
+                    null, null, identityFingerprint(contract));
         }
         return contractMapper.selectOaLaborContractById(contract.getContractId());
     }
@@ -192,13 +206,14 @@ public class OaLaborContractServiceImpl implements IOaLaborContractService
     @Transactional(rollbackFor = Exception.class)
     public OaLaborContract sendContract(Long contractId, Long selectedShopDeptId)
     {
-        OaLaborContract contract = assertAndGetScopedContract(contractId, selectedShopDeptId);
+        legacySalaryWrites.reject();
+        OaLaborContract contract = assertAndGetScopedContractForUpdate(contractId, selectedShopDeptId);
         if (!STATUS_DRAFT.equals(contract.getStatus()))
         {
             throw new ServiceException("仅草稿合同可以发送签署");
         }
         validateIdentityFields(contract);
-        validateEmployeeDeptInShopScope(contract, contract.getShopDeptId());
+        validateEmployeeIdentity(contract, contract.getShopDeptId(), false);
         OaLaborContractTemplate template = requireActiveTemplate(contract.getTemplateId());
         OaCompanySealConfig sealConfig = requireActiveSeal();
         OaLaborContractTemplate frozenTemplate = documentService.freezeTemplateSnapshot(contract, template);
@@ -223,7 +238,7 @@ public class OaLaborContractServiceImpl implements IOaLaborContractService
         update.setContractFileHash(generated.getSha256());
         update.setSentTime(new Date());
         update.setUpdateBy(SecurityUtils.getUsername());
-        contractMapper.updateOaLaborContract(update);
+        requireOneChanged(contractMapper.updateOaLaborContract(update));
         recordEvent(contractId, "send", "发送员工签署并冻结合同版本", null, null, documentVersion,
                 generated.getSha256());
         return contractMapper.selectOaLaborContractById(contractId);
@@ -253,7 +268,7 @@ public class OaLaborContractServiceImpl implements IOaLaborContractService
     @Transactional(rollbackFor = Exception.class)
     public OaLaborContract voidContract(Long contractId, Long selectedShopDeptId)
     {
-        OaLaborContract contract = assertAndGetScopedContract(contractId, selectedShopDeptId);
+        OaLaborContract contract = assertAndGetScopedContractForUpdate(contractId, selectedShopDeptId);
         if (STATUS_VOIDED.equals(contract.getStatus()))
         {
             return contract;
@@ -262,12 +277,16 @@ public class OaLaborContractServiceImpl implements IOaLaborContractService
         {
             throw new ServiceException("已签署合同不能直接作废，请走解除/终止流程");
         }
+        if (!STATUS_DRAFT.equals(contract.getStatus()) && !STATUS_PENDING_SIGN.equals(contract.getStatus()))
+        {
+            throw new ServiceException("当前合同状态不允许作废，请刷新后核对");
+        }
         OaLaborContract update = new OaLaborContract();
         update.setContractId(contractId);
         update.setStatus(STATUS_VOIDED);
         update.setVoidedTime(new Date());
         update.setUpdateBy(SecurityUtils.getUsername());
-        contractMapper.updateOaLaborContract(update);
+        requireOneChanged(contractMapper.markVoided(update, contract.getStatus()));
         recordEvent(contractId, "void", "作废劳动合同", null, null, contract.getContractFileHash());
         return contractMapper.selectOaLaborContractById(contractId);
     }
@@ -303,7 +322,7 @@ public class OaLaborContractServiceImpl implements IOaLaborContractService
     @Transactional(rollbackFor = Exception.class)
     public OaLaborContract signContract(Long contractId, OaLaborContractSignRequest request)
     {
-        OaLaborContract contract = requireContract(contractId);
+        OaLaborContract contract = requireContractForUpdate(contractId);
         assertEmployeeOwner(contract);
         if (!STATUS_PENDING_SIGN.equals(contract.getStatus()))
         {
@@ -329,26 +348,28 @@ public class OaLaborContractServiceImpl implements IOaLaborContractService
         contract.setSignerIp(request.getSignerIp());
         contract.setSignerUserAgent(request.getSignerUserAgent());
         contract.setSignedTime(signedTime);
-        GeneratedContractFile generated = documentService.generateSignedArchive(contract, template, sealConfig, request);
+        return documentService.withSignedArchiveAttempt(contract, () -> {
+            GeneratedContractFile generated = documentService.generateSignedArchive(contract, template, sealConfig, request);
 
-        OaLaborContract update = new OaLaborContract();
-        update.setContractId(contractId);
-        update.setStatus(STATUS_SIGNED);
-        update.setArchiveFileUrl(generated.getDocxUrl());
-        update.setPdfFileUrl(generated.getPdfUrl());
-        update.setSignatureFileUrl(generated.getSignatureFileUrl());
-        update.setArchiveFileHash(generated.getSha256());
-        update.setCertificateFileUrl(generated.getCertificateFileUrl());
-        update.setCertificateFileHash(generated.getCertificateSha256());
-        update.setContractFileHash(generated.getSha256());
-        update.setSignerIp(request.getSignerIp());
-        update.setSignerUserAgent(request.getSignerUserAgent());
-        update.setSignedTime(signedTime);
-        update.setUpdateBy(SecurityUtils.getUsername());
-        contractMapper.updateOaLaborContract(update);
-        recordEvent(contractId, "sign", "员工完成线上签署", request.getSignerIp(), request.getSignerUserAgent(),
-                contract.getDocumentVersion(), generated.getSha256());
-        return contractMapper.selectOaLaborContractById(contractId);
+            OaLaborContract update = new OaLaborContract();
+            update.setContractId(contractId);
+            update.setStatus(STATUS_SIGNED);
+            update.setArchiveFileUrl(generated.getDocxUrl());
+            update.setPdfFileUrl(generated.getPdfUrl());
+            update.setSignatureFileUrl(generated.getSignatureFileUrl());
+            update.setArchiveFileHash(generated.getSha256());
+            update.setCertificateFileUrl(generated.getCertificateFileUrl());
+            update.setCertificateFileHash(generated.getCertificateSha256());
+            update.setContractFileHash(generated.getSha256());
+            update.setSignerIp(request.getSignerIp());
+            update.setSignerUserAgent(request.getSignerUserAgent());
+            update.setSignedTime(signedTime);
+            update.setUpdateBy(SecurityUtils.getUsername());
+            requireOneChanged(contractMapper.markSigned(update, contract.getDocumentVersion(), contract.getPreviewFileHash()));
+            recordEvent(contractId, "sign", "员工完成线上签署", request.getSignerIp(), request.getSignerUserAgent(),
+                    contract.getDocumentVersion(), generated.getSha256());
+            return contractMapper.selectOaLaborContractById(contractId);
+        });
     }
 
     @Override
@@ -417,9 +438,37 @@ public class OaLaborContractServiceImpl implements IOaLaborContractService
         return contract;
     }
 
+    private OaLaborContract requireContractForUpdate(Long contractId)
+    {
+        try
+        {
+            OaLaborContract contract = contractMapper.selectOaLaborContractByIdForUpdate(contractId);
+            if (contract == null) throw new ServiceException("劳动合同不存在");
+            return contract;
+        }
+        catch (org.springframework.dao.PessimisticLockingFailureException e)
+        {
+            throw new ServiceException("合同正在处理中，请稍后刷新并重试原操作");
+        }
+    }
+
+    private OaLaborContract assertAndGetScopedContractForUpdate(Long contractId, Long selectedShopDeptId)
+    {
+        return assertContractScope(requireContractForUpdate(contractId), selectedShopDeptId);
+    }
+
+    private void requireOneChanged(int changed)
+    {
+        if (changed != 1) throw new ServiceException("合同状态或文档版本已变化，请刷新后核对");
+    }
+
     private OaLaborContract assertAndGetScopedContract(Long contractId, Long selectedShopDeptId)
     {
-        OaLaborContract contract = requireContract(contractId);
+        return assertContractScope(requireContract(contractId), selectedShopDeptId);
+    }
+
+    private OaLaborContract assertContractScope(OaLaborContract contract, Long selectedShopDeptId)
+    {
         if (SecurityUtils.isAdmin())
         {
             return contract;
@@ -589,15 +638,62 @@ public class OaLaborContractServiceImpl implements IOaLaborContractService
         return ID_CARD_CHECK_CODES[sum % 11] == normalized.charAt(17);
     }
 
-    private void validateEmployeeDeptInShopScope(OaLaborContract contract, Long shopDeptId)
+    private void validateEmployeeIdentity(OaLaborContract contract, Long shopDeptId, boolean saving)
     {
-        if (contract == null || contract.getEmployeeDeptId() == null || shopDeptId == null)
+        OaLaborContract identity = contractMapper.selectScopedEmployeeIdentity(contract.getEmployeeId(), shopDeptId);
+        if (identity == null)
         {
+            throw new ServiceException("员工不存在或不在当前合同组织范围内");
+        }
+        if (saving)
+        {
+            contract.setEmployeeDeptId(identity.getEmployeeDeptId());
+            contract.setEmployeeName(identity.getEmployeeName());
+        }
+        else if (!java.util.Objects.equals(contract.getEmployeeName(), identity.getEmployeeName()))
+        {
+            throw new ServiceException("员工档案姓名已变化，请核对并保存草稿后再发送");
+        }
+        String authoritativeId = StringUtils.trim(identity.getEmployeeIdCard());
+        if (StringUtils.isNotBlank(authoritativeId))
+        {
+            if (!authoritativeId.equalsIgnoreCase(contract.getEmployeeIdCard()))
+            {
+                throw new ServiceException("合同身份证与员工档案不一致，请核对员工后保存");
+            }
+            contract.setIdentityManuallyVerified(false);
             return;
         }
-        if (deptScopeMapper.countDeptInScope(shopDeptId, contract.getEmployeeDeptId()) <= 0)
+        if (saving)
         {
-            throw new ServiceException("员工不在当前合同组织范围内");
+            String note = StringUtils.trim(contract.getIdentityVerificationNote());
+            if (!contract.isIdentityManuallyVerified() || note == null || note.length() < 4 || note.length() > 200)
+            {
+                throw new ServiceException("员工档案未登记身份证，请核对本人证件并填写身份核对说明");
+            }
+            return;
+        }
+        String fingerprint = identityFingerprint(contract);
+        boolean verified = eventMapper.selectEventsByContractId(contract.getContractId()).stream()
+                .anyMatch(event -> "identity_verify".equals(event.getEventType())
+                        && fingerprint.equals(event.getFileHash()));
+        if (!verified)
+        {
+            throw new ServiceException("员工档案未登记身份证，请返回草稿完成身份核对并保存后再发送");
+        }
+    }
+
+    private String identityFingerprint(OaLaborContract contract)
+    {
+        try
+        {
+            byte[] bytes = MessageDigest.getInstance("SHA-256").digest(
+                    (contract.getEmployeeId() + ":" + contract.getEmployeeIdCard()).getBytes(StandardCharsets.UTF_8));
+            return java.util.HexFormat.of().formatHex(bytes);
+        }
+        catch (NoSuchAlgorithmException e)
+        {
+            throw new IllegalStateException(e);
         }
     }
 
@@ -666,7 +762,10 @@ public class OaLaborContractServiceImpl implements IOaLaborContractService
         event.setCreateTime(createTime);
         event.setCreateBy(SecurityUtils.getUsername());
         event.setEventHash(calculateEventHash(event));
-        eventMapper.insertOaLaborContractEvent(event);
+        if (eventMapper.insertOaLaborContractEvent(event) != 1)
+        {
+            throw new ServiceException("合同事件记录未成功保存，请核对后重试");
+        }
     }
 
     private String contentType(String kind)

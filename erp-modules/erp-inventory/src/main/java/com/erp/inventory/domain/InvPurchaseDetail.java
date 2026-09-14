@@ -20,6 +20,7 @@ public class InvPurchaseDetail
     private BigDecimal unitPrice;
     private BigDecimal amount;
     private BigDecimal receivedQuantity;
+    private BigDecimal stockedQuantity;
     private BigDecimal historicalReturnedQuantity;
     private BigDecimal returnableQuantity;
 
@@ -53,6 +54,8 @@ public class InvPurchaseDetail
     public void setUnitPrice(BigDecimal unitPrice) { this.unitPrice = unitPrice; }
     public BigDecimal getAmount() { return amount; }
     public void setAmount(BigDecimal amount) { this.amount = amount; }
+    public BigDecimal getStockedQuantity() { return stockedQuantity; }
+    public void setStockedQuantity(BigDecimal value) { this.stockedQuantity = value; }
     public BigDecimal getReceivedQuantity() { return receivedQuantity; }
     public void setReceivedQuantity(BigDecimal receivedQuantity) { this.receivedQuantity = receivedQuantity; }
     public BigDecimal getHistoricalReturnedQuantity() { return historicalReturnedQuantity; }

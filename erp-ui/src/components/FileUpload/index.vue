@@ -4,10 +4,13 @@
       multiple
       :action="uploadFileUrl"
       :before-upload="handleBeforeUpload"
-      :file-list="fileList"
+      :file-list="widgetFileList"
       :data="data"
       :limit="limit"
       :on-error="handleUploadError"
+      :on-progress="handleUploadProgress"
+      :http-request="uploadHttpRequest"
+      :before-remove="canRemoveWidgetFile"
       :on-exceed="handleExceed"
       :on-success="handleUploadSuccess"
       :show-file-list="false"
@@ -27,6 +30,7 @@
         的文件
       </div>
     </el-upload>
+    <upload-queue :items="Object.values(uploadTasks)" @cancel="cancelQueuedUpload" @retry="retryQueuedUpload" @dismiss="dismissQueuedUpload" />
 
     <!-- 文件列表 -->
     <transition-group ref="uploadFileList" class="upload-file-list el-upload-list el-upload-list--text" name="el-fade-in-linear" tag="ul">
@@ -44,7 +48,7 @@
           <span class="el-icon-document"> {{ getFileName(file.name) }} </span>
         </span>
         <div class="ele-upload-list__item-content-action">
-          <el-link :underline="false" @click="handleDelete(index)" type="danger" v-if="!disabled">删除</el-link>
+          <button type="button" class="attachment-remove-button" :aria-label="'删除附件：' + getFileName(file.name)" @click="handleDelete(file)" v-if="!disabled">删除</button>
         </div>
       </li>
     </transition-group>
@@ -54,14 +58,19 @@
 <script>
 import { getToken } from "@/utils/auth"
 import { applySessionAuthHeaders, buildSessionAuthHeaders, shouldUseSessionCredentials } from "@/utils/sessionMode"
-import { deleteFile } from "@/api/system/file"
 import Sortable from 'sortablejs'
+import UploadQueue from '@/components/UploadQueue'
+import { uploadProgressData, uploadProgressMethods } from '@/utils/uploadProgress'
 const { sanitizeFileUrl } = require("@/utils/urlSecurity")
 const { safeTrustedApiUrl } = require("@/utils/requestSecurity")
 
 export default {
+  components: { UploadQueue },
+  inject: { elForm: { default: null } },
+  created() { this.registerUploadFormGuard() },
   name: "FileUpload",
   props: {
+    contextKey: { type: [String, Number], default: '' },
     // 值
     value: [String, Object, Array],
     // 上传接口地址
@@ -106,6 +115,8 @@ export default {
   },
   data() {
     return {
+      ...uploadProgressData(),
+      lastEmittedValue: null,
       uploadOperations: {},
       uploadPeriodResults: {},
       uploadTombstones: [],
@@ -129,13 +140,15 @@ export default {
           onEnd: (evt) => {
             const movedItem = this.fileList.splice(evt.oldIndex, 1)[0]
             this.fileList.splice(evt.newIndex, 0, movedItem)
-            this.$emit("input", this.listToString(this.fileList))
+            this.lastEmittedValue = this.listToString(this.fileList)
+            this.$emit("input", this.lastEmittedValue)
           }
         })
       })
     }
   },
   beforeDestroy() {
+    this.disposeUploadProgress()
     if (this.uploadDestroyed) return
     this.uploadDestroyed = true
     Object.keys(this.uploadOperations).forEach(uid => {
@@ -147,8 +160,21 @@ export default {
     this.closeOwnedUploadLoading()
   },
   watch: {
+    contextKey() { this.resetUploadProgressScope() },
+    '$route.fullPath'() { this.resetUploadProgressScope() },
+    disabled(value) { if (value) this.resetUploadProgressScope() },
+    uploadFormModel() { this.resetUploadProgressScope() },
+    '$store.getters.id'() { this.resetUploadProgressScope() },
+    action(value) {
+      this.resetUploadProgressScope()
+      this.uploadFileUrl = safeTrustedApiUrl(process.env.VUE_APP_BASE_API, value)
+    },
     value: {
       handler(val) {
+        const values = Array.isArray(val) ? val : typeof val === 'string' ? val.split(',') : val ? [val] : []
+        const incoming = this.listToString(values.map(item => typeof item === 'string' ? { url: item } : item))
+        if (incoming === this.lastEmittedValue) return
+        this.resetUploadProgressScope()
         if (val) {
           let temp = 1
           // 首先将值转为数组
@@ -175,12 +201,15 @@ export default {
     }
   },
   computed: {
+    widgetFileList() { return this.uploadWidgetFileList() },
+    uploadFormModel() { return this.elForm && this.elForm.model },
     // 是否显示提示
     showTip() {
       return this.isShowTip && (this.fileType || this.fileSize)
     },
   },
   methods: {
+    ...uploadProgressMethods,
     // 上传前校检格式和大小
     handleBeforeUpload(file) {
       applySessionAuthHeaders(this.headers, getToken())
@@ -220,8 +249,7 @@ export default {
       const pendingBefore = this.pendingUploadCount()
       if (pendingBefore === 0) {
         this.uploadBusyPeriodId += 1
-        this.$modal.loading("正在上传文件，请稍候...")
-        this.uploadLoadingOwned = true
+        // A local per-file queue replaces the fullscreen loading overlay.
         this.$set(this.uploadPeriodResults, this.uploadBusyPeriodId, { successes: [] })
       }
       this.$set(this.uploadOperations, uid, {
@@ -234,6 +262,7 @@ export default {
         committed: false,
         removeHandled: false
       })
+      this.beginUploadTask(file)
       return true
     },
     // 文件个数超出
@@ -259,21 +288,15 @@ export default {
         : (url ? "上传响应包含不安全的文件地址，已拒绝保存" : "上传成功响应缺少文件地址，请重试")
       this.settleUploadOperation(file, "business_failed", null, message)
     },
-    // 删除文件
-    handleDelete(index) {
-      const file = this.fileList[index]
-      this.deleteRemoteFile(file).finally(() => {
-        this.fileList.splice(index, 1)
-        this.$emit("input", this.listToString(this.fileList))
-      })
-    },
-    deleteRemoteFile(file) {
-      const fileUrl = file && (file.url || file.name)
-      const safeUrl = sanitizeFileUrl(fileUrl)
-      if (!safeUrl) {
-        return Promise.resolve()
-      }
-      return deleteFile(safeUrl).catch(() => {})
+    // 编辑时仅移除表单引用；业务保存前不能删除仍被原记录使用的文件。
+    handleDelete(file) {
+      const uid = this.uploadUid(file)
+      const index = this.fileList.findIndex(value => value === file ||
+        (uid ? this.uploadUid(value) === uid : file && value.url === file.url))
+      if (index < 0) return
+      this.fileList.splice(index, 1)
+      this.lastEmittedValue = this.listToString(this.fileList)
+      this.$emit("input", this.listToString(this.fileList))
     },
     uploadUid(file) {
       const value = file && file.uid !== undefined
@@ -292,12 +315,22 @@ export default {
         return count + (this.uploadOperations[uid].state === "pending" ? 1 : 0)
       }, 0)
     },
+    retireUploadOperation(file) {
+      const uid = this.uploadUid(file), operation = this.uploadOperations[uid]
+      if (!operation || operation.state !== 'pending') return
+      operation.state = 'canceled'
+      this.rememberUploadTombstone(operation)
+      this.deleteUploadOperation(uid)
+      if (this.pendingUploadCount() === 0) this.completeUploadBusyPeriod(operation.busyPeriodId)
+    },
     settleUploadOperation(file, state, result, message) {
+      if (!this.uploadTaskCurrent(file && this.uploadTasks[this.uploadUid(file)])) return
       const uid = this.uploadUid(file)
       const operation = uid && this.uploadOperations[uid]
       if (this.uploadDestroyed || !operation || operation.state !== "pending" ||
         operation.fileIdentity !== this.uploadFileIdentity(file)) return
       const pendingBefore = this.pendingUploadCount()
+      this.finishUploadTask(file, state === 'succeeded' ? 'succeeded' : 'failed', message, result && result.url)
       operation.state = state
       operation.result = result
       const period = this.uploadPeriodResults[operation.busyPeriodId]
@@ -320,9 +353,11 @@ export default {
       const period = this.uploadPeriodResults[busyPeriodId]
       const completed = (period ? period.successes : [])
         .sort((left, right) => left.order - right.order)
-      if (completed.length) {
+      if (completed.length && !this.uploadProgressResetting && !this.uploadProgressDestroyed) {
         this.fileList = this.fileList.concat(completed.map(item => item.result))
-        this.$emit("input", this.listToString(this.fileList))
+        this.commitUploadedTasks()
+        this.lastEmittedValue = this.listToString(this.fileList)
+            this.$emit("input", this.lastEmittedValue)
       }
       if (typeof this.$delete === "function") this.$delete(this.uploadPeriodResults, busyPeriodId)
       else delete this.uploadPeriodResults[busyPeriodId]
@@ -388,8 +423,19 @@ export default {
   align-items: center;
   color: inherit;
 }
-.ele-upload-list__item-content-action .el-link {
+.attachment-remove-button {
   margin-right: 10px;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
+  color: #c23535;
+  cursor: pointer;
+  font: inherit;
+}
+.attachment-remove-button:focus-visible {
+  outline: 2px solid #0b6b53;
+  outline-offset: 2px;
 }
 .unsafe-file-link {
   color: #909399;

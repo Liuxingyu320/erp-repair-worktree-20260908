@@ -13,7 +13,9 @@ function loadSfc(relative, globals = {}) {
   const script = match[1]
     .replace(/import\s+[\s\S]*?\s+from\s+["'][^"']+["']\s*/g, "")
     .replace("export default", "module.exports =")
-  const sandbox = { module: { exports: {} }, exports: {}, ...globals }
+  const sandbox = { module: { exports: {} }, exports: {},
+    getSelectedDeptId: () => "10",
+    require(id) { return require(path.resolve(root, "src", id.slice(2))) }, ...globals }
   sandbox.exports = sandbox.module.exports
   vm.runInNewContext(script, sandbox, { filename: relative })
   return { component: sandbox.module.exports, source }

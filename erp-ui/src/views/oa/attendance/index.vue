@@ -31,6 +31,9 @@
 
     <el-card shadow="never" class="attendance-center-card">
       <el-tabs v-model="activeTab" @tab-click="handleTabClick">
+        <el-tab-pane v-if="can('oa:attendance:leave:balance:read')" label="假期额度" name="balance"><leave-balance-management v-if="activeTab === 'balance'" /></el-tab-pane>
+        <el-tab-pane v-if="can('oa:attendance:leave:balance:rule')" label="假期政策" name="balanceRules"><leave-balance-rule-management v-if="activeTab === 'balanceRules'" /></el-tab-pane>
+        <el-tab-pane v-if="can('oa:attendance:leave:balance:convert')" label="加班转调休" name="compensatory"><p>选择当前门店已日结的加班记录，核定转入调休。</p><el-button @click="standaloneTransferOpen = true">选择日结记录核定转休</el-button><overtime-transfer-dialog :open="standaloneTransferOpen" @close="standaloneTransferOpen = false" /></el-tab-pane>
         <el-tab-pane v-if="can('oa:attendance:shift:list')" label="班次管理" name="shift">
           <shift-management />
         </el-tab-pane>
@@ -80,10 +83,10 @@ const requestTodoTypes = Object.freeze({
 
 export default {
   name: 'OaAttendanceV2',
-  components: { AttendanceSiteManagement, CorrectionManagement, DayResultManagement, LeaveManagement, ShiftManagement, WeeklySchedule },
+  components: { OvertimeTransferDialog: () => import('./components/OvertimeTransferDialog.vue'), LeaveBalanceManagement: () => import('./components/LeaveBalanceManagement.vue'), LeaveBalanceRuleManagement: () => import('./components/LeaveBalanceRuleManagement.vue'), AttendanceSiteManagement, CorrectionManagement, DayResultManagement, LeaveManagement, ShiftManagement, WeeklySchedule },
   data() {
     return {
-      activeTab: 'shift',
+      activeTab: 'shift', standaloneTransferOpen: false,
       shopContext: getSelectedDeptContext() || {},
       requestMode: '',
       requestSubTab: 'leave',
@@ -110,11 +113,13 @@ export default {
       deep: true,
       handler() {
         this.applyRouteFocus()
+        this.ensureVisibleTab()
       }
     }
   },
   created() {
     this.applyRouteFocus()
+    this.ensureVisibleTab()
     if (!this.can('oa:attendance:leave:list') && !this.can('oa:attendance:leave:type:list') && this.can('oa:attendance:correction:list')) {
       this.requestSubTab = 'correction'
     }
@@ -140,9 +145,22 @@ export default {
         this.activeTab = 'requests'
         return
       }
-      if (['shift', 'site', 'schedule', 'day', 'requests'].indexOf(requested) > -1) this.activeTab = requested
+      if (['shift', 'site', 'schedule', 'day', 'requests', 'balance', 'balanceRules', 'compensatory'].indexOf(requested) > -1) this.activeTab = requested
+    },
+    ensureVisibleTab() {
+      const allowed = []
+      if (this.can('oa:attendance:shift:list')) allowed.push('shift')
+      if (this.can('oa:attendance:site:list')) allowed.push('site')
+      if (this.can('oa:attendance:schedule:list') && this.can('oa:attendance:site:list')) allowed.push('schedule')
+      if (this.can('oa:attendance:day:list')) allowed.push('day')
+      if (this.canRequestReview) allowed.push('requests')
+      if (this.can('oa:attendance:leave:balance:read')) allowed.push('balance')
+      if (this.can('oa:attendance:leave:balance:rule')) allowed.push('balanceRules')
+      if (this.can('oa:attendance:leave:balance:convert')) allowed.push('compensatory')
+      if (!allowed.includes(this.activeTab) && allowed.length) this.activeTab = allowed[0]
     },
     handleTabClick(tab) {
+      this.standaloneTransferOpen = false
       if (!this.$router || !this.$route || tab.name === 'requests') return
       const query = Object.assign({}, this.$route.query || {}, { tab: tab.name })
       delete query.todoType

@@ -52,6 +52,10 @@ export function reassignApprovalTask(taskId, data) {
   return request({ url: `${BASE_URL}/tasks/${taskId}/reassign`, method: 'post', data, silentError: true })
 }
 
+export function listApprovalReassignOptions(taskId, params) {
+  return request({ url: `${BASE_URL}/tasks/${taskId}/reassign-options`, method: 'get', params, silentError: true })
+}
+
 export function replayApprovalCallback(outboxId, data) {
   return request({ url: `${BASE_URL}/callbacks/${outboxId}/replay`, method: 'post', data, silentError: true })
 }

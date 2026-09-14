@@ -1,6 +1,10 @@
 package com.erp.system.service.impl;
 
 import java.util.Comparator;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Objects;
+import com.erp.system.service.support.DictCacheCoordinator;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -26,11 +30,14 @@ import com.erp.system.service.ISysDictTypeService;
 @Service
 public class SysDictTypeServiceImpl implements ISysDictTypeService
 {
+    private ServiceException dictionaryConflict(String message) { return new ServiceException(message, 409); }
     @Autowired
     private SysDictTypeMapper dictTypeMapper;
 
     @Autowired
     private SysDictDataMapper dictDataMapper;
+    @Autowired
+    private DictCacheCoordinator dictCache;
 
     /**
      * 项目启动时，初始化字典到缓存
@@ -73,18 +80,11 @@ public class SysDictTypeServiceImpl implements ISysDictTypeService
     @Override
     public List<SysDictData> selectDictDataByType(String dictType)
     {
-        List<SysDictData> dictDatas = DictUtils.getDictCache(dictType);
-        if (StringUtils.isNotEmpty(dictDatas))
-        {
-            return dictDatas;
-        }
-        dictDatas = dictDataMapper.selectDictDataByType(dictType);
-        if (StringUtils.isNotEmpty(dictDatas))
-        {
-            DictUtils.setDictCache(dictType, dictDatas);
-            return dictDatas;
-        }
-        return null;
+        // A removed/renamed type is never an implicit alias, even if a delayed old read repopulates Redis.
+        if (dictTypeMapper.selectDictTypeByType(dictType) == null) return null;
+        // The API reads committed database values. Redis may be unavailable or await invalidation on another node.
+        // Never SET a read snapshot: a concurrent rename/data write could make it stale before Redis SET.
+        return dictDataMapper.selectDictDataByType(dictType);
     }
 
     /**
@@ -117,18 +117,24 @@ public class SysDictTypeServiceImpl implements ISysDictTypeService
      * @param dictIds 需要删除的字典ID
      */
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public void deleteDictTypeByIds(Long[] dictIds)
     {
-        for (Long dictId : dictIds)
-        {
-            SysDictType dictType = selectDictTypeById(dictId);
-            if (dictDataMapper.countDictDataByType(dictType.getDictType()) > 0)
-            {
-                throw new ServiceException(String.format("%1$s已分配,不能删除", dictType.getDictName()));
-            }
-            dictTypeMapper.deleteDictTypeById(dictId);
-            DictUtils.removeDictCache(dictType.getDictType());
+        dictCache.beginMutation();
+        if (dictIds == null || dictIds.length == 0 || dictIds.length > 200 || Arrays.stream(dictIds).anyMatch(id -> id == null || id <= 0))
+            throw dictionaryConflict("请选择1至200个有效字典编号");
+        List<SysDictType> locked = new ArrayList<>();
+        for (Long id : Arrays.stream(dictIds).distinct().sorted().toList()) {
+            SysDictType type = dictTypeMapper.lockDictTypeById(id);
+            if (type == null) throw dictionaryConflict("字典编号 " + id + " 已不存在，整批未删除");
+            locked.add(type);
         }
+        for (SysDictType type : locked)
+            if (!dictDataMapper.lockDictDataIdsByType(type.getDictType()).isEmpty())
+                throw dictionaryConflict(type.getDictName() + "（" + type.getDictType() + "）已分配字典项，整批不能删除");
+        for (SysDictType type : locked)
+            if (dictTypeMapper.deleteDictTypeById(type.getDictId()) != 1) throw dictionaryConflict("字典已变化，整批删除已回滚");
+        dictCache.afterCommit(locked.stream().map(SysDictType::getDictType).toList());
     }
 
     /**
@@ -152,7 +158,7 @@ public class SysDictTypeServiceImpl implements ISysDictTypeService
     @Override
     public void clearDictCache()
     {
-        DictUtils.clearDictCache();
+        dictCache.clearAll();
     }
 
     /**
@@ -162,7 +168,6 @@ public class SysDictTypeServiceImpl implements ISysDictTypeService
     public void resetDictCache()
     {
         clearDictCache();
-        loadingDictCache();
     }
 
     /**
@@ -172,12 +177,15 @@ public class SysDictTypeServiceImpl implements ISysDictTypeService
      * @return 结果
      */
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public int insertDictType(SysDictType dict)
     {
+        dictCache.beginMutation();
+        if (dictTypeMapper.lockDictTypeByType(dict.getDictType()) != null) throw dictionaryConflict("字典类型已存在");
         int row = dictTypeMapper.insertDictType(dict);
         if (row > 0)
         {
-            DictUtils.setDictCache(dict.getDictType(), null);
+            dictCache.afterCommit(List.of(dict.getDictType()));
         }
         return row;
     }
@@ -192,14 +200,16 @@ public class SysDictTypeServiceImpl implements ISysDictTypeService
     @Transactional(rollbackFor = Exception.class)
     public int updateDictType(SysDictType dict)
     {
-        SysDictType oldDict = dictTypeMapper.selectDictTypeById(dict.getDictId());
-        dictDataMapper.updateDictDataType(oldDict.getDictType(), dict.getDictType());
+        dictCache.beginMutation();
+        SysDictType oldDict = dictTypeMapper.lockDictTypeById(dict.getDictId());
+        if (oldDict == null) throw dictionaryConflict("字典已不存在，请刷新后重试");
+        SysDictType nameOwner = dictTypeMapper.lockDictTypeByType(dict.getDictType());
+        if (nameOwner != null && !Objects.equals(nameOwner.getDictId(), oldDict.getDictId())) throw dictionaryConflict("字典类型已存在");
+        String oldType = oldDict.getDictType();
+        dictDataMapper.updateDictDataType(oldType, dict.getDictType());
         int row = dictTypeMapper.updateDictType(dict);
-        if (row > 0)
-        {
-            List<SysDictData> dictDatas = dictDataMapper.selectDictDataByType(dict.getDictType());
-            DictUtils.setDictCache(dict.getDictType(), dictDatas);
-        }
+        if (row != 1) throw dictionaryConflict("字典已变化，修改未保存");
+        dictCache.afterCommit(List.of(oldType, dict.getDictType()));
         return row;
     }
 

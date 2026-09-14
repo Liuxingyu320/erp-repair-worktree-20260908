@@ -14,6 +14,7 @@ public interface InvStockCheckDetailMapper
     int updateInvStockCheckDetail(InvStockCheckDetail detail);
     int resetSnapshot(@Param("detailId") Long detailId,
             @Param("bookQty") BigDecimal bookQty, @Param("costPrice") BigDecimal costPrice);
+    int refreshSnapshotCost(@Param("detailId") Long detailId, @Param("costPrice") BigDecimal costPrice);
     int deleteInvStockCheckDetailByCheckId(Long checkId);
     List<Map<String, Object>> selectStockForCheck(@Param("shopDeptId") Long shopDeptId, @Param("warehouseId") Long warehouseId);
 }

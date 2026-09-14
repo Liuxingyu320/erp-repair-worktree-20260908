@@ -31,18 +31,20 @@ public class SysJobServiceImpl implements ISysJobService
     @Autowired
     private SysJobMapper jobMapper;
 
+    @Autowired
+    private SysJobDeletionService deletionService;
+
+    @Autowired
+    private SysJobSchedulerReconciler reconciler;
+
     /**
      * 项目启动时，初始化定时器 主要是防止手动修改数据库导致未同步到定时任务处理（注：不能手动修改数据库ID和任务组名，否则会导致脏数据）
      */
     @PostConstruct
     public void init() throws SchedulerException, TaskException
     {
-        scheduler.clear();
-        List<SysJob> jobList = jobMapper.selectJobAll();
-        for (SysJob job : jobList)
-        {
-            ScheduleUtils.createScheduleJob(scheduler, job);
-        }
+        // Never clear foreign jobs or another scheduler instance's state.
+        for (SysJob job : jobMapper.selectJobAll()) reconciler.synchronizeDefinition(job.getJobId());
     }
 
     /**
@@ -78,14 +80,11 @@ public class SysJobServiceImpl implements ISysJobService
     @Transactional(rollbackFor = Exception.class)
     public int pauseJob(SysJob job) throws SchedulerException
     {
-        Long jobId = job.getJobId();
-        String jobGroup = job.getJobGroup();
-        job.setStatus(ScheduleConstants.Status.PAUSE.getValue());
-        int rows = jobMapper.updateJob(job);
-        if (rows > 0)
-        {
-            scheduler.pauseJob(ScheduleUtils.getJobKey(jobId, jobGroup));
-        }
+        SysJob current = lockCurrent(job);
+        current.setStatus(ScheduleConstants.Status.PAUSE.getValue());
+        current.setRevision(java.util.UUID.randomUUID().toString());
+        int rows = jobMapper.updateJob(current);
+        synchronizeAfterCommit(current.getJobId());
         return rows;
     }
 
@@ -98,14 +97,11 @@ public class SysJobServiceImpl implements ISysJobService
     @Transactional(rollbackFor = Exception.class)
     public int resumeJob(SysJob job) throws SchedulerException
     {
-        Long jobId = job.getJobId();
-        String jobGroup = job.getJobGroup();
-        job.setStatus(ScheduleConstants.Status.NORMAL.getValue());
-        int rows = jobMapper.updateJob(job);
-        if (rows > 0)
-        {
-            scheduler.resumeJob(ScheduleUtils.getJobKey(jobId, jobGroup));
-        }
+        SysJob current = lockCurrent(job);
+        current.setStatus(ScheduleConstants.Status.NORMAL.getValue());
+        current.setRevision(java.util.UUID.randomUUID().toString());
+        int rows = jobMapper.updateJob(current);
+        synchronizeAfterCommit(current.getJobId());
         return rows;
     }
 
@@ -115,17 +111,10 @@ public class SysJobServiceImpl implements ISysJobService
      * @param job 调度信息
      */
     @Override
-    @Transactional(rollbackFor = Exception.class)
     public int deleteJob(SysJob job) throws SchedulerException
     {
-        Long jobId = job.getJobId();
-        String jobGroup = job.getJobGroup();
-        int rows = jobMapper.deleteJobById(jobId);
-        if (rows > 0)
-        {
-            scheduler.deleteJob(ScheduleUtils.getJobKey(jobId, jobGroup));
-        }
-        return rows;
+        deletionService.deleteLegacy(new Long[] {job.getJobId()},com.erp.common.security.utils.SecurityUtils.getUserId());
+        return 1;
     }
 
     /**
@@ -135,14 +124,9 @@ public class SysJobServiceImpl implements ISysJobService
      * @return 结果
      */
     @Override
-    @Transactional(rollbackFor = Exception.class)
     public void deleteJobByIds(Long[] jobIds) throws SchedulerException
     {
-        for (Long jobId : jobIds)
-        {
-            SysJob job = jobMapper.selectJobById(jobId);
-            deleteJob(job);
-        }
+        deletionService.deleteLegacy(jobIds,com.erp.common.security.utils.SecurityUtils.getUserId());
     }
 
     /**
@@ -177,8 +161,9 @@ public class SysJobServiceImpl implements ISysJobService
     public boolean run(SysJob job) throws SchedulerException
     {
         Long jobId = job.getJobId();
-        SysJob properties = selectJobById(jobId);
-        if (properties == null)
+        SysJob properties = jobMapper.selectJobByIdForUpdate(jobId);
+        if (properties == null || job.getRevision() == null
+                || !java.util.Objects.equals(properties.getRevision(),job.getRevision()))
         {
             return false;
         }
@@ -189,6 +174,7 @@ public class SysJobServiceImpl implements ISysJobService
         // 参数
         JobDataMap dataMap = new JobDataMap();
         dataMap.put(ScheduleConstants.TASK_PROPERTIES, properties);
+        dataMap.put("ERP_MANUAL_RUN", Boolean.TRUE);
         if (scheduler.checkExists(jobKey))
         {
             scheduler.triggerJob(jobKey, dataMap);
@@ -201,7 +187,8 @@ public class SysJobServiceImpl implements ISysJobService
     {
         if (scheduler.checkExists(jobKey))
         {
-            return;
+            SysJob scheduled = SysJobSchedulerReconciler.ownedDefinition(scheduler.getJobDetail(jobKey),jobKey);
+            if (scheduled != null && java.util.Objects.equals(scheduled.getRevision(),job.getRevision())) return;
         }
         try
         {
@@ -222,12 +209,11 @@ public class SysJobServiceImpl implements ISysJobService
     @Transactional(rollbackFor = Exception.class)
     public int insertJob(SysJob job) throws SchedulerException, TaskException
     {
+        job.setJobId(null);
+        job.setRevision(java.util.UUID.randomUUID().toString());
         job.setStatus(ScheduleConstants.Status.PAUSE.getValue());
         int rows = jobMapper.insertJob(job);
-        if (rows > 0)
-        {
-            ScheduleUtils.createScheduleJob(scheduler, job);
-        }
+        if (rows > 0) synchronizeAfterCommit(job.getJobId());
         return rows;
     }
 
@@ -240,12 +226,10 @@ public class SysJobServiceImpl implements ISysJobService
     @Transactional(rollbackFor = Exception.class)
     public int updateJob(SysJob job) throws SchedulerException, TaskException
     {
-        SysJob properties = selectJobById(job.getJobId());
+        lockCurrent(job);
+        job.setRevision(java.util.UUID.randomUUID().toString());
         int rows = jobMapper.updateJob(job);
-        if (rows > 0)
-        {
-            updateSchedulerJob(job, properties.getJobGroup());
-        }
+        if (rows > 0) synchronizeAfterCommit(job.getJobId());
         return rows;
     }
 
@@ -257,15 +241,29 @@ public class SysJobServiceImpl implements ISysJobService
      */
     public void updateSchedulerJob(SysJob job, String jobGroup) throws SchedulerException, TaskException
     {
-        Long jobId = job.getJobId();
-        // 判断是否存在
-        JobKey jobKey = ScheduleUtils.getJobKey(jobId, jobGroup);
-        if (scheduler.checkExists(jobKey))
+        synchronizeAfterCommit(job.getJobId());
+    }
+
+    private SysJob lockCurrent(SysJob request)
+    {
+        if (request == null || request.getJobId() == null || request.getRevision() == null)
+            throw new ServiceException("任务版本缺失，请刷新页面后重试",409);
+        SysJob current = jobMapper.selectJobByIdForUpdate(request.getJobId());
+        if (current == null || !java.util.Objects.equals(current.getRevision(),request.getRevision()))
+            throw new ServiceException("任务已被修改或删除，请刷新后重试",409);
+        return current;
+    }
+
+    private void synchronizeAfterCommit(Long id)
+    {
+        if (org.springframework.transaction.support.TransactionSynchronizationManager.isSynchronizationActive())
         {
-            // 防止创建时存在数据问题 先移除，然后在执行创建操作
-            scheduler.deleteJob(jobKey);
+            org.springframework.transaction.support.TransactionSynchronizationManager.registerSynchronization(
+                    new org.springframework.transaction.support.TransactionSynchronization() {
+                        @Override public void afterCommit() {reconciler.synchronizeDefinition(id);}
+                    });
         }
-        ScheduleUtils.createScheduleJob(scheduler, job);
+        else reconciler.synchronizeDefinition(id);
     }
 
     /**

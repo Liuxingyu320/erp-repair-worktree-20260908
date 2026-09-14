@@ -11,6 +11,17 @@ import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.Map;
+import java.util.TreeMap;
+import java.util.Objects;
+import java.util.Comparator;
+import com.erp.common.security.auth.AuthUtil;
+import com.erp.oa.domain.OaFixedAssetConfigCommand;
+import com.erp.oa.domain.dto.OaFixedAssetConfigBatchRequest;
+import com.erp.oa.domain.vo.OaFixedAssetConfigSnapshot;
+import com.erp.oa.mapper.OaFixedAssetConfigCommandMapper;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -74,6 +85,137 @@ public class OaFixedAssetServiceImpl implements IOaFixedAssetService
     private ShopScopeService shopScopeService;
 
     private Clock clock = Clock.systemDefaultZone();
+    @Autowired private OaFixedAssetConfigCommandMapper configCommandMapper;
+    private final ObjectMapper configCommandJson = new ObjectMapper().findAndRegisterModules().disable(com.fasterxml.jackson.databind.MapperFeature.USE_GETTERS_AS_SETTERS).disable(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
+
+    private ServiceException configConflict(String message) { return new ServiceException(message, 409); }
+    private Long lockConfigScope(Long shopId, Long expectedVersion)
+    {
+        configCommandMapper.ensureScope(shopId);
+        Long version = configCommandMapper.lockScope(shopId);
+        if (version == null || version < 0 || version == Long.MAX_VALUE) throw configConflict("店铺配置版本不可用，请联系管理员");
+        if (expectedVersion != null && !Objects.equals(expectedVersion, version)) throw configConflict("店铺配置已被其他操作修改，请比较服务器最新快照后再保存");
+        return version;
+    }
+    private void advanceConfigVersion(Long shopId, Long version)
+    {
+        if (configCommandMapper.advanceVersion(shopId, version) != 1) throw configConflict("店铺配置版本冲突，整批未保存");
+    }
+    private void requireConfigPermission(String permission)
+    {
+        if (!SecurityUtils.isAdmin() && !AuthUtil.hasPermi(permission)) throw configConflict("无权执行固定资产配置操作：" + permission);
+    }
+    private String configRequestId(String value)
+    {
+        if (value == null || !value.matches("[A-Za-z0-9_-]{1,64}")) throw configConflict("配置请求号无效，请刷新页面后重试");
+        return value;
+    }
+    private String commandJson(Object value)
+    {
+        try { return configCommandJson.writeValueAsString(value); }
+        catch (Exception error) { throw configConflict("配置回执序列化失败，整批未保存"); }
+    }
+    private OaFixedAssetConfigSnapshot commandSnapshot(OaFixedAssetConfigCommand command)
+    {
+        try { return configCommandJson.readValue(command.getResultJson(), OaFixedAssetConfigSnapshot.class); }
+        catch (Exception error) { throw configConflict("原配置回执无法读取，请联系管理员核对"); }
+    }
+    private String decimalKey(BigDecimal value) { return value == null ? null : value.stripTrailingZeros().toPlainString(); }
+    private String configPayloadHash(OaFixedAssetConfigBatchRequest request, Long shop)
+    {
+        Map<String,Object> body = new TreeMap<>(); body.put("shop",shop); body.put("version",request.getExpectedVersion()); body.put("ratio",decimalKey(request.getAnnualRepairRatio()));
+        List<Map<String,Object>> rows = new ArrayList<>();
+        for (OaFixedAssetConfig row : request.getRows()) {
+            Map<String,Object> item = new TreeMap<>(); item.put("id",row.getConfigId()); item.put("oe",row.getOeItemId()); item.put("quantity",decimalKey(row.getAssetQuantity())); item.put("price",decimalKey(row.getAssetUnitPrice())); item.put("status",StringUtils.isEmpty(row.getStatus()) ? "0" : row.getStatus()); item.put("remark",row.getRemark()); rows.add(item);
+        }
+        rows.sort(Comparator.comparing(item -> String.valueOf(item.get("oe")))); body.put("rows",rows);
+        try { return java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(commandJson(body).getBytes(java.nio.charset.StandardCharsets.UTF_8))); }
+        catch (java.security.NoSuchAlgorithmException impossible) { throw new IllegalStateException(impossible); }
+    }
+    @Override
+    @Transactional(readOnly=true, isolation=Isolation.REPEATABLE_READ)
+    public OaFixedAssetConfigSnapshot selectConfigSnapshot(Long shopId, Long selectedShopId)
+    {
+        Long shop = resolveReadableShop(shopId, selectedShopId);
+        Long version = configCommandMapper.selectVersion(shop);
+        return configSnapshot(shop, version == null ? 0L : version, null);
+    }
+    private OaFixedAssetConfigSnapshot configSnapshot(Long shop, Long version, String requestId)
+    {
+        OaFixedAssetConfig query = new OaFixedAssetConfig(); query.setShopDeptId(shop);
+        OaFixedAssetConfigSnapshot result = new OaFixedAssetConfigSnapshot(); result.setShopDeptId(shop); result.setVersion(String.valueOf(version)); result.setCurrentVersion(result.getVersion()); result.setRequestId(requestId);
+        result.setRows(configMapper.selectConfigList(query));
+        OaFixedAssetQuota quota = quotaMapper.selectQuota(shop, currentYear());
+        result.setAnnualRepairRatio(quota == null || quota.getAnnualRepairRatio() == null ? DEFAULT_ANNUAL_RATIO : quota.getAnnualRepairRatio()); return result;
+    }
+    @Override
+    @Transactional(readOnly=true, isolation=Isolation.REPEATABLE_READ)
+    public OaFixedAssetConfigSnapshot selectConfigCommand(String requestId, Long shopId, Long selectedShopId)
+    {
+        Long shop = resolveReadableShop(shopId, selectedShopId);
+        OaFixedAssetConfigCommand command = configCommandMapper.selectCommand(shop, SecurityUtils.getUserId(), configRequestId(requestId));
+        if (command == null || command.getResultJson() == null) return null;
+        OaFixedAssetConfigSnapshot result = commandSnapshot(command); Long current = configCommandMapper.selectVersion(shop); result.setCurrentVersion(String.valueOf(current == null ? 0L : current)); return result;
+    }
+    @Override
+    @Transactional(rollbackFor=Exception.class)
+    public OaFixedAssetConfigSnapshot saveConfigBatch(OaFixedAssetConfigBatchRequest request, Long selectedShopId)
+    {
+        if (request == null || request.getRows() == null || request.getRows().size() > 5000 || request.getRows().stream().anyMatch(Objects::isNull)) throw configConflict("固定资产集合无效，单店最多5000项");
+        String requestId = configRequestId(request.getRequestId());
+        if (request.getExpectedVersion() == null || request.getExpectedVersion() < 0) throw configConflict("缺少店铺配置快照版本，请重新读取");
+        BigDecimal ratio = request.getAnnualRepairRatio();
+        if (ratio == null || ratio.signum() < 0 || ratio.compareTo(ONE_HUNDRED) > 0) throw configConflict("年度申报比例须在0至100之间");
+        Long shop = resolveWritableShop(request.getShopDeptId(), selectedShopId);
+        requireConfigPermission(request.getRows().isEmpty() ? "oa:fixedAsset:config:delete" : "oa:fixedAsset:config:edit");
+        String hash = configPayloadHash(request, shop); Long actor = SecurityUtils.getUserId();
+        Long version = lockConfigScope(shop, null);
+        configCommandMapper.claimCommand(shop, actor, requestId, hash);
+        OaFixedAssetConfigCommand command = configCommandMapper.lockCommand(shop, actor, requestId);
+        if (command == null || !Objects.equals(hash, command.getPayloadHash())) throw configConflict("原请求号已用于不同的配置，请先核对原请求");
+        if (command.getResultJson() != null) { OaFixedAssetConfigSnapshot result = commandSnapshot(command); result.setCurrentVersion(String.valueOf(version)); return result; }
+        if (!Objects.equals(version, request.getExpectedVersion())) throw configConflict("店铺配置已被其他操作修改，请比较服务器最新快照后再保存");
+        List<OaFixedAssetConfig> existing = configCommandMapper.lockConfigRows(shop);
+        Map<Long,OaFixedAssetConfig> byId = new TreeMap<>(); existing.forEach(row -> byId.put(row.getConfigId(),row));
+        Set<Long> selected = new HashSet<>(), oeIds = new HashSet<>(); List<OaFixedAssetConfig> prepared = new ArrayList<>();
+        int rowNumber = 0;
+        for (OaFixedAssetConfig input : request.getRows()) {
+            rowNumber++;
+            if (input.getShopDeptId() != null && !Objects.equals(shop,input.getShopDeptId())) throw configConflict("第"+rowNumber+"行属于其他店铺，整批未保存");
+            if (input.getOeItemId() == null || input.getOeItemId() <= 0 || !oeIds.add(input.getOeItemId())) throw configConflict("第"+rowNumber+"行OE编号无效或重复");
+            if (input.getConfigId() != null && (!selected.add(input.getConfigId()) || !byId.containsKey(input.getConfigId()))) throw configConflict("第"+rowNumber+"行配置不属于当前店铺或已变化");
+            if (input.getAssetQuantity() == null || input.getAssetQuantity().signum() <= 0 || input.getAssetQuantity().precision() - input.getAssetQuantity().scale() > 14 || input.getAssetQuantity().scale() > 2) throw configConflict("第"+rowNumber+"行数量须为有效正数，最多两位小数");
+            if (input.getAssetUnitPrice() != null && (input.getAssetUnitPrice().signum() < 0 || input.getAssetUnitPrice().precision() - input.getAssetUnitPrice().scale() > 14 || input.getAssetUnitPrice().scale() > 2)) throw configConflict("第"+rowNumber+"行资产单价无效");
+            String status = StringUtils.isEmpty(input.getStatus()) ? STATUS_NORMAL : input.getStatus();
+            if (!"0".equals(status) && !"1".equals(status)) throw configConflict("第"+rowNumber+"行状态无效");
+            if (input.getRemark() != null && input.getRemark().length() > 500) throw configConflict("第"+rowNumber+"行备注超过500字");
+            OaFixedAssetConfig row = new OaFixedAssetConfig(); row.setConfigId(input.getConfigId()); row.setShopDeptId(shop); row.setOeItemId(input.getOeItemId()); row.setAssetQuantity(input.getAssetQuantity()); row.setAssetUnitPrice(input.getAssetUnitPrice()); row.setStatus(status); row.setRemark(input.getRemark()); prepared.add(row);
+        }
+        List<OaFixedAssetConfig> removed = existing.stream().filter(row -> !selected.contains(row.getConfigId())).toList();
+        if (!removed.isEmpty()) requireConfigPermission("oa:fixedAsset:config:delete");
+        // Every reference/amount is checked before the first config mutation; consistent OE lock order avoids reversed batch contention.
+        for (OaFixedAssetConfig row : prepared.stream().sorted(Comparator.comparing(OaFixedAssetConfig::getOeItemId)).toList()) {
+            try {
+                OaFixedAssetConfig oe = assertAndGetActiveOeItem(row.getOeItemId());
+                if (STATUS_NORMAL.equals(row.getStatus())) assertPurchaseReferenceComplete(oe);
+                if (row.getAssetUnitPrice() == null || row.getAssetUnitPrice().signum() == 0) row.setAssetUnitPrice(oe.getAssetUnitPrice());
+                if (row.getAssetUnitPrice() == null || row.getAssetUnitPrice().signum() < 0) throw configConflict("缺少有效资产单价");
+                row.setAssetAmount(resolveAssetAmount(row));
+                if (row.getAssetAmount().precision() - row.getAssetAmount().scale() > 14) throw configConflict("资产金额超出可保存范围");
+            } catch (ServiceException | OaFixedAssetValidationException error) { throw configConflict("OE " + row.getOeItemId() + "：" + error.getMessage() + "；整批未保存"); }
+        }
+        for (OaFixedAssetConfig row : removed) if (configMapper.deleteConfigById(row.getConfigId()) != 1) throw configConflict("删除配置失败，整批未保存");
+        for (OaFixedAssetConfig row : prepared) {
+            int changed;
+            if (row.getConfigId() == null) { row.setCreateBy(SecurityUtils.getUsername()); changed = configMapper.insertConfig(row); }
+            else { row.setUpdateBy(SecurityUtils.getUsername()); changed = configMapper.updateConfig(row); }
+            if (changed != 1) throw configConflict("OE " + row.getOeItemId() + " 保存失败，整批未保存");
+        }
+        rebuildQuota(shop,currentYear(),ratio); advanceConfigVersion(shop,version);
+        OaFixedAssetConfigSnapshot result = configSnapshot(shop,version+1,requestId);
+        if (configCommandMapper.completeCommand(shop,actor,requestId,hash,commandJson(result)) != 1) throw configConflict("配置回执保存失败，整批未保存");
+        return result;
+    }
 
     @Override
     public List<OaFixedAssetConfig> selectConfigList(OaFixedAssetConfig config, Long selectedShopDeptId)
@@ -100,6 +242,7 @@ public class OaFixedAssetServiceImpl implements IOaFixedAssetService
     public OaFixedAssetConfig saveConfig(OaFixedAssetConfig config, Long selectedShopDeptId)
     {
         Long shopDeptId = resolveWritableShop(config.getShopDeptId(), selectedShopDeptId);
+        Long scopeVersion = lockConfigScope(shopDeptId, config.getExpectedVersion());
         if (StringUtils.isEmpty(config.getStatus()))
         {
             config.setStatus(STATUS_NORMAL);
@@ -122,11 +265,13 @@ public class OaFixedAssetServiceImpl implements IOaFixedAssetService
         }
         else
         {
-            selectConfigById(config.getConfigId(), selectedShopDeptId);
+            OaFixedAssetConfig original = selectConfigById(config.getConfigId(), selectedShopDeptId);
+            if (!Objects.equals(original.getShopDeptId(), shopDeptId)) throw new ServiceException("不能把现有配置移动到其他店铺");
             config.setUpdateBy(SecurityUtils.getUsername());
             configMapper.updateConfig(config);
         }
         rebuildQuota(shopDeptId, currentYear(), config.getAnnualRepairRatio());
+        advanceConfigVersion(shopDeptId, scopeVersion);
         return configMapper.selectConfigById(config.getConfigId());
     }
 
@@ -134,9 +279,19 @@ public class OaFixedAssetServiceImpl implements IOaFixedAssetService
     @Transactional(rollbackFor = Exception.class)
     public int deleteConfigById(Long configId, Long selectedShopDeptId)
     {
+        return deleteConfigById(configId, selectedShopDeptId, null);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public int deleteConfigById(Long configId, Long selectedShopDeptId, Long expectedVersion)
+    {
         OaFixedAssetConfig config = selectConfigById(configId, selectedShopDeptId);
+        Long version = lockConfigScope(config.getShopDeptId(), expectedVersion);
         int rows = configMapper.deleteConfigById(configId);
+        if (rows != 1) throw new ServiceException("配置已不存在，删除未生效");
         rebuildQuota(config.getShopDeptId(), currentYear(), null);
+        advanceConfigVersion(config.getShopDeptId(),version);
         return rows;
     }
 
@@ -550,6 +705,7 @@ public class OaFixedAssetServiceImpl implements IOaFixedAssetService
         result.setItemDescription(assetConfig.getItemDescription());
         result.setOrderUnit(assetConfig.getOrderUnit());
         result.setImageUrl(assetConfig.getImageUrl());
+        result.setImageUrls(assetConfig.getImageUrls());
         result.setPurchaseReferenceUrl(assetConfig.getPurchaseReferenceUrl());
         result.setPurchaseReferenceNote(assetConfig.getPurchaseReferenceNote());
         result.setPurchaseReferenceReady(referenceReady);
@@ -607,7 +763,7 @@ public class OaFixedAssetServiceImpl implements IOaFixedAssetService
         {
             throw new ServiceException("请选择OE器皿");
         }
-        OaFixedAssetConfig oeSnapshot = configMapper.selectOeItemSnapshot(oeItemId);
+        OaFixedAssetConfig oeSnapshot = configMapper.selectOeItemSnapshotForUpdate(oeItemId);
         if (oeSnapshot == null)
         {
             throw new ServiceException("OE器皿不存在或已停用");

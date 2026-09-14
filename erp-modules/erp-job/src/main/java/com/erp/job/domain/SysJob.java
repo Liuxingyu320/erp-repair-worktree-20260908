@@ -26,6 +26,11 @@ public class SysJob extends BaseEntity
     @Excel(name = "任务编号", cellType = ColumnType.NUMERIC)
     private Long jobId;
 
+    /** Server-assigned definition revision; changes on every mutation. */
+    private String revision;
+    public String getRevision() { return revision; }
+    public void setRevision(String revision) { this.revision = revision; }
+
     /** 任务名称 */
     @Excel(name = "任务名称")
     private String jobName;
@@ -54,6 +59,7 @@ public class SysJob extends BaseEntity
     @Excel(name = "任务状态", readConverterExp = "0=正常,1=暂停")
     private String status;
 
+    @com.fasterxml.jackson.databind.annotation.JsonSerialize(using = com.fasterxml.jackson.databind.ser.std.ToStringSerializer.class)
     public Long getJobId()
     {
         return jobId;

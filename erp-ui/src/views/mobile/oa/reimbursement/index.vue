@@ -1,5 +1,14 @@
 <template>
   <div class="mobile-reimbursement mobile-system-page">
+    <approval-command-recovery :message="withdrawError" :reason="withdrawReason" :unknown="withdrawUnknown" :busy="acting || checkingWithdraw" :checking="checkingWithdraw" :checked="withdrawChecked" check-label="核对撤回结果" retry-label="重试原撤回请求" @check="checkWithdrawCommand" @retry="retryWithdrawCommand" />
+    <section v-if="submitRecoveryMessage" class="state-card" role="alert">
+      <p>{{ submitRecoveryMessage }}</p>
+      <template v-if="submitUnknown">
+        <button type="button" :disabled="submitting || checkingSubmission" @click="checkSubmissionResult">核对提交结果</button>
+        <button type="button" :disabled="submitting || checkingSubmission || !submitChecked" @click="retrySubmissionIntent">重试原提交</button>
+        <button type="button" :disabled="submitting || checkingSubmission" @click="openSubmissionRecord">查看当前报销</button>
+      </template>
+    </section>
     <header class="mobile-header">
       <button type="button" aria-label="返回" @click="goBack">
         <i class="el-icon-arrow-left" aria-hidden="true" />
@@ -105,6 +114,19 @@
       </template>
 
       <template v-else-if="mode === 'form'">
+        <section v-if="formConflict" class="state-card" role="alert" style="margin-bottom: 16px; padding: 12px; border: 1px solid #e6a23c">
+          <strong>需要核对报销记录</strong>
+          <p>{{ formConflict.message }}</p>
+          <p>本地草稿（版本 {{ form.rowVersion == null ? '新建' : form.rowVersion }}）：{{ form.title }} · {{ form.purpose }}</p>
+          <ul><li v-for="(row, index) in form.items" :key="'local-' + index">{{ row.expenseType || '未分类' }} · {{ row.description || row.merchantName || '未填写说明' }} · 金额 {{ row.claimedAmount }}</li></ul>
+          <template v-if="formConflict.remote">
+            <p>最新记录（版本 {{ formConflict.remote.rowVersion }}）：{{ formConflict.remote.title }} · {{ formConflict.remote.purpose }}</p>
+            <ul><li v-for="(row, index) in formConflict.remote.items" :key="'remote-' + index">{{ row.expenseType || '未分类' }} · {{ row.description || row.merchantName || '未填写说明' }} · 金额 {{ row.claimedAmount }}</li></ul>
+          </template>
+          <button type="button" @click="reviewFormConflict">重新获取最新对照</button>
+          <button type="button" @click="useLatestConflictRecord">放弃本地修改并加载最新</button>
+        </section>
+
         <section class="smart-start-card">
           <div class="smart-start-copy">
             <span class="smart-start-icon"><i class="el-icon-camera-solid" aria-hidden="true" /></span>
@@ -117,12 +139,12 @@
           <div class="invoice-upload-actions">
             <button
               type="button"
-              :disabled="uploadQueueActive || saving"
+              :disabled="busy"
               @click="openInvoicePicker('camera')"
             >拍照发票</button>
             <button
               type="button"
-              :disabled="uploadQueueActive || saving"
+              :disabled="busy"
               @click="openInvoicePicker('file')"
             >批量选择</button>
           </div>
@@ -319,13 +341,13 @@
         </section>
 
         <div class="form-actions">
-          <button type="button" :disabled="busy" @click="saveDraftOnly">
+          <button type="button" :disabled="busy || !!formConflict" @click="saveDraftOnly">
             {{ saving ? '保存中…' : '保存草稿' }}
           </button>
           <button
             type="button"
             class="primary"
-            :disabled="busy || !submissionAvailable"
+            :disabled="busy || !!formConflict || !submissionAvailable"
             @click="submitForm"
           >{{ submitting ? '提交中…' : (submissionReadiness.ready ? '确认无误并提交' : `提交前还差 ${submissionReadiness.blockingIssues.length} 项`) }}</button>
         </div>
@@ -410,10 +432,11 @@
       @click="openForm()"
     ><i class="el-icon-plus" aria-hidden="true" /></button>
 
+    <approval-command-recovery :message="approvalError" :reason="approvalReason" :unknown="approvalUnknown" :busy="acting || checkingApproval" :checking="checkingApproval" :checked="approvalChecked" @check="checkApprovalCommand" @retry="retryApprovalCommand" />
     <footer v-if="mode === 'detail' && canAct" class="approval-bar">
-      <button type="button" :disabled="busy" @click="approvalAction('return')">退回</button>
-      <button type="button" class="reject" :disabled="busy" @click="approvalAction('reject')">拒绝</button>
-      <button type="button" class="approve" :disabled="busy" @click="approvalAction('approve')">同意</button>
+      <button type="button" :disabled="busy || approvalUnknown || checkingApproval" @click="approvalAction('return')">退回</button>
+      <button type="button" class="reject" :disabled="busy || approvalUnknown || checkingApproval" @click="approvalAction('reject')">拒绝</button>
+      <button type="button" class="approve" :disabled="busy || approvalUnknown || checkingApproval" @click="approvalAction('approve')">同意</button>
     </footer>
 
     <div
@@ -455,6 +478,9 @@
 </template>
 
 <script>
+import { createReimbursementWithdrawRecovery } from "@/mixins/reimbursementWithdrawRecovery"
+import { createApprovalCommandRecovery } from "@/mixins/approvalCommandRecovery"
+import ApprovalCommandRecovery from "@/components/ApprovalCommandRecovery"
 import {
   deleteReimbursementInvoice,
   getReimbursement,
@@ -478,7 +504,7 @@ import {
   statusLabel as approvalStatusLabel
 } from "@/views/approval/manage/components/approvalUi"
 import { blobValidate } from "@/utils/common"
-import { hasValidatedSelectedDeptContext } from "@/utils/shopContext"
+import { getSelectedDeptId, hasValidatedSelectedDeptContext } from "@/utils/shopContext"
 
 const {
   formatMoney,
@@ -494,11 +520,16 @@ const {
 } = require("./mobileReimbursementState")
 const {
   applyInvoiceToForm,
-  recoverReimbursementDeleteFailure,
+  mergeReimbursementInvoiceDeletion,
+  cloneReimbursementDraft, captureReimbursementSave, mergeReimbursementSavedDraft,
+  mergeReimbursementReadDraft, isReimbursementVersionConflict, reimbursementDeleteMatches,
   reimbursementReadiness
 } = require("@/utils/reimbursementSmartFill")
 
 const INVOICE_UPLOAD_CONTEXT_MESSAGE = "请先选择门店或仓库，再上传发票"
+const SILENT_READ = { silentError: true }
+const { createUiOperationScope } = require("@/utils/uiOperationScope")
+const { approvalFailureKind } = require("@/utils/approvalCommandRecovery")
 
 function dateText() {
   const now = new Date()
@@ -546,6 +577,12 @@ function emptyInvoicePreview() {
 }
 
 export default {
+  components: { ApprovalCommandRecovery },
+  mixins: [createReimbursementWithdrawRecovery({ refresh: vm => { vm.$store.dispatch("todo/invalidateAfterMutation").catch(() => {}); return vm.loadList(true) } }), createApprovalCommandRecovery({
+    target: vm => vm.detail && ({ businessCode: 'OA_REIMBURSEMENT', businessId: vm.detail.reimbursementId, taskId: vm.approvalTaskId, instanceId: vm.detail.approvalInstanceId, approvalRound: vm.detail.approvalRound }),
+    visible: vm => vm.mode === 'detail' && !vm.pageInactive, canAct: vm => vm.canAct, loading: 'acting',
+    success: (vm, command) => { vm.$store.dispatch('todo/invalidateAfterMutation').catch(() => {}); return vm.openDetail(command.businessId) }
+  })],
   name: "MobileOaReimbursement",
   data() {
     return {
@@ -553,7 +590,15 @@ export default {
       loading: false,
       loadingMore: false,
       saving: false,
+      formEpoch: 0,
+      formReadSeq: 0,
+      detailEpoch: 0,
+      listReadSeq: 0,
+      pageReadSeq: 0,
+      pageInactive: false,
+      deptListenerBound: false,
       submitting: false,
+      submitIntent: null, submitUnknown: false, submitChecked: false, checkingSubmission: false, submitRecoveryMessage: "",
       uploading: false,
       uploadQueueActive: false,
       uploadQueueToken: 0,
@@ -581,6 +626,7 @@ export default {
       },
       form: form(),
       formBaseline: "",
+      formServerSnapshot: null, formConflict: null, saveInFlight: false, saveOperationSeq: 0, deleteOperationSeq: 0,
       detail: null,
       approvalDetail: null,
       invoicePreview: emptyInvoicePreview(),
@@ -611,7 +657,7 @@ export default {
       return "我的报销"
     },
     busy() {
-      return this.saving || this.submitting || this.uploadWorkActive ||
+      return this.saveInFlight || this.saving || this.submitting || this.submitUnknown || this.checkingSubmission || this.uploadWorkActive ||
         this.acting ||
         !!this.deletingInvoiceId ||
         !!this.recognizingInvoiceId || !!this.savingRecognitionInvoiceId
@@ -643,6 +689,9 @@ export default {
       return this.approvalDetail && this.approvalDetail.instance || {}
     },
     canAct() {
+      if (!this.detail || this.loading || this.error) return false
+      if (this.routeReimbursementId && String(this.routeReimbursementId) !== String(this.detail.reimbursementId)) return false
+      if (String(this.instance.instanceId) !== String(this.detail.approvalInstanceId) || String(this.instance.businessId) !== String(this.detail.reimbursementId) || this.instance.businessCode !== "OA_REIMBURSEMENT") return false
       const task = this.tasks.find(value =>
         String(value.taskId || value.id) === String(this.approvalTaskId))
       return !!task &&
@@ -659,6 +708,7 @@ export default {
     }
   },
   created() {
+    this.bindDeptListener()
     this.loadAvailability()
     this.reload()
   },
@@ -667,7 +717,34 @@ export default {
       window.addEventListener("beforeunload", this.handleBeforeUnload)
     }
   },
+  activated() {
+    if (!this.pageInactive) return
+    this.pageInactive = false
+    this.bindDeptListener()
+    // A kept-alive form may contain an unsaved draft. Refresh its remote version
+    // with the existing merge policy; never reopen/reset the form on activation.
+    if (this.mode === "form") {
+      if (this.form.reimbursementId) {
+        const pending = this.refreshForm(true)
+        const token = { epoch: this.formEpoch, readSeq: this.formReadSeq,
+          reimbursementId: this.formReadId(this.form.reimbursementId), deptId: this.liveDeptId() }
+        pending.catch(error => {
+          if (this.isCurrentFormRead(token)) this.$modal.msgError(reimbursementErrorMessage(error))
+        })
+      }
+      return
+    }
+    this.reload()
+  },
+  deactivated() {
+    this.pageInactive = true
+    this.invalidatePendingFormReads()
+  },
   beforeDestroy() {
+    this.pageInactive = true
+    this.formEpoch += 1
+    this.invalidatePendingFormReads()
+    this.unbindDeptListener()
     if (typeof window !== "undefined") {
       window.removeEventListener("beforeunload", this.handleBeforeUnload)
     }
@@ -755,6 +832,61 @@ export default {
         this.submissionAvailable = false
       })
     },
+    liveDeptId() {
+      return getSelectedDeptId()
+    },
+    sameDeptId(deptId) {
+      return String(this.liveDeptId() || "") === String(deptId || "")
+    },
+    formReadId(value) {
+      return value == null || value === "" ? "" : String(value)
+    },
+    beginFormRead(reimbursementId) {
+      this.formReadSeq += 1
+      return {
+        epoch: this.formEpoch,
+        readSeq: this.formReadSeq,
+        reimbursementId: this.formReadId(reimbursementId),
+        deptId: this.liveDeptId()
+      }
+    },
+    isCurrentFormRead(token) {
+      if (this.pageInactive || this.mode !== "form") return false
+      if (!token || token.epoch !== this.formEpoch || token.readSeq !== this.formReadSeq) return false
+      if (!this.sameDeptId(token.deptId)) return false
+      return this.formReadId(this.form && this.form.reimbursementId) === token.reimbursementId
+    },
+    isCurrentDetailRead(epoch, reimbursementId, deptId) {
+      return !this.pageInactive
+        && this.mode === "detail"
+        && epoch === this.detailEpoch
+        && this.formReadId(this.detail && this.detail.reimbursementId || reimbursementId) === this.formReadId(reimbursementId)
+        && this.sameDeptId(deptId)
+    },
+    isCurrentListRead(listSeq, deptId) {
+      return !this.pageInactive && this.mode === "list" && listSeq === this.listReadSeq && this.sameDeptId(deptId)
+    },
+    invalidatePendingFormReads() {
+      this.pageReadSeq += 1
+      this.formReadSeq += 1
+      this.detailEpoch += 1
+      this.listReadSeq += 1
+      this.loading = false
+      this.loadingMore = false
+    },
+    bindDeptListener() {
+      if (typeof window === "undefined" || this.deptListenerBound) return
+      window.addEventListener("erp:dept-changed", this.handleDeptChanged)
+      this.deptListenerBound = true
+    },
+    unbindDeptListener() {
+      if (typeof window === "undefined" || !this.deptListenerBound) return
+      window.removeEventListener("erp:dept-changed", this.handleDeptChanged)
+      this.deptListenerBound = false
+    },
+    handleDeptChanged() {
+      this.invalidatePendingFormReads()
+    },
     refreshCurrent() {
       if (!this.isFormDirty) return this.reload()
       return this.confirmDiscardChanges()
@@ -762,6 +894,7 @@ export default {
         .catch(() => undefined)
     },
     reload() {
+      if (this.pageInactive) return Promise.resolve()
       this.error = ""
       if (/^\d+$/.test(this.routeReimbursementId)) {
         return this.openDetail(this.routeReimbursementId)
@@ -772,7 +905,13 @@ export default {
       return this.loadList(true)
     },
     loadList(reset = true) {
+      if (this.pageInactive) return Promise.resolve()
       this.mode = "list"
+      this.formReadSeq += 1
+      this.detailEpoch += 1
+      this.listReadSeq += 1
+      const listSeq = this.listReadSeq
+      const deptId = this.liveDeptId()
       if (reset) {
         this.listQuery.pageNum = 1
         this.loading = true
@@ -785,14 +924,16 @@ export default {
         pageSize: this.listQuery.pageSize,
         title: this.listQuery.keyword || undefined,
         status: this.listQuery.status || undefined
-      })
+      }, SILENT_READ)
         .then(response => {
+          if (!this.isCurrentListRead(listSeq, deptId)) return
           const incoming = Array.isArray(response.rows) ? response.rows : []
           this.rows = reset
             ? incoming
             : mergeReimbursementRows(this.rows, incoming)
           this.total = response.total || 0
         }).catch(error => {
+          if (!this.isCurrentListRead(listSeq, deptId)) return
           if (reset) {
             this.error = reimbursementErrorMessage(error)
           } else {
@@ -800,6 +941,7 @@ export default {
             this.$modal.msgError(reimbursementErrorMessage(error))
           }
         }).finally(() => {
+          if (listSeq !== this.listReadSeq) return
           this.loading = false
           this.loadingMore = false
         })
@@ -815,7 +957,7 @@ export default {
     },
     normalizeForm(source) {
       const value = source || {}
-      const items = Array.isArray(value.items) && value.items.length
+      const items = Array.isArray(value.items)
         ? value.items.map(row => ({
           ...row,
           claimedAmount: normalizeMoneyInput(row.claimedAmount)
@@ -836,46 +978,197 @@ export default {
           })) : []
       }
     },
+    resetFormRecovery() {
+      this.submissionScope().invalidate(); this.submitIntent = null; this.submitUnknown = false; this.submitChecked = false; this.checkingSubmission = false; this.submitRecoveryMessage = ""
+
+      this.formConflict = null
+      this.formServerSnapshot = null
+      this.saveInFlight = false
+      this.saveOperationSeq += 1
+      this.saving = false
+      this.submitting = false
+      this.deletingInvoiceId = ""
+      this.deleteOperationSeq += 1
+      this.uploadQueueToken += 1
+      this.uploadQueueActive = false
+      this.uploading = false
+      this.uploadController = null
+      this.pendingInvoiceFile = null
+      this.pendingInvoiceKnownIds = []
+      this.checkingUploadResult = false
+    },
+    captureFormOperation() {
+      return { epoch: this.formEpoch, page: this.pageReadSeq, reimbursementId: this.form.reimbursementId }
+    },
+    isCurrentFormOperation(operation) {
+      return !this.pageInactive && this.mode === "form" && operation.epoch === this.formEpoch && operation.page === this.pageReadSeq &&
+        (operation.reimbursementId == null || String(operation.reimbursementId) === String(this.form.reimbursementId))
+    },
+    ensureFormWritable() {
+      if (this.submitUnknown || this.checkingSubmission) { this.$modal.msgWarning("请先核对上次提交结果，再修改草稿"); return false }
+
+      if (this.pageInactive || this.mode !== "form" || this.loading) { this.$modal.msgWarning("请等待当前报销记录加载完成"); return false }
+      if (this.form.status && !this.editable(this.form)) { this.$modal.msgWarning("当前记录已不能编辑，请查看最新状态"); return false }
+      if (!this.formConflict) return true
+      this.$modal.msgWarning("草稿有待核对的变化，请先核对最新记录再保存或提交")
+      return false
+    },
+    setFormConflict(kind, message, remote, extra = {}) {
+      this.formConflict = { kind, message, remote: remote ? cloneReimbursementDraft(remote) : null,
+        reimbursementId: remote && remote.reimbursementId || this.form.reimbursementId, ...extra }
+    },
+    async reviewFormConflict() {
+      const conflict = this.formConflict
+      if (!conflict) return
+      const id = conflict.reimbursementId
+      if (!id) { this.$modal.msgWarning("新建结果尚不明确，请先在报销记录列表核对，避免重复新建"); return }
+      let token
+      const operation = this.captureFormOperation()
+      try {
+        token = this.beginFormRead(this.form.reimbursementId)
+        const response = await getReimbursement(id, SILENT_READ)
+        if (this.formConflict !== conflict || !this.isCurrentFormRead(token)) return
+        const remote = this.normalizeForm(response.data)
+        if (conflict.kind === "deleteUnknown" && reimbursementDeleteMatches(conflict.baseline, remote, conflict.invoice)) {
+          this.form = mergeReimbursementInvoiceDeletion(this.form, remote, conflict.invoice)
+          this.formBaseline = serializeReimbursementForm(remote)
+          this.formServerSnapshot = cloneReimbursementDraft(remote)
+          this.formConflict = null
+          this.$modal.msgSuccess("已核对：发票及关联费用已删除")
+        } else this.formConflict = { ...conflict, remote: cloneReimbursementDraft(remote) }
+      } catch (error) {
+        if (this.formConflict === conflict && this.isCurrentFormOperation(operation) && (!token || this.isCurrentFormRead(token))) this.$modal.msgWarning("最新记录暂时无法读取，草稿和原版本已保留，请稍后重新核对")
+      }
+    },
+    async useLatestConflictRecord() {
+      const conflict = this.formConflict
+      if (!conflict) return
+      if (!conflict.reimbursementId) { this.$modal.msgWarning("请先在报销记录列表找到已保存记录再打开，避免重复新建"); return }
+      try { await this.$modal.confirm("将放弃当前未保存修改并加载最新记录，确认已核对？", "加载最新记录") } catch (_) { return }
+      if (this.formConflict !== conflict) return
+      const requestSnapshot = serializeReimbursementForm(this.form)
+      const token = this.beginFormRead(this.form.reimbursementId)
+      try {
+        const response = await getReimbursement(conflict.reimbursementId, SILENT_READ)
+        if (this.formConflict !== conflict || !this.isCurrentFormRead(token)) return
+        if (serializeReimbursementForm(this.form) !== requestSnapshot) {
+          this.formConflict = { ...conflict, remote: cloneReimbursementDraft(response.data) }
+          this.$modal.msgWarning("加载期间又有新修改，草稿已保留，请重新核对后选择")
+          return
+        }
+        this.form = this.normalizeForm(response.data)
+        this.captureFormBaseline()
+        this.formConflict = null
+      } catch (error) {
+        if (this.formConflict === conflict && this.isCurrentFormRead(token)) this.$modal.msgError("最新记录加载失败，原草稿仍保留")
+      }
+    },
+    async persistFormDraft() {
+      if (!this.ensureFormWritable()) throw new Error("草稿尚未完成冲突核对")
+      if (this.saveInFlight) throw new Error("草稿正在保存，请稍后重试")
+      const operation = this.captureFormOperation()
+      const capture = captureReimbursementSave(this.form)
+      const saveSeq = ++this.saveOperationSeq
+      this.saveInFlight = true
+      this.formReadSeq += 1
+      try {
+        const response = await saveReimbursement(cloneReimbursementDraft(capture.payload))
+        if (!this.isCurrentFormOperation(operation)) throw new Error("STALE_FORM_OPERATION")
+        const remote = this.normalizeForm(response.data)
+        try {
+          this.form = mergeReimbursementSavedDraft(this.form, remote, capture)
+        } catch (error) {
+          this.setFormConflict("saveIdentity", error.message, remote)
+          throw error
+        }
+        this.formBaseline = serializeReimbursementForm(remote)
+        this.formServerSnapshot = cloneReimbursementDraft(remote)
+
+        return cloneReimbursementDraft(remote)
+      } catch (error) {
+        if (this.isCurrentFormOperation(operation) && !this.formConflict) {
+          if (isReimbursementVersionConflict(error)) {
+            this.setFormConflict("version", "报销记录已被其他操作修改，原草稿和版本已保留，请核对最新记录", null)
+            await this.reviewFormConflict()
+          } else if (!error.response && /timeout|network|ECONN|unknown|网络|超时/i.test(String(error.code || "") + " " + String(error.message || ""))) {
+            this.setFormConflict("saveUnknown", "保存结果尚不明确，原草稿已保留，请先核对，避免重复保存", null)
+          }
+        }
+        throw error
+      } finally {
+        if (saveSeq === this.saveOperationSeq) this.saveInFlight = false
+      }
+    },
     captureFormBaseline() {
       this.formBaseline = serializeReimbursementForm(this.form)
+      this.formServerSnapshot = cloneReimbursementDraft(this.form)
     },
     openForm(id) {
+      if (this.pageInactive) return
+      this.formEpoch += 1
+      this.resetFormRecovery()
+      this.listReadSeq += 1
+      this.detailEpoch += 1
       this.error = ""
       this.mode = "form"
       if (!id) {
+        this.loading = false
         this.form = form()
+        this.beginFormRead("")
         this.captureFormBaseline()
         return
       }
+      const token = this.beginFormRead(id)
+      this.form = Object.assign(form(), { reimbursementId: id })
+      this.captureFormBaseline()
       this.loading = true
-      return getReimbursement(id).then(response => {
+      return getReimbursement(id, SILENT_READ).then(response => {
+        if (!this.isCurrentFormRead(token)) return
         this.form = this.normalizeForm(response.data)
         this.captureFormBaseline()
       }).catch(error => {
+        if (!this.isCurrentFormRead(token)) return
         this.error = reimbursementErrorMessage(error)
       }).finally(() => {
-        this.loading = false
+        if (this.isCurrentFormRead(token)) this.loading = false
       })
     },
     openDetail(id) {
+      if (this.pageInactive) return
+      this.formEpoch += 1
+      this.formReadSeq += 1
+      this.loading = false
+      this.listReadSeq += 1
+      this.detailEpoch += 1
+      const epoch = this.detailEpoch
+      const deptId = this.liveDeptId()
+      const actor = String(this.$store.getters.id), session = this.$store.state && this.$store.state.user && this.$store.state.user.sessionRevision
+      const current = () => this.isCurrentDetailRead(epoch, id, deptId) && actor === String(this.$store.getters.id) && session === (this.$store.state && this.$store.state.user && this.$store.state.user.sessionRevision)
       this.mode = "detail"
+      this.error = ""
       this.loading = true
       this.detail = null
       this.approvalDetail = null
-      return getReimbursement(id).then(response => {
-        this.detail = response.data || {}
+      return getReimbursement(id, SILENT_READ).then(response => {
+        if (!current()) return
+        const record = response.data || {}
+        if (String(record.reimbursementId) !== String(id)) throw Error("详情与当前报销目标不一致，请重新打开待办")
+        this.detail = record
         if (!this.detail.approvalInstanceId) return undefined
         return getApprovalInstance(this.detail.approvalInstanceId, {
           silentError: true
         })
       }).then(response => {
-        if (!response) return
-        this.approvalDetail = response.data && response.data.data !== undefined
-          ? response.data.data : response.data || {}
+        if (!response || !current()) return
+        const approval = response.data && response.data.data !== undefined ? response.data.data : response.data || {}
+        const instance = approval.instance || {}
+        if (String(instance.instanceId) !== String(this.detail.approvalInstanceId) || String(instance.businessId) !== String(id) || instance.businessCode !== "OA_REIMBURSEMENT") throw Error("审批实例与当前报销单不一致，请返回待办核对")
+        this.approvalDetail = approval
       }).catch(error => {
+        if (!current()) return
         this.error = reimbursementErrorMessage(error)
       }).finally(() => {
-        this.loading = false
+        if (epoch === this.detailEpoch && this.mode === "detail" && !this.pageInactive) this.loading = false
       })
     },
     addItem() {
@@ -889,86 +1182,122 @@ export default {
       this.form.items.splice(index, 1)
     },
     persist(requireComplete = false) {
-      const validation = requireComplete
-        ? validateReimbursementSubmission(this.form)
-        : ""
+      if (!this.ensureFormWritable()) return Promise.reject(new Error("草稿尚未完成冲突核对"))
+      const validation = requireComplete ? validateReimbursementSubmission(this.form) : ""
       if (validation) return Promise.reject(new Error(validation))
-      const requestSnapshot = serializeReimbursementForm(this.form)
-      return saveReimbursement(this.form).then(response => {
-        const latest = this.form
-        const changedDuringRequest =
-          serializeReimbursementForm(latest) !== requestSnapshot
-        const remote = this.normalizeForm(response.data)
-        if (changedDuringRequest) {
-          this.form = {
-            ...remote,
-            title: latest.title,
-            purpose: latest.purpose,
-            items: latest.items
-          }
-          this.formBaseline = serializeReimbursementForm(remote)
-        } else {
-          this.form = remote
-          this.captureFormBaseline()
-        }
-        return this.form
-      })
+      return this.persistFormDraft()
     },
     saveDraftOnly() {
-      if (this.busy) return
+      if (this.busy || !this.ensureFormWritable()) return Promise.resolve()
+      const operation = this.captureFormOperation()
       this.saving = true
-      this.persist(false).then(() => {
-        this.$modal.msgSuccess("草稿已保存，可继续补充后再提交")
+      return this.persist(false).then(() => {
+        if (this.isCurrentFormOperation(operation)) this.$modal.msgSuccess(this.isFormDirty ? "草稿已保存，期间新增修改尚未保存" : "草稿已保存，可继续补充后再提交")
       }).catch(error => {
-        if (error && !String(error.message || "").startsWith("请") &&
-            !String(error.message || "").startsWith("请输入")) {
-          this.$modal.msgError(reimbursementErrorMessage(error))
-        }
+        if (this.isCurrentFormOperation(operation)) this.$modal.msgError(reimbursementErrorMessage(error))
       }).finally(() => {
-        this.saving = false
+        if (operation.epoch === this.formEpoch) this.saving = false
       })
+    },
+    submissionScope() {
+      if (!this._submissionScope) this._submissionScope = createUiOperationScope(() => ({ actor: this.$store.getters.id,
+        session: this.$store.state && this.$store.state.user && this.$store.state.user.sessionRevision,
+        dept: this.liveDeptId(), epoch: this.formEpoch, inactive: this.pageInactive, mode: this.mode }))
+      return this._submissionScope
     },
     submitForm() {
-      if (this.busy) return
-      if (!this.submissionAvailable) {
-        this.$modal.msgWarning("报销审批当前未开放")
-        return
-      }
-      if (!this.submissionReadiness.ready) {
-        this.$modal.msgWarning(this.submissionReadiness.blockingIssues[0])
-        return
-      }
+      if (this.submitUnknown) return this.checkSubmissionResult()
+      if (this.busy || !this.ensureFormWritable()) return Promise.resolve()
+      if (!this.submissionAvailable) { this.$modal.msgWarning("报销审批当前未开放"); return Promise.resolve() }
+      if (!this.submissionReadiness.ready) { this.$modal.msgWarning(this.submissionReadiness.blockingIssues[0]); return Promise.resolve() }
       const validation = validateReimbursementSubmission(this.form)
-      if (validation) {
-        this.$modal.msgWarning(validation)
-        return
-      }
-      this.submitting = true
+      if (validation) { this.$modal.msgWarning(validation); return Promise.resolve() }
+      const operation = this.captureFormOperation(), scope = this.submissionScope(), token = scope.begin("submit")
+      const current = () => scope.isCurrent(token) && this.isCurrentFormOperation(operation)
+      this.submitting = true; this.submitRecoveryMessage = ""
       let draftSaved = false
-      this.persist(true).then(saved => {
+      return this.persist(true).then(saved => {
+        if (!current()) return
         draftSaved = true
-        return submitReimbursement(saved)
-      }).then(() => {
-        this.$modal.msgSuccess("报销申请已提交审批")
-        this.$store.dispatch("todo/invalidateAfterMutation").catch(() => {})
-        return this.loadList(true)
+        if (this.isFormDirty) throw new Error("保存期间有新的未保存修改，已保留草稿，请核对后再次提交")
+        if (!this.ensureFormWritable()) throw new Error("请先完成草稿核对")
+        const baseRound = Number(saved.approvalRound || 0)
+        if (!saved.reimbursementId || !Number.isSafeInteger(baseRound) || baseRound < 0 || saved.rowVersion == null) throw Error("保存回包缺少审批轮次或版本，请核对草稿后再提交")
+        const payload = cloneReimbursementDraft(saved)
+        payload.expectedBaseRound = baseRound; payload.expectedVersion = saved.rowVersion
+        const intent = Object.freeze({ reimbursementId: String(saved.reimbursementId), baseRound, version: String(saved.rowVersion), payload: Object.freeze(payload) })
+        this.submitIntent = intent
+        return this.sendSubmissionIntent(intent, token)
       }).catch(error => {
+        if (!current()) return
         const message = reimbursementErrorMessage(error)
-        if (draftSaved) {
-          this.$modal.msgWarning(`草稿已保存，但尚未提交：${message}`)
-        } else {
-          this.$modal.msgError(message)
+        if (draftSaved) this.$modal.msgWarning(`草稿已保存，本次尚未发出提交请求：${message}`)
+        else this.$modal.msgError(message)
+      }).finally(() => { if (current()) this.submitting = false })
+    },
+    sendSubmissionIntent(intent, token) {
+      const scope = this.submissionScope(), current = () => scope.isCurrent(token) && this.submitIntent === intent
+      return submitReimbursement(intent.payload).then(response => {
+        if (!current()) return
+        const record = response && response.data
+        if (!record || String(record.reimbursementId) !== intent.reimbursementId || Number(record.approvalRound) !== intent.baseRound + 1 || !["pending", "submitting"].includes(record.status)) {
+          this.submitUnknown = true; this.submitRecoveryMessage = "提交回包尚不能确认原审批轮次，请核对结果"; return
         }
-      }).finally(() => {
-        this.submitting = false
+        this.applySubmissionResult(record, intent)
+      }).catch(error => {
+        if (!current()) return
+        const kind = approvalFailureKind(error)
+        if (kind === "handled") return
+        this.submitUnknown = kind === "unknown"; this.submitChecked = false
+        this.submitRecoveryMessage = this.submitUnknown ? "草稿已保存，提交结果待核对；请求可能已经受理，不会自动重新保存或提交。" : "草稿已保存，审批提交被拒绝：" + reimbursementErrorMessage(error)
+        if (!this.submitUnknown) this.submitIntent = null
       })
     },
+    applySubmissionResult(record, intent) {
+      if (this.submitIntent !== intent) return
+      this.submitUnknown = false; this.submitChecked = false; this.submitIntent = null; this.submitting = false; this.checkingSubmission = false
+      this.submitRecoveryMessage = ""
+      this.$modal.msgSuccess(record.status === "submitting" ? "报销申请已受理，审批正在发起，请稍后查看" : "报销申请当前已进入审批")
+      this.$store.dispatch("todo/invalidateAfterMutation").catch(() => {})
+      return this.openDetail(intent.reimbursementId)
+    },
+    checkSubmissionResult() {
+      const intent = this.submitIntent
+      if (!intent || !this.submitUnknown || this.checkingSubmission || this.submitting) return Promise.resolve()
+      const scope = this.submissionScope(), token = scope.begin("submit-check"), current = () => scope.isCurrent(token) && this.submitIntent === intent
+      this.checkingSubmission = true; this.submitChecked = false
+      return getReimbursement(intent.reimbursementId, SILENT_READ).then(response => {
+        if (!current()) return
+        const record = response.data || {}
+        if (String(record.reimbursementId) !== intent.reimbursementId) throw Error("查询结果与原报销单不一致")
+        if (Number(record.approvalRound) === intent.baseRound + 1 && ["pending", "submitting"].includes(record.status)) return this.applySubmissionResult(record, intent)
+        const unchanged = ["draft", "returned", "withdrawn"].includes(record.status) && Number(record.approvalRound || 0) === intent.baseRound && String(record.rowVersion) === intent.version
+        this.submitChecked = unchanged
+        this.submitRecoveryMessage = unchanged ? "已核对：原草稿版本与审批轮次未变，可显式重试原提交；不会先重复保存草稿。" : "报销状态、版本或审批轮次已变化，不能重试原提交。请打开当前报销详情核对。"
+      }).catch(error => { if (current() && !(error && error.notified)) this.submitRecoveryMessage = "提交结果仍待核对：" + reimbursementErrorMessage(error) })
+        .finally(() => { if (scope.isCurrent(token)) this.checkingSubmission = false })
+    },
+    retrySubmissionIntent() {
+      const intent = this.submitIntent
+      if (!intent || !this.submitUnknown || !this.submitChecked || this.submitting || this.checkingSubmission) return Promise.resolve()
+      const scope = this.submissionScope(), token = scope.begin("submit")
+      this.submitting = true; this.submitChecked = false
+      return this.sendSubmissionIntent(intent, token).finally(() => { if (scope.isCurrent(token)) this.submitting = false })
+    },
+    openSubmissionRecord() {
+      const id = this.submitIntent && this.submitIntent.reimbursementId
+      if (this.submitting || this.checkingSubmission || !id) return
+      this.submissionScope().invalidate(); this.submitIntent = null; this.submitUnknown = false; this.submitChecked = false; this.submitRecoveryMessage = ""
+      return this.openDetail(id)
+    },
     hasInvoiceUploadContext() {
+      if (this.formConflict) { this.$modal.msgWarning("请先核对草稿变化，再上传发票"); return false }
       if (hasValidatedSelectedDeptContext()) return true
       this.$modal.msgWarning(INVOICE_UPLOAD_CONTEXT_MESSAGE)
       return false
     },
     openInvoicePicker(kind) {
+      if (this.busy) return
       if (!this.hasInvoiceUploadContext()) return
       const input = kind === "camera" ? this.$refs.invoiceCameraInput : this.$refs.invoiceInput
       if (input && typeof input.click === "function") input.click()
@@ -981,7 +1310,7 @@ export default {
       }
       const files = Array.from(target && target.files || [])
       if (target) target.value = ""
-      if (!files.length || this.uploadQueueActive) return
+      if (!files.length || this.busy) return
       const validFiles = files.filter(file => this.validateInvoiceFile(file))
       if (!validFiles.length) return
       this.processInvoiceQueue(validFiles)
@@ -999,6 +1328,7 @@ export default {
       return true
     },
     async processInvoiceQueue(files) {
+      if (this.busy) return false
       if (!this.hasInvoiceUploadContext()) return false
       const queueToken = ++this.uploadQueueToken
       this.uploadQueueActive = true
@@ -1042,6 +1372,8 @@ export default {
         return Promise.resolve(false)
       }
       if (!this.hasInvoiceUploadContext()) return Promise.resolve(false)
+      const operation = this.captureFormOperation()
+      const current = () => this.isCurrentFormOperation(operation)
       const controller = new AbortController()
       let uploadedInvoice = null
       const knownInvoiceIds = new Set((this.form.invoices || []).map(invoice =>
@@ -1057,6 +1389,7 @@ export default {
         this.form.reimbursementId,
         file,
         event => {
+          if (!current()) return
           const loaded = Number(event && event.loaded) || 0
           const total = Number(event && event.total) || Number(file.size) || 0
           this.uploadProgress = total > 0
@@ -1066,9 +1399,11 @@ export default {
         controller.signal
       )
         .then(response => {
+          if (!current()) throw new Error("STALE_FORM_OPERATION")
           uploadedInvoice = response.data || {}
           return this.refreshForm(true).then(() => uploadedInvoice)
         }).then(uploadedInvoice => {
+          if (!current()) throw new Error("STALE_FORM_OPERATION")
           const invoice = (this.form.invoices || []).find(value =>
             String(value.invoiceId) === String(uploadedInvoice.invoiceId)
           ) || uploadedInvoice
@@ -1079,6 +1414,7 @@ export default {
             ? this.persist(false)
             : Promise.resolve(this.form)
           return persist.then(() => {
+            if (!current()) return false
             if (uploadedInvoice.idempotentReplay) {
               this.$modal.msgWarning(
                 `${file.name} 已存在于当前报销单，未重复识别或生成明细`
@@ -1111,6 +1447,7 @@ export default {
             return true
           })
         }).catch(error => {
+          if (!current()) return false
           if (this.isCanceledUpload(error)) {
             this.pendingInvoiceFile = null
             this.pendingInvoiceKnownIds = []
@@ -1121,6 +1458,7 @@ export default {
           }
           this.uploadError = reimbursementErrorMessage(error)
           return this.refreshForm(true).catch(() => undefined).then(() => {
+            if (!current()) return false
             const recovered = uploadedInvoice && uploadedInvoice.invoiceId
               ? uploadedInvoice
               : (this.form.invoices || []).find(invoice =>
@@ -1145,8 +1483,8 @@ export default {
         }).finally(() => {
           if (this.uploadController === controller) {
             this.uploadController = null
+            this.uploading = false
           }
-          this.uploading = false
         })
     },
     retryInvoiceUpload() {
@@ -1212,29 +1550,37 @@ export default {
       )
     },
     refreshForm(preserveLocalEdits = true) {
+      if (this.pageInactive) return Promise.resolve()
+      const reimbursementId = this.form.reimbursementId
+      if (!reimbursementId) return Promise.resolve()
+      if (this.formConflict) return this.reviewFormConflict()
+      const token = this.beginFormRead(reimbursementId)
       const requestSnapshot = serializeReimbursementForm(this.form)
       const dirtyAtStart = this.isFormDirty
-      return getReimbursement(this.form.reimbursementId).then(response => {
+      this.loading = true
+      return getReimbursement(reimbursementId, SILENT_READ).then(response => {
+        if (!this.isCurrentFormRead(token)) return
         const remote = this.normalizeForm(response.data)
-        const latest = this.form
-        const changedDuringRequest =
-          serializeReimbursementForm(latest) !== requestSnapshot
-        if (preserveLocalEdits && (dirtyAtStart || changedDuringRequest)) {
-          this.form = {
-            ...remote,
-            title: latest.title,
-            purpose: latest.purpose,
-            items: latest.items
-          }
-          this.formBaseline = serializeReimbursementForm(remote)
-        } else {
-          this.form = remote
-          this.captureFormBaseline()
+        const changedDuringRequest = serializeReimbursementForm(this.form) !== requestSnapshot
+        try {
+          this.form = mergeReimbursementReadDraft(this.form, remote, this.formServerSnapshot, preserveLocalEdits && (dirtyAtStart || changedDuringRequest))
+        } catch (error) {
+          this.setFormConflict("readConflict", error.message, remote)
+          throw error
         }
+        this.formBaseline = serializeReimbursementForm(remote)
+        this.formServerSnapshot = cloneReimbursementDraft(remote)
+      }).catch(error => {
+        if (!this.isCurrentFormRead(token)) return
+        throw error
+      }).finally(() => {
+        if (!this.isCurrentFormRead(token)) return
+        this.loading = false
+
       })
     },
     rerunRecognition(invoice, engine) {
-      if (!invoice || this.recognizingInvoiceId) return
+      if (!invoice || this.busy || !this.ensureFormWritable()) return
       if (engine === "cloud" &&
           !this.recognitionAvailability.cloudConfigured) {
         this.$modal.msgWarning(
@@ -1271,7 +1617,7 @@ export default {
       }, {})
     },
     saveInvoiceRecognition(invoice) {
-      if (!invoice || this.savingRecognitionInvoiceId) return
+      if (!invoice || this.busy || !this.ensureFormWritable()) return
       this.savingRecognitionInvoiceId = invoice.invoiceId
       updateReimbursementInvoiceRecognition(
         this.form.reimbursementId,
@@ -1310,58 +1656,48 @@ export default {
       )
       this.$modal.msgSuccess(`已应用到明细 ${result.itemIndex + 1}`)
     },
-    deleteInvoice(invoice) {
-      const linkedMessage = invoice.itemId != null
-        ? "，同时删除对应费用明细" : ""
+    async deleteInvoice(invoice) {
+      if (this.busy || !invoice || !this.ensureFormWritable()) return
+      const reimbursementId = this.form.reimbursementId
+      const operation = this.captureFormOperation()
+      const invoiceId = String(invoice.invoiceId)
+      const frozenInvoice = cloneReimbursementDraft(invoice)
+      const baseline = cloneReimbursementDraft(this.formServerSnapshot || this.form)
+      const expectedVersion = this.form.rowVersion
+      const current = () => this.isCurrentFormOperation(operation) && String(this.form.reimbursementId) === String(reimbursementId)
+      const deleteSeq = ++this.deleteOperationSeq
+      this.deletingInvoiceId = invoiceId
       let deleteStarted = false
-      let refreshFailed = false
-      this.$modal.confirm(
-        `确认删除“${invoice.originalName}”${linkedMessage}？`,
-        "删除发票"
-      )
-        .then(() => {
-          deleteStarted = true
-          this.deletingInvoiceId = String(invoice.invoiceId)
-          return deleteReimbursementInvoice(
-            this.form.reimbursementId,
-            invoice.invoiceId,
-            this.form.rowVersion
-          )
-        }).then(response => {
-          const detail = response && response.data
-          if (detail && detail.reimbursementId != null) {
-            this.form = this.normalizeForm(detail)
-            this.captureFormBaseline()
-          } else {
-            this.form.invoices = (this.form.invoices || []).filter(value =>
-              String(value.invoiceId) !== String(invoice.invoiceId)
-            )
-            if (invoice.itemId != null) {
-              this.form.items = (this.form.items || []).filter(value =>
-                String(value.itemId) !== String(invoice.itemId)
-              )
-            }
-            return this.refreshForm(false).catch(() => {
-              refreshFailed = true
-              this.$modal.msgWarning(
-                "发票已删除，但页面刷新失败，请手动刷新"
-              )
-            })
-          }
-        }).then(() => {
-          if (!refreshFailed) this.$modal.msgSuccess("发票已删除")
-        }).catch(error => {
-          if (!deleteStarted) return undefined
-          return recoverReimbursementDeleteFailure(
-            error,
-            value => this.$modal.msgError(reimbursementErrorMessage(value)),
-            () => this.refreshForm(false)
-          )
-        }).finally(() => {
-          if (this.deletingInvoiceId === String(invoice.invoiceId)) {
-            this.deletingInvoiceId = ""
-          }
-        })
+      try {
+        const linkedMessage = invoice.itemId != null ? "，同时删除对应费用明细" : ""
+        await this.$modal.confirm(`确认删除“${invoice.originalName}”${linkedMessage}？`, "删除发票")
+        if (!current()) return
+        deleteStarted = true
+        this.formReadSeq += 1
+        const response = await deleteReimbursementInvoice(reimbursementId, invoice.invoiceId, expectedVersion)
+        if (!current()) return
+        const detail = response && response.data
+        if (detail && detail.reimbursementId != null && detail.rowVersion != null && Array.isArray(detail.items) && Array.isArray(detail.invoices)) {
+          const remote = this.normalizeForm(detail)
+          this.form = mergeReimbursementInvoiceDeletion(this.form, remote, frozenInvoice)
+          this.formBaseline = serializeReimbursementForm(remote)
+          this.formServerSnapshot = cloneReimbursementDraft(remote)
+          this.$modal.msgSuccess("发票已删除")
+        } else {
+          this.setFormConflict("deleteUnknown", "删除响应未包含权威记录，正在核对，原草稿与版本已保留", null, { baseline, invoice: frozenInvoice })
+          await this.reviewFormConflict()
+        }
+      } catch (error) {
+        if (!deleteStarted || !current()) return
+        const conflict = isReimbursementVersionConflict(error)
+        this.setFormConflict(conflict ? "version" : "deleteUnknown",
+          conflict ? "删除遇到版本冲突，原草稿与版本已保留；请比较最新费用后再继续" : "删除结果尚不明确，原草稿与版本已保留，核对前不能再次保存或提交",
+          null, { baseline, invoice: frozenInvoice })
+        this.$modal.msgError(reimbursementErrorMessage(error))
+        await this.reviewFormConflict()
+      } finally {
+        if (deleteSeq === this.deleteOperationSeq && this.deletingInvoiceId === invoiceId) this.deletingInvoiceId = ""
+      }
     },
     downloadInvoice(invoice) {
       return this.downloadFile(this.form.reimbursementId, invoice)
@@ -1439,48 +1775,7 @@ export default {
       if (!preview || !preview.invoice) return
       this.downloadFile(preview.reimbursementId, preview.invoice)
     },
-    withdraw(row) {
-      this.$prompt("请输入撤回原因", "撤回报销", {
-        inputValue: "申请人撤回",
-        inputValidator: value => String(value || "").trim()
-          ? true : "请输入撤回原因"
-      }).then(({ value }) => withdrawReimbursement(
-        row.reimbursementId,
-        { reason: String(value).trim() }
-      )).then(() => {
-        this.$modal.msgSuccess("撤回请求已提交")
-        this.$store.dispatch("todo/invalidateAfterMutation").catch(() => {})
-        this.loadList(true)
-      }).catch(() => {})
-    },
-    approvalAction(action) {
-      if (!this.canAct || this.busy) return
-      const ask = action === "approve"
-        ? this.$modal.confirm("确认同意这张报销申请？", "审批确认")
-          .then(() => "")
-        : this.$prompt(
-          action === "return" ? "请输入退回原因" : "请输入拒绝原因",
-          action === "return" ? "退回修改" : "拒绝申请",
-          { inputValidator: value => String(value || "").trim()
-            ? true : "原因不能为空" }
-        ).then(({ value }) => String(value).trim())
-      ask.then(reason => {
-        this.acting = true
-        const payload = {
-          requestId: stableApprovalRequestId(this.approvalTaskId, action),
-          reason
-        }
-        if (action === "approve") return approveApprovalTask(this.approvalTaskId, payload)
-        if (action === "return") return returnApprovalTask(this.approvalTaskId, payload)
-        return rejectApprovalTask(this.approvalTaskId, payload)
-      }).then(() => {
-        this.$modal.msgSuccess("审批动作已提交")
-        this.$store.dispatch("todo/invalidateAfterMutation").catch(() => {})
-        return this.openDetail(this.detail.reimbursementId)
-      }).catch(() => {}).finally(() => {
-        this.acting = false
-      })
-    },
+    approvalAction(action) { return this.runApprovalCommand(action) },
     handleBeforeUnload(event) {
       if (!this.isFormDirty && !this.uploadWorkActive) return
       event.preventDefault()

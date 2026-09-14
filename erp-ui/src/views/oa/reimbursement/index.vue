@@ -1,5 +1,31 @@
 <template>
   <div class="app-container reimbursement-page">
+    <approval-command-recovery :message="withdrawError" :reason="withdrawReason" :unknown="withdrawUnknown" :busy="acting || checkingWithdraw" :checking="checkingWithdraw" :checked="withdrawChecked" check-label="核对撤回结果" retry-label="重试原撤回请求" @check="checkWithdrawCommand" @retry="retryWithdrawCommand" />
+    <section v-if="financeMode" v-hasPermi="['oa:reimbursement:finance:export']" class="mb16">
+      <el-button icon="el-icon-time" @click="openExportHistory">我的历史导出批次</el-button>
+      <el-alert v-if="exportRecoveryError" :title="exportRecoveryError" type="warning" :closable="false" />
+      <div v-if="pendingExportCommand">
+        <span>原请求已保留（{{ pendingExportCommand.reimbursementIds.length }} 张报销单）。</span>
+        <el-button type="text" :disabled="exporting || checkingExport" @click="checkExportCommand">核对批次创建结果</el-button>
+        <el-button type="text" :disabled="exporting || checkingExport || !exportCommandChecked" @click="retryExportCommand">重试原批次创建</el-button>
+      </div>
+      <el-alert v-for="batch in exportReceipts" :key="batch.batchId" :title="`原批次 ${batch.batchNo} 已生成，包含 ${batch.reimbursementCount} 张报销单`" type="info" :closable="false">
+        <el-button type="text" :disabled="!!downloadingBatchId" @click="downloadOriginalExport(batch)">重新下载此批次</el-button>
+      </el-alert>
+    </section>
+    <el-dialog title="我的历史导出批次" :visible.sync="exportHistoryVisible" append-to-body width="90%">
+      <el-alert v-if="exportHistoryError" :title="exportHistoryError" type="error" :closable="false"><el-button type="text" @click="loadExportHistory">重新读取</el-button></el-alert>
+      <el-table v-loading="exportHistoryLoading" :data="exportHistoryRows" row-key="batchId">
+        <el-table-column label="原批次号" prop="batchNo" min-width="170" />
+        <el-table-column label="创建时间" prop="createTime" min-width="160" />
+        <el-table-column label="创建人" prop="createdByName" min-width="100" />
+        <el-table-column label="报销数" prop="reimbursementCount" width="80" />
+        <el-table-column label="原包状态" width="105"><template slot-scope="scope">{{ scope.row.archiveStatus === 'AVAILABLE' ? '可下载' : '原包不可用' }}</template></el-table-column>
+        <el-table-column label="操作" width="150"><template slot-scope="scope"><el-button type="text" :disabled="!!downloadingBatchId || scope.row.archiveStatus !== 'AVAILABLE'" @click="downloadOriginalExport(scope.row)">下载原批次</el-button></template></el-table-column>
+      </el-table>
+      <p>标记“已导出”表示批次已生成。原包不可用时请核对后显式生成新批次，历史批次不会重建。</p>
+      <pagination v-show="exportHistoryTotal > 0" :total="exportHistoryTotal" :page.sync="exportHistoryPage" :limit="10" @pagination="loadExportHistory" />
+    </el-dialog>
     <section class="page-hero">
       <div>
         <span class="eyebrow">OA 协同 · 费用报销</span>
@@ -77,7 +103,7 @@
             type="success"
             icon="el-icon-download"
             :loading="exporting"
-            :disabled="!selectedRows.length"
+            :disabled="!selectedRows.length || !!pendingExportCommand"
             @click="exportSelected"
           >导出 Excel＋发票（{{ selectedRows.length }}）</el-button>
         </el-form-item>
@@ -175,7 +201,7 @@
       :close-on-click-modal="false"
       :before-close="handleFormBeforeClose"
       append-to-body
-      @closed="resetForm"
+      @closed="handleFormClosed"
     >
       <el-form
         ref="form"
@@ -185,6 +211,18 @@
         label-width="92px"
         v-loading="formLoading"
       >
+        <section v-if="formConflict" class="state-card" role="alert" style="margin-bottom: 16px; padding: 12px; border: 1px solid #e6a23c">
+          <strong>需要核对报销记录</strong>
+          <p>{{ formConflict.message }}</p>
+          <p>本地草稿（版本 {{ form.rowVersion == null ? '新建' : form.rowVersion }}）：{{ form.title }} · {{ form.purpose }}</p>
+          <ul><li v-for="(row, index) in form.items" :key="'local-' + index">{{ row.expenseType || '未分类' }} · {{ row.description || row.merchantName || '未填写说明' }} · 金额 {{ row.claimedAmount }}</li></ul>
+          <template v-if="formConflict.remote">
+            <p>最新记录（版本 {{ formConflict.remote.rowVersion }}）：{{ formConflict.remote.title }} · {{ formConflict.remote.purpose }}</p>
+            <ul><li v-for="(row, index) in formConflict.remote.items" :key="'remote-' + index">{{ row.expenseType || '未分类' }} · {{ row.description || row.merchantName || '未填写说明' }} · 金额 {{ row.claimedAmount }}</li></ul>
+          </template>
+          <button type="button" @click="reviewFormConflict">重新获取最新对照</button>
+          <button type="button" @click="useLatestConflictRecord">放弃本地修改并加载最新</button>
+        </section>
         <div class="smart-start-card">
           <div class="smart-start-icon">
             <i class="el-icon-camera-solid" aria-hidden="true" />
@@ -436,11 +474,11 @@
           {{ autoSavedAt ? `最近保存 ${autoSavedAt}` : '发票上传前会自动保存草稿' }}
         </span>
         <el-button @click="requestCloseForm">关闭</el-button>
-        <el-button type="primary" :loading="saving" :disabled="uploading" @click="saveDraft">保存草稿</el-button>
+        <el-button type="primary" :loading="saving" :disabled="formWriteBusy || !!formConflict" @click="saveDraft">保存草稿</el-button>
         <el-button
           type="success"
           :loading="submitting"
-          :disabled="!submissionAvailable || uploading"
+          :disabled="formWriteBusy || !!formConflict || !submissionAvailable || uploading"
           @click="saveAndSubmit"
         >{{ submissionReadiness.ready ? '确认无误并提交审批' : `提交前还差 ${submissionReadiness.blockingIssues.length} 项` }}</el-button>
       </div>
@@ -454,6 +492,7 @@
       append-to-body
     >
       <div v-loading="detailLoading">
+        <el-alert v-if="detailError" :title="detailError" type="error" :closable="false"><el-button type="text" @click="openRouteTarget(true)">重新读取目标</el-button><el-button type="text" @click="$router.push('/workbench/todo')">返回待办</el-button></el-alert>
         <el-descriptions v-if="detail" :column="3" border size="small">
           <el-descriptions-item label="报销单号">{{ detail.reimbursementNo || '-' }}</el-descriptions-item>
           <el-descriptions-item label="申请人">{{ detail.applicantNickName || detail.applicantName || '-' }}</el-descriptions-item>
@@ -540,25 +579,27 @@
           </el-table>
         </template>
       </div>
+      <approval-command-recovery :message="approvalError" :reason="approvalReason" :unknown="approvalUnknown" :busy="acting || checkingApproval" :checking="checkingApproval" :checked="approvalChecked" @check="checkApprovalCommand" @retry="retryApprovalCommand" />
       <div slot="footer">
         <el-button @click="detailVisible = false">关闭</el-button>
+        <el-button v-if="approvalTaskId" :disabled="acting || checkingApproval" @click="returnToNextTodo">返回待办并定位下一条</el-button>
         <el-button
           v-if="canAct"
           type="warning"
           :loading="acting"
-          @click="approvalAction('return')"
+          :disabled="approvalUnknown || checkingApproval" @click="approvalAction('return')"
         >退回修改</el-button>
         <el-button
           v-if="canAct"
           type="danger"
           :loading="acting"
-          @click="approvalAction('reject')"
+          :disabled="approvalUnknown || checkingApproval" @click="approvalAction('reject')"
         >拒绝</el-button>
         <el-button
           v-if="canAct"
           type="success"
           :loading="acting"
-          @click="approvalAction('approve')"
+          :disabled="approvalUnknown || checkingApproval" @click="approvalAction('approve')"
         >同意</el-button>
       </div>
     </el-dialog>
@@ -702,6 +743,10 @@
 </template>
 
 <script>
+import reimbursementExportRecovery from "@/mixins/reimbursementExportRecovery"
+import { createReimbursementWithdrawRecovery } from "@/mixins/reimbursementWithdrawRecovery"
+import { createApprovalCommandRecovery } from "@/mixins/approvalCommandRecovery"
+import ApprovalCommandRecovery from "@/components/ApprovalCommandRecovery"
 import {
   createReimbursementExport,
   deleteReimbursementInvoice,
@@ -728,17 +773,24 @@ import {
   statusLabel as approvalStatusLabel
 } from "@/views/approval/manage/components/approvalUi"
 import { blobValidate } from "@/utils/common"
-import { hasValidatedSelectedDeptContext } from "@/utils/shopContext"
+import { getSelectedDeptId, hasValidatedSelectedDeptContext } from "@/utils/shopContext"
 
 const {
   applyInvoiceToForm,
   ensureDraftForInvoiceUpload,
-  recoverReimbursementDeleteFailure,
+  mergeReimbursementInvoiceDeletion,
+  cloneReimbursementDraft, captureReimbursementSave, mergeReimbursementSavedDraft,
+  mergeReimbursementReadDraft, isReimbursementVersionConflict, reimbursementDeleteMatches,
   reimbursementFormSnapshot,
   reimbursementReadiness
 } = require("@/utils/reimbursementSmartFill")
 
+const { createUiOperationScope } = require("@/utils/uiOperationScope")
+const { sanitizeRouteParams } = require("@/utils/todoRouteParams")
+const { returnAfterTodoAction } = require("@/utils/todoActionReturn")
+
 const INVOICE_UPLOAD_CONTEXT_MESSAGE = "请先选择门店或仓库，再上传发票"
+const SILENT_READ = { silentError: true }
 
 const STATUS_OPTIONS = [
   ["draft", "草稿"],
@@ -811,12 +863,25 @@ function responseMessage(error) {
 }
 
 export default {
+  components: { ApprovalCommandRecovery },
+  mixins: [reimbursementExportRecovery, createReimbursementWithdrawRecovery({ refresh: vm => { vm.$store.dispatch("todo/invalidateAfterMutation").catch(() => {}); return vm.loadList() } }), createApprovalCommandRecovery({
+    target: vm => vm.detail && ({ businessCode: 'OA_REIMBURSEMENT', businessId: vm.detail.reimbursementId, taskId: vm.approvalTaskId, instanceId: vm.detail.approvalInstanceId, approvalRound: vm.detail.approvalRound }),
+    visible: vm => vm.detailVisible && !vm.pageInactive, canAct: vm => vm.canAct, loading: 'acting',
+    success: (vm, command) => { vm.refreshTodo(); vm.loadList(); return vm.showDetail(command.businessId) }
+  })],
   name: "OaReimbursement",
   data() {
     return {
       loading: false,
       formLoading: false,
       saving: false,
+      formEpoch: 0,
+      formReadSeq: 0,
+      detailEpoch: 0,
+      pageReadSeq: 0,
+      pageInactive: false,
+      deptListenerBound: false,
+      deletingInvoiceId: "",
       submitting: false,
       uploading: false,
       uploadQueue: Promise.resolve(),
@@ -842,9 +907,12 @@ export default {
       formVisible: false,
       form: emptyForm(),
       formBaseline: "",
+      formServerSnapshot: null, formConflict: null, saveInFlight: false, saveOperationSeq: 0, deleteOperationSeq: 0,
       autoSavedAt: "",
       detailVisible: false,
       detailLoading: false,
+      detailError: "",
+      loadedRouteTargetKey: "",
       detail: null,
       approvalDetail: null,
       submissionAvailable: false,
@@ -880,6 +948,7 @@ export default {
     }
   },
   computed: {
+    routeTargetKey() { return JSON.stringify(this.reimbursementRouteTarget()) },
     financeMode() {
       return String(this.$route.query.mode || "").toLowerCase() === "finance"
     },
@@ -891,6 +960,10 @@ export default {
     },
     submissionReadiness() {
       return reimbursementReadiness(this.form)
+    },
+    formWriteBusy() {
+      return this.saveInFlight || this.saving || this.submitting || this.uploading ||
+        !!this.deletingInvoiceId || !!this.recognizingEngine || this.savingRecognition
     },
     formDirty() {
       return Boolean(this.formBaseline) &&
@@ -912,7 +985,10 @@ export default {
       return this.$route.query.approvalTaskId || ""
     },
     canAct() {
-      if (!this.approvalTaskId) return false
+      if (!this.approvalTaskId || !this.detail || this.detailLoading || this.detailError) return false
+      const target = this.reimbursementRouteTarget()
+      if (target.reimbursementId && target.reimbursementId !== String(this.detail.reimbursementId)) return false
+      if (String(this.approvalInstance.instanceId) !== String(this.detail.approvalInstanceId) || String(this.approvalInstance.businessId) !== String(this.detail.reimbursementId) || this.approvalInstance.businessCode !== "OA_REIMBURSEMENT") return false
       const task = this.approvalTasks.find(item =>
         String(item.taskId || item.id) === String(this.approvalTaskId))
       return !!task &&
@@ -921,6 +997,10 @@ export default {
     }
   },
   watch: {
+    "$route.fullPath"() { this.invalidatePendingFormReads() },
+    routeTargetKey() { this.openRouteTarget() },
+    detailVisible(value) { if (!value) { this.detailEpoch += 1; this.detailLoading = false; this.approvalDetail = null } },
+    "$store.state.user.sessionRevision"() { this.invalidatePendingFormReads(); this.detail = null; this.detailVisible = false; this.loadedRouteTargetKey = "" },
     "$route.query.mode"() {
       this.query.pageNum = 1
       this.selectedRows = []
@@ -930,11 +1010,35 @@ export default {
   },
   created() {
     if (this.financeMode) this.query.exportStatus = "not_exported"
+    this.bindDeptListener()
     this.loadAvailability()
-    this.loadList().then(() => this.openRouteTarget())
+    this.loadList().catch(() => {})
+    this.openRouteTarget()
+  },
+  activated() {
+    if (!this.pageInactive) return
+    this.pageInactive = false
+    this.bindDeptListener()
+    this.openRouteTarget(true)
+  },
+  deactivated() {
+    this.pageInactive = true
+    this.invalidatePendingFormReads()
   },
   beforeDestroy() {
+    this.pageInactive = true
+    this.formEpoch += 1
+    this.invalidatePendingFormReads()
+    this.unbindDeptListener()
     this.clearPreview()
+  },
+  beforeRouteUpdate(to, from, next) {
+    const token = this.routeNavigationScope().begin("navigate")
+    if (this.uploading || this.formWriteBusy) { this.$modal.msgWarning("当前操作尚未完成，请稍后切换"); next(false); return }
+    if (!this.formVisible || !this.formDirty) { next(); return }
+    this.$modal.confirm("当前修改尚未保存，切换待办后将丢失。确认切换？", "放弃未保存修改")
+      .then(() => { if (this.routeNavigationScope().isCurrent(token)) { this.formVisible = false; next() } else next(false) })
+      .catch(() => next(false))
   },
   beforeRouteLeave(to, from, next) {
     if (this.uploading) {
@@ -1052,32 +1156,126 @@ export default {
       table.clearSelection()
       this.unexportedRows.forEach(row => table.toggleRowSelection(row, true))
     },
-    openRouteTarget() {
-      const id = this.$route.query.reimbursementId ||
-        this.$route.query.businessId
-      if (/^\d+$/.test(String(id || ""))) this.showDetail(id)
+    async returnToNextTodo() {
+      if (this.acting || this.checkingApproval) return
+      const result = await returnAfterTodoAction({ router: this.$router, todoType: "OA_REIMBURSEMENT_APPROVAL", businessId: this.detail && this.detail.reimbursementId })
+      if (!result.returned) return this.$router.push("/workbench/todo")
+      return result
+    },
+    reimbursementRouteTarget() {
+      const source = this.$route && this.$route.query || {}
+      const result = sanitizeRouteParams({ reimbursementId: source.reimbursementId == null ? null : source.reimbursementId,
+        businessId: source.businessId == null ? null : source.businessId,
+        approvalTaskId: source.approvalTaskId == null ? null : source.approvalTaskId,
+        approvalInstanceId: source.approvalInstanceId == null ? null : source.approvalInstanceId })
+      const query = result.ok ? result.params : {}
+      const normalize = value => /^[1-9]\d{0,18}$/.test(String(value || "")) ? String(value) : ""
+      return { reimbursementId: normalize(query.reimbursementId || query.businessId),
+        taskId: normalize(query.approvalTaskId), instanceId: normalize(query.approvalInstanceId) }
+    },
+    routeNavigationScope() {
+      if (!this._routeNavigationScope) this._routeNavigationScope = createUiOperationScope(() => ({ actor: this.$store.getters.id, session: this.$store.state.user.sessionRevision, dept: this.liveDeptId() }))
+      return this._routeNavigationScope
+    },
+    openRouteTarget(force = false) {
+      if (this.pageInactive) return Promise.resolve()
+      const target = this.reimbursementRouteTarget(), key = JSON.stringify(target)
+      if (!target.reimbursementId) { this.loadedRouteTargetKey = ""; this.detailVisible = false; this.detail = null; this.approvalDetail = null; return Promise.resolve() }
+      if (!force && this.loadedRouteTargetKey === key) return Promise.resolve()
+      this.loadedRouteTargetKey = key
+      return this.showDetail(target.reimbursementId, target)
+    },
+    liveDeptId() {
+      return getSelectedDeptId()
+    },
+    sameDeptId(deptId) {
+      return String(this.liveDeptId() || "") === String(deptId || "")
+    },
+    formReadId(value) {
+      return value == null || value === "" ? "" : String(value)
+    },
+    beginFormRead(reimbursementId) {
+      this.formReadSeq += 1
+      return {
+        epoch: this.formEpoch,
+        readSeq: this.formReadSeq,
+        reimbursementId: this.formReadId(reimbursementId),
+        deptId: this.liveDeptId()
+      }
+    },
+    isCurrentFormRead(token) {
+      if (this.pageInactive || !this.formVisible) return false
+      if (!token || token.epoch !== this.formEpoch || token.readSeq !== this.formReadSeq) return false
+      if (!this.sameDeptId(token.deptId)) return false
+      return this.formReadId(this.form && this.form.reimbursementId) === token.reimbursementId
+    },
+    isCurrentDetailRead(epoch, reimbursementId, deptId) {
+      return !this.pageInactive
+        && this.detailVisible
+        && epoch === this.detailEpoch
+        && this.formReadId(this.detail && this.detail.reimbursementId || reimbursementId) === this.formReadId(reimbursementId)
+        && this.sameDeptId(deptId)
+    },
+    invalidatePendingFormReads() {
+      this.pageReadSeq += 1
+      this.formReadSeq += 1
+      this.detailEpoch += 1
+      this.formLoading = false
+      this.detailLoading = false
+    },
+    bindDeptListener() {
+      if (typeof window === "undefined" || this.deptListenerBound) return
+      window.addEventListener("erp:dept-changed", this.handleDeptChanged)
+      this.deptListenerBound = true
+    },
+    unbindDeptListener() {
+      if (typeof window === "undefined" || !this.deptListenerBound) return
+      window.removeEventListener("erp:dept-changed", this.handleDeptChanged)
+      this.deptListenerBound = false
+    },
+    handleDeptChanged() {
+      this.invalidatePendingFormReads()
+      this.routeNavigationScope().invalidate()
+      this.detail = null; this.approvalDetail = null; this.loadedRouteTargetKey = ""
+      if (!this.pageInactive) { this.loadList().catch(() => {}); this.openRouteTarget() }
     },
     openForm(row) {
+      if (this.pageInactive) return
+      this.pageReadSeq += 1
+      this.detailEpoch += 1
+      this.detailLoading = false
+      this.formEpoch += 1
+      this.resetFormRecovery()
       this.formVisible = true
       this.autoSavedAt = ""
       if (!row) {
+        this.formLoading = false
         this.form = emptyForm()
+        this.beginFormRead("")
         this.captureFormBaseline()
         return
       }
+      const reimbursementId = row.reimbursementId
+      const token = this.beginFormRead(reimbursementId)
+      this.form = Object.assign(emptyForm(), { reimbursementId })
+      this.captureFormBaseline()
       this.formLoading = true
-      getReimbursement(row.reimbursementId).then(response => {
+      return getReimbursement(reimbursementId, SILENT_READ).then(response => {
+        if (!this.isCurrentFormRead(token)) return
         this.form = this.normalizeForm(response.data)
         this.captureFormBaseline()
+      }).catch(error => {
+        if (!this.isCurrentFormRead(token)) return
+        this.$modal.msgError(responseMessage(error))
       }).finally(() => {
-        this.formLoading = false
+        if (this.isCurrentFormRead(token)) this.formLoading = false
       })
     },
     normalizeForm(value) {
       const source = value || {}
       return {
         ...source,
-        items: Array.isArray(source.items) && source.items.length
+        items: Array.isArray(source.items)
           ? source.items.map(item => ({ ...item }))
           : [emptyItem()],
         invoices: Array.isArray(source.invoices)
@@ -1085,16 +1283,139 @@ export default {
       }
     },
     resetForm() {
+      this.resetFormRecovery()
+      this.formEpoch += 1
+      this.formReadSeq += 1
       this.form = emptyForm()
       this.formBaseline = ""
       this.autoSavedAt = ""
+      this.formLoading = false
       this.uploadQueue = Promise.resolve()
       this.uploadPendingCount = 0
       this.uncertainUploadFiles = {}
       if (this.$refs.form) this.$refs.form.clearValidate()
     },
+    handleFormClosed() {
+      if (this.formVisible) return
+      this.resetForm()
+    },
+    resetFormRecovery() {
+      this.formConflict = null
+      this.formServerSnapshot = null
+      this.saveInFlight = false
+      this.saveOperationSeq += 1
+      this.saving = false
+      this.submitting = false
+      this.deletingInvoiceId = ""
+      this.deleteOperationSeq += 1
+      this.uploadQueue = Promise.resolve()
+      this.uploadPendingCount = 0
+      this.uploading = false
+      this.uncertainUploadFiles = {}
+    },
+    captureFormOperation() {
+      return { epoch: this.formEpoch, page: this.pageReadSeq, reimbursementId: this.form.reimbursementId }
+    },
+    isCurrentFormOperation(operation) {
+      return !this.pageInactive && this.formVisible && operation.epoch === this.formEpoch && operation.page === this.pageReadSeq &&
+        (operation.reimbursementId == null || String(operation.reimbursementId) === String(this.form.reimbursementId))
+    },
+    ensureFormWritable() {
+      if (this.pageInactive || !this.formVisible || this.formLoading) { this.$modal.msgWarning("请等待当前报销记录加载完成"); return false }
+      if (this.form.status && !this.editable(this.form)) { this.$modal.msgWarning("当前记录已不能编辑，请查看最新状态"); return false }
+      if (!this.formConflict) return true
+      this.$modal.msgWarning("草稿有待核对的变化，请先核对最新记录再保存或提交")
+      return false
+    },
+    setFormConflict(kind, message, remote, extra = {}) {
+      this.formConflict = { kind, message, remote: remote ? cloneReimbursementDraft(remote) : null,
+        reimbursementId: remote && remote.reimbursementId || this.form.reimbursementId, ...extra }
+    },
+    async reviewFormConflict() {
+      const conflict = this.formConflict
+      if (!conflict) return
+      const id = conflict.reimbursementId
+      if (!id) { this.$modal.msgWarning("新建结果尚不明确，请先在报销记录列表核对，避免重复新建"); return }
+      let token
+      const operation = this.captureFormOperation()
+      try {
+        token = this.beginFormRead(this.form.reimbursementId)
+        const response = await getReimbursement(id, SILENT_READ)
+        if (this.formConflict !== conflict || !this.isCurrentFormRead(token)) return
+        const remote = this.normalizeForm(response.data)
+        if (conflict.kind === "deleteUnknown" && reimbursementDeleteMatches(conflict.baseline, remote, conflict.invoice)) {
+          this.form = mergeReimbursementInvoiceDeletion(this.form, remote, conflict.invoice)
+          this.formBaseline = reimbursementFormSnapshot(remote)
+          this.formServerSnapshot = cloneReimbursementDraft(remote)
+          this.formConflict = null
+          this.$modal.msgSuccess("已核对：发票及关联费用已删除")
+        } else this.formConflict = { ...conflict, remote: cloneReimbursementDraft(remote) }
+      } catch (error) {
+        if (this.formConflict === conflict && this.isCurrentFormOperation(operation) && (!token || this.isCurrentFormRead(token))) this.$modal.msgWarning("最新记录暂时无法读取，草稿和原版本已保留，请稍后重新核对")
+      }
+    },
+    async useLatestConflictRecord() {
+      const conflict = this.formConflict
+      if (!conflict) return
+      if (!conflict.reimbursementId) { this.$modal.msgWarning("请先在报销记录列表找到已保存记录再打开，避免重复新建"); return }
+      try { await this.$modal.confirm("将放弃当前未保存修改并加载最新记录，确认已核对？", "加载最新记录") } catch (_) { return }
+      if (this.formConflict !== conflict) return
+      const requestSnapshot = reimbursementFormSnapshot(this.form)
+      const token = this.beginFormRead(this.form.reimbursementId)
+      try {
+        const response = await getReimbursement(conflict.reimbursementId, SILENT_READ)
+        if (this.formConflict !== conflict || !this.isCurrentFormRead(token)) return
+        if (reimbursementFormSnapshot(this.form) !== requestSnapshot) {
+          this.formConflict = { ...conflict, remote: cloneReimbursementDraft(response.data) }
+          this.$modal.msgWarning("加载期间又有新修改，草稿已保留，请重新核对后选择")
+          return
+        }
+        this.form = this.normalizeForm(response.data)
+        this.captureFormBaseline()
+        this.formConflict = null
+      } catch (error) {
+        if (this.formConflict === conflict && this.isCurrentFormRead(token)) this.$modal.msgError("最新记录加载失败，原草稿仍保留")
+      }
+    },
+    async persistFormDraft() {
+      if (!this.ensureFormWritable()) throw new Error("草稿尚未完成冲突核对")
+      if (this.saveInFlight) throw new Error("草稿正在保存，请稍后重试")
+      const operation = this.captureFormOperation()
+      const capture = captureReimbursementSave(this.form)
+      const saveSeq = ++this.saveOperationSeq
+      this.saveInFlight = true
+      this.formReadSeq += 1
+      try {
+        const response = await saveReimbursement(cloneReimbursementDraft(capture.payload))
+        if (!this.isCurrentFormOperation(operation)) throw new Error("STALE_FORM_OPERATION")
+        const remote = this.normalizeForm(response.data)
+        try {
+          this.applySavedForm(remote, capture)
+        } catch (error) {
+          this.setFormConflict("saveIdentity", error.message, remote)
+          throw error
+        }
+        this.formBaseline = reimbursementFormSnapshot(remote)
+        this.formServerSnapshot = cloneReimbursementDraft(remote)
+        this.markAutoSaved()
+        return cloneReimbursementDraft(remote)
+      } catch (error) {
+        if (this.isCurrentFormOperation(operation) && !this.formConflict) {
+          if (isReimbursementVersionConflict(error)) {
+            this.setFormConflict("version", "报销记录已被其他操作修改，原草稿和版本已保留，请核对最新记录", null)
+            await this.reviewFormConflict()
+          } else if (!error.response && /timeout|network|ECONN|unknown|网络|超时/i.test(String(error.code || "") + " " + String(error.message || ""))) {
+            this.setFormConflict("saveUnknown", "保存结果尚不明确，原草稿已保留，请先核对，避免重复保存", null)
+          }
+        }
+        throw error
+      } finally {
+        if (saveSeq === this.saveOperationSeq) this.saveInFlight = false
+      }
+    },
     captureFormBaseline(saved = false) {
       this.formBaseline = reimbursementFormSnapshot(this.form)
+      this.formServerSnapshot = cloneReimbursementDraft(this.form)
       if (saved) this.markAutoSaved()
     },
     markAutoSaved() {
@@ -1103,29 +1424,13 @@ export default {
         minute: "2-digit"
       })
     },
-    applySavedForm(responseData, requestSnapshot) {
-      const latest = this.form
-      const changedDuringRequest =
-        reimbursementFormSnapshot(latest) !== requestSnapshot
-      const remote = this.normalizeForm(responseData)
-      if (changedDuringRequest) {
-        this.form = {
-          ...remote,
-          title: latest.title,
-          purpose: latest.purpose,
-          items: latest.items
-        }
-        this.formBaseline = reimbursementFormSnapshot(remote)
-        this.markAutoSaved()
-      } else {
-        this.form = remote
-        this.captureFormBaseline(true)
-      }
+    applySavedForm(responseData, capture) {
+      this.form = mergeReimbursementSavedDraft(this.form, this.normalizeForm(responseData), capture)
       return this.form
     },
     requestCloseForm() {
-      if (this.uploading) {
-        this.$modal.msgWarning("发票正在上传识别，请处理完成后再关闭")
+      if (this.formWriteBusy) {
+        this.$modal.msgWarning("报销操作正在处理，请完成后再关闭")
         return
       }
       if (!this.formDirty) {
@@ -1140,8 +1445,8 @@ export default {
       }).catch(() => {})
     },
     handleFormBeforeClose(done) {
-      if (this.uploading) {
-        this.$modal.msgWarning("发票正在上传识别，请处理完成后再关闭")
+      if (this.formWriteBusy) {
+        this.$modal.msgWarning("报销操作正在处理，请完成后再关闭")
         return
       }
       if (!this.formDirty) {
@@ -1191,61 +1496,56 @@ export default {
       })
     },
     saveDraft() {
-      if (this.saving) return Promise.resolve()
-      const requestSnapshot = reimbursementFormSnapshot(this.form)
+      if (this.formWriteBusy || !this.ensureFormWritable()) return Promise.resolve()
+      const operation = this.captureFormOperation()
       this.saving = true
-      return saveReimbursement(this.form).then(response => {
-        this.applySavedForm(response.data, requestSnapshot)
-        this.$modal.msgSuccess("草稿已保存，可随时继续补充")
+      return this.persistFormDraft().then(() => {
+        if (!this.isCurrentFormOperation(operation)) return
+        this.$modal.msgSuccess(this.formDirty ? "草稿已保存，期间新增修改尚未保存" : "草稿已保存，可随时继续补充")
         this.loadList()
         return this.form
       }).catch(error => {
-        this.$modal.msgError(responseMessage(error))
+        if (this.isCurrentFormOperation(operation)) this.$modal.msgError(responseMessage(error))
         return undefined
       }).finally(() => {
-        this.saving = false
+        if (operation.epoch === this.formEpoch) this.saving = false
       })
     },
     saveAndSubmit() {
-      if (this.submitting) return
-      let requestSnapshot = ""
-      if (!this.submissionAvailable) {
-        this.$modal.msgWarning("报销审批当前未开放")
-        return
-      }
-      if (!this.submissionReadiness.ready) {
-        this.$modal.msgWarning(this.submissionReadiness.blockingIssues[0])
-        return
-      }
-      this.validateForm().then(() => {
-        this.submitting = true
-        requestSnapshot = reimbursementFormSnapshot(this.form)
-        return saveReimbursement(this.form)
-      }).then(response => {
-        this.applySavedForm(response.data, requestSnapshot)
-        if (!this.form.invoices.length) {
-          throw new Error("请至少上传一个发票文件后再提交")
-        }
-        return submitReimbursement(this.form)
+      if (this.formWriteBusy || !this.ensureFormWritable()) return Promise.resolve()
+      if (!this.submissionAvailable) { this.$modal.msgWarning("报销审批当前未开放"); return Promise.resolve() }
+      if (!this.submissionReadiness.ready) { this.$modal.msgWarning(this.submissionReadiness.blockingIssues[0]); return Promise.resolve() }
+      const operation = this.captureFormOperation()
+      this.submitting = true
+      return this.validateForm().then(() => {
+        if (!this.isCurrentFormOperation(operation)) throw new Error("STALE_FORM_OPERATION")
+        return this.persistFormDraft()
+      }).then(saved => {
+        if (!this.isCurrentFormOperation(operation)) throw new Error("STALE_FORM_OPERATION")
+        if (this.formDirty) throw new Error("保存期间有新的未保存修改，已保留草稿，请核对后再次提交")
+        if (!this.ensureFormWritable()) throw new Error("请先完成草稿核对")
+        if (!saved.invoices.length) throw new Error("请至少上传一个发票文件后再提交")
+        return submitReimbursement({ ...cloneReimbursementDraft(saved), expectedBaseRound: saved.approvalRound || 0, expectedVersion: saved.rowVersion })
       }).then(() => {
+        if (!this.isCurrentFormOperation(operation)) return
         this.$modal.msgSuccess("报销申请已提交审批")
         this.formVisible = false
         this.refreshTodo()
         this.loadList()
       }).catch(error => {
-        if (error && error.message !== "表单校验失败") {
-          this.$modal.msgError(responseMessage(error))
-        }
+        if (this.isCurrentFormOperation(operation) && error && error.message !== "表单校验失败") this.$modal.msgError(responseMessage(error))
       }).finally(() => {
-        this.submitting = false
+        if (operation.epoch === this.formEpoch) this.submitting = false
       })
     },
     hasInvoiceUploadContext() {
+      if (this.formConflict) { this.$modal.msgWarning("请先核对草稿变化，再上传发票"); return false }
       if (hasValidatedSelectedDeptContext()) return true
       this.$modal.msgWarning(INVOICE_UPLOAD_CONTEXT_MESSAGE)
       return false
     },
     beforeInvoiceUpload(file) {
+      if (this.deletingInvoiceId || this.saving || this.submitting) return false
       if (!this.hasInvoiceUploadContext()) return false
       const extension = String(file.name || "").split(".").pop().toLowerCase()
       if (!["pdf", "png", "jpg", "jpeg", "ofd"].includes(extension)) {
@@ -1259,9 +1559,12 @@ export default {
       return true
     },
     uploadInvoice(option) {
+      if (this.deletingInvoiceId || this.saving || this.submitting) return Promise.resolve(false)
       const file = option && option.file
       if (!file) return Promise.resolve()
       if (!this.hasInvoiceUploadContext()) return Promise.resolve(false)
+      const operation = this.captureFormOperation()
+      const current = () => this.isCurrentFormOperation(operation)
       if (!this.uploadPendingCount) {
         this.uploadCompletedCount = 0
         this.uploadFailedCount = 0
@@ -1269,15 +1572,16 @@ export default {
       this.uploadPendingCount += 1
       this.uploading = true
       const queued = this.uploadQueue.then(
-        () => this.confirmUncertainUpload(file).then(canUpload =>
-          canUpload ? this.processInvoiceUpload(file) : false
-        ),
-        () => this.confirmUncertainUpload(file).then(canUpload =>
-          canUpload ? this.processInvoiceUpload(file) : false
-        )
+        () => current() ? this.confirmUncertainUpload(file).then(canUpload =>
+          current() && canUpload ? this.processInvoiceUpload(file) : false
+        ) : false,
+        () => current() ? this.confirmUncertainUpload(file).then(canUpload =>
+          current() && canUpload ? this.processInvoiceUpload(file) : false
+        ) : false
       )
       this.uploadQueue = queued.catch(() => undefined)
       return queued.finally(() => {
+        if (!current()) return
         this.uploadPendingCount = Math.max(0, this.uploadPendingCount - 1)
         if (!this.uploadPendingCount) {
           this.uploading = false
@@ -1312,7 +1616,9 @@ export default {
       const key = this.uploadFileKey(file)
       const pending = this.uncertainUploadFiles[key]
       if (!pending || !this.form.reimbursementId) return Promise.resolve(true)
+      const operation = this.captureFormOperation()
       return this.reloadFormDetail(true).then(() => {
+        if (!this.isCurrentFormOperation(operation)) return false
         const recovered = this.matchingNewInvoice(
           file,
           pending.knownInvoiceIds
@@ -1327,6 +1633,7 @@ export default {
         }
         return true
       }).catch(() => {
+        if (!this.isCurrentFormOperation(operation)) return false
         this.$modal.msgWarning(
           `${file.name} 上次上传结果暂时无法确认，请等待网络恢复后再试，避免重复报销`
         )
@@ -1337,10 +1644,8 @@ export default {
       if (!this.hasInvoiceUploadContext()) {
         return Promise.reject(new Error(INVOICE_UPLOAD_CONTEXT_MESSAGE))
       }
-      return ensureDraftForInvoiceUpload(this.form, form => {
-        const requestSnapshot = reimbursementFormSnapshot(form)
-        return saveReimbursement(form).then(response => {
-          this.applySavedForm(response.data, requestSnapshot)
+      return ensureDraftForInvoiceUpload(this.form, () => {
+        return this.persistFormDraft().then(() => {
           this.$modal.msgSuccess("已自动创建草稿，开始识别发票")
           return this.form
         })
@@ -1348,20 +1653,25 @@ export default {
     },
     processInvoiceUpload(file) {
       if (!this.hasInvoiceUploadContext()) return Promise.resolve(false)
+      const operation = this.captureFormOperation()
+      const current = () => this.isCurrentFormOperation(operation)
       let uploadedInvoice = null
       let smartFill = null
       let uploadAttempted = false
       let knownInvoiceIds = new Set()
       return this.ensureDraftForUpload().then(() => {
+        if (!current()) throw new Error("STALE_FORM_OPERATION")
         knownInvoiceIds = new Set((this.form.invoices || []).map(invoice =>
           String(invoice.invoiceId)
         ))
         uploadAttempted = true
         return uploadReimbursementInvoice(this.form.reimbursementId, file)
       }).then(response => {
+        if (!current()) throw new Error("STALE_FORM_OPERATION")
         uploadedInvoice = response.data || {}
         return this.reloadFormDetail(true)
       }).then(() => {
+        if (!current()) throw new Error("STALE_FORM_OPERATION")
         const fresh = (this.form.invoices || []).find(invoice =>
           String(invoice.invoiceId) === String(uploadedInvoice.invoiceId)
         ) || uploadedInvoice
@@ -1371,12 +1681,9 @@ export default {
         }
         smartFill = applyInvoiceToForm(this.form, fresh)
         if (!smartFill.applied) return this.form
-        const requestSnapshot = reimbursementFormSnapshot(this.form)
-        return saveReimbursement(this.form).then(response => {
-          this.applySavedForm(response.data, requestSnapshot)
-          return this.form
-        })
+        return this.persistFormDraft().then(() => this.form)
       }).then(() => {
+        if (!current()) throw new Error("STALE_FORM_OPERATION")
         this.uploadCompletedCount += 1
         if (uploadedInvoice.idempotentReplay) {
           this.$modal.msgWarning(
@@ -1404,10 +1711,12 @@ export default {
         }
         return true
       }).catch(error => {
+        if (!current()) return false
         const refresh = this.form.reimbursementId
           ? this.reloadFormDetail(true).catch(() => undefined)
           : Promise.resolve()
         return refresh.then(() => {
+        if (!current()) return false
           const recovered = !uploadAttempted
             ? null
             : uploadedInvoice && uploadedInvoice.invoiceId
@@ -1434,26 +1743,32 @@ export default {
       })
     },
     reloadFormDetail(preserveLocalEdits = true) {
+      if (this.pageInactive) return Promise.resolve()
+      const reimbursementId = this.form.reimbursementId
+      if (!reimbursementId) return Promise.resolve()
+      if (this.formConflict) return this.reviewFormConflict()
+      const token = this.beginFormRead(reimbursementId)
       const requestSnapshot = reimbursementFormSnapshot(this.form)
       const dirtyAtStart = this.formDirty
-      return getReimbursement(this.form.reimbursementId).then(response => {
+      this.formLoading = true
+      return getReimbursement(reimbursementId, SILENT_READ).then(response => {
+        if (!this.isCurrentFormRead(token)) return
         const remote = this.normalizeForm(response.data)
-        const latest = this.form
-        const changedDuringRequest =
-          reimbursementFormSnapshot(latest) !== requestSnapshot
-        if (preserveLocalEdits && (dirtyAtStart || changedDuringRequest)) {
-          this.form = {
-            ...remote,
-            title: latest.title,
-            purpose: latest.purpose,
-            items: latest.items
-          }
-          this.formBaseline = reimbursementFormSnapshot(remote)
-        } else {
-          this.form = remote
-          this.captureFormBaseline()
+        const changedDuringRequest = reimbursementFormSnapshot(this.form) !== requestSnapshot
+        try {
+          this.form = mergeReimbursementReadDraft(this.form, remote, this.formServerSnapshot, preserveLocalEdits && (dirtyAtStart || changedDuringRequest))
+        } catch (error) {
+          this.setFormConflict("readConflict", error.message, remote)
+          throw error
         }
+        this.formBaseline = reimbursementFormSnapshot(remote)
+        this.formServerSnapshot = cloneReimbursementDraft(remote)
+      }).catch(error => {
+        if (!this.isCurrentFormRead(token)) return
+        throw error
       }).finally(() => {
+        if (!this.isCurrentFormRead(token)) return
+        this.formLoading = false
         if (this.$refs.form) this.$refs.form.clearValidate()
       })
     },
@@ -1466,7 +1781,7 @@ export default {
       this.recognitionVisible = true
     },
     rerunRecognition(engine) {
-      if (!this.recognitionForm.invoiceId || this.recognizingEngine) return
+      if (!this.recognitionForm.invoiceId || this.formWriteBusy || !this.ensureFormWritable()) return
       if (engine === "cloud" &&
           !this.recognitionAvailability.cloudConfigured) {
         this.$modal.msgWarning(
@@ -1508,7 +1823,7 @@ export default {
       }, {})
     },
     saveRecognitionCorrection() {
-      if (!this.recognitionForm.invoiceId || this.savingRecognition) return
+      if (!this.recognitionForm.invoiceId || this.formWriteBusy || !this.ensureFormWritable()) return
       this.savingRecognition = true
       updateReimbursementInvoiceRecognition(
         this.form.reimbursementId,
@@ -1540,120 +1855,88 @@ export default {
       }
       this.$modal.msgSuccess(`已应用到明细 ${result.itemIndex + 1}`)
     },
-    removeInvoice(invoice) {
-      const linkedMessage = invoice.itemId != null
-        ? "，同时删除对应费用明细" : ""
+    async removeInvoice(invoice) {
+      if (this.formWriteBusy || !invoice || !this.ensureFormWritable()) return
+      const reimbursementId = this.form.reimbursementId
+      const operation = this.captureFormOperation()
+      const invoiceId = String(invoice.invoiceId)
+      const frozenInvoice = cloneReimbursementDraft(invoice)
+      const baseline = cloneReimbursementDraft(this.formServerSnapshot || this.form)
+      const expectedVersion = this.form.rowVersion
+      const current = () => this.isCurrentFormOperation(operation) && String(this.form.reimbursementId) === String(reimbursementId)
+      const deleteSeq = ++this.deleteOperationSeq
+      this.deletingInvoiceId = invoiceId
       let deleteStarted = false
-      let refreshFailed = false
-      this.$modal.confirm(
-        `确认删除“${invoice.originalName}”${linkedMessage}？`,
-        "删除发票"
-      )
-        .then(() => {
-          deleteStarted = true
-          return deleteReimbursementInvoice(
-            this.form.reimbursementId,
-            invoice.invoiceId,
-            this.form.rowVersion
-          )
-        })
-        .then(response => {
-          const detail = response && response.data
-          if (detail && detail.reimbursementId != null) {
-            this.form = this.normalizeForm(detail)
-            this.captureFormBaseline()
-          } else {
-            this.form.invoices = (this.form.invoices || []).filter(value =>
-              String(value.invoiceId) !== String(invoice.invoiceId)
-            )
-            if (invoice.itemId != null) {
-              this.form.items = (this.form.items || []).filter(value =>
-                String(value.itemId) !== String(invoice.itemId)
-              )
-            }
-            return this.reloadFormDetail(false).catch(() => {
-              refreshFailed = true
-              this.$modal.msgWarning(
-                "发票已删除，但页面刷新失败，请手动刷新"
-              )
-            })
-          }
-        }).then(() => {
-          if (!refreshFailed) this.$modal.msgSuccess("发票已删除")
-        }).catch(error => {
-          if (!deleteStarted) return undefined
-          return recoverReimbursementDeleteFailure(
-            error,
-            value => this.$modal.msgError(responseMessage(value)),
-            () => this.reloadFormDetail(false)
-          )
-        })
+      try {
+        const linkedMessage = invoice.itemId != null ? "，同时删除对应费用明细" : ""
+        await this.$modal.confirm(`确认删除“${invoice.originalName}”${linkedMessage}？`, "删除发票")
+        if (!current()) return
+        deleteStarted = true
+        this.formReadSeq += 1
+        const response = await deleteReimbursementInvoice(reimbursementId, invoice.invoiceId, expectedVersion)
+        if (!current()) return
+        const detail = response && response.data
+        if (detail && detail.reimbursementId != null && detail.rowVersion != null && Array.isArray(detail.items) && Array.isArray(detail.invoices)) {
+          const remote = this.normalizeForm(detail)
+          this.form = mergeReimbursementInvoiceDeletion(this.form, remote, frozenInvoice)
+          this.formBaseline = reimbursementFormSnapshot(remote)
+          this.formServerSnapshot = cloneReimbursementDraft(remote)
+          this.$modal.msgSuccess("发票已删除")
+        } else {
+          this.setFormConflict("deleteUnknown", "删除响应未包含权威记录，正在核对，原草稿与版本已保留", null, { baseline, invoice: frozenInvoice })
+          await this.reviewFormConflict()
+        }
+      } catch (error) {
+        if (!deleteStarted || !current()) return
+        const conflict = isReimbursementVersionConflict(error)
+        this.setFormConflict(conflict ? "version" : "deleteUnknown",
+          conflict ? "删除遇到版本冲突，原草稿与版本已保留；请比较最新费用后再继续" : "删除结果尚不明确，原草稿与版本已保留，核对前不能再次保存或提交",
+          null, { baseline, invoice: frozenInvoice })
+        this.$modal.msgError(responseMessage(error))
+        await this.reviewFormConflict()
+      } finally {
+        if (deleteSeq === this.deleteOperationSeq && this.deletingInvoiceId === invoiceId) this.deletingInvoiceId = ""
+      }
     },
-    showDetail(id) {
+    showDetail(id, routeTarget = null) {
+      if (this.pageInactive) return
+      this.pageReadSeq += 1
+      this.formReadSeq += 1
+      this.formLoading = false
+      this.detailEpoch += 1
+      const epoch = this.detailEpoch
+      const deptId = this.liveDeptId()
       this.detailVisible = true
       this.detailLoading = true
       this.detail = null
+      this.detailError = ""
       this.approvalDetail = null
-      return getReimbursement(id).then(response => {
-        this.detail = response.data || {}
+      const actor = String(this.$store.getters.id), session = this.$store.state.user.sessionRevision
+      const current = () => this.isCurrentDetailRead(epoch, id, deptId) && actor === String(this.$store.getters.id) && session === this.$store.state.user.sessionRevision
+      return getReimbursement(id, SILENT_READ).then(response => {
+        if (!current()) return
+        const detail = response.data || {}
+        if (String(detail.reimbursementId) !== String(id)) throw Error("详情回包与当前报销目标不一致，请重新打开待办")
+        if (routeTarget && routeTarget.instanceId && String(detail.approvalInstanceId) !== routeTarget.instanceId) throw Error("该待办的审批轮次已变化，请返回待办刷新")
+        this.detail = detail
         if (!this.detail.approvalInstanceId) return undefined
         return getApprovalInstance(this.detail.approvalInstanceId, {
           silentError: true
         })
       }).then(response => {
-        if (!response) return
-        this.approvalDetail = response.data && response.data.data !== undefined
-          ? response.data.data : response.data || {}
+        if (!response || !current()) return
+        const approval = response.data && response.data.data !== undefined ? response.data.data : response.data || {}
+        const instance = approval.instance || {}
+        if (String(instance.instanceId) !== String(this.detail.approvalInstanceId) || String(instance.businessId) !== String(id) || instance.businessCode !== "OA_REIMBURSEMENT") throw Error("审批实例与当前报销单不一致，请返回待办核对")
+        this.approvalDetail = approval
+      }).catch(error => {
+        if (!current()) return
+        this.detailError = responseMessage(error)
       }).finally(() => {
-        this.detailLoading = false
+        if (epoch === this.detailEpoch && this.detailVisible && !this.pageInactive) this.detailLoading = false
       })
     },
-    withdraw(row) {
-      this.$prompt("请输入撤回原因", "撤回报销申请", {
-        inputValue: "申请人撤回",
-        inputValidator: value => String(value || "").trim()
-          ? true : "请输入撤回原因"
-      }).then(({ value }) => withdrawReimbursement(
-        row.reimbursementId,
-        { reason: String(value).trim() }
-      )).then(() => {
-        this.$modal.msgSuccess("撤回请求已提交")
-        this.refreshTodo()
-        this.loadList()
-      }).catch(() => {})
-    },
-    approvalAction(action) {
-      if (!this.canAct || this.acting) return
-      const ask = action === "approve"
-        ? this.$modal.confirm("确认同意这张报销申请？", "审批确认")
-          .then(() => "")
-        : this.$prompt(
-          action === "return" ? "请输入退回原因" : "请输入拒绝原因",
-          action === "return" ? "退回修改" : "拒绝申请",
-          { inputValidator: value => String(value || "").trim()
-            ? true : "原因不能为空" }
-        ).then(({ value }) => String(value).trim())
-      ask.then(reason => {
-        this.acting = true
-        const payload = {
-          requestId: `OA_REIMBURSEMENT:${this.approvalTaskId}:${action}:${Date.now()}`,
-          reason
-        }
-        if (action === "approve") {
-          return approveApprovalTask(this.approvalTaskId, payload)
-        }
-        if (action === "return") {
-          return returnApprovalTask(this.approvalTaskId, payload)
-        }
-        return rejectApprovalTask(this.approvalTaskId, payload)
-      }).then(() => {
-        this.$modal.msgSuccess("审批动作已提交")
-        this.refreshTodo()
-        return this.showDetail(this.detail.reimbursementId)
-      }).then(() => this.loadList()).catch(() => {}).finally(() => {
-        this.acting = false
-      })
-    },
+    approvalAction(action) { return this.runApprovalCommand(action) },
     previewInvoice(reimbursementId, invoice) {
       getReimbursementInvoice(
         reimbursementId,
@@ -1682,41 +1965,6 @@ export default {
       if (this.previewUrl) URL.revokeObjectURL(this.previewUrl)
       this.previewUrl = ""
       this.previewKind = ""
-    },
-    exportSelected() {
-      if (!this.selectedRows.length || this.exporting) return
-      const repeated = this.selectedRows.some(row =>
-        row.exportStatus === "exported")
-      const message = repeated
-        ? "所选数据包含已导出报销单，继续将生成新的可追溯批次。是否继续？"
-        : "将生成一个包含三张 Excel 工作表和全部原始发票的 ZIP。是否继续？"
-      this.$modal.confirm(message, "导出会计资料").then(() => {
-        this.exporting = true
-        return createReimbursementExport(
-          this.selectedRows.map(row => row.reimbursementId)
-        )
-      }).then(response => {
-        const batch = response.data || {}
-        return downloadReimbursementExport(batch.batchId).then(blob => ({
-          blob,
-          batch
-        }))
-      }).then(({ blob, batch }) => {
-        if (!blobValidate(blob)) return this.$download.printErrMsg(blob)
-        this.$download.saveAs(
-          new Blob([blob], { type: "application/zip" }),
-          batch.archiveName || `报销会计资料_${batch.batchNo || Date.now()}.zip`
-        )
-        this.$modal.msgSuccess("会计资料包已生成并开始下载")
-        this.selectedRows = []
-        this.loadList()
-      }).catch(error => {
-        if (error && error !== "cancel") {
-          this.$modal.msgError(responseMessage(error))
-        }
-      }).finally(() => {
-        this.exporting = false
-      })
     },
     refreshTodo() {
       return this.$store.dispatch("todo/invalidateAfterMutation")

@@ -22,6 +22,26 @@ public class EmployeeSalaryValues
     public BigDecimal getSalaryTotal() { return salaryTotal; }
     public void setSalaryTotal(BigDecimal value) { salaryTotal = value; }
 
+    public boolean sameAmounts(EmployeeSalaryValues other)
+    {
+        return other != null && fingerprint().equals(other.fingerprint());
+    }
+
+    /** Canonical null-aware fingerprint, also used to freeze the previewed previous amounts. */
+    public String fingerprint()
+    {
+        StringBuilder text = new StringBuilder("salary-v1|");
+        for (BigDecimal value : new BigDecimal[] { baseSalary, postSalary, fieldAllowance,
+                performanceSalary, salaryTotal })
+            text.append(value == null ? "null" : value.stripTrailingZeros().toPlainString()).append('|');
+        try
+        {
+            return java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256")
+                    .digest(text.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+        }
+        catch (java.security.NoSuchAlgorithmException error) { throw new IllegalStateException(error); }
+    }
+
     public String validationError()
     {
         BigDecimal[] amounts = { baseSalary, postSalary, fieldAllowance,

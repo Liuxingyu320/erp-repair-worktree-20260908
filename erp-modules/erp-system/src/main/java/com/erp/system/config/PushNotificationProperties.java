@@ -60,6 +60,8 @@ public class PushNotificationProperties
     {
         private boolean enabled;
 
+        private String authMode = "token";
+
         private String teamId;
 
         private String keyId;
@@ -67,6 +69,10 @@ public class PushNotificationProperties
         private String bundleId = "com.erp.mobile";
 
         private String privateKeyPath;
+
+        private String certificatePath;
+
+        private String certificatePassword = "";
 
         private String environment = "production";
 
@@ -78,6 +84,16 @@ public class PushNotificationProperties
         public void setEnabled(boolean enabled)
         {
             this.enabled = enabled;
+        }
+
+        public String getAuthMode()
+        {
+            return authMode;
+        }
+
+        public void setAuthMode(String authMode)
+        {
+            this.authMode = authMode;
         }
 
         public String getTeamId()
@@ -120,6 +136,26 @@ public class PushNotificationProperties
             this.privateKeyPath = privateKeyPath;
         }
 
+        public String getCertificatePath()
+        {
+            return certificatePath;
+        }
+
+        public void setCertificatePath(String certificatePath)
+        {
+            this.certificatePath = certificatePath;
+        }
+
+        public String getCertificatePassword()
+        {
+            return certificatePassword;
+        }
+
+        public void setCertificatePassword(String certificatePassword)
+        {
+            this.certificatePassword = certificatePassword;
+        }
+
         public String getEnvironment()
         {
             return environment;
@@ -132,9 +168,17 @@ public class PushNotificationProperties
 
         public boolean isComplete()
         {
-            return enabled && notBlank(teamId) && notBlank(keyId) && notBlank(bundleId)
-                    && notBlank(privateKeyPath)
-                    && ("production".equalsIgnoreCase(environment) || "sandbox".equalsIgnoreCase(environment));
+            if (!enabled || !notBlank(bundleId)
+                    || !("production".equalsIgnoreCase(environment) || "sandbox".equalsIgnoreCase(environment)))
+            {
+                return false;
+            }
+            if ("certificate".equalsIgnoreCase(authMode))
+            {
+                return notBlank(certificatePath);
+            }
+            return "token".equalsIgnoreCase(authMode)
+                    && notBlank(teamId) && notBlank(keyId) && notBlank(privateKeyPath);
         }
     }
 

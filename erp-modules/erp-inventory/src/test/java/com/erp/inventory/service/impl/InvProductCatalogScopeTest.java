@@ -743,6 +743,12 @@ class InvProductCatalogScopeTest
     private static class FakeSupplierMapper implements InvSupplierMapper
     {
         @Override
+        public InvSupplier selectInvSupplierByIdForUpdate(Long supplierId) { return selectInvSupplierById(supplierId); }
+
+        @Override
+        public List<Long> selectReferencingOeIdsForUpdate(String supplierName) { return Collections.emptyList(); }
+
+        @Override
         public List<InvSupplier> selectInvSupplierList(InvSupplier supplier)
         {
             return Collections.emptyList();

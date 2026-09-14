@@ -1,5 +1,11 @@
 <template>
   <div class="app-container oa-workspace-page fixed-asset-config-page">
+    <el-alert v-if="configError" :title="configError" type="warning" :closable="false" />
+    <div v-if="pendingConfigCommand">
+      原店铺 {{ pendingConfigCommand.payload.shopDeptId }} 的保存请求已保留。
+      <el-button type="text" :loading="checkingConfigCommand" :disabled="saving || deletingConfig" @click="checkConfigCommand">核对原请求</el-button>
+      <el-button type="text" :disabled="!configCommandChecked || checkingConfigCommand || saving" @click="retryConfigCommand">重试原请求</el-button>
+    </div>
     <section class="oa-page-hero">
       <div class="oa-hero__copy">
         <span class="oa-hero__eyebrow">OA 协同 · 固定资产</span>
@@ -167,11 +173,22 @@
       </div>
     </el-drawer>
 
-    <el-dialog :title="selectedAssetRows.length ? '维护店铺固定资产明细' : '添加店铺固定资产明细'" :visible.sync="configOpen" width="760px" append-to-body>
-      <el-form ref="configForm" :model="form" :rules="rules" label-width="112px">
+    <el-dialog :title="selectedAssetRows.length ? '维护店铺固定资产明细' : '添加店铺固定资产明细'" :visible.sync="configOpen" :close-on-click-modal="!configEditingLocked" :close-on-press-escape="!configEditingLocked" :show-close="!configEditingLocked" width="760px" append-to-body>
+      <el-alert v-if="configError" :title="configError" type="warning" :closable="false">
+        <el-button v-if="!pendingConfigCommand" type="text" :disabled="saving" @click="compareCurrentConfig">查看服务器快照</el-button>
+        <el-button v-else type="text" :loading="checkingConfigCommand" :disabled="saving" @click="checkConfigCommand">核对原请求</el-button>
+        <el-button v-if="pendingConfigCommand" type="text" :disabled="!configCommandChecked || checkingConfigCommand || saving" @click="retryConfigCommand">重试原请求</el-button>
+      </el-alert>
+      <div v-if="latestConfigSnapshot">
+        <p>服务器版本 {{ latestConfigSnapshot.version }}；下方当前输入保持不变。</p>
+        <el-table :data="latestConfigSnapshot.rows" size="mini"><el-table-column label="服务器 OE" prop="oeItemName"/><el-table-column label="服务器数量" prop="assetQuantity"/></el-table>
+        <el-button type="text" @click="adoptCurrentConfig">确认采用服务器快照</el-button>
+      </div>
+      <el-form v-loading="configReading" :disabled="configEditingLocked" ref="configForm" :model="form" :rules="rules" label-width="112px">
         <el-form-item label="店铺" prop="shopDeptId">
           <treeselect
             v-model="form.shopDeptId"
+            :disabled="configEditingLocked"
             :options="shopOptions"
             :normalizer="normalizer"
             :append-to-body="true"
@@ -249,8 +266,8 @@
         </el-form-item>
       </el-form>
       <div slot="footer">
-        <el-button @click="configOpen = false">取消</el-button>
-        <el-button type="primary" :loading="saving" @click="saveConfig">保存</el-button>
+        <el-button :disabled="configEditingLocked" @click="configOpen = false">关闭</el-button>
+        <el-button type="primary" :loading="saving" :disabled="!configReady || configEditingLocked" @click="saveConfig">保存</el-button>
       </div>
     </el-dialog>
 
@@ -258,6 +275,7 @@
 </template>
 
 <script>
+import fixedAssetConfigBatch from "@/mixins/fixedAssetConfigBatch"
 import Treeselect from "@riophae/vue-treeselect"
 import "@riophae/vue-treeselect/dist/vue-treeselect.css"
 import {
@@ -272,6 +290,7 @@ import { getBusinessEmptyText } from "@/utils/businessEmptyState"
 
 export default {
   name: "OaFixedAssetConfig",
+  mixins: [fixedAssetConfigBatch],
   components: { Treeselect },
   data() {
     return {
@@ -320,7 +339,7 @@ export default {
   methods: {
     normalizer(node) {
       return {
-        id: node.deptId || node.id,
+        id: String(node.deptId || node.id),
         label: node.deptName || node.label,
         children: node.children && node.children.length ? node.children : undefined
       }
@@ -364,21 +383,12 @@ export default {
       this.activeStoreConfig = row || { details: [] }
       this.detailDrawerOpen = true
     },
-    openConfigForm(row) {
-      const storeRow = row || this.findStoreConfigByShop(this.queryParams.shopDeptId)
-      this.applyStoreConfigToForm(storeRow, this.queryParams.shopDeptId)
-      this.configOpen = true
-      this.loadSelectableOeOptions()
-    },
-    handleConfigShopChange(shopDeptId) {
-      const storeRow = this.findStoreConfigByShop(shopDeptId)
-      this.applyStoreConfigToForm(storeRow, shopDeptId)
-      this.loadSelectableOeOptions()
-    },
+    openConfigForm(row) { return this.openConfigBatch(row) },
+    handleConfigShopChange(shopDeptId) { return this.changeConfigShop(shopDeptId) },
     applyStoreConfigToForm(storeRow, shopDeptId) {
       const details = storeRow && storeRow.details ? storeRow.details : []
-      const annualRepairRatio = storeRow && storeRow.annualRepairRatio
-        ? storeRow.annualRepairRatio
+      const annualRepairRatio = storeRow && storeRow.annualRepairRatio != null
+        ? Number(storeRow.annualRepairRatio)
         : (this.form.annualRepairRatio || this.quota.annualRepairRatio || 20)
       this.form = {
         shopDeptId: storeRow ? storeRow.shopDeptId : shopDeptId,
@@ -406,8 +416,11 @@ export default {
     },
     loadSelectableOeOptions(keyword = "") {
       keyword = (keyword || "").trim()
+      if (!this.configOpen) return Promise.resolve()
+      const scope = this.fixedConfigScope(), token = scope.begin("oe"), shop = this.loadedConfigShop
       this.oeLoading = true
-      listOe({ pageNum: 1, pageSize: 50, oeItemName: keyword, status: "0" }).then(res => {
+      return listOe({ pageNum: 1, pageSize: 50, oeItemName: keyword, status: "0" }).then(res => {
+        if (!scope.isCurrent(token) || !this.configOpen || shop !== this.loadedConfigShop) return
         const selectedOptions = this.selectedAssetRows.map(row => ({
           oeItemId: row.oeItemId,
           oeItemCode: row.oeItemCode,
@@ -418,11 +431,12 @@ export default {
         this.oeOptions = mergedOptions.filter((item, index, list) =>
           item.oeItemId && list.findIndex(option => option.oeItemId === item.oeItemId) === index
         )
-      }).finally(() => {
-        this.oeLoading = false
+      }).catch(error => { if (scope.isCurrent(token) && this.configOpen && shop === this.loadedConfigShop) this.configError = error && error.message || "OE选项读取失败，请重试" }).finally(() => {
+        if (scope.isCurrent(token) && shop === this.loadedConfigShop) this.oeLoading = false
       })
     },
     syncSelectedOe(oeItemIds) {
+      if (this.configEditingLocked) return
       const ids = Array.isArray(oeItemIds) ? oeItemIds : []
       const existingRows = this.selectedAssetRows.reduce((result, row) => {
         result[row.oeItemId] = row
@@ -450,6 +464,7 @@ export default {
       return row
     },
     removeAssetRow(row) {
+      if (this.configEditingLocked) return
       this.selectedAssetRows = this.selectedAssetRows.filter(item => item.oeItemId !== row.oeItemId)
       this.selectedOeItemIds = this.selectedOeItemIds.filter(oeItemId => oeItemId !== row.oeItemId)
     },
@@ -459,61 +474,8 @@ export default {
       const price = Number(row.assetUnitPrice || 0)
       row.assetAmount = Number((qty * price).toFixed(2))
     },
-    saveConfig() {
-      this.$refs.configForm.validate(valid => {
-        if (!valid) return
-        if (!this.selectedAssetRows.length) {
-          this.$modal.msgWarning("请选择固定资产OE器皿")
-          return
-        }
-        const invalidRow = this.selectedAssetRows.find(row => Number(row.assetQuantity || 0) <= 0)
-        if (invalidRow) {
-          this.$modal.msgWarning("请输入有效的固定资产数量")
-          return
-        }
-        this.saving = true
-        this.saveAssetRows().then(() => {
-          this.$modal.msgSuccess("固定资产配置已保存")
-          this.configOpen = false
-          this.getList()
-        }).finally(() => {
-          this.saving = false
-        })
-      })
-    },
-    saveAssetRows() {
-      const selectedConfigIds = this.selectedAssetRows.map(row => row.configId).filter(Boolean)
-      const selectedOeItemIds = this.selectedAssetRows.map(row => row.oeItemId).filter(Boolean)
-      const removedRows = this.originalAssetRows.filter(row =>
-        row.configId && selectedConfigIds.indexOf(row.configId) === -1 && selectedOeItemIds.indexOf(row.oeItemId) === -1
-      )
-      const deleteRequests = removedRows.map(row => () => deleteFixedAssetConfig(row.configId))
-      const saveRequests = this.selectedAssetRows.map(row => () => saveFixedAssetConfig({
-        configId: row.configId,
-        shopDeptId: this.form.shopDeptId,
-        oeItemId: row.oeItemId,
-        oeItemName: row.oeItemName,
-        assetQuantity: row.assetQuantity,
-        assetUnitPrice: row.assetUnitPrice,
-        assetAmount: row.assetAmount,
-        annualRepairRatio: this.form.annualRepairRatio,
-        status: this.form.status,
-        remark: this.form.remark
-      }))
-      return this.runAssetRowRequestsSequentially(deleteRequests.concat(saveRequests))
-    },
-    runAssetRowRequestsSequentially(requests) {
-      return requests.reduce((chain, request) => chain.then(() => request()), Promise.resolve())
-    },
-    removeStoreConfig(row) {
-      const details = row && row.details ? row.details : []
-      this.$modal.confirm("确认删除该店铺固定资产配置？将删除该店铺下所有固定资产明细。").then(() => {
-        return Promise.all(details.filter(item => item.configId).map(item => deleteFixedAssetConfig(item.configId)))
-      }).then(() => {
-        this.$modal.msgSuccess("删除成功")
-        this.getList()
-      })
-    },
+    saveConfig() { return this.saveConfigBatch() },
+    removeStoreConfig(row) { return this.removeConfigBatch(row) },
     groupFixedAssetConfigs(rows) {
       const groups = []
       const groupMap = {}

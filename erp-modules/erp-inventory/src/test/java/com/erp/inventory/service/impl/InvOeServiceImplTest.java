@@ -64,6 +64,7 @@ class InvOeServiceImplTest
     {
         InvOeItem db = completeOe();
         when(oeMapper.selectInvOeById(1L)).thenReturn(db);
+        when(oeMapper.selectInvOeByIdForUpdate(1L)).thenReturn(db);
         when(oeMapper.countActiveFixedAssetConfigByOeItemId(1L)).thenReturn(1);
         ReflectionTestUtils.setField(service, "purchaseReferenceAllowedHosts", "");
         InvOeItem request = updateRequest(db);
@@ -84,6 +85,7 @@ class InvOeServiceImplTest
     {
         InvOeItem db = completeOe();
         when(oeMapper.selectInvOeById(1L)).thenReturn(db);
+        when(oeMapper.selectInvOeByIdForUpdate(1L)).thenReturn(db);
         when(oeMapper.countActiveFixedAssetConfigByOeItemId(1L)).thenReturn(1);
         InvOeItem request = updateRequest(db);
         request.setPurchaseReferenceTouched(Boolean.TRUE);
@@ -104,6 +106,7 @@ class InvOeServiceImplTest
     {
         InvOeItem db = completeOe();
         when(oeMapper.selectInvOeById(1L)).thenReturn(db);
+        when(oeMapper.selectInvOeByIdForUpdate(1L)).thenReturn(db);
         when(oeMapper.countActiveFixedAssetConfigByOeItemId(1L)).thenReturn(0);
         InvOeItem request = updateRequest(db);
         request.setPurchaseReferenceTouched(Boolean.TRUE);
@@ -128,6 +131,7 @@ class InvOeServiceImplTest
     {
         InvOeItem db = completeOe();
         when(oeMapper.selectInvOeById(1L)).thenReturn(db);
+        when(oeMapper.selectInvOeByIdForUpdate(1L)).thenReturn(db);
         InvOeItem request = updateRequest(db);
         request.setPurchaseReferenceTouched(Boolean.TRUE);
         request.setPurchaseReferenceUrl("https://untrusted.example/item/1");

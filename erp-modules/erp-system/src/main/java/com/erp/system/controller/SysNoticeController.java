@@ -271,8 +271,7 @@ public class SysNoticeController extends BaseController
     public TableDataInfo readUsersList(Long noticeId, String searchValue)
     {
         startPage();
-        List<SysNoticeReadUserVo> list = noticeReadService.selectReadUsersByNoticeId(noticeId, searchValue);
-        return getDataTable(list);
+        return noticeReadService.selectReadUsersPage(noticeId, searchValue);
     }
 
     /**

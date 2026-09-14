@@ -22,6 +22,7 @@ public final class AttendanceLeaveModels
         public String unitMode;
         public String payPolicy;
         public BigDecimal paidRatio;
+        public BigDecimal minutesPerDay;
         public Boolean balanceRequired;
         public Boolean attachmentRequired;
         public Integer attachmentThresholdMinutes;
@@ -52,6 +53,13 @@ public final class AttendanceLeaveModels
         public LocalDateTime startTime;
         public LocalDateTime endTime;
         public Integer totalMinutes;
+        public BigDecimal requestedDays;
+        @JsonIgnore public String quotaPolicyJson;
+        public com.erp.oa.attendance.leave.balance.AttendanceLeaveQuotaModels.PolicySnapshot quotaPolicySnapshot;
+        @com.fasterxml.jackson.databind.annotation.JsonSerialize(using=com.fasterxml.jackson.databind.ser.std.ToStringSerializer.class)
+        @tools.jackson.databind.annotation.JsonSerialize(using=tools.jackson.databind.ser.std.ToStringSerializer.class)
+        public Long quotaUnits;
+        public String quotaStatus;
         public String reason;
         public String status;
         public Integer businessRound;

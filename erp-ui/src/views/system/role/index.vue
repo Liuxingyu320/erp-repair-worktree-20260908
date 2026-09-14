@@ -164,7 +164,7 @@
               <el-dropdown-item command="handleAuthUser" icon="el-icon-user"
                 v-hasPermi="['system:role:authUser']">分配用户</el-dropdown-item>
               <el-dropdown-item command="handleSalaryConfig" icon="el-icon-money"
-                v-hasPermi="['system:salary:role']">薪资配置</el-dropdown-item>
+                v-hasPermi="['system:salary:role']">历史薪资方案</el-dropdown-item>
             </el-dropdown-menu>
           </el-dropdown>
         </template>
@@ -181,7 +181,7 @@
     </div>
 
     <!-- 添加或修改角色配置对话框 -->
-    <el-dialog :title="title" :visible.sync="open" width="760px" append-to-body>
+    <el-dialog :title="title" :visible.sync="open" width="760px" append-to-body @close="invalidateRoleLoad">
       <el-alert
         v-if="copySource"
         :title="`复制自「${copySource.roleName}」：将复制菜单和数据范围，不复制用户授权与薪资配置。`"
@@ -190,7 +190,8 @@
         show-icon
         class="role-copy-alert"
       />
-      <el-form ref="form" :model="form" :rules="rules" label-width="100px">
+      <el-alert v-if="roleLoadFailed" title="角色权限加载失败，请重试后保存" type="error" :closable="false"><el-button type="text" @click="retryRoleLoad">重新加载</el-button></el-alert>
+      <el-form ref="form" v-loading="roleLoading" :disabled="!roleReady || roleSaving" :model="form" :rules="rules" label-width="100px">
         <el-form-item label="角色名称" prop="roleName">
           <el-input v-model="form.roleName" placeholder="请输入角色名称" />
         </el-form-item>
@@ -270,7 +271,7 @@
         </el-form-item>
       </el-form>
       <div slot="footer" class="dialog-footer">
-        <el-button type="primary" @click="submitForm">确 定</el-button>
+        <el-button type="primary" :disabled="!roleReady || roleLoading" :loading="roleSaving" @click="submitForm">确 定</el-button>
         <el-button @click="cancel">取 消</el-button>
       </div>
     </el-dialog>
@@ -323,7 +324,7 @@
 </template>
 
 <script>
-import { listRole, getRole, delRole, updateRole, dataScope, changeRoleStatus, deptTreeSelect } from "@/api/system/role"
+import { listRole, getRole, delRole, addRole, updateRole, dataScope, changeRoleStatus, deptTreeSelect } from "@/api/system/role"
 import { treeselect as menuTreeselect, roleMenuTreeselect } from "@/api/system/menu"
 import { confirmExportAction } from "@/utils/exportConfirm"
 import RoleWizard from "./components/RoleWizard.vue"
@@ -352,6 +353,12 @@ export default {
       title: "",
       // 是否显示弹出层
       open: false,
+      roleLoadEpoch: 0,
+      roleLoading: false,
+      roleReady: false,
+      roleLoadFailed: false,
+      roleLoadTarget: null,
+      roleSaving: false,
       // 是否显示弹出层（数据权限）
       openDataScope: false,
       roleWizardOpen: false,
@@ -614,30 +621,57 @@ export default {
         if (button && typeof button.focus === "function") button.focus()
       })
     },
+    invalidateRoleLoad() {
+      this.roleLoadEpoch += 1
+      this.roleReady = false
+      this.roleLoading = false
+    },
+    retryRoleLoad() {
+      if (this.roleLoadTarget) this.loadRoleEditor(this.roleLoadTarget.id, this.roleLoadTarget.copy)
+    },
+    async loadRoleEditor(roleId, copy = false) {
+      this.reset()
+      const epoch = ++this.roleLoadEpoch
+      this.roleLoadTarget = { id: roleId, copy }
+      this.roleReady = false
+      this.roleLoading = true
+      this.roleLoadFailed = false
+      this.open = true
+      this.title = copy ? "复制角色" : "修改角色"
+      try {
+        const [role, menu, dept] = await Promise.all([
+          getRole(roleId), roleMenuTreeselect(roleId), deptTreeSelect(roleId)
+        ])
+        if (epoch !== this.roleLoadEpoch || !this.open) return
+        if (!role.data || !Array.isArray(menu.menus) || !Array.isArray(menu.checkedKeys) ||
+          !Array.isArray(dept.depts) || !Array.isArray(dept.checkedKeys)) throw new Error("角色权限响应不完整")
+        const source = role.data
+        this.form = { ...source }
+        if (copy) {
+          this.copySource = { roleId: source.roleId, roleName: source.roleName }
+          this.form = {
+            ...source, roleId: undefined, roleName: `${source.roleName}（副本）`,
+            roleKey: `${source.roleKey}-copy`, status: "1",
+            createBy: undefined, createTime: undefined, updateBy: undefined, updateTime: undefined
+          }
+        }
+        this.menuOptions = menu.menus
+        this.deptOptions = dept.depts
+        await this.$nextTick()
+        if (epoch !== this.roleLoadEpoch || !this.open) return
+        this.$refs.menu.setCheckedKeys([])
+        ;(menu.checkedKeys || []).forEach(key => this.$refs.menu.setChecked(key, true, false))
+        this.$refs.dept.setCheckedKeys(dept.checkedKeys || [])
+        this.roleReady = true
+      } catch (error) {
+        if (epoch === this.roleLoadEpoch && this.open) this.roleLoadFailed = true
+      } finally {
+        if (epoch === this.roleLoadEpoch) this.roleLoading = false
+      }
+    },
     /** 修改按钮操作 */
     handleUpdate(row) {
-      this.reset()
-      const roleId = row.roleId || this.ids
-      const roleMenu = this.getRoleMenuTreeselect(roleId)
-      const deptTree = this.getDeptTree(roleId)
-      getRole(roleId).then(response => {
-        this.form = response.data
-        this.open = true
-        this.$nextTick(() => {
-          roleMenu.then(res => {
-            let checkedKeys = res.checkedKeys
-            checkedKeys.forEach((v) => {
-                this.$nextTick(()=>{
-                    this.$refs.menu.setChecked(v, true ,false)
-                })
-            })
-          })
-          deptTree.then(res => {
-            this.$refs.dept.setCheckedKeys(res.checkedKeys || [])
-          })
-        })
-      })
-      this.title = "修改角色"
+      return this.loadRoleEditor(row.roleId || this.ids[0])
     },
     /** 选择角色权限范围触发 */
     dataScopeSelectChange(value) {
@@ -647,34 +681,7 @@ export default {
     },
     /** 复制角色；用户授权和薪资配置属于独立关系，不参与复制。 */
     handleCopy(row) {
-      this.reset()
-      const roleMenu = this.getRoleMenuTreeselect(row.roleId)
-      const deptTree = this.getDeptTree(row.roleId)
-      getRole(row.roleId).then(response => {
-        const source = response.data
-        this.copySource = { roleId: source.roleId, roleName: source.roleName }
-        this.form = {
-          ...source,
-          roleId: undefined,
-          roleName: `${source.roleName}（副本）`,
-          roleKey: `${source.roleKey}-copy`,
-          status: "1",
-          createBy: undefined,
-          createTime: undefined,
-          updateBy: undefined,
-          updateTime: undefined
-        }
-        this.open = true
-        this.$nextTick(() => {
-          roleMenu.then(res => {
-            ;(res.checkedKeys || []).forEach(key => this.$refs.menu.setChecked(key, true, false))
-          })
-          deptTree.then(res => {
-            this.$refs.dept.setCheckedKeys(res.checkedKeys || [])
-          })
-        })
-      })
-      this.title = "复制角色"
+      return this.loadRoleEditor(row.roleId, true)
     },
     /** 分配用户操作 */
     handleAuthUser(row) {
@@ -687,22 +694,23 @@ export default {
     },
     /** 提交按钮 */
     submitForm() {
-      this.$refs["form"].validate(valid => {
-        if (valid) {
-          this.form.menuIds = this.getMenuAllCheckedKeys()
-          this.form.deptIds = this.form.dataScope === "2" ? this.getDeptAllCheckedKeys() : []
-          if (this.form.dataScope === "2" && this.form.deptIds.length === 0) {
-            this.$modal.msgWarning("自定义数据权限至少选择一个部门")
-            return
-          }
-          if (this.form.roleId != undefined) {
-            updateRole(this.form).then(() => {
-              this.$modal.msgSuccess("修改成功")
-              this.open = false
-              this.getList()
-            })
-          }
+      if (!this.roleReady || this.roleLoading || this.roleSaving) return
+      const epoch = this.roleLoadEpoch
+      this.$refs.form.validate(valid => {
+        if (!valid || !this.roleReady || epoch !== this.roleLoadEpoch || this.roleSaving) return
+        const payload = { ...this.form, menuIds: this.getMenuAllCheckedKeys(),
+          deptIds: this.form.dataScope === "2" ? this.getDeptAllCheckedKeys() : [] }
+        if (payload.dataScope === "2" && payload.deptIds.length === 0) {
+          this.$modal.msgWarning("自定义数据权限至少选择一个部门")
+          return
         }
+        this.roleSaving = true
+        const save = payload.roleId != null ? updateRole : addRole
+        save(payload).then(() => {
+          this.$modal.msgSuccess(payload.roleId != null ? "修改成功" : "复制成功")
+          if (epoch === this.roleLoadEpoch) this.open = false
+          this.getList()
+        }).catch(() => {}).finally(() => { this.roleSaving = false })
       })
     },
     dataScopeLabel(value) {

@@ -6,10 +6,10 @@
     custom-class="sign-task-batch-finalize-dialog"
     append-to-body
     :close-on-click-modal="false"
-    :close-on-press-escape="!submitting"
-    :show-close="!submitting"
+    :close-on-press-escape="!operationLocked"
+    :show-close="!operationLocked"
     :before-close="handleBeforeClose"
-    @closed="resetState"
+    @closed="handleClosed"
   >
     <div v-loading="previewLoading" class="batch-finalize-workbench">
       <el-alert
@@ -37,10 +37,10 @@
           <el-tag size="mini" type="success">可提交 {{ readyCount }}</el-tag>
           <el-tag v-if="blockedCount" size="mini" type="danger">阻断 {{ blockedCount }}</el-tag>
           <el-tag v-if="mismatchCount" size="mini" type="warning">需说明改选 {{ mismatchCount }}</el-tag>
-          <el-button type="text" size="mini" :disabled="submitting" @click="loadPreview">刷新预检</el-button>
+          <el-button type="text" size="mini" :disabled="operationLocked" @click="loadPreview">刷新预检</el-button>
         </div>
 
-        <div v-if="!hasExecutionResults" class="batch-apply-bar">
+        <div v-if="pendingRows.length" class="batch-apply-bar">
           <span class="batch-apply-label">批量应用</span>
           <el-select
             v-model="bulkLegalEntityId"
@@ -49,6 +49,7 @@
             size="small"
             placeholder="先选择合同公司"
             class="batch-company-select"
+            :disabled="operationLocked"
             @change="handleBulkCompanyChoice"
           >
             <el-option
@@ -59,7 +60,7 @@
               :disabled="company.selectable === false"
             />
           </el-select>
-          <el-button size="small" :disabled="!bulkLegalEntityId" @click="applyCompanyToAll">
+          <el-button size="small" :disabled="operationLocked || !bulkLegalEntityId" @click="applyCompanyToAll">
             应用公司到全部
           </el-button>
           <el-select
@@ -69,7 +70,7 @@
             size="small"
             placeholder="选择同公司印章"
             class="batch-seal-select"
-            :disabled="!bulkLegalEntityId || !bulkSealOptions.length"
+            :disabled="operationLocked || !bulkLegalEntityId || !bulkSealOptions.length"
           >
             <el-option
               v-for="seal in bulkSealOptions"
@@ -78,7 +79,7 @@
               :value="sealId(seal)"
             />
           </el-select>
-          <el-button size="small" :disabled="!bulkSealId" @click="applySealToSameCompany">
+          <el-button size="small" :disabled="operationLocked || !bulkSealId" @click="applySealToSameCompany">
             应用印章到同公司
           </el-button>
         </div>
@@ -122,7 +123,7 @@
                 placeholder="请选择合同公司"
                 size="small"
                 style="width: 100%"
-                :disabled="submitting || rowSucceeded(scope.row)"
+                :disabled="operationLocked || rowSucceeded(scope.row)"
                 @change="handleCompanyChange(scope.row)"
               >
                 <el-option
@@ -157,7 +158,7 @@
                   placeholder="请选择有效合同印章"
                   size="small"
                   style="width: 100%"
-                  :disabled="!scope.row.legalEntityId || submitting || rowSucceeded(scope.row)"
+                  :disabled="!scope.row.legalEntityId || operationLocked || rowSucceeded(scope.row)"
                   @change="markEdited"
                 >
                   <el-option
@@ -184,7 +185,7 @@
                 maxlength="500"
                 show-word-limit
                 placeholder="所选公司与建议不一致，请填写原因"
-                :disabled="submitting || rowSucceeded(scope.row)"
+                :disabled="operationLocked || rowSucceeded(scope.row)"
                 @input="markEdited"
               />
               <span v-else class="matched-copy">与建议一致，无需填写</span>
@@ -229,34 +230,42 @@
         />
 
         <el-checkbox
-          v-if="!hasExecutionResults"
+          v-if="pendingRows.length"
           v-model="confirmed"
-          :disabled="submitting || blockedCount > 0"
+          :disabled="operationLocked || blockedCount > 0"
           class="finalize-confirmation"
         >
           我已逐项核对合同公司、有效印章与改选原因，确认生成最终合同；本步骤不发送，预览后另行发送最终文件
         </el-checkbox>
       </template>
 
+      <el-alert v-if="commandUnknown" title="批量生成结果待核对，已冻结原公司、印章与请求号；不会自动重新生成。" type="warning" :closable="false">
+        <p>{{ recoveryMessage }}</p>
+        <el-button type="text" :disabled="submitting || confirming || checking" @click="checkUnknownResult">核对原任务</el-button>
+        <el-button type="text" :disabled="submitting || confirming || checking || !checkedUnknown" @click="retryOriginalCommand">重试原未确认项</el-button>
+      </el-alert>
       <el-empty v-else-if="!previewLoading && !previewError" description="没有可批量处理的任务" />
     </div>
 
     <span slot="footer" class="dialog-footer">
-      <el-button :disabled="submitting" @click="closeDialog">{{ hasExecutionResults ? '关闭' : '取消' }}</el-button>
+      <el-button :disabled="operationLocked" @click="closeDialog">{{ hasExecutionResults ? '关闭' : '取消' }}</el-button>
       <el-button
-        v-if="!hasExecutionResults"
+        v-if="pendingRows.length"
         type="primary"
         icon="el-icon-s-claim"
         :loading="submitting"
         :disabled="!canSubmit"
         @click="confirmAndSubmit"
-      >批量生成正式合同（{{ rows.length }}）</el-button>
+      >批量生成正式合同（{{ pendingRows.length }}）</el-button>
     </span>
   </el-dialog>
 </template>
 
 <script>
-import { finalizeSignTaskBatch, previewSignTaskBatchFinalize } from '@/api/oa/signTask'
+import { getSignTask, finalizeSignTaskBatch, previewSignTaskBatchFinalize } from '@/api/oa/signTask'
+import { getSignPackage } from '@/api/oa/signPackage'
+import { getSelectedSignScopeDeptId } from '@/utils/signScopeContext'
+const { createUiOperationScope } = require('@/utils/uiOperationScope')
 const { signBusinessText } = require('@/utils/signDisplayText')
 
 const SUCCESS_RESULTS = ['SUCCESS', 'FINALIZED', 'ALREADY_FINALIZED', 'COMPLETED', 'PENDING_FINAL_CONFIRM']
@@ -270,6 +279,12 @@ export default {
   data() {
     return {
       previewLoading: false,
+      confirming: false,
+      checking: false,
+      commandUnknown: false,
+      checkedUnknown: false,
+      recoveryMessage: '',
+      pendingCommand: null,
       submitting: false,
       previewError: '',
       legalEntities: [],
@@ -282,11 +297,13 @@ export default {
     }
   },
   computed: {
+    operationLocked() { return this.submitting || this.confirming || this.commandUnknown || this.checking },
+    pendingRows() { return this.rows.filter(row => !this.rowSucceeded(row)) },
     readyCount() {
-      return this.rows.filter(row => this.rowBlockers(row).length === 0).length
+      return this.pendingRows.filter(row => this.rowBlockers(row).length === 0).length
     },
     blockedCount() {
-      return this.rows.length - this.readyCount
+      return this.pendingRows.length - this.readyCount
     },
     mismatchCount() {
       return this.rows.filter(row => this.recommendationMismatch(row)).length
@@ -308,8 +325,8 @@ export default {
       return result
     },
     canSubmit() {
-      return this.rows.length > 0 && !this.previewLoading && !this.submitting &&
-        !this.hasExecutionResults && this.blockedCount === 0 && this.confirmed
+      return this.pendingRows.length > 0 && !this.previewLoading && !this.operationLocked &&
+        this.blockedCount === 0 && this.confirmed
     },
     hasExecutionResults() {
       return this.rows.some(row => !!row.result)
@@ -332,42 +349,61 @@ export default {
     }
   },
   watch: {
-    visible(value) {
-      if (value) this.loadPreview()
-    }
+    visible(value) { this.resetState(); if (value) this.schedulePreview() },
+    taskIds: { deep: true, handler() { if (this.visible) { this.resetState(); this.schedulePreview() } } },
+    '$store.state.user.sessionRevision'() { this.resetState(); if (this.visible) this.schedulePreview() }
   },
+  created() { window.addEventListener('erp:sign-scope-changed', this.handleScopeChange) },
+  beforeDestroy() { window.removeEventListener('erp:sign-scope-changed', this.handleScopeChange); this.operationScope().deactivate() },
+  deactivated() { this.operationScope().deactivate(); this.resetState() },
+  activated() { this.operationScope().activate(); if (this.visible) this.loadPreview() },
   methods: {
+    schedulePreview() {
+      const revision = (this._previewSchedule || 0) + 1
+      this._previewSchedule = revision
+      this.$nextTick(() => { if (this.visible && revision === this._previewSchedule) this.loadPreview() })
+    },
+    operationIdentity() {
+      return JSON.stringify({ actor: this.$store && this.$store.getters.id,
+        session: this.$store && this.$store.state.user.sessionRevision,
+        dept: getSelectedSignScopeDeptId(), tasks: this.normalizedTaskIds(), visible: this.visible })
+    },
+    handleScopeChange() { this.resetState(); if (this.visible) this.schedulePreview() },
+    operationScope() {
+      if (!this._batchScope) this._batchScope = createUiOperationScope(() => this.operationIdentity())
+      return this._batchScope
+    },
     loadPreview() {
-      if (this.previewLoading || this.submitting) return
+      if (this.operationLocked || !this.visible) return
       const taskIds = this.normalizedTaskIds()
-      if (!taskIds.length) {
-        this.previewError = '没有选中的待选公司盖章任务'
-        this.rows = []
-        return
-      }
-      if (taskIds.length > 20) {
-        this.previewError = '单次最多处理20个签约任务'
-        this.rows = []
+      this.operationScope().invalidate()
+      const token = this.operationScope().begin('preview')
+      const current = () => this.visible && this.operationScope().isCurrent(token)
+      this.rows = []; this.legalEntities = []; this.previewError = ''
+      if (!taskIds.length || taskIds.length > 20) {
+        this.previewError = !taskIds.length ? '没有选中的待选公司盖章任务' : '单次最多处理20个签约任务'
+        this.previewLoading = false
         return
       }
       this.previewLoading = true
-      this.previewError = ''
       this.responseSummary = null
       this.requestId = ''
       this.confirmed = false
       return previewSignTaskBatchFinalize({ taskIds }).then(response => {
+        if (!current()) return
         const data = response.data || {}
         const items = Array.isArray(data.items) ? data.items : []
+        const ids = items.map(item => this.normalizeId(item.taskId))
+        if (ids.length !== taskIds.length || new Set(ids).size !== ids.length || ids.some(id => !taskIds.includes(id))) {
+          throw Error('预检返回任务与当前批次不一致，请重新预检')
+        }
         this.legalEntities = this.mergeCompanyCandidates(items)
         this.rows = items.map(item => this.createRow(item))
-        if (!this.rows.length) this.previewError = '服务端未返回可处理任务，请刷新列表后重试'
       }).catch(error => {
-        this.rows = []
-        this.legalEntities = []
+        if (!current()) return
+        this.rows = []; this.legalEntities = []
         this.previewError = signBusinessText(error && error.message, '批量预检失败，请刷新任务列表后重试')
-      }).finally(() => {
-        this.previewLoading = false
-      })
+      }).finally(() => { if (current()) this.previewLoading = false })
     },
     createRow(item) {
       const recommendedId = this.normalizeId(item && item.recommendedLegalEntityId)
@@ -525,15 +561,17 @@ export default {
       return options.length === 1 ? this.sealId(options[0]) : ''
     },
     handleCompanyChange(row) {
+      if (this.operationLocked) return
       row.sealId = this.resolveRecommendedSeal(row)
       row.correctionReason = this.recommendationMismatch(row) ? row.correctionReason : ''
       this.markEdited()
     },
     handleBulkCompanyChoice() {
+      if (this.operationLocked) return
       this.bulkSealId = ''
     },
     applyCompanyToAll() {
-      if (!this.bulkLegalEntityId) return
+      if (this.operationLocked || !this.bulkLegalEntityId) return
       let applied = 0
       this.rows.forEach(row => {
         if (this.rowSucceeded(row)) return
@@ -550,7 +588,7 @@ export default {
       else if (applied < this.rows.length) this.$message.warning(`已应用到 ${applied} 项，其余任务无该公司可用候选`)
     },
     applySealToSameCompany() {
-      if (!this.bulkLegalEntityId || !this.bulkSealId) return
+      if (this.operationLocked || !this.bulkLegalEntityId || !this.bulkSealId) return
       let applied = 0
       this.rows.forEach(row => {
         if (this.rowSucceeded(row) || this.normalizeId(row.legalEntityId) !== this.normalizeId(this.bulkLegalEntityId)) return
@@ -582,67 +620,104 @@ export default {
       return Array.from(new Set(messages))
     },
     markEdited() {
-      this.requestId = ''
-      this.confirmed = false
+      if (this.operationLocked) return
+      this.operationScope().invalidate('confirm')
+      this.pendingRows.forEach(row => { row.result = ''; row.resultMessage = '' })
+      this.requestId = ''; this.pendingCommand = null; this.confirmed = false
     },
-    confirmAndSubmit() {
-      if (!this.canSubmit) {
-        this.$message.warning('请先处理所有阻断项并完成核对确认')
-        return
-      }
-      const sealCount = this.rows.filter(row => this.requiresSeal(row)).length
-      return this.$confirm(
-        `即将为 ${this.rows.length} 位员工固定合同公司，其中 ${sealCount} 项将加盖公司印章并生成最终合同。本步骤不会发送，生成后还需预览并另行发送最终文件。是否继续？`,
-        '二次确认',
-        { confirmButtonText: '确认生成', cancelButtonText: '返回核对', type: 'warning' }
-      ).then(() => this.submitBatch()).catch(reason => {
-        if (reason !== 'cancel' && reason !== 'close') {
-          this.$message.error(signBusinessText(reason && reason.message, '无法完成二次确认'))
-        }
-      })
-    },
-    submitBatch() {
-      if (this.submitting) return
-      if (!this.requestId) this.requestId = this.createRequestId()
-      const items = this.rows.map(row => ({
-        taskId: row.taskId,
-        packageId: row.packageId,
-        expectedTaskVersion: row.taskVersion,
-        expectedPackageVersion: row.packageVersion,
+    commandItems() {
+      return this.pendingRows.map(row => ({ taskId: row.taskId, packageId: row.packageId,
+        expectedTaskVersion: row.taskVersion, expectedPackageVersion: row.packageVersion,
         legalEntityId: this.normalizeId(row.legalEntityId),
         sealId: this.requiresSeal(row) ? this.normalizeId(row.sealId) : null,
-        correctionReason: String(row.correctionReason || '').trim() || null
-      }))
-      this.submitting = true
-      return finalizeSignTaskBatch({ requestId: this.requestId, items }).then(response => {
+        correctionReason: String(row.correctionReason || '').trim() || null }))
+    },
+    confirmAndSubmit() {
+      if (!this.canSubmit) return
+      const scope = this.operationScope(), items = this.commandItems()
+      const token = scope.begin('confirm', items)
+      this.confirming = true
+      return this.$confirm(
+        `即将为 ${items.length} 位员工固定合同公司并生成最终合同。本步骤不会发送，生成后还需预览并另行发送最终文件。是否继续？`,
+        '二次确认', { confirmButtonText: '确认生成', cancelButtonText: '返回核对', type: 'warning' }
+      ).then(() => {
+        if (!scope.isCurrent(token, this.commandItems())) return
+        this.confirming = false
+        const command = Object.freeze({ requestId: this.createRequestId(), items: Object.freeze(items.map(item => Object.freeze(item))) })
+        this.pendingCommand = command; this.requestId = command.requestId
+        return this.submitBatch(command)
+      }).catch(reason => {
+        if (scope.isCurrent(token) && reason !== 'cancel' && reason !== 'close') this.$message.error(signBusinessText(reason && reason.message, '无法完成二次确认'))
+      }).finally(() => { if (scope.isCurrent(token)) this.confirming = false })
+    },
+    submitBatch(command) {
+      if (this.submitting || !command || command !== this.pendingCommand || !this.visible) return
+      const scope = this.operationScope(), token = scope.begin('submit')
+      const current = () => this.visible && scope.isCurrent(token) && command === this.pendingCommand
+      this.submitting = true; this.checkedUnknown = false
+      return finalizeSignTaskBatch(command).then(response => {
+        if (!current()) return
         const data = response.data || {}
-        const results = Array.isArray(data.items) ? data.items
-          : (Array.isArray(data.results) ? data.results : [])
-        this.responseSummary = data.summary || data
-        this.applyExecutionResults(results)
-        const reportedSuccess = (Number(this.responseSummary.successCount) || 0) +
-          (Number(this.responseSummary.finalizedCount) || 0) +
-          (Number(this.responseSummary.alreadyFinalizedCount) || 0)
-        const successCount = Math.max(reportedSuccess, this.executionSuccessCount)
-        if (successCount > 0) this.$emit('completed', { successCount, response: data })
-        if (!results.length) {
-          this.$message.warning('服务端未返回逐项结果，请刷新列表确认处理状态')
-        }
+        const results = Array.isArray(data.items) ? data.items : (Array.isArray(data.results) ? data.results : [])
+        const ids = results.map(row => this.normalizeId(row.taskId))
+        const complete = ids.length === command.items.length && new Set(ids).size === ids.length && command.items.every(row => ids.includes(row.taskId))
+        this.applyExecutionResults(results, command)
+        this.responseSummary = null
+        this.commandUnknown = !complete || this.rows.some(row => row.result === 'UNKNOWN')
+        if (this.commandUnknown) this.recoveryMessage = '逐项结果不完整，请核对原任务；不会将缺失结果当成失败后新建请求。'
+        else { this.pendingCommand = null; this.requestId = ''; this.confirmed = false }
+        const successCount = this.rows.filter(row => this.rowSucceeded(row)).length
+        if (successCount) this.$emit('completed', { successCount, response: data })
       }).catch(error => {
-        this.$message.error(signBusinessText(error && error.message, '批量生成正式合同失败，本次请求号已保留，可安全重试'))
-      }).finally(() => {
-        this.submitting = false
+        if (!current()) return
+        // A transport/5xx failure does not prove that no per-item transaction committed.
+        const status = error && error.response && error.response.status
+        this.commandUnknown = !status || status >= 500 || Number(error && error.code) >= 500
+        this.recoveryMessage = this.commandUnknown ? '请求结果暂时无法确认，请先核对原任务，再显式重试原请求。' : signBusinessText(error && error.message, '批量生成被拒绝，请检查权限或状态')
+        if (!error || !error.notified) this.$message.error(this.recoveryMessage)
+        if (!this.commandUnknown) { this.pendingCommand = null; this.requestId = ''; this.confirmed = false }
+      }).finally(() => { if (current() || (scope.isCurrent(token) && !this.pendingCommand)) this.submitting = false })
+    },
+    applyExecutionResults(results, command) {
+      const byTaskId = new Map(results.map(item => [this.normalizeId(item && item.taskId), item || {}]))
+      command.items.forEach(snapshot => {
+        const row = this.rows.find(row => row.taskId === snapshot.taskId)
+        if (!row || JSON.stringify(this.itemSnapshot(row)) !== JSON.stringify(snapshot)) return
+        const result = byTaskId.get(snapshot.taskId)
+        row.result = result ? String(result.result || result.status || (result.success === true ? 'SUCCESS' : 'FAILED')).toUpperCase() : 'UNKNOWN'
+        row.resultMessage = result ? String(result.message || result.failureReason || result.detail || '') : '结果缺失，待核对'
       })
     },
-    applyExecutionResults(results) {
-      const byTaskId = new Map()
-      results.forEach(item => byTaskId.set(this.normalizeId(item && item.taskId), item || {}))
-      this.rows.forEach(row => {
-        const result = byTaskId.get(this.normalizeId(row.taskId))
-        if (!result) return
-        row.result = String(result.result || result.status || (result.success === true ? 'SUCCESS' : 'FAILED')).toUpperCase()
-        row.resultMessage = String(result.message || result.failureReason || result.detail || '')
-      })
+    itemSnapshot(row) {
+      return { taskId: row.taskId, packageId: row.packageId, expectedTaskVersion: row.taskVersion,
+        expectedPackageVersion: row.packageVersion, legalEntityId: this.normalizeId(row.legalEntityId),
+        sealId: this.requiresSeal(row) ? this.normalizeId(row.sealId) : null,
+        correctionReason: String(row.correctionReason || '').trim() || null }
+    },
+    checkUnknownResult() {
+      const command = this.pendingCommand
+      if (!this.commandUnknown || !command || this.checking || this.submitting) return
+      const scope = this.operationScope(), token = scope.begin('check')
+      const current = () => this.visible && scope.isCurrent(token) && command === this.pendingCommand
+      this.checking = true; this.checkedUnknown = false
+      return Promise.all(command.items.map(item => Promise.all([getSignTask(item.taskId), getSignPackage(item.packageId)]).then(([task, pack]) => {
+        const actualTask = task.data && task.data.task || {}, actualPackage = pack.data || {}
+        if (String(actualTask.taskId) !== item.taskId || String(actualPackage.packageId) !== item.packageId) throw Error('核对返回的任务或签约包不匹配')
+        return `任务 ${item.taskId}：${signBusinessText(actualTask.status, '状态待确认')}，签约包 ${signBusinessText(actualPackage.status, '状态待确认')}`
+      }))).then(messages => {
+        if (!current()) return
+        this.recoveryMessage = messages.join('；') + '。当前状态不能单独证明本次请求成功；重试只使用原请求号及原载荷。'
+        this.checkedUnknown = true
+      }).catch(error => { if (current()) this.recoveryMessage = signBusinessText(error && error.message, '结果核对失败，请稍后重试核对') })
+        .finally(() => { if (current()) this.checking = false })
+    },
+    retryOriginalCommand() {
+      if (!this.commandUnknown || !this.checkedUnknown || this.submitting || this.checking || !this.pendingCommand) return
+      const old = this.pendingCommand
+      const items = old.items.filter(item => !this.rows.some(row => row.taskId === item.taskId && this.rowSucceeded(row)))
+      const command = Object.freeze({ requestId: old.requestId, items: Object.freeze(items) })
+      this.pendingCommand = command
+      return this.submitBatch(command)
     },
     rowSucceeded(row) {
       return !!row && SUCCESS_RESULTS.includes(String(row.result || '').toUpperCase())
@@ -662,7 +737,8 @@ export default {
         PENDING_FINAL_CONFIRM: '待员工确认',
         CONFLICT: '状态已变更',
         SKIPPED: '未处理',
-        FAILED: '处理失败'
+        FAILED: '处理失败',
+        UNKNOWN: '结果待核对'
       }[String(result || '').toUpperCase()] || String(result || '未知结果')
     },
     createRequestId() {
@@ -670,13 +746,18 @@ export default {
       return `sign-batch-finalize-${Date.now()}-${Math.random().toString(16).slice(2)}`
     },
     handleBeforeClose(done) {
-      if (this.submitting) return
-      done()
+      if (this.operationLocked) return
+      this.resetState(); done()
     },
     closeDialog() {
-      if (!this.submitting) this.$emit('update:visible', false)
+      if (!this.operationLocked) { this.resetState(); this.$emit('update:visible', false) }
     },
+    handleClosed() { if (!this.visible) this.resetState() },
     resetState() {
+      this._previewSchedule = (this._previewSchedule || 0) + 1
+      this.operationScope().invalidate()
+      this.confirming = false; this.checking = false; this.commandUnknown = false; this.checkedUnknown = false
+      this.pendingCommand = null; this.recoveryMessage = ''
       this.previewLoading = false
       this.submitting = false
       this.previewError = ''

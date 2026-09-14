@@ -1,8 +1,9 @@
 import request from '@/utils/request'
 
 // 查询字典数据列表
-export function listData(query) {
+export function listData(query, options) {
   return request({
+    silentError: !!(options && options.silentError === true),
     url: '/system/dict/data/list',
     method: 'get',
     params: query

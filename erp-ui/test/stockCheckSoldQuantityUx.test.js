@@ -56,11 +56,11 @@ assert.ok(
 
 assert.ok(
   source.includes("detail-total-banner") &&
-    source.includes("总共 {{ filteredFormDetails.length }} 个商品") &&
-    source.includes("总共 {{ filteredDetailDetails.length }} 个商品") &&
+    source.includes("显示 {{ filteredFormDetails.length }} / {{ form.details.length }} 个商品") &&
+    source.includes("显示 {{ filteredDetailDetails.length }} / {{ detail.details.length }} 个商品") &&
     !source.includes("detail-filter-count") &&
     !source.includes("check-summary-strip"),
-  "stock check detail dialogs should show one prominent total count instead of ratio text or summary cards"
+  "stock check detail dialogs should show one prominent filtered/total count without duplicated summary cards"
 )
 
 assert.ok(
@@ -94,7 +94,7 @@ assert.ok(
     source.includes("categoryCheckProductIds") &&
     source.includes("selectedCheckProductIds") &&
     source.includes("sampleSize") &&
-    source.includes("details: productIds.map(productId => ({ productId }))") &&
+    source.includes("details: productIds.map(key =>") && source.includes("checkStockItemKey") &&
     stockCheckDomainSource.includes("private Long categoryId") &&
     stockCheckDomainSource.includes("private String checkScope") &&
     stockCheckServiceSource.includes("filterSnapshotRows") &&

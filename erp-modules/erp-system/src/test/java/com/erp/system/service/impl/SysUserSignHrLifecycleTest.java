@@ -16,6 +16,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import com.erp.common.core.context.SecurityContextHolder;
 import com.erp.common.core.exception.ServiceException;
 import com.erp.system.api.domain.SysUser;
+import com.erp.system.api.domain.SysRole;
+import java.util.List;
 import com.erp.system.mapper.SysConfigMapper;
 import com.erp.system.mapper.SysUserMapper;
 import com.erp.system.mapper.SysUserPostMapper;
@@ -71,6 +73,13 @@ class SysUserSignHrLifecycleTest
     @DisplayName("用户授权先锁状态再改关联并同步")
     void shouldLockBeforeChangingUserRoles()
     {
+        SysRole role = new SysRole();
+        role.setRoleId(2L);
+        role.setStatus("0");
+        role.setDelFlag("0");
+        when(roleMapper.selectRoleByIdForUpdate(2L)).thenReturn(role);
+        when(userRoleMapper.lockUserForRoleAssignment(88L)).thenReturn(88L);
+        when(userRoleMapper.selectRoleIdsByUserId(88L)).thenReturn(List.of());
         SecurityContextHolder.setUserId("1");
         try
         {
@@ -81,9 +90,12 @@ class SysUserSignHrLifecycleTest
             SecurityContextHolder.remove();
         }
 
-        InOrder order = inOrder(configMapper, userRoleMapper);
+        InOrder order = inOrder(configMapper, roleMapper, userRoleMapper);
         order.verify(configMapper).lockSignHrState();
-        order.verify(userRoleMapper).deleteUserRoleByUserId(88L);
+        order.verify(roleMapper).selectRoleByIdForUpdate(2L);
+        order.verify(userRoleMapper).lockUserForRoleAssignment(88L);
+        order.verify(userRoleMapper).selectRoleIdsByUserId(88L);
+        verify(userRoleMapper, never()).deleteUserRoleByUserId(88L);
         order.verify(userRoleMapper).batchUserRole(org.mockito.ArgumentMatchers.anyList());
         order.verify(configMapper).syncSignHrPermissions();
     }

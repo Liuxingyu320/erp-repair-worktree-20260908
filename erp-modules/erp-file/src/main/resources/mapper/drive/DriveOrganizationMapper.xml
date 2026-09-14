@@ -87,6 +87,14 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
           on rd.role_id = r.role_id
          and r.data_scope = '2'
         where ur.user_id = #{userId}
+          and exists (
+              select 1
+              from sys_role_menu rm
+              join sys_menu m on m.menu_id = rm.menu_id
+              where rm.role_id = r.role_id
+                and m.status = '0'
+                and m.perms = 'drive:department:manage'
+          )
         order by r.role_id, rd.dept_id
     </select>
 

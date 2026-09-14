@@ -4,6 +4,7 @@
 
     <resultMap type="InvSalesOrder" id="InvSalesOrderResult">
         <id property="orderId" column="order_id"/>
+        <result property="version" column="version"/>
         <result property="orderNo" column="order_no"/>
         <result property="orderTitle" column="order_title"/>
         <result property="customerId" column="customer_id"/>
@@ -29,7 +30,7 @@
     </resultMap>
 
     <sql id="selectInvSalesOrderVo">
-        select o.order_id, o.order_no, o.order_title, o.customer_id, o.customer_name,
+        select o.order_id, o.version, o.order_no, o.order_title, o.customer_id, o.customer_name,
                shop_dept.dept_name as target_dept_name,
                coalesce(detail_summary.total_quantity, 0) as total_quantity,
                coalesce(detail_summary.delivered_quantity, 0) as delivered_quantity,
@@ -58,11 +59,52 @@
     </select>
 
     <select id="selectInvSalesOrderByIdForUpdate" parameterType="Long" resultMap="InvSalesOrderResult">
-        select order_id, order_no, order_title, customer_id, customer_name, total_amount,
+        select order_id, version, order_no, order_title, customer_id, customer_name, total_amount,
                order_date, status, shop_dept_id, applicant_id, applicant_name,
                applicant_dept_id, create_by, create_time, update_by, update_time, remark
         from inv_sales_order
         where order_id = #{orderId} for update
+    </select>
+
+    <!-- Filter availability before pagination. Old rows lacking a source line still consume material allowance. -->
+    <select id="selectReturnableSalesOrderList" resultMap="InvSalesOrderResult">
+        <include refid="selectInvSalesOrderVo"/>
+        where o.shop_dept_id = #{shopDeptId}
+          and o.status not in ('draft', 'cancelled')
+          <if test="query.keyword != null and query.keyword != ''">
+            and (locate(#{query.keyword}, o.order_no) &gt; 0 or locate(#{query.keyword}, o.customer_name) &gt; 0)
+          </if>
+          <if test="query.orderNo != null and query.orderNo != ''">and locate(#{query.orderNo}, o.order_no) &gt; 0</if>
+          <if test="query.customerName != null and query.customerName != ''">and locate(#{query.customerName}, o.customer_name) &gt; 0</if>
+          <if test="query.startDate != null and query.startDate != ''">and o.order_date &gt;= #{query.startDate}</if>
+          <if test="query.endDate != null and query.endDate != ''">and o.order_date &lt;= #{query.endDate}</if>
+          and exists (
+              select 1 from inv_sales_detail sd
+              where sd.order_id = o.order_id
+                and coalesce(nullif(sd.item_type, ''), 'product') in ('product', 'gift')
+                and coalesce(sd.item_id, sd.product_id) is not null
+                and coalesce(sd.delivered_quantity, 0) &gt; (
+                    select coalesce(sum(rd.quantity), 0)
+                    from inv_sales_return_detail rd inner join inv_sales_return r on r.return_id = rd.return_id
+                    where r.sales_order_id = o.order_id and r.status in ('submitted', 'returned')
+                      and (rd.sales_detail_id = sd.detail_id or (rd.sales_detail_id is null
+                           and coalesce(nullif(rd.item_type, ''), 'product') = coalesce(nullif(sd.item_type, ''), 'product')
+                           and coalesce(rd.item_id, rd.product_id) = coalesce(sd.item_id, sd.product_id)))
+                )
+                and (
+                    select coalesce(sum(same_item.delivered_quantity), 0) from inv_sales_detail same_item
+                    where same_item.order_id = o.order_id
+                      and coalesce(nullif(same_item.item_type, ''), 'product') = coalesce(nullif(sd.item_type, ''), 'product')
+                      and coalesce(same_item.item_id, same_item.product_id) = coalesce(sd.item_id, sd.product_id)
+                ) &gt; (
+                    select coalesce(sum(rd.quantity), 0)
+                    from inv_sales_return_detail rd inner join inv_sales_return r on r.return_id = rd.return_id
+                    where r.sales_order_id = o.order_id and r.status in ('submitted', 'returned')
+                      and coalesce(nullif(rd.item_type, ''), 'product') = coalesce(nullif(sd.item_type, ''), 'product')
+                      and coalesce(rd.item_id, rd.product_id) = coalesce(sd.item_id, sd.product_id)
+                )
+          )
+        order by o.create_time desc, o.order_id desc
     </select>
 
     <select id="selectInvSalesOrderList" parameterType="InvSalesOrder" resultMap="InvSalesOrderResult">
@@ -131,9 +173,13 @@
             <if test="totalAmount != null">total_amount = #{totalAmount},</if>
             <if test="orderDate != null">order_date = #{orderDate},</if>
             <if test="status != null">status = #{status},</if>
+            <if test="params.updateContent == true">remark = #{remark},</if>
+            version = coalesce(version, 0) + 1,
             update_by = #{updateBy}, update_time = sysdate()
         </set>
         where order_id = #{orderId}
+          and coalesce(version, 0) = #{version}
+          and status = #{params.expectedStatus}
     </update>
 
     <delete id="deleteInvSalesOrderByIds" parameterType="Long">

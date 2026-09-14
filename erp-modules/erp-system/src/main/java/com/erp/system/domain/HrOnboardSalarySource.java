@@ -10,6 +10,7 @@ public class HrOnboardSalarySource
     public Long shopDeptId;
     public Long taskId;
     public Long sourceEventVersion;
+    public Boolean historicalSupplement;
     public String status;
     public String matchType;
     public String snapshotJson;

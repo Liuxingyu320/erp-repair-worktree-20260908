@@ -1,5 +1,5 @@
 import { getSalesDetail, listSales } from "@/api/inventory/sales"
-import { getPurchaseDetail, listPurchase } from "@/api/inventory/purchase"
+import { getPurchaseDetail, getPurchaseDraft, getPurchaseActionContext, getPurchaseReceiveContext, listPurchase } from "@/api/inventory/purchase"
 import { getStock, listStock, listStockLog } from "@/api/inventory/stock"
 import {
   getStockCheck,
@@ -14,8 +14,8 @@ import { categoryTree, getCategory } from "@/api/inventory/category"
 import { getCustomerServiceCard, listCustomerServiceCards } from "@/api/inventory/customer"
 import { getSupplier, getSupplierProducts, listSupplier } from "@/api/inventory/supplier"
 import { getDeliveryNotice, listDeliveryNotice } from "@/api/inventory/deliveryNotice"
-import { getSalesReturn, listSalesReturn } from "@/api/inventory/salesReturn"
-import { getPurchaseReturn, listPurchaseReturn } from "@/api/inventory/purchaseReturn"
+import { getSalesReturn, getSalesReturnDraft, getSalesReturnActionContext, listSalesReturn } from "@/api/inventory/salesReturn"
+import { getPurchaseReturn, getPurchaseReturnDraft, getPurchaseReturnActionContext, listPurchaseReturn } from "@/api/inventory/purchaseReturn"
 import { getTransferApprovalTrack, getTransferDetail, listTransferProcessing, listTransferRecords } from "@/api/inventory/transfer"
 import { getPurchaseDetail as getOaPurchaseDetail, listMyPurchases } from "@/api/oa/purchase"
 import { getFixedAssetRepair, listFixedAssetRepairs } from "@/api/oa/fixedAsset"
@@ -547,11 +547,11 @@ const fetchFocusedFeatureData = (featureKey, query) => {
   const id = ids[featureKey]
   if (!hasValue(id)) return null
   if (featureKey === "sales") return resolveFocusedRow(getSalesDetail(id), "orderId", id)
-  if (featureKey === "purchase") return resolveFocusedRow(getPurchaseDetail(id), "orderId", id)
+  if (featureKey === "purchase") return resolveFocusedRow(getPurchaseActionContext(id, { silentError: true }), "orderId", id)
   if (featureKey === "outbound") return resolveFocusedRow(getDeliveryNotice(id), "noticeId", id)
   if (featureKey === "stockCheck") return resolveFocusedRow(getStockCheck(id), "checkId", id)
-  if (featureKey === "salesReturn") return resolveFocusedRow(getSalesReturn(id), "returnId", id)
-  if (featureKey === "purchaseReturn") return resolveFocusedRow(getPurchaseReturn(id), "returnId", id)
+  if (featureKey === "salesReturn") return resolveFocusedRow(getSalesReturnActionContext(id, { silentError: true }), "returnId", id)
+  if (featureKey === "purchaseReturn") return resolveFocusedRow(getPurchaseReturnActionContext(id, { silentError: true }), "returnId", id)
   if (featureKey === "transfer" || featureKey === "transferApproval") {
     return resolveFocusedRow(getTransferDetail(id), "transferId", id)
   }
@@ -742,6 +742,26 @@ export function fetchMobileFeatureDetail(featureKey, item, options = {}) {
   const approvalSeed = Object.assign({}, row || {})
   if (options.approvalTaskId) approvalSeed.approvalTaskId = options.approvalTaskId
   if (options.approvalInstanceId) approvalSeed.approvalInstanceId = options.approvalInstanceId
+
+  // A specialist's list-to-action flow must not silently require general query permission.
+  // Only draft editing and receiving hydrate full task-specific data; ID-only actions use the list header.
+  if (["purchase", "purchaseReturn", "salesReturn"].includes(featureKey) && id !== undefined &&
+      Array.isArray(options.inventoryPermissions)) {
+    const permissions = options.inventoryPermissions
+    const has = suffix => permissions.includes("*:*:*") || permissions.includes("inv:" + featureKey + ":" + suffix)
+    if (!has("query")) {
+      if (row.status === "draft" && has("add")) {
+        const readDraft = { purchase: getPurchaseDraft, purchaseReturn: getPurchaseReturnDraft, salesReturn: getSalesReturnDraft }[featureKey]
+        return resolveDetail(readDraft(id))
+      }
+      if (featureKey === "purchase" && row.status === "submitted" && has("receive")) {
+        return resolveDetail(getPurchaseReceiveContext(id))
+      }
+      const actions = featureKey === "purchase" ? ["submit", "receive", "qc", "remove"] : ["submit", "confirm", "remove"]
+      if (actions.some(has)) return Promise.resolve(Object.assign({}, row, { details: undefined, _specialistSummaryOnly: true }))
+      return Promise.reject(new Error("当前岗位无权读取此单据详情"))
+    }
+  }
 
   if (featureKey === "sales" && id !== undefined) {
     return resolveDetail(getSalesDetail(id))

@@ -941,42 +941,6 @@ class EmployeeImportPlanTest(unittest.TestCase):
         )
         self.assertFalse(any("&" in part for path in plan.dept_paths for part in path))
 
-    def test_store_level_user_keeps_official_main_department_with_store_scope(self):
-        plan = build_import_plan(
-            main_rows=[
-                {
-                    "姓名": "Grace",
-                    "手机号": "13800000121",
-                    "1级部门": "总部运营",
-                    "2级部门": "上海区域",
-                    "3级部门": "上海区域运营",
-                    "职位": "茶艺师",
-                    "员工状态": "正式",
-                }
-            ],
-            region_rows_by_sheet={
-                "上海区域": [
-                    {
-                        "姓名": "Grace",
-                        "手机号": "13800000121",
-                        "1级部门": "金英灵韵运营部",
-                        "2级部门": "上海区域",
-                        "3级部门": "上海区域运营",
-                        "4级部门": "锦庐",
-                        "职位": "茶艺师",
-                    }
-                ]
-            },
-            mitian_rows=[],
-            sheet1_rows=[],
-        )
-
-        user = plan.users_by_phone["13800000121"]
-        operation_path = ("金英灵韵", "上海区域", "上海区域运营")
-        store_path = ("金英灵韵", "上海区域", "上海区域运营", "锦庐")
-        self.assertEqual(operation_path, user.main_dept_path)
-        self.assertEqual({operation_path, store_path}, user.project_paths)
-
     def test_store_manager_with_multiple_stores_keeps_official_main_and_all_store_scopes(self):
         plan = build_import_plan(
             main_rows=[

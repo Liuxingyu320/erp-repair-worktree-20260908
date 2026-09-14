@@ -100,6 +100,7 @@ export default {
       return patch
     },
     submit() {
+      if (this.saving || !this.visible) return
       if (!this.form.userId) {
         this.$message.warning("未绑定账号的档案请在电脑端完成入职确认")
         return

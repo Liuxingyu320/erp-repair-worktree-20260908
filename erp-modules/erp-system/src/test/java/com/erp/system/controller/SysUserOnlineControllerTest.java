@@ -77,9 +77,8 @@ class SysUserOnlineControllerTest
         String invalidKey = CacheConstants.LOGIN_TOKEN_KEY + token('c');
         when(redisService.scanKeys(CacheConstants.LOGIN_TOKEN_KEY + "*", 500, 5000))
                 .thenReturn(new KeyScanResult(List.of(firstKey, secondKey, invalidKey), true, 4, 5000));
-        when(tokenService.getLoginUserByCacheKey(firstKey)).thenReturn(loginUser(21L, "older", 100L));
-        when(tokenService.getLoginUserByCacheKey(secondKey)).thenReturn(loginUser(22L, "newer", 200L));
-        when(tokenService.getLoginUserByCacheKey(invalidKey)).thenReturn(null);
+        when(tokenService.getLoginUsersForDisplay(List.of(firstKey, secondKey, invalidKey)))
+                .thenReturn(java.util.Arrays.asList(loginUser(21L, "older", 100L), loginUser(22L, "newer", 200L), null));
         when(userService.selectVisibleUserIds(Set.of(21L, 22L))).thenReturn(Set.of(21L, 22L));
 
         MockHttpServletRequest request = new MockHttpServletRequest();
@@ -113,8 +112,8 @@ class SysUserOnlineControllerTest
         String hiddenKey = CacheConstants.LOGIN_TOKEN_KEY + hiddenToken;
         when(redisService.scanKeys(CacheConstants.LOGIN_TOKEN_KEY + "*", 500, 5000))
                 .thenReturn(new KeyScanResult(List.of(visibleKey, hiddenKey), false, 2, 5000));
-        when(tokenService.getLoginUserByCacheKey(visibleKey)).thenReturn(loginUser(21L, "visible", 100L));
-        when(tokenService.getLoginUserByCacheKey(hiddenKey)).thenReturn(loginUser(99L, "hidden", 200L));
+        when(tokenService.getLoginUsersForDisplay(List.of(visibleKey, hiddenKey)))
+                .thenReturn(List.of(loginUser(21L, "visible", 100L), loginUser(99L, "hidden", 200L)));
         when(userService.selectVisibleUserIds(Set.of(21L, 99L))).thenReturn(Set.of(21L));
 
         SysUserOnlineTableDataInfo response = (SysUserOnlineTableDataInfo) controller.list(null, null);

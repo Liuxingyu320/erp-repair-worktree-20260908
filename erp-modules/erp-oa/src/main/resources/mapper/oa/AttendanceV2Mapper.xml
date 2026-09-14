@@ -7,6 +7,15 @@
         select current_timestamp
     </select>
 
+    <resultMap id="databaseClockResult" type="com.erp.oa.attendance.domain.AttendanceModels$DatabaseClock">
+        <result property="localTime" column="local_time"/>
+        <result property="epochMillis" column="epoch_millis"/>
+    </resultMap>
+    <select id="selectDatabaseClock" resultMap="databaseClockResult">
+        select current_timestamp(3) as local_time,
+               cast(unix_timestamp(current_timestamp(3)) * 1000 as unsigned) as epoch_millis
+    </select>
+
     <resultMap id="shiftResult" type="com.erp.oa.attendance.domain.AttendanceModels$Shift">
         <id property="shiftId" column="shift_id"/>
         <result property="shiftCode" column="shift_code"/>
@@ -297,7 +306,7 @@
     <select id="selectPublishedScheduleCandidatesForUser" resultMap="scheduleResult">
         select <include refid="scheduleColumns"/> <include refid="scheduleFrom"/>
         where s.user_id=#{userId} and s.status='PUBLISHED'
-          and s.business_date in (#{today},#{yesterday})
+          and s.business_date between #{dateFrom} and #{dateTo}
         order by s.business_date desc
     </select>
     <insert id="insertDraftSchedule" parameterType="com.erp.oa.attendance.domain.AttendanceModels$Schedule"
@@ -500,6 +509,45 @@
         limit 100
     </select>
 
+    <sql id="activeEmployeePageFrom">
+        from sys_user u join sys_user_profile p on p.user_id=u.user_id
+        join sys_dept target_dept on target_dept.dept_id=#{shopId}
+        where u.status='0' and u.del_flag='0'
+          and p.employee_status in ('试用','正式','在职','待离职')
+          and target_dept.status='0' and target_dept.del_flag='0'
+          and target_dept.dept_type='STORE'
+          and (
+            exists (
+              select 1 from sys_dept employee_dept
+              where employee_dept.dept_id=u.dept_id
+                and employee_dept.status='0' and employee_dept.del_flag='0'
+                and (employee_dept.dept_id=target_dept.dept_id
+                     or find_in_set(target_dept.dept_id,employee_dept.ancestors))
+            )
+            or exists (
+              select 1 from sys_user_shop us
+              where us.user_id=u.user_id
+                and us.dept_id=target_dept.dept_id
+            )
+          )
+          <if test="keyword != null and keyword != ''">
+            and (u.nick_name like concat('%',#{keyword},'%')
+                 or p.employee_no like concat('%',#{keyword},'%'))
+          </if>
+    </sql>
+    <select id="countActiveEmployeeOptions" resultType="long">
+        select count(distinct u.user_id)
+        <include refid="activeEmployeePageFrom" />
+    </select>
+    <select id="selectActiveEmployeeOptionsPage"
+            resultType="com.erp.oa.attendance.domain.AttendanceModels$EmployeeOption">
+        select distinct u.user_id userId, u.nick_name userName,
+               p.employee_no employeeNo
+        <include refid="activeEmployeePageFrom" />
+        order by u.nick_name,u.user_id
+        limit #{pageSize} offset #{offset}
+    </select>
+
     <resultMap id="challengeResult" type="com.erp.oa.attendance.domain.AttendanceModels$Challenge">
       <id property="challengeId" column="challenge_id"/><result property="challengeToken" column="challenge_token"/>
       <result property="scheduleId" column="schedule_id"/><result property="userId" column="user_id"/>
@@ -674,13 +722,14 @@
         #{createBy},now())
     </insert>
 
-    <update id="invalidateUnsettledDayResultForRemainingWork">
+    <update id="invalidateDayResultForRemainingWork">
       update oa_attendance_day_result
-      set result_status='PENDING',
+      set settled_at=null,
+          result_status='PENDING',
           exception_codes='REMAINING_WORK_CONFIRMATION_CHANGED',
           calculated_at=now(),row_version=row_version+1,
           update_by=#{updateBy},update_time=now()
-      where schedule_id=#{scheduleId} and settled_at is null
+      where schedule_id=#{scheduleId}
     </update>
 
     <select id="selectRemainingWorkConfirmationById"
@@ -761,6 +810,8 @@
       <result property="lateMinutes" column="late_minutes"/><result property="earlyLeaveMinutes" column="early_leave_minutes"/>
       <result property="rawOvertimeMinutes" column="raw_overtime_minutes"/>
       <result property="timeCreditUsedMinutes" column="time_credit_used_minutes"/>
+      <result property="overtimeTransferredMinutes" column="overtime_transferred_minutes"/>
+      <result property="overtimeTransferInvalid" column="overtime_transfer_invalid"/>
       <result property="netOvertimeMinutes" column="net_overtime_minutes"/>
       <result property="timeCreditOffsetMinutes" column="time_credit_offset_minutes"/>
       <result property="netEarlyLeaveMinutes" column="net_early_leave_minutes"/>
@@ -849,13 +900,31 @@
         calculated_at=values(calculated_at),settled_at=values(settled_at),
         row_version=row_version+1,update_by=values(update_by),update_time=now()
     </insert>
+    <sql id="overtimeTransferProjection">
+ SELECT t.source_day_result_id,
+ SUM(CASE WHEN t.action='APPLY' THEN t.transfer_minutes WHEN t.action='REVERSE' THEN -t.transfer_minutes ELSE 0 END) transferred_minutes,
+ SUM(CASE WHEN t.action='APPLY' AND reversed.transfer_id IS NULL AND
+  (d.day_result_id IS NULL OR d.settled_at IS NULL OR NOT(d.row_version &lt;=> t.source_version)
+   OR NOT(d.schedule_id &lt;=> t.source_schedule_id) OR NOT(d.user_id &lt;=> t.user_id) OR NOT(d.shop_id &lt;=> t.shop_id)
+   OR NOT(d.business_date &lt;=> t.source_business_date) OR NOT(d.worked_minutes &lt;=> t.source_worked_minutes)
+   OR NOT(d.scheduled_minutes &lt;=> t.source_scheduled_minutes) OR NOT(d.settled_at &lt;=> t.source_settled_at)
+   OR COALESCE(s.status,'')&lt;&gt;'PUBLISHED' OR NOT(s.user_id &lt;=> t.user_id) OR NOT(s.shop_id &lt;=> t.shop_id)
+   OR NOT(s.business_date &lt;=> t.source_business_date)) THEN 1 ELSE 0 END) invalid_count
+ FROM oa_attendance_overtime_transfer t
+ LEFT JOIN oa_attendance_overtime_transfer reversed ON reversed.original_transfer_id=t.transfer_id AND reversed.action='REVERSE'
+ LEFT JOIN oa_attendance_day_result d ON d.day_result_id=t.source_day_result_id
+ LEFT JOIN oa_attendance_schedule s ON s.schedule_id=d.schedule_id
+ GROUP BY t.source_day_result_id
+    </sql>
     <select id="selectDayResultsByUserAndRange" resultMap="dayResult">
       select d.*,
        greatest(coalesce(d.worked_minutes,0)-coalesce(d.scheduled_minutes,0),0)
         raw_overtime_minutes,
        coalesce(tc_source.used_minutes,0) time_credit_used_minutes,
+       coalesce(ot.transferred_minutes,0) overtime_transferred_minutes,
+       coalesce(ot.invalid_count,0) overtime_transfer_invalid,
        greatest(coalesce(d.worked_minutes,0)-coalesce(d.scheduled_minutes,0),0)
-        - coalesce(tc_source.used_minutes,0) net_overtime_minutes,
+        - coalesce(tc_source.used_minutes,0) - coalesce(ot.transferred_minutes,0) net_overtime_minutes,
        coalesce(tc_target.offset_minutes,0) time_credit_offset_minutes,
        coalesce(d.early_leave_minutes,0)-coalesce(tc_target.offset_minutes,0)
         net_early_leave_minutes
@@ -867,6 +936,7 @@
          used_minutes
        from oa_attendance_time_credit_adjustment group by source_day_result_id
       ) tc_source on tc_source.source_day_result_id=d.day_result_id
+      LEFT JOIN (<include refid="overtimeTransferProjection"/>) ot ON ot.source_day_result_id=d.day_result_id
       left join (
        select target_day_result_id,
         sum(case when adjustment_action='APPLY' then adjustment_minutes
@@ -892,9 +962,10 @@
        greatest(coalesce(d.worked_minutes,0)-coalesce(d.scheduled_minutes,
         s.standard_minutes_snapshot,0),0) raw_overtime_minutes,
        coalesce(tc_source.used_minutes,0) time_credit_used_minutes,
+       coalesce(ot.transferred_minutes,0) overtime_transferred_minutes,
+       coalesce(ot.invalid_count,0) overtime_transfer_invalid,
        greatest(coalesce(d.worked_minutes,0)-coalesce(d.scheduled_minutes,
-        s.standard_minutes_snapshot,0),0)-coalesce(tc_source.used_minutes,0)
-        net_overtime_minutes,
+        s.standard_minutes_snapshot,0),0)-coalesce(tc_source.used_minutes,0) - coalesce(ot.transferred_minutes,0) net_overtime_minutes,
        coalesce(tc_target.offset_minutes,0) time_credit_offset_minutes,
        coalesce(d.early_leave_minutes,0)-coalesce(tc_target.offset_minutes,0)
         net_early_leave_minutes,
@@ -915,6 +986,7 @@
          used_minutes
        from oa_attendance_time_credit_adjustment group by source_day_result_id
       ) tc_source on tc_source.source_day_result_id=d.day_result_id
+      LEFT JOIN (<include refid="overtimeTransferProjection"/>) ot ON ot.source_day_result_id=d.day_result_id
       left join (
        select target_day_result_id,
         sum(case when adjustment_action='APPLY' then adjustment_minutes

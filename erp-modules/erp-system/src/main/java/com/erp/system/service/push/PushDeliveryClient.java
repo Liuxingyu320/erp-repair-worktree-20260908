@@ -23,29 +23,35 @@ public interface PushDeliveryClient
         {
             throw new ServiceException("推送路由不能为空");
         }
+        if (command.getRecipientUserId() == null || command.getRecipientUserId() <= 0)
+        {
+            throw new ServiceException("推送接收用户不能为空");
+        }
         String routeType = command.getRouteType().trim();
-        String idKey;
-        if ("OA_SIGN_HR_TASK".equals(routeType))
-        {
-            idKey = "taskId";
-        }
-        else if ("OA_SIGN_PACKAGE_SIGN".equals(routeType))
-        {
-            idKey = "packageId";
-        }
-        else
-        {
-            throw new ServiceException("推送路由类型不受支持");
-        }
-
         try
         {
             JSONObject routeParams = JSON.parseObject(command.getRouteParams());
-            Object rawId = routeParams == null ? null : routeParams.get(idKey);
-            String idText = rawId == null ? null : String.valueOf(rawId);
-            if (idText == null || !idText.matches("[1-9][0-9]{0,18}"))
+            Map<String, String> data = new LinkedHashMap<>();
+            data.put("routeType", routeType);
+            // Ownership always comes from the targeted command, never from route parameters.
+            data.put("recipientUserId", String.valueOf(command.getRecipientUserId()));
+            switch (routeType)
             {
-                throw new ServiceException("推送路由ID不能为空");
+                case "OA_SIGN_HR_TASK" -> data.put("taskId", routeId(routeParams, "taskId"));
+                case "OA_SIGN_PACKAGE_SIGN" -> data.put("packageId", routeId(routeParams, "packageId"));
+                case "HR_HEALTH_CERT_DUE" ->
+                {
+                    data.put("employeeId", routeId(routeParams, "userId"));
+                    data.put("certificateId", routeId(routeParams, "certificateId"));
+                }
+                case "USER_NOTIFICATION" ->
+                {
+                    if (routeParams != null && routeParams.containsKey("notificationId"))
+                    {
+                        data.put("notificationId", routeId(routeParams, "notificationId"));
+                    }
+                }
+                default -> throw new ServiceException("推送路由类型不受支持");
             }
             String businessKey = command.getBusinessKey() == null
                     ? null : command.getBusinessKey().trim();
@@ -53,10 +59,6 @@ public interface PushDeliveryClient
             {
                 throw new ServiceException("推送业务键无效");
             }
-            long id = Long.parseLong(idText);
-            Map<String, String> data = new LinkedHashMap<>();
-            data.put("routeType", routeType);
-            data.put(idKey, String.valueOf(id));
             data.put("businessKey", businessKey);
             return data;
         }
@@ -68,6 +70,17 @@ public interface PushDeliveryClient
         {
             throw new ServiceException("推送路由参数格式不正确");
         }
+    }
+
+    private static String routeId(JSONObject params, String key)
+    {
+        Object rawId = params == null ? null : params.get(key);
+        String idText = rawId == null ? null : String.valueOf(rawId);
+        if (idText == null || !idText.matches("[1-9][0-9]{0,18}"))
+        {
+            throw new ServiceException("推送路由ID不能为空");
+        }
+        return String.valueOf(Long.parseLong(idText));
     }
 
     enum DeliveryStatus

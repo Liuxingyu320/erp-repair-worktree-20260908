@@ -346,6 +346,10 @@ class OaFixedAssetServiceImplTest
         OaShopScopeService shopScopeService = new OaShopScopeService();
         ReflectionTestUtils.setField(shopScopeService, "deptScopeMapper", mappers.deptScopeMapper);
         ReflectionTestUtils.setField(service, "configMapper", mappers.configMapper);
+        var commands = org.mockito.Mockito.mock(com.erp.oa.mapper.OaFixedAssetConfigCommandMapper.class);
+        org.mockito.Mockito.when(commands.lockScope(org.mockito.ArgumentMatchers.anyLong())).thenReturn(0L);
+        org.mockito.Mockito.when(commands.advanceVersion(org.mockito.ArgumentMatchers.anyLong(),org.mockito.ArgumentMatchers.anyLong())).thenReturn(1);
+        ReflectionTestUtils.setField(service, "configCommandMapper", commands);
         ReflectionTestUtils.setField(service, "quotaMapper", mappers.quotaMapper);
         ReflectionTestUtils.setField(service, "repairMapper", mappers.repairMapper);
         ReflectionTestUtils.setField(service, "ledgerMapper", mappers.ledgerMapper);
@@ -492,6 +496,9 @@ class OaFixedAssetServiceImplTest
                     .map(OaFixedAssetConfig::getAssetAmount)
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
         }
+
+        @Override
+        public OaFixedAssetConfig selectOeItemSnapshotForUpdate(Long oeItemId) { return selectOeItemSnapshot(oeItemId); }
 
         @Override
         public OaFixedAssetConfig selectOeItemSnapshot(Long oeItemId)

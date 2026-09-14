@@ -7,7 +7,7 @@ const testDir = path.join(rootDir, "test")
 
 function listTestFiles() {
   return fs.readdirSync(testDir)
-    .filter(file => /\.test(?:\.[cm]?js|\.js)$/.test(file) || /\.test\.js$/.test(file))
+    .filter(file => /\.test\.[cm]?js$/.test(file))
     .sort()
 }
 

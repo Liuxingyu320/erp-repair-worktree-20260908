@@ -88,6 +88,7 @@
       <el-divider content-position="left">发货明细</el-divider>
       <el-table :data="detail.details" size="small" border>
         <el-table-column label="商品" prop="productName" min-width="160"/>
+        <el-table-column label="出库仓库" min-width="120"><template slot-scope="scope">{{ lineWarehouseLabel(scope.row) }}</template></el-table-column>
         <el-table-column label="通知数量" prop="noticeQty" width="110" align="right"/>
         <el-table-column label="已发数量" prop="deliveredQty" width="110" align="right"/>
         <el-table-column label="未发数量" width="110" align="right">
@@ -96,7 +97,8 @@
       </el-table>
     </el-dialog>
 
-    <el-dialog title="执行发货" :visible.sync="deliverOpen" width="760px" append-to-body :close-on-click-modal="false">
+    <el-dialog title="执行发货" :visible.sync="deliverOpen" width="760px" append-to-body :close-on-click-modal="false"
+      :close-on-press-escape="!submitLoading" :show-close="!submitLoading" :before-close="beforeDeliverClose">
       <el-descriptions :column="2" border size="small">
         <el-descriptions-item label="通知单号">{{ deliverDetail.noticeNo }}</el-descriptions-item>
         <el-descriptions-item label="销售单号">{{ deliverDetail.salesOrderNo }}</el-descriptions-item>
@@ -107,15 +109,20 @@
       <el-form label-width="86px" size="small" class="mb12">
         <el-form-item label="发货仓库" required>
           <WarehouseSelect
+            v-if="deliverOpen"
+            :key="deliverRevision"
             ref="deliverWarehouseSelect"
             v-model="deliverForm.warehouseId"
             purpose="deliverySource"
             :scope-dept-id="deliverDetail.shopDeptId"
+            :allowed-warehouse-ids="deliveryWarehouseIds"
+            :disabled="submitLoading || deliveryUncertain"
             autoload
             :clearable="false"
             placeholder="请选择发货仓库"
             width="260px"
             @loaded="onDeliverWarehousesLoaded"
+            @load-error="onDeliveryWarehouseError"
           />
         </el-form-item>
       </el-form>
@@ -128,20 +135,27 @@
         :closable="false"
         class="mb12"
       />
-      <el-table :data="deliverForm.items" size="small" border>
+      <el-alert title="一张通知可包含多个仓库，本次只提交所选仓库的明细。切换仓库会保留其他组已录数量。"
+        type="info" :closable="false" class="mb12"/>
+      <div v-if="deliveryUncertain" role="alert" class="mb12">
+        发货结果待核实，已暂停重复提交。请先重新读取通知和剩余数量。
+        <el-button type="text" :disabled="submitLoading" @click="refreshDeliverState">核对最新发货结果</el-button>
+      </div>
+      <el-button size="mini" :disabled="submitLoading || deliveryUncertain || !activeDeliveryItems.length" @click="fillRemainingDelivery">本仓全部剩余</el-button>
+      <el-table :data="activeDeliveryItems" size="small" border empty-text="请选择本通知有待发明细的授权仓库">
         <el-table-column label="商品" prop="productName" min-width="160"/>
         <el-table-column label="通知数量" prop="noticeQty" width="100" align="right"/>
         <el-table-column label="已发数量" prop="deliveredQty" width="100" align="right"/>
         <el-table-column label="未发数量" prop="remainingQty" width="100" align="right"/>
         <el-table-column label="本次发货" width="150">
           <template slot-scope="scope">
-            <el-input-number v-model="scope.row.deliverQuantity" :min="0" :max="scope.row.remainingQty" :precision="2" size="small" style="width:100%"/>
+            <el-input-number v-model="scope.row.deliverQuantity" :disabled="submitLoading || deliveryUncertain" :min="0" :max="scope.row.remainingQty" :precision="2" size="small" style="width:100%"/>
           </template>
         </el-table-column>
       </el-table>
       <div slot="footer">
-        <el-button @click="deliverOpen = false">取消</el-button>
-        <el-button v-hasPermi="['inv:deliveryNotice:deliver']" type="primary" :loading="submitLoading" :disabled="deliverWarehousesLoaded && deliverWarehouseOptions.length === 0" @click="submitDeliver">确认发货</el-button>
+        <el-button :disabled="submitLoading" @click="deliverOpen = false">关闭</el-button>
+        <el-button v-hasPermi="['inv:deliveryNotice:deliver']" type="primary" :loading="submitLoading" :disabled="submitLoading || deliveryUncertain || !deliverWarehousesLoaded || !activeDeliveryItems.length || !deliverWarehouseOptions.length" @click="submitDeliver">确认发货</el-button>
       </div>
     </el-dialog>
   </div>
@@ -152,6 +166,8 @@ import { listDeliveryNotice, getDeliveryNotice, deliverDeliveryNotice, cancelDel
 import { getBusinessEmptyText } from "@/utils/businessEmptyState"
 import { getSelectedDeptContext } from "@/utils/shopContext"
 import WarehouseSelect from "@/views/inventory/components/WarehouseSelect"
+const { createUiOperationScope } = require("@/utils/uiOperationScope")
+const { defaultSalesWarehouse, deliveryWarehouseRows } = require("@/utils/salesWarehouse")
 const { createTodoBusinessFocusMixin } = require("@/mixins/todoBusinessFocus")
 
 export default {
@@ -175,6 +191,7 @@ export default {
       list: [],
       detailOpen: false,
       deliverOpen: false,
+      deliverRevision: 0, contextRevision: 0, deliveryUncertain: false, attemptedDetailIds: [],
       deliverWarehousesLoaded: false,
       deliverWarehouseOptions: [],
       detail: { details: [] },
@@ -184,7 +201,14 @@ export default {
     }
   },
   computed: {
+    deliveryWarehouseIds() {
+      return Array.from(new Set(this.deliverForm.items.filter(row => row.remainingQty > 0 && row.warehouseId).map(row => String(row.warehouseId))))
+    },
+    activeDeliveryItems() {
+      return deliveryWarehouseRows(this.deliverForm.items, this.deliverForm.warehouseId).filter(row => row.remainingQty > 0)
+    },
     selectedDeptContext() {
+      void this.contextRevision
       return getSelectedDeptContext()
     },
     deliveryScopeTitle() {
@@ -203,94 +227,206 @@ export default {
       return getBusinessEmptyText("deliveryNotice", "missingBaseline")
     }
   },
-  created() { this.getList() },
+  created() {
+    this._deptChanged = () => this.handleDeliveryContextChanged()
+    window.addEventListener("erp:dept-changed", this._deptChanged)
+    this.getList()
+  },
+  beforeDestroy() {
+    window.removeEventListener("erp:dept-changed", this._deptChanged)
+    this.operationScope().deactivate()
+  },
+  watch: {
+    "$store.getters.id"() { this.handleDeliveryContextChanged() },
+    "$store.getters.token"() { this.handleDeliveryContextChanged() },
+    deliverOpen(value) { if (!value) this.invalidateDelivery() },
+    detailOpen(value) { if (!value) this.operationScope().invalidate("detail") }
+  },
   methods: {
+    operationScope() {
+      if (!this._deliveryScope) this._deliveryScope = createUiOperationScope(() => ({
+        actorId: String((this.$store && this.$store.getters.id) || ""),
+        deptId: String(getSelectedDeptContext().deptId || ""), revision: this.contextRevision
+      }))
+      return this._deliveryScope
+    },
+    invalidateDelivery() {
+      this.deliverRevision += 1
+      ;["deliverOpen", "deliverSubmit", "deliverRefresh"].forEach(lane => this.operationScope().invalidate(lane))
+      this.submitLoading = false
+    },
+    handleDeliveryContextChanged() {
+      this.contextRevision += 1
+      this.operationScope().invalidate()
+      this.invalidateDelivery()
+      this.deliverOpen = false
+      this.detailOpen = false
+      this.getList()
+    },
+    beforeDeliverClose(done) { if (!this.submitLoading) done() },
+    onDeliveryWarehouseError() {
+      if (this.deliverOpen) this.$modal.msgWarning("仓库加载失败，请点击仓库选择框重试")
+    },
+    fillRemainingDelivery() {
+      if (this.submitLoading || this.deliveryUncertain) return
+      this.activeDeliveryItems.forEach(row => { row.deliverQuantity = row.remainingQty })
+    },
+    lineWarehouseLabel(row) {
+      const warehouse = this.deliverWarehouseOptions.find(item => String(item.deptId) === String(row.warehouseId))
+      return row.warehouseName || (warehouse && warehouse.deptName) || (row.warehouseId ? "仓库 " + row.warehouseId : "未选择")
+    },
     getList() {
+      const operation = this.operationScope().begin("list")
+      const query = { ...this.queryParams }
       this.loading = true
-      return this.loadTodoBusinessList(() => listDeliveryNotice(this.queryParams)).then(res => {
+      return this.loadTodoBusinessList(() => listDeliveryNotice(query)).then(res => {
+        if (!this.operationScope().isCurrent(operation)) return { discarded: true }
         this.list = res.rows || []
         this.total = res.total || 0
         return this.handleTodoFocusRows(this.list)
-      }).finally(() => { this.loading = false })
+      }).finally(() => { if (this.operationScope().isCurrent(operation)) this.loading = false })
     },
     resetQuery() {
       this.queryParams = { pageNum: 1, pageSize: 10, noticeNo: undefined, salesOrderNo: undefined, customerName: undefined, status: undefined }
       this.getList()
     },
     openDetail(row) {
+      const operation = this.operationScope().begin("detail")
       this.detailOpen = true
-      getDeliveryNotice(row.noticeId).then(res => { this.detail = res.data || { details: [] } })
+      this.detail = { details: [] }
+      return getDeliveryNotice(row.noticeId).then(res => {
+        if (this.operationScope().isCurrent(operation)) this.detail = res.data || { details: [] }
+      })
     },
     openDeliver(row) {
-      getDeliveryNotice(row.noticeId).then(res => {
+      this.invalidateDelivery()
+      const operation = this.operationScope().begin("deliverOpen", this.deliverRevision)
+      return getDeliveryNotice(row.noticeId).then(res => {
+        if (!this.operationScope().isCurrent(operation, this.deliverRevision)) return { discarded: true }
         this.deliverDetail = res.data || { details: [] }
         this.deliverWarehousesLoaded = false
         this.deliverWarehouseOptions = []
-        this.deliverForm.warehouseId = this.deliverDetail.warehouseId || undefined
-        this.deliverForm.items = (this.deliverDetail.details || []).map(item => {
-          const remaining = this.remainingQty(item)
-          return {
-            detailId: item.detailId,
-            productName: item.productName,
-            noticeQty: Number(item.noticeQty || 0),
-            deliveredQty: Number(item.deliveredQty || 0),
-            remainingQty: remaining,
-            deliverQuantity: remaining
-          }
-        })
+        this.deliveryUncertain = false
+        this.attemptedDetailIds = []
+        this.deliverForm = { warehouseId: undefined, items: this.deliveryItems(this.deliverDetail.details) }
         this.deliverOpen = true
-        this.$nextTick(() => {
-          if (this.$refs.deliverWarehouseSelect) {
-            this.$refs.deliverWarehouseSelect.reloadWarehouses()
-          }
-        })
+      })
+    },
+    deliveryItems(details, previousItems = [], resetIds = []) {
+      return (details || []).map(item => {
+        const previous = previousItems.find(row => String(row.detailId) === String(item.detailId))
+        const remaining = this.remainingQty(item)
+        const attempted = resetIds.some(id => String(id) === String(item.detailId))
+        return {
+          ...item,
+          warehouseId: item.warehouseId,
+          noticeQty: Number(item.noticeQty || 0), deliveredQty: Number(item.deliveredQty || 0), remainingQty: remaining,
+          deliverQuantity: attempted ? 0 : previous ? Math.min(Number(previous.deliverQuantity || 0), remaining) : remaining
+        }
       })
     },
     onDeliverWarehousesLoaded(warehouses) {
-      this.deliverWarehouseOptions = warehouses || []
+      if (!this.deliverOpen) return
+      const ids = this.deliveryWarehouseIds
+      this.deliverWarehouseOptions = (warehouses || []).filter(row => ids.includes(String(row.deptId)))
       this.deliverWarehousesLoaded = true
+      this.deliverForm.warehouseId = defaultSalesWarehouse(this.deliverWarehouseOptions,
+        getSelectedDeptContext().deptId, this.deliverForm.warehouseId || this.deliverDetail.warehouseId)
+    },
+    refreshDeliverState() {
+      if (this.submitLoading) return Promise.resolve({ busy: true })
+      const operation = this.operationScope().begin("deliverRefresh", this.deliverRevision)
+      const noticeId = this.deliverDetail.noticeId
+      this.submitLoading = true
+      return getDeliveryNotice(noticeId).then(res => {
+        if (!this.operationScope().isCurrent(operation, this.deliverRevision)) return { discarded: true }
+        const data = res.data || { details: [] }
+        this.deliverForm.items = this.deliveryItems(data.details, this.deliverForm.items, this.attemptedDetailIds)
+        this.deliverDetail = data
+        this.deliveryUncertain = false
+        this.attemptedDetailIds = []
+        this.onDeliverWarehousesLoaded(this.deliverWarehouseOptions)
+        if (!this.canDeliver(data)) this.deliverOpen = false
+        this.getList()
+        return { refreshed: true }
+      }).catch(error => {
+        if (this.operationScope().isCurrent(operation, this.deliverRevision)) {
+          this.deliveryUncertain = true
+          this.$modal.msgWarning("最新发货结果读取失败，请重试核对后再操作")
+        }
+        return { failed: true, error }
+      }).finally(() => {
+        if (this.operationScope().isCurrent(operation, this.deliverRevision)) this.submitLoading = false
+      })
     },
     submitDeliver() {
-      if (!this.deliverForm.warehouseId) {
-        this.$modal.msgError("请选择发货仓库")
-        return
+      if (this.submitLoading || this.deliveryUncertain) return Promise.resolve({ busy: true })
+      const warehouseId = this.deliverForm.warehouseId
+      if (!this.deliverWarehousesLoaded || !this.deliverWarehouseOptions.some(row => String(row.deptId) === String(warehouseId))) {
+        this.$modal.msgError("请选择本通知有待发明细的授权仓库")
+        return Promise.resolve({ invalid: true })
       }
-      const items = this.deliverForm.items
-        .filter(item => Number(item.deliverQuantity || 0) > 0)
-        .map(item => ({ detailId: item.detailId, deliverQuantity: item.deliverQuantity }))
-      if (items.length === 0) {
-        this.$modal.msgError("请至少录入一条发货数量")
-        return
+      const rows = this.activeDeliveryItems
+      if (rows.some(row => !Number.isFinite(Number(row.deliverQuantity)) || Number(row.deliverQuantity) < 0 || Number(row.deliverQuantity) > row.remainingQty)) {
+        this.$modal.msgError("本次发货数量须在 0 到未发数量之间")
+        return Promise.resolve({ invalid: true })
       }
-      const over = this.deliverForm.items.find(item => Number(item.deliverQuantity || 0) > Number(item.remainingQty || 0))
-      if (over) {
-        this.$modal.msgError("本次发货数量不能超过未发数量")
-        return
+      const items = rows.filter(row => Number(row.deliverQuantity) > 0)
+        .map(row => ({ detailId: row.detailId, deliverQuantity: Number(row.deliverQuantity) }))
+      if (!items.length) {
+        this.$modal.msgError("请至少录入一条本仓发货数量")
+        return Promise.resolve({ invalid: true })
       }
-      this.$modal.confirm(this.getDeliveryNoticeDeliverConfirmMessage(items)).then(() => {
-        this.submitLoading = true
-        return deliverDeliveryNotice(this.deliverDetail.noticeId, {
-          warehouseId: this.deliverForm.warehouseId,
-          items: items
-        }).then(res => {
-          this.$modal.msgSuccess(res.msg || "发货成功")
-          this.deliverOpen = false
-          this.getList()
-        }).finally(() => { this.submitLoading = false })
-      }).catch(() => {})
-    },
-    handleCancel(row) {
-      this.$modal.confirm(this.getDeliveryNoticeCancelConfirmMessage(row)).then(() => {
-        cancelDeliveryNotice(row.noticeId).then(res => {
-          this.$modal.msgSuccess(res.msg || "已取消")
-          this.getList()
+      const target = { noticeId: this.deliverDetail.noticeId, warehouseId, items }
+      const operation = this.operationScope().begin("deliverSubmit", this.deliverRevision)
+      this.submitLoading = true
+      let sent = false
+      let succeeded = false
+      return this.$modal.confirm(this.getDeliveryNoticeDeliverConfirmMessage(items)).then(() => {
+        if (!this.operationScope().isCurrent(operation, this.deliverRevision)) return { discarded: true }
+        sent = true
+        this.attemptedDetailIds = items.map(row => row.detailId)
+        return deliverDeliveryNotice(target.noticeId, { warehouseId: target.warehouseId, items: target.items }).then(res => {
+          if (!this.operationScope().isCurrent(operation, this.deliverRevision)) return { discarded: true }
+          succeeded = true
+          this.$modal.msgSuccess(res.msg || "本仓发货成功")
+          return { success: true }
         })
+      }).catch(error => {
+        if (this.operationScope().isCurrent(operation, this.deliverRevision) && sent) {
+          // A transport failure may have committed. Query before permitting another submit.
+          this.deliveryUncertain = !error || !error.response || error.response.status >= 500
+          if (!this.deliveryUncertain) this.attemptedDetailIds = []
+        }
+        return { failed: true, error }
+      }).finally(() => {
+        if (this.operationScope().isCurrent(operation, this.deliverRevision)) {
+          this.submitLoading = false
+          if (succeeded) { this.deliveryUncertain = true; this.refreshDeliverState() }
+        }
       })
     },
-    handleExport() {
-      this.$modal.confirm(this.getDeliveryNoticeExportConfirmMessage()).then(() => {
-        this.download("inventory/deliveryNotice/export", { ...this.queryParams }, this.exportFileName("发货通知数据"))
-      })
+    async handleCancel(row) {
+      if (!row || !row.noticeId) return
+      const noticeId=String(row.noticeId), scope=this.operationScope(), operation=scope.begin('cancel:'+noticeId,noticeId)
+      try {
+        await this.$modal.confirm(this.getDeliveryNoticeCancelConfirmMessage({...row}))
+        if(!scope.isCurrent(operation,String(row.noticeId))) return
+        const res=await cancelDeliveryNotice(noticeId, {silentError:true})
+        if(!scope.isCurrent(operation,String(row.noticeId))) return
+        this.$modal.msgSuccess(res.msg || "已取消")
+        this.getList()
+      } catch(error) {
+        if(scope.isCurrent(operation,String(row.noticeId)) && error!=='cancel' && error!=='close') this.$modal.msgError('取消结果未确认，请刷新通知状态后重试')
+      }
+    },
+    async handleExport() {
+      const scope=this.operationScope(), query={...this.queryParams}, identity=JSON.stringify(query), operation=scope.begin('export',identity)
+      try {
+        await this.$modal.confirm(this.getDeliveryNoticeExportConfirmMessage())
+        if(!scope.isCurrent(operation,JSON.stringify(this.queryParams))) return
+        return this.download("inventory/deliveryNotice/export", query, this.exportFileName("发货通知数据"))
+      } catch(error) { /* Canceling the confirmation has no side effects. */ }
     },
     getDeliveryNoticeDeliverConfirmMessage(items) {
       const total = (items || []).reduce((sum, item) => sum + Number(item.deliverQuantity || 0), 0)
@@ -348,7 +484,7 @@ export default {
       if (!row) return "-"
       if (row.warehouseName) return row.warehouseName
       if (row.warehouseId !== undefined && row.warehouseId !== null && row.warehouseId !== "") return "未关联仓库名称"
-      return "待选择"
+      return "按明细仓库发货"
     },
     statusLabel(val) {
       const map = { pending: "待发货", delivering: "发货中", completed: "已发货", cancelled: "已取消" }

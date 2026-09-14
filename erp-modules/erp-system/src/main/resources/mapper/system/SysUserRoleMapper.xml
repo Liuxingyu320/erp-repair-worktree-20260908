@@ -42,6 +42,10 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 		select role_id from sys_user_role where user_id = #{userId} for update
 	</select>
 
+	<select id="lockUserForRoleAssignment" parameterType="Long" resultType="Long">
+		select user_id from sys_user where user_id = #{userId} and del_flag = '0' for update
+	</select>
+
 	<insert id="insertUserRoleIfAbsent">
 		insert into sys_user_role (user_id, role_id)
 		select #{userId}, r.role_id

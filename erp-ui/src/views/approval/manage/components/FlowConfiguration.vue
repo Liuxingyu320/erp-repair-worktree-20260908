@@ -71,7 +71,7 @@
         </el-table-column>
         <el-table-column label="状态" width="95"><template slot-scope="scope"><el-tag :type="statusType(scope.row.ruleStatus || scope.row.status)" size="mini">{{ statusLabel(scope.row.ruleStatus || scope.row.status) }}</el-tag></template></el-table-column>
         <el-table-column label="更新时间" prop="updateTime" width="165" />
-        <el-table-column label="操作" width="250" fixed="right">
+        <el-table-column label="操作" width="350" fixed="right">
           <template slot-scope="scope">
             <el-button
               v-if="draftVersion(scope.row)"
@@ -89,6 +89,8 @@
               :loading="copyingRuleId === ruleId(scope.row)"
               @click="copyAsDraft(scope.row)"
             >复制新版本</el-button>
+            <el-button v-if="scope.row.currentVersionId" v-hasPermi="['approval:validation:run']" type="text" size="mini"
+              @click="$emit('check-version', { templateId: scope.row.templateId, ruleId: ruleId(scope.row), versionId: scope.row.currentVersionId })">检查当前版本</el-button>
             <el-button
               v-if="String(scope.row.ruleStatus || scope.row.status).toUpperCase() !== 'DISABLED'"
               v-hasPermi="['approval:template:edit']"

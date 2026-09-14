@@ -24,6 +24,8 @@ import DictData from '@/components/DictData'
 import pushRegistration from '@/services/lazyPushRegistration'
 
 pushRegistration.setRouter(router)
+// Install the click listener before restoring the session so cold-start taps are retained.
+void pushRegistration.bootstrap().catch(() => {})
 
 // 全局方法挂载
 Vue.prototype.getDicts = getDicts

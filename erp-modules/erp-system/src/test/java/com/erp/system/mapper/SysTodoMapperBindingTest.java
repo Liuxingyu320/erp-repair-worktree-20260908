@@ -42,6 +42,7 @@ class SysTodoMapperBindingTest
     void rendersCrossOrganizationReviewAndPersonalReturnedLaneIndependently() throws Exception
     {
         Configuration configuration = new Configuration();
+        HealthCertificateMapperFragments.register(configuration);
         try (InputStream input = Resources.getResourceAsStream("mapper/system/SysTodoMapper.xml"))
         {
             new XMLMapperBuilder(input, configuration, "mapper/system/SysTodoMapper.xml",

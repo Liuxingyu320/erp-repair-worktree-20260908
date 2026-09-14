@@ -78,6 +78,7 @@ class AttendanceRequestSettlementInvalidationTest
         when(mapper.selectActiveEmployeeNameInShop(7L, 101L))
                 .thenReturn("员工七");
         when(mapper.selectLeaveTypeById(3L)).thenReturn(type);
+        when(mapper.selectLeaveTypeForUpdate(3L)).thenReturn(type);
         when(mapper.countOverlappingLeave(eq(7L), eq(12L), any(), any()))
                 .thenReturn(0);
         when(mapper.countLeaveAttachments(12L)).thenReturn(0);
@@ -108,7 +109,7 @@ class AttendanceRequestSettlementInvalidationTest
                 mock(AttendanceLeaveAttachmentStorage.class),
                 mock(AttendanceLeaveApprovalOutboxService.class),
                 mock(AttendanceLeaveApprovalAfterCommitTrigger.class),
-                mock(RemoteApprovalService.class), shopScope, gate);
+                mock(RemoteApprovalService.class), shopScope, gate, legacyQuota());
 
         service.submit(12L, 1L, 101L);
 
@@ -138,6 +139,7 @@ class AttendanceRequestSettlementInvalidationTest
         when(mapper.selectActiveEmployeeNameInShop(7L, 101L))
                 .thenReturn("员工七");
         when(mapper.selectLeaveTypeById(3L)).thenReturn(type);
+        when(mapper.selectLeaveTypeForUpdate(3L)).thenReturn(type);
         when(mapper.countOverlappingLeave(eq(7L), eq(12L), any(), any()))
                 .thenReturn(0);
         when(mapper.calculateScheduledWorkMinutes(7L, 101L,
@@ -167,7 +169,7 @@ class AttendanceRequestSettlementInvalidationTest
                 mock(AttendanceLeaveAttachmentStorage.class),
                 mock(AttendanceLeaveApprovalOutboxService.class),
                 mock(AttendanceLeaveApprovalAfterCommitTrigger.class),
-                mock(RemoteApprovalService.class), shopScope, gate);
+                mock(RemoteApprovalService.class), shopScope, gate, legacyQuota());
 
         service.submit(12L, 1L, 101L);
 
@@ -194,6 +196,7 @@ class AttendanceRequestSettlementInvalidationTest
         when(mapper.selectActiveEmployeeNameInShop(7L, 101L))
                 .thenReturn("员工七");
         when(mapper.selectLeaveTypeById(3L)).thenReturn(type);
+        when(mapper.selectLeaveTypeForUpdate(3L)).thenReturn(type);
         when(mapper.countOverlappingLeave(eq(7L), eq(12L), any(), any()))
                 .thenReturn(0);
         when(mapper.calculateScheduledWorkMinutes(7L, 101L,
@@ -205,7 +208,7 @@ class AttendanceRequestSettlementInvalidationTest
                 mock(AttendanceLeaveAttachmentStorage.class),
                 mock(AttendanceLeaveApprovalOutboxService.class),
                 mock(AttendanceLeaveApprovalAfterCommitTrigger.class),
-                mock(RemoteApprovalService.class), shopScope, gate);
+                mock(RemoteApprovalService.class), shopScope, gate, legacyQuota());
 
         assertThatThrownBy(() -> service.submit(12L, 1L, 101L))
                 .hasMessageContaining("LEAVE_NO_SCHEDULED_WORK");
@@ -340,5 +343,14 @@ class AttendanceRequestSettlementInvalidationTest
         value.startMinuteOffset = 540;
         value.endMinuteOffset = 1080;
         return value;
+    }
+
+    private static com.erp.oa.attendance.leave.balance.AttendanceLeaveQuotaService legacyQuota()
+    {
+        return org.mockito.Mockito.mock(com.erp.oa.attendance.leave.balance.AttendanceLeaveQuotaService.class, invocation -> {
+            String method=invocation.getMethod().getName();
+            if("hydrate".equals(method) || "copyPolicy".equals(method))return invocation.getArgument(0);
+            return org.mockito.Answers.RETURNS_DEFAULTS.answer(invocation);
+        });
     }
 }

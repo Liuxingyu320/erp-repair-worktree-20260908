@@ -535,9 +535,9 @@ assert.ok(
     mobileDrivePage.includes('controller.signal') &&
     mobileDrivePage.includes('cancelUpload()') &&
     mobileDrivePage.includes('cancelActiveUpload()') &&
-    mobileDrivePage.includes('isDriveRequestCanceled(error)') &&
+    mobileDrivePage.includes('getDriveUploadReceipt(item.operationId)') &&
     mobileDrivePage.includes("uploadState.status === 'canceled'"),
-  'mobile uploads should expose cancellation, distinguish it from failure and abort on teardown'
+  'mobile uploads should query durable receipts after interrupted waiting and abort on teardown'
 )
 assert.ok(
   mobileDrivePage.includes("getDriveContent(node.nodeId, 'preview')") &&

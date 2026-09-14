@@ -1,0 +1,4 @@
+# Target preflight must verify existing schema and primary HR import permissions.
+erp_employee_salary_import_20260908.sql
+erp_employee_salary_source_20260911.sql
+erp_legacy_salary_readonly_menu_20260911.sql
