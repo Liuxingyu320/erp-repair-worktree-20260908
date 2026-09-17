@@ -1,6 +1,7 @@
 package com.erp.system.domain.vo;
 
 import java.util.Date;
+import com.fasterxml.jackson.annotation.JsonFormat;
 
 /** Safe configuration row for management screens. */
 public class SysConfigListVo
@@ -13,8 +14,36 @@ public class SysConfigListVo
     private boolean sensitive;
     private boolean valueConfigured;
     private String remark;
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
     private Date createTime;
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
     private Date updateTime;
+
+    private Integer version;
+    private String groupCode;
+    private String valueType;
+    private String sensitiveFlag;
+    private String validationRule;
+    private Integer displayOrder;
+    private Boolean publicConfig;
+    private String descriptorDescription;
+
+    public Integer getVersion() { return version; }
+    public void setVersion(Integer version) { this.version = version; }
+    public String getGroupCode() { return groupCode; }
+    public void setGroupCode(String groupCode) { this.groupCode = groupCode; }
+    public String getValueType() { return valueType; }
+    public void setValueType(String valueType) { this.valueType = valueType; }
+    public String getSensitiveFlag() { return sensitiveFlag; }
+    public void setSensitiveFlag(String sensitiveFlag) { this.sensitiveFlag = sensitiveFlag; }
+    public String getValidationRule() { return validationRule; }
+    public void setValidationRule(String validationRule) { this.validationRule = validationRule; }
+    public Integer getDisplayOrder() { return displayOrder; }
+    public void setDisplayOrder(Integer displayOrder) { this.displayOrder = displayOrder; }
+    public Boolean getPublicConfig() { return publicConfig; }
+    public void setPublicConfig(Boolean publicConfig) { this.publicConfig = publicConfig; }
+    public String getDescriptorDescription() { return descriptorDescription; }
+    public void setDescriptorDescription(String descriptorDescription) { this.descriptorDescription = descriptorDescription; }
 
     public Long getConfigId() { return configId; }
     public void setConfigId(Long configId) { this.configId = configId; }

@@ -1,10 +1,10 @@
 <template>
   <div class="app-container system-management-page">
     <system-page-header
-      title="角色成员"
-      description="查看当前角色已授权成员，添加用户或批量取消授权。"
+      :title="roleHeaderTitle"
+      :description="roleHeaderDescription"
       icon="el-icon-user-solid"
-      tip="成员变更会影响其菜单权限和数据访问范围。"
+      :tip="roleHeaderTip"
     />
     <div v-show="showSearch" class="search-card role-member-search-card">
      <el-form :model="queryParams" ref="queryForm" size="small" :inline="true">
@@ -65,6 +65,9 @@
           @click="handleClose"
         >关闭</el-button>
       </el-col>
+      <el-col v-if="roleLoadError" :span="1.5">
+        <el-button type="text" size="mini" :disabled="loading" @click="loadRole(queryParams.roleId)">重试角色信息</el-button>
+      </el-col>
       <right-toolbar :showSearch.sync="showSearch" @queryTable="getList"></right-toolbar>
     </el-row>
     </div>
@@ -108,7 +111,7 @@
 
 <script>
 import systemListRecovery from "@/mixins/systemListRecovery"
-import { allocatedUserList, authUserCancel, authUserCancelAll } from "@/api/system/role"
+import { allocatedUserList, authUserCancel, authUserCancelAll, getRole } from "@/api/system/role"
 import selectUser from "./selectUser"
 
 export default {
@@ -137,18 +140,66 @@ export default {
         roleId: undefined,
         userName: undefined,
         nickName: undefined
-      }
+      },
+      role: null,
+      roleLoadError: ""
+    }
+  },
+  computed: {
+    roleHeaderTitle() {
+      if (this.role && this.role.roleName) return `${this.role.roleName} · 角色成员`
+      return "角色成员"
+    },
+    roleHeaderDescription() {
+      if (this.roleLoadError) return this.roleLoadError
+      if (!this.role) return "正在读取角色信息。"
+      const status = this.role.status === "1" ? "已停用" : "正常"
+      const scope = this.roleDataScopeLabel(this.role.dataScope)
+      return `当前角色：${this.role.roleName} · 状态 ${status} · 数据范围 ${scope}`
+    },
+    roleHeaderTip() {
+      const name = this.role && this.role.roleName ? `「${this.role.roleName}」` : "当前角色"
+      return `成员变更会影响其菜单权限和数据访问范围。正在配置${name}。`
     }
   },
   watch: {
     "$route.params.roleId": { immediate: true, handler(roleId) {
       this.queryParams.roleId = roleId
       this.userIds = []
-      if (roleId) this.getList()
+      this.role = null
+      this.roleLoadError = ""
+      if (roleId) {
+        this.loadRole(roleId)
+        this.getList()
+      }
       else { this.loading = false; this.loadError = "角色不存在，请返回重试" }
     } }
   },
   methods: {
+    loadRole(roleId) {
+      this.roleLoadError = ""
+      return getRole(roleId).then(response => {
+        this.role = (response && response.data) || null
+        if (!this.role || !this.role.roleName) {
+          this.roleLoadError = "角色信息暂未加载，可重试后继续分配成员。"
+        }
+      }).catch(() => {
+        this.role = null
+        this.roleLoadError = "角色信息暂未加载，可重试后继续分配成员。"
+      })
+    },
+    roleDataScopeLabel(value) {
+      return {
+        "1": "全部数据",
+        "2": "自定义部门",
+        "3": "本部门",
+        "4": "本部门及以下",
+        "5": "仅本人"
+      }[value] || "未设置"
+    },
+    roleConfirmName() {
+      return this.role && this.role.roleName ? this.role.roleName : "当前角色"
+    },
     /** 查询授权用户列表 */
     getList() {
       const query = { ...this.queryParams }
@@ -185,7 +236,7 @@ export default {
     /** 取消授权按钮操作 */
     cancelAuthUser(row) {
       const roleId = this.queryParams.roleId
-      this.$modal.confirm(`确认取消用户「${row.userName || row.nickName || row.userId}」的当前角色授权吗？`).then(function() {
+      this.$modal.confirm(`确认取消用户「${row.userName || row.nickName || row.userId}」在角色「${this.roleConfirmName()}」的授权吗？`).then(function() {
         return authUserCancel({ userId: row.userId, roleId: roleId })
       }).then(() => {
         this.getList()
@@ -196,7 +247,7 @@ export default {
     cancelAuthUserAll() {
       const roleId = this.queryParams.roleId
       const userIds = this.userIds.join(",")
-      this.$modal.confirm(`确认取消选中的 ${this.userIds.length} 个用户的当前角色授权吗？`).then(function() {
+      this.$modal.confirm(`确认取消选中的 ${this.userIds.length} 个用户在角色「${this.roleConfirmName()}」的授权吗？`).then(function() {
         return authUserCancelAll({ roleId: roleId, userIds: userIds })
       }).then(() => {
         this.getList()

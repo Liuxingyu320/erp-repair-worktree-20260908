@@ -4,6 +4,7 @@
 
     <resultMap type="InvSalesReturn" id="InvSalesReturnResult">
         <id property="returnId" column="return_id"/>
+        <result property="version" column="version"/>
         <result property="returnNo" column="return_no"/>
         <result property="salesOrderId" column="sales_order_id"/>
         <result property="salesOrderNo" column="sales_order_no"/>
@@ -30,7 +31,7 @@
     </resultMap>
 
     <sql id="selectInvSalesReturnVo">
-        select r.return_id, r.return_no, r.sales_order_id, r.sales_order_no, r.return_title,
+        select r.version, r.return_id, r.return_no, r.sales_order_id, r.sales_order_no, r.return_title,
                r.customer_name, r.total_amount,
                coalesce(detail_summary.total_quantity, 0) as total_quantity,
                coalesce(detail_summary.returned_quantity, 0) as returned_quantity,
@@ -45,7 +46,7 @@
              left join sys_user u on u.user_id = r.applicant_id
              left join sys_dept applicant_dept on applicant_dept.dept_id = r.applicant_dept_id
              left join (
-                 select return_id,
+                 select version, return_id,
                         sum(coalesce(quantity, 0)) as total_quantity,
                         sum(coalesce(returned_quantity, 0)) as returned_quantity,
                         sum(coalesce(quantity, 0) - coalesce(returned_quantity, 0)) as remaining_quantity
@@ -82,7 +83,7 @@
     </select>
 
     <select id="selectInvSalesReturnByIdForUpdate" parameterType="Long" resultMap="InvSalesReturnResult">
-        select return_id, return_no, sales_order_id, sales_order_no, return_title,
+        select version, return_id, return_no, sales_order_id, sales_order_no, return_title,
                customer_name, total_amount, return_date, status, shop_dept_id,
                applicant_id, applicant_name, applicant_dept_id,
                create_by, create_time, update_by, update_time, remark
@@ -107,6 +108,7 @@
     <update id="updateInvSalesReturn" parameterType="InvSalesReturn">
         update inv_sales_return
         <set>
+            version = version + 1,
             <if test="params.updateContent == true">
                 sales_order_id = #{salesOrderId}, sales_order_no = #{salesOrderNo},
             </if>
@@ -119,6 +121,7 @@
             update_by = #{updateBy}, update_time = sysdate()
         </set>
         where return_id = #{returnId}
+        <if test="params.updateContent == true">and status = 'draft' and version = #{version}</if>
         <if test="params.expectedStatus != null">and status = #{params.expectedStatus}</if>
     </update>
 

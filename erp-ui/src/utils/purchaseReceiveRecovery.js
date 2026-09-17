@@ -59,11 +59,13 @@ function createIndexedDbReceiveStore(indexedDB, name = "erp-purchase-receive-v1"
     }),
     settle: (key, requestId, result) => mutate(key, current => current && current.requestId === requestId && current.phase === "ACTIVE"
       ? Object.assign({}, current, { phase: "SETTLED", result }) : current),
-    acknowledge: (key, requestId, guard) => mutate(key, current => {
+    redact: (key, requestId) => mutate(key, current => current && current.requestId === requestId && current.phase === "ACKED"
+      ? Object.assign({}, current, { payload: null, result: null, fingerprint: null }) : current),
+    acknowledge: (key, requestId, guard, options = {}) => mutate(key, current => {
       // Context may have changed while the database transaction was queued.
       if (guard) guard()
       return current && current.requestId === requestId && current.phase === "SETTLED"
-        ? Object.assign({}, current, { phase: "ACKED" }) : current
+        ? Object.assign({}, current, { phase: "ACKED" }, options.redact ? { payload: null, result: null, fingerprint: null } : {}) : current
     })
   }
 }

@@ -231,6 +231,9 @@ assert.ok(
     desktopSource.includes("handlePreviewTemplate(scope.row)") &&
     desktopSource.includes("handleDownloadTemplate(scope.row)") &&
     desktopSource.includes("this.openBlobFile(") &&
+    desktopSource.includes('window.open("about:blank", "_blank")') &&
+    desktopSource.includes("浏览器阻止了预览窗口") &&
+    !desktopSource.includes('window.open(url, "_blank")') &&
     desktopSource.includes("previewSignTemplateFile(row.templateId)") &&
     desktopSource.includes("validatePdfBlob(blob)") &&
     desktopSource.includes("downloadSignTemplateFile(row.templateId)") &&

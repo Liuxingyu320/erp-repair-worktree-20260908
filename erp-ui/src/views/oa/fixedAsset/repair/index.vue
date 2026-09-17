@@ -53,19 +53,19 @@
 
     <section class="repair-summary">
       <div class="oa-metric-card">
-        <span>上报记录</span>
+        <span>筛选范围上报记录</span>
         <strong>{{ total }}</strong>
       </div>
       <div class="oa-metric-card oa-metric-card--warning">
-        <span>历史待确认</span>
+        <span>本页历史待确认</span>
         <strong>{{ pendingConfirmCount }}</strong>
       </div>
       <div class="oa-metric-card oa-metric-card--success">
-        <span>已上报</span>
+        <span>本页已上报</span>
         <strong>{{ submittedCount }}</strong>
       </div>
       <div class="oa-metric-card oa-metric-card--danger">
-        <span>已驳回/取消</span>
+        <span>本页已驳回/取消</span>
         <strong>{{ closedCount }}</strong>
       </div>
     </section>
@@ -135,13 +135,18 @@
             <el-button size="mini" icon="el-icon-plus" @click="addRepairAssetRow">添加资产</el-button>
             <span>合计占用 {{ money(repairUsageAmount) }}</span>
           </div>
+          <div class="mb12">
+            <span v-if="assetError" role="alert">{{ assetError }}</span>
+            <el-button v-if="assetError" size="mini" :loading="assetLoading" @click="loadAssets(undefined, assetKeyword, assetPage + 1)">重试资产加载</el-button>
+            <el-button v-else-if="assetPage * 100 < assetTotal" size="mini" :loading="assetLoading" @click="loadAssets(undefined, assetKeyword, assetPage + 1)">加载更多资产（共 {{ assetTotal }} 项）</el-button>
+          </div>
           <el-table :data="repairAssetRows" border size="mini" class="repair-asset-table" empty-text="请添加固定资产明细">
             <el-table-column label="固定资产" min-width="260">
               <template slot-scope="scope">
                 <el-select
                   v-model="scope.row.oeItemId"
-                  filterable
-                  placeholder="选择本店铺已配置OE器皿"
+                  filterable remote :remote-method="searchAssets" :loading="assetLoading"
+                  placeholder="搜索本店资产名称或编码"
                   style="width: 100%"
                   @change="syncAsset(scope.row)"
                 >
@@ -279,6 +284,7 @@ export default {
       detailOpen: false,
       total: 0,
       list: [],
+      assetPage: 0, assetTotal: 0, assetKeyword: "", assetLoading: false, assetError: "",
       assetOptions: [],
       repairAssetRows: [],
       quota: {},
@@ -433,15 +439,27 @@ export default {
       this.loadAssets(shopDeptId)
       this.loadQuota(shopDeptId)
     },
-    loadAssets(shopDeptId) {
+    searchAssets(keyword) { return this.loadAssets(undefined, keyword, 1) },
+    loadAssets(shopDeptId, keyword = "", pageNum = 1) {
       shopDeptId = shopDeptId || this.form.shopDeptId || this.effectiveShopDeptId()
       if (!shopDeptId) { this.assetOptions = []; return Promise.resolve() }
       const scope = this.operationScope(), target = { shop: String(shopDeptId), draft: this.draftGeneration }
       const operation = scope.begin("repair-assets", target)
       const current = () => this.repairOpen && scope.isCurrent(operation, { shop: String(this.form.shopDeptId || ""), draft: this.draftGeneration })
-      return listFixedAssetConfigs({ pageNum: 1, pageSize: 100, shopDeptId, status: "0" }).then(res => {
-        if (current()) this.assetOptions = res.rows || []
-      }).catch(() => { if (current()) this.repairError = "资产明细加载失败，请保留草稿后重新加载" })
+      const selectedIds = new Set(this.repairAssetRows.map(row => String(row.oeItemId || "")))
+      if (pageNum === 1) {
+        this.assetPage = 0; this.assetTotal = 0; this.assetKeyword = keyword
+        this.assetOptions = this.assetOptions.filter(row => selectedIds.has(String(row.oeItemId)))
+      }
+      this.assetLoading = true; this.assetError = ""
+      return listFixedAssetConfigs({ pageNum, pageSize: 100, shopDeptId, status: "0", oeItemName: keyword || undefined }, { silentError: true }).then(res => {
+        if (!current()) return
+        const options = new Map(this.assetOptions.map(row => [String(row.oeItemId), row]))
+        ;(res.rows || []).forEach(row => options.set(String(row.oeItemId), row))
+        this.assetOptions = Array.from(options.values())
+        this.assetPage = pageNum; this.assetTotal = Number(res.total || 0)
+      }).catch(() => { if (current()) this.assetError = "资产加载失败，已保留所选明细，请重试" })
+        .finally(() => { if (current()) this.assetLoading = false })
     },
     createRepairAssetRow(asset) {
       return {
@@ -461,7 +479,7 @@ export default {
       this.repairAssetRows.splice(index, 1)
     },
     syncAsset(row) {
-      const asset = this.assetOptions.find(item => item.oeItemId === row.oeItemId)
+      const asset = this.assetOptions.find(item => String(item.oeItemId) === String(row.oeItemId))
       if (asset) {
         row.oeItemCode = asset.oeItemCode
         row.oeItemName = asset.oeItemName

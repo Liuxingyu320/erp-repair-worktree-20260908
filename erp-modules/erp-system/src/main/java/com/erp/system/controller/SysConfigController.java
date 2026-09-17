@@ -47,6 +47,16 @@ public class SysConfigController extends BaseController
     @Autowired
     private SysConfigSensitivityPolicy sensitivityPolicy;
 
+    @Autowired
+    private SysConfigDescriptorRegistry configDescriptorRegistry;
+
+    @RequiresPermissions("system:config:list")
+    @GetMapping("/descriptors")
+    public AjaxResult descriptors()
+    {
+        return success(configDescriptorRegistry.registeredDescriptors());
+    }
+
     /**
      * 获取参数配置列表
      */

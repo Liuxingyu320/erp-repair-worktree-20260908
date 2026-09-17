@@ -22,6 +22,13 @@ assert.ok(
 )
 
 assert.ok(
+  roleSource.includes("runSystemListRequest") &&
+    roleSource.includes("加载失败") &&
+    roleSource.includes("silentError: true"),
+  "role list failures must release the spinner and offer retry"
+)
+
+assert.ok(
   wizardSource.includes("目录 {{ menuStats.directory }}") &&
     wizardSource.includes("菜单 {{ menuStats.menu }}") &&
     wizardSource.includes("按钮 {{ menuStats.button }}") &&

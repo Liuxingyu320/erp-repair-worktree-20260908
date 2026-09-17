@@ -1,5 +1,9 @@
 package com.erp.system.service.support;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.beans.BeanUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import com.erp.system.config.SysConfigDescriptorRegistry;
 import java.util.Locale;
 import java.util.Set;
 import java.util.regex.Pattern;
@@ -27,6 +31,27 @@ public class SysConfigSensitivityPolicy
     private static final Pattern SENSITIVE_NAME = Pattern.compile(
             "(^|[._-])(password|passwd|secret|token|credential|private[._-]?key|access[._-]?key|api[._-]?key)([._-]|$)",
             Pattern.CASE_INSENSITIVE);
+
+    private final SysConfigDescriptorRegistry descriptors;
+
+    public SysConfigSensitivityPolicy()
+    {
+        this(new SysConfigDescriptorRegistry(new ObjectMapper()));
+    }
+
+    @Autowired
+    public SysConfigSensitivityPolicy(SysConfigDescriptorRegistry descriptors)
+    {
+        this.descriptors = descriptors;
+    }
+
+    public boolean isSensitive(SysConfig config)
+    {
+        if (config == null) return false;
+        boolean registered = descriptors.registeredDescriptors().stream()
+                .anyMatch(item -> item.getConfigKey().equals(config.getConfigKey()));
+        return descriptors.isSensitive(config) || (!registered && isSensitive(config.getConfigKey()));
+    }
 
     public boolean isSensitive(String configKey)
     {
@@ -70,7 +95,7 @@ public class SysConfigSensitivityPolicy
     public SysConfigExportVo toExportVo(SysConfig config)
     {
         SysConfigExportVo view = new SysConfigExportVo();
-        boolean sensitive = isSensitive(config.getConfigKey());
+        boolean sensitive = isSensitive(config);
         view.setConfigId(config.getConfigId());
         view.setConfigName(config.getConfigName());
         view.setConfigKey(config.getConfigKey());
@@ -83,7 +108,7 @@ public class SysConfigSensitivityPolicy
 
     private void copySafeFields(SysConfig config, SysConfigListVo view)
     {
-        boolean sensitive = isSensitive(config.getConfigKey());
+        boolean sensitive = isSensitive(config);
         view.setConfigId(config.getConfigId());
         view.setConfigName(config.getConfigName());
         view.setConfigKey(config.getConfigKey());
@@ -94,5 +119,17 @@ public class SysConfigSensitivityPolicy
         view.setRemark(config.getRemark());
         view.setCreateTime(config.getCreateTime());
         view.setUpdateTime(config.getUpdateTime());
+        view.setVersion(config.getVersion());
+        // Resolve trusted metadata on a copy: callers may still need the original value internally.
+        SysConfig metadata = new SysConfig();
+        BeanUtils.copyProperties(config, metadata);
+        descriptors.prepareForManagement(metadata);
+        view.setGroupCode(metadata.getGroupCode());
+        view.setValueType(sensitive ? SysConfigDescriptorRegistry.TYPE_PASSWORD : metadata.getValueType());
+        view.setSensitiveFlag(sensitive ? "Y" : "N");
+        view.setValidationRule(metadata.getValidationRule());
+        view.setDisplayOrder(metadata.getDisplayOrder());
+        view.setPublicConfig(!sensitive && Boolean.TRUE.equals(metadata.getPublicConfig()));
+        view.setDescriptorDescription(metadata.getDescriptorDescription());
     }
 }

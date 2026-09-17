@@ -29,7 +29,8 @@ function setup() {
     let resolve, reject; const promise = new Promise((a,b) => { resolve=a; reject=b }); calls.push({ id, args, resolve, reject }); return promise
   } } })
   const definition = load(path.join(root, 'src/views/inventory/purchase/index.vue'), id => {
-    if (id.startsWith('@/api/')) return api
+    if (id === '@/utils/inventoryQuantity') return require('../src/utils/inventoryQuantity')
+      if (id.startsWith('@/api/')) return api
     if (id === '@/utils/shopContext') return { getSelectedDeptId: () => env.dept, isSelectedWarehouse: () => true }
     if (id === '@/mixins/todoBusinessFocus') return { createTodoBusinessFocusMixin: () => ({}) }
     if (id.startsWith('@/') || id.startsWith('./')) return {}

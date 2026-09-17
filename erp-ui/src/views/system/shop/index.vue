@@ -39,9 +39,15 @@
             <el-table-column label="用户昵称" prop="nickName" min-width="110" align="center" :show-overflow-tooltip="true" />
             <el-table-column label="部门" prop="deptName" min-width="130" align="center" :show-overflow-tooltip="true" />
             <el-table-column label="岗位" prop="postNames" min-width="130" align="center" :show-overflow-tooltip="true" />
-            <el-table-column label="组织范围" width="110" align="center" :show-overflow-tooltip="true">
+            <el-table-column label="组织范围" min-width="140" align="center" :show-overflow-tooltip="true">
               <template slot-scope="scope">
                 <span>{{ getUserShopScopeLabel(scope.row) }}</span>
+                <el-button
+                  v-if="shopScopeLoadFailed"
+                  type="text"
+                  size="mini"
+                  @click.stop="loadUserShopScopes(userList)"
+                >重试</el-button>
               </template>
             </el-table-column>
             <el-table-column label="状态" prop="status" width="78" align="center">
@@ -174,6 +180,7 @@ export default {
       userShopScopeMap: {},
       userShopPreservedCountMap: {},
       shopScopeLabelMap: {},
+      shopScopeLoadFailed: false,
       shopScopeRequestSeq: 0,
       routeUserId: undefined,
       routeUserName: "",
@@ -624,9 +631,11 @@ export default {
       if (!users.length) {
         this.userShopScopeMap = {}
         this.shopScopeLabelMap = {}
+        this.shopScopeLoadFailed = false
         return
       }
       const requestSeq = ++this.shopScopeRequestSeq
+      this.shopScopeLoadFailed = false
       batchUserShop(users.map(row => row.userId)).then(response => {
         if (requestSeq !== this.shopScopeRequestSeq) {
           return
@@ -638,6 +647,7 @@ export default {
         })
         this.userShopScopeMap = scopeMap
         this.userShopPreservedCountMap = {}
+        this.shopScopeLoadFailed = false
         this.refreshShopScopeLabels()
       }).catch(() => {
         if (requestSeq !== this.shopScopeRequestSeq) {
@@ -645,6 +655,7 @@ export default {
         }
         this.userShopScopeMap = {}
         this.userShopPreservedCountMap = {}
+        this.shopScopeLoadFailed = true
         this.refreshShopScopeLabels()
       })
     },
@@ -659,11 +670,17 @@ export default {
       if (!row || !row.userId) {
         return "-"
       }
+      if (this.shopScopeLoadFailed) {
+        return "读取失败，可重试"
+      }
       const shopScopeLabel = this.shopScopeLabelMap[row.userId]
       if (shopScopeLabel && shopScopeLabel !== "-") {
         return this.appendPreservedScopeCount(shopScopeLabel, row.userId)
       }
-      return this.appendPreservedScopeCount(this.getUserDeptScopeLabel(row), row.userId)
+      if (Object.prototype.hasOwnProperty.call(this.userShopScopeMap, row.userId)) {
+        return "未授权"
+      }
+      return "读取中"
     },
     appendPreservedScopeCount(label, userId) {
       const preservedCount = Number(this.userShopPreservedCountMap[userId] || 0)

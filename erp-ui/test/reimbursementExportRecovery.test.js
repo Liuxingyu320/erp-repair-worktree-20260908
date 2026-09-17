@@ -29,6 +29,7 @@ test('A12 history is owner-only default, newest request wins and late errors/fin
 test('A12 template keeps recovery/history entry beside filtered list and guards duplicate export',()=>{
  const source=fs.readFileSync(require('node:path').join(__dirname,'../src/views/oa/reimbursement/index.vue'),'utf8'),template=compiler.parseComponent(source).template.content
  assert.deepEqual(compiler.compile(template).errors,[]);assert.match(template,/@click="openExportHistory"/);assert.match(template,/@click="downloadOriginalExport\(batch\)"/);assert.match(template,/:disabled="!selectedRows.length \|\| !!pendingExportCommand"/)
+ assert.match(template,/同意并打开下一条/);assert.match(source,/approveAndOpenNext/);assert.match(source,/returnToNextTodo\(\)/)
 })
 
 const rejectExport = (code,status=code)=>({code,response:{status,data:{code,msg:'所选集合不可导出'}}})

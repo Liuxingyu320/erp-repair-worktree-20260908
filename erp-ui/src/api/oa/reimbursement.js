@@ -14,8 +14,8 @@ export function listMyReimbursements(params, options) {
   return request({ url: `${BASE_URL}/my`, method: 'get', params, silentError: options && options.silentError === true })
 }
 
-export function listFinanceReimbursements(params) {
-  return request({ url: `${BASE_URL}/finance`, method: 'get', params })
+export function listFinanceReimbursements(params, options) {
+  return request({ url: `${BASE_URL}/finance`, method: 'get', silentError: options && options.silentError === true, params })
 }
 
 export function getReimbursement(reimbursementId, options) {

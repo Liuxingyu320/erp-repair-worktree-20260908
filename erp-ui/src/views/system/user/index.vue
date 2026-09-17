@@ -142,6 +142,7 @@
         </div>
 
         <div class="table-card user-table-card">
+          <div v-if="userListError" role="alert" class="system-list-error"><span>加载失败：{{ userListError }}</span> <el-button type="text" :disabled="loading" @click="getList">重新加载</el-button></div>
           <el-table v-accessible-table="'用户列表'" v-loading="loading" :data="userList" @selection-change="handleSelectionChange">
             <el-table-column type="selection" width="50" align="center" />
             <el-table-column label="用户编号" align="center" key="userId" prop="userId" v-if="columns.userId.visible" width="90" />
@@ -288,6 +289,46 @@
               <el-col :span="24">
                 <el-form-item v-if="form.userId == undefined" label="登录账号" prop="userName">
                   <el-input v-model="form.userName" placeholder="请输入登录账号" maxlength="30" />
+                </el-form-item>
+              </el-col>
+            </el-row>
+            <el-row :gutter="16">
+              <el-col :span="12">
+                <el-form-item label="归属部门" prop="deptId">
+                  <treeselect
+                    v-model="form.deptId"
+                    :options="enabledDeptOptions"
+                    :normalizer="deptNormalizer"
+                    placeholder="请选择归属部门"
+                  />
+                </el-form-item>
+              </el-col>
+              <el-col :span="12">
+                <el-form-item label="岗位">
+                  <el-select v-model="form.postIds" multiple clearable placeholder="请选择岗位" class="form-full-control">
+                    <el-option
+                      v-for="item in postOptions"
+                      :key="item.postId"
+                      :label="item.postName"
+                      :value="item.postId"
+                      :disabled="item.status == 1"
+                    />
+                  </el-select>
+                </el-form-item>
+              </el-col>
+            </el-row>
+            <el-row :gutter="16">
+              <el-col :span="24">
+                <el-form-item label="角色" prop="roleIds">
+                  <el-select v-model="form.roleIds" multiple placeholder="请选择角色" class="form-full-control">
+                    <el-option
+                      v-for="item in roleOptions"
+                      :key="item.roleId"
+                      :label="item.roleName"
+                      :value="item.roleId"
+                      :disabled="item.status == 1"
+                    />
+                  </el-select>
                 </el-form-item>
               </el-col>
             </el-row>
@@ -512,9 +553,9 @@
         </el-tabs>
       </el-form>
       <div slot="footer" class="dialog-footer">
-        <span class="wizard-footer-hint">第 {{ activeWizardStep + 1 }} / 5 步</span>
+        <span class="wizard-footer-hint">第 {{ activeWizardStep + 1 }} / {{ wizardStepCount }} 步</span>
         <el-button v-if="activeWizardStep > 0" @click="previousWizardStep">上一步</el-button>
-        <el-button v-if="activeWizardStep < 4" type="primary" @click="nextWizardStep">下一步</el-button>
+        <el-button v-if="activeWizardStep < wizardStepCount - 1" type="primary" @click="nextWizardStep">下一步</el-button>
         <el-button v-else type="primary" @click="submitForm">{{ form.userId ? "保存修改" : "创建用户" }}</el-button>
         <el-button @click="cancel">取 消</el-button>
       </div>
@@ -646,6 +687,8 @@ export default {
     return {
       // 遮罩层
       loading: true,
+      userListRequestId: 0,
+      userListError: "",
       // 选中数组
       ids: [],
       // 非单个禁用
@@ -673,7 +716,7 @@ export default {
       deptOptions: undefined,
       deptDefaultExpandedKeys: [],
       // 过滤掉已禁用部门树选项
-      enabledDeptOptions: undefined,
+      enabledDeptOptions: [],
       // 是否显示弹出层
       open: false,
       userDialogTrigger: null,
@@ -850,12 +893,20 @@ export default {
       const warnings = this.form && this.form.profile && this.form.profile.derivedWarnings
       return Array.isArray(warnings) ? warnings.filter(Boolean).join("；") : ""
     },
+    wizardTabs() {
+      const tabs = ["account"]
+      if (this.canAccessPiiForm) {
+        tabs.push("identity", "contact", "contract")
+      }
+      tabs.push("review")
+      return tabs
+    },
+    wizardStepCount() {
+      return this.wizardTabs.length
+    },
     activeWizardStep() {
-      if (this.activeProfileTab === "account") return 0
-      if (this.activeProfileTab === "organization") return 1
-      if (this.activeProfileTab === "roles") return 2
-      if (this.activeProfileTab === "review") return 4
-      return 3
+      const index = this.wizardTabs.indexOf(this.activeProfileTab)
+      return index >= 0 ? index : 0
     },
     selectedRoleOptions() {
       const selected = this.form.roleIds || []
@@ -1128,13 +1179,21 @@ export default {
     },
     /** 查询用户列表 */
     getList() {
+      const requestId = ++this.userListRequestId
       this.loading = true
-      listUser(this.addDateRange(this.queryParams, this.dateRange)).then(response => {
+      this.userListError = ""
+      return listUser(this.addDateRange(this.queryParams, this.dateRange), { silentError: true }).then(response => {
+        if (requestId !== this.userListRequestId) return
         this.userList = response.rows
         this.total = response.total
         this.loadSetupSummary()
+      }).catch(error => {
+        if (requestId !== this.userListRequestId) return
+        this.userList = []
+        this.total = 0
+        this.userListError = (error && error.message) || "用户列表加载失败，请重试"
       }).finally(() => {
-        this.loading = false
+        if (requestId === this.userListRequestId) this.loading = false
       })
     },
     /** 查询部门下拉树结构 */
@@ -1798,8 +1857,9 @@ export default {
       }[value] || "未设置"
     },
     goWizardStep(step) {
-      const target = Math.max(0, Math.min(4, step))
-      this.activeProfileTab = ["account", "organization", "roles", "identity", "review"][target]
+      const tabs = this.wizardTabs
+      const target = Math.max(0, Math.min(tabs.length - 1, step))
+      this.activeProfileTab = tabs[target]
     },
     previousWizardStep() {
       this.goWizardStep(this.activeWizardStep - 1)
@@ -1810,13 +1870,11 @@ export default {
       })
     },
     validateWizardStep(step) {
-      const fieldsByStep = {
-        0: ["nickName", ...(this.form.userId ? [] : ["userName", "password"]), "phonenumber", "email"],
-        1: ["deptId"],
-        2: ["roleIds"],
-        3: []
+      const tab = this.wizardTabs[step]
+      const fieldsByTab = {
+        account: ["nickName", ...(this.form.userId ? [] : ["userName"]), "deptId", "roleIds", "phonenumber", "email"]
       }
-      const fields = fieldsByStep[step] || []
+      const fields = fieldsByTab[tab] || []
       if (!fields.length) {
         this.$set(this.wizardStepErrors, step, false)
         return Promise.resolve(true)
@@ -1830,20 +1888,23 @@ export default {
       })
     },
     jumpToFirstInvalidField(invalidFields) {
-      const stepByField = {
-        nickName: 0,
-        userName: 0,
-        password: 0,
-        phonenumber: 0,
-        email: 0,
-        deptId: 1,
-        roleIds: 2
-      }
       const field = Object.keys(invalidFields || {})[0]
-      const step = stepByField[field] === undefined ? 3 : stepByField[field]
+      const accountFields = ["nickName", "userName", "password", "phonenumber", "email", "deptId", "roleIds"]
+      const tab = accountFields.includes(field) ? "account" : "review"
+      const step = Math.max(0, this.wizardTabs.indexOf(tab))
       this.$set(this.wizardStepErrors, step, true)
       this.goWizardStep(step)
       this.$nextTick(() => this.$message.warning("请先修正当前步骤中的必填项或格式错误"))
+    },
+    deptNormalizer(node) {
+      if (node.children && !node.children.length) {
+        delete node.children
+      }
+      return {
+        id: node.id,
+        label: node.label,
+        children: node.children
+      }
     },
     wizardStepStatus(step) {
       if (this.wizardStepErrors[step]) return "error"

@@ -11,6 +11,8 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public final class InvSpecialistActionContext
 {
+    private String version;
+    public String getVersion() { return version; }
     private String orderId;
     private String returnId;
     private String orderNo;
@@ -23,18 +25,18 @@ public final class InvSpecialistActionContext
     public static InvSpecialistActionContext purchase(InvPurchaseOrder row)
     {
         var result=new InvSpecialistActionContext();result.orderId=id(row.getOrderId());result.orderNo=row.getOrderNo();
-        result.status=row.getStatus();result.shopDeptId=id(row.getShopDeptId());result.qcStatus=row.getQcStatus();
+        result.version=id(row.getVersion());result.status=row.getStatus();result.shopDeptId=id(row.getShopDeptId());result.qcStatus=row.getQcStatus();
         result.receivedQuantity=row.getReceivedQuantity();result.remainingQuantity=row.getRemainingQuantity();return result;
     }
     public static InvSpecialistActionContext purchaseReturn(InvPurchaseReturn row)
     {
         var result=new InvSpecialistActionContext();result.returnId=id(row.getReturnId());result.returnNo=row.getReturnNo();
-        result.status=row.getStatus();result.shopDeptId=id(row.getShopDeptId());return result;
+        result.version=id(row.getVersion());result.status=row.getStatus();result.shopDeptId=id(row.getShopDeptId());return result;
     }
     public static InvSpecialistActionContext salesReturn(InvSalesReturn row)
     {
         var result=new InvSpecialistActionContext();result.returnId=id(row.getReturnId());result.returnNo=row.getReturnNo();
-        result.status=row.getStatus();result.shopDeptId=id(row.getShopDeptId());return result;
+        result.version=id(row.getVersion());result.status=row.getStatus();result.shopDeptId=id(row.getShopDeptId());return result;
     }
     private static String id(Long value){return value==null?null:value.toString();}
     public String getOrderId(){return orderId;} public String getReturnId(){return returnId;}

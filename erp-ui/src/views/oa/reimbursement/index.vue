@@ -601,6 +601,13 @@
           :loading="acting"
           :disabled="approvalUnknown || checkingApproval" @click="approvalAction('approve')"
         >同意</el-button>
+        <el-button
+          v-if="canAct"
+          type="primary"
+          :loading="acting"
+          :disabled="approvalUnknown || checkingApproval"
+          @click="approveAndOpenNext"
+        >同意并打开下一条</el-button>
       </div>
     </el-dialog>
 
@@ -1020,6 +1027,7 @@ export default {
     this.pageInactive = false
     this.bindDeptListener()
     this.openRouteTarget(true)
+    this.loadList().catch(() => {})
   },
   deactivated() {
     this.pageInactive = true
@@ -1129,6 +1137,9 @@ export default {
       })
     },
     loadList() {
+      const sequence = this.listSequence = (this.listSequence || 0) + 1
+      const deptId = getSelectedDeptId()
+      const current = () => !this.pageInactive && sequence === this.listSequence && this.sameDeptId(deptId)
       this.loading = true
       const loader = this.financeMode
         ? listFinanceReimbursements
@@ -1139,11 +1150,12 @@ export default {
         delete params.applicantName
         delete params.exportStatus
       }
-      return loader(params).then(response => {
+      return loader(params, { silentError: true }).then(response => {
+        if (!current()) return
         this.rows = response.rows || []
         this.total = response.total || 0
-      }).finally(() => {
-        this.loading = false
+      }).catch(error => { if (current()) { this.rows = []; this.total = 0; this.$modal.msgError(error.message || "列表加载失败，请重试") } }).finally(() => {
+        if (current()) this.loading = false
       })
     },
     search() {
@@ -1217,6 +1229,8 @@ export default {
         && this.sameDeptId(deptId)
     },
     invalidatePendingFormReads() {
+      this.listSequence = (this.listSequence || 0) + 1
+      this.loading = false
       this.pageReadSeq += 1
       this.formReadSeq += 1
       this.detailEpoch += 1
@@ -1937,6 +1951,12 @@ export default {
       })
     },
     approvalAction(action) { return this.runApprovalCommand(action) },
+    approveAndOpenNext() {
+      return this.runApprovalCommand("approve").then(() => {
+        if (this.approvalUnknown || this.approvalError || this.acting) return
+        return this.returnToNextTodo()
+      })
+    },
     previewInvoice(reimbursementId, invoice) {
       getReimbursementInvoice(
         reimbursementId,

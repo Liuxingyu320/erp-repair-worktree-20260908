@@ -4,6 +4,7 @@
 
     <resultMap type="InvPurchaseOrder" id="InvPurchaseOrderResult">
         <id property="orderId" column="order_id"/>
+        <result property="version" column="version"/>
         <result property="orderNo" column="order_no"/>
         <result property="orderTitle" column="order_title"/>
         <result property="supplierId" column="supplier_id"/>
@@ -30,7 +31,7 @@
     </resultMap>
 
     <sql id="selectInvPurchaseOrderVo">
-        select o.order_id, o.order_no, o.order_title, o.supplier_id, o.supplier_name, o.total_amount,
+        select o.version, o.order_id, o.order_no, o.order_title, o.supplier_id, o.supplier_name, o.total_amount,
                o.order_date, o.status, o.qc_status, o.shop_dept_id,
                shop_dept.dept_name as shop_dept_name,
                o.applicant_id, o.applicant_name, u.nick_name as applicant_nick_name,
@@ -51,7 +52,7 @@
     </select>
 
     <select id="selectInvPurchaseOrderByIdForUpdate" parameterType="Long" resultMap="InvPurchaseOrderResult">
-        select order_id, order_no, order_title, supplier_id, supplier_name, total_amount,
+        select version, order_id, order_no, order_title, supplier_id, supplier_name, total_amount,
                order_date, status, qc_status, shop_dept_id, applicant_id, applicant_name,
                applicant_dept_id, create_by, create_time, update_by, update_time, remark
         from inv_purchase_order
@@ -138,6 +139,7 @@
     <update id="updateInvPurchaseOrder" parameterType="InvPurchaseOrder">
         update inv_purchase_order
         <set>
+            version = version + 1,
             <if test="orderTitle != null">order_title = #{orderTitle},</if>
             <if test="supplierId != null">supplier_id = #{supplierId},</if>
             <if test="supplierName != null">supplier_name = #{supplierName},</if>
@@ -152,7 +154,7 @@
 
     <update id="updatePurchaseContent" parameterType="InvPurchaseOrder">
         update inv_purchase_order
-        set order_title = #{orderTitle},
+        set version = version + 1, order_title = #{orderTitle},
             supplier_id = #{supplierId},
             supplier_name = #{supplierName},
             total_amount = #{totalAmount},
@@ -161,12 +163,12 @@
             update_by = #{updateBy},
             update_time = sysdate()
         where order_id = #{orderId}
-          and status = 'draft'
+          and status = 'draft' and version = #{version}
     </update>
 
     <update id="transitionPurchaseStatus">
         update inv_purchase_order
-        set status = #{status},
+        set version = version + 1, status = #{status},
             <if test="qcStatus != null">qc_status = #{qcStatus},</if>
             update_by = #{updateBy},
             update_time = sysdate()

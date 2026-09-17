@@ -180,8 +180,9 @@
     </div>
 
     <!-- 添加或修改参数配置对话框 -->
-    <el-dialog :title="title" :visible.sync="open" width="640px" append-to-body @opened="focusConfigName">
+    <el-dialog :title="title" :visible.sync="open" width="640px" append-to-body :before-close="closeConfigDialog" @opened="focusConfigName">
       <el-form ref="form" :model="form" :rules="rules" label-width="100px">
+        <el-alert v-if="submitError" :title="submitError" type="error" :closable="false" show-icon />
         <el-alert
           v-if="form.descriptorDescription || unknownBuiltInWarning"
           :title="unknownBuiltInWarning || form.descriptorDescription"
@@ -241,7 +242,7 @@
         </el-form-item>
       </el-form>
       <div slot="footer" class="dialog-footer">
-        <el-button type="primary" @click="submitForm">确 定</el-button>
+        <el-button type="primary" :loading="submitting" @click="submitForm">确 定</el-button>
         <el-button @click="cancel">取 消</el-button>
       </div>
     </el-dialog>
@@ -279,6 +280,8 @@ export default {
       // 代码注册的可信配置描述符
       configDescriptors: [],
       originalSensitive: false,
+      submitting: false,
+      submitError: "",
       valueTypeOptions: [
         { label: "文本", value: "string" },
         { label: "整数", value: "integer" },
@@ -459,6 +462,16 @@ export default {
         if (scope.isCurrent(token)) this.listError = error && error.message || "查询失败，请重试"
       }).finally(() => { if (scope.isCurrent(token)) this.loading = false })
     },
+    invalidateConfigEditor() {
+      this.configScope().invalidate("detail")
+      this.configScope().invalidate("submit")
+      this.submitting = false
+      this.submitError = ""
+    },
+    closeConfigDialog(done) {
+      this.cancel()
+      done()
+    },
     // 取消按钮
     cancel() {
       this.open = false
@@ -466,6 +479,7 @@ export default {
     },
     // 表单重置
     reset() {
+      this.invalidateConfigEditor()
       this.form = {
         configId: undefined,
         configName: undefined,
@@ -507,32 +521,51 @@ export default {
     handleUpdate(row) {
       this.reset()
       const configId = row.configId || this.ids
-      getConfig(configId).then(response => {
+      const scope = this.configScope(), token = scope.begin("detail", configId)
+      return getConfig(configId, { silentError: true }).then(response => {
+        if (!scope.isCurrent(token)) return
         this.form = response.data
+        this.originalSensitive = Boolean(this.form.sensitive)
         this.$set(this.form, "updateSensitiveValue", false)
         if (this.form.sensitive) this.form.configValue = ""
         this.open = true
         this.title = "修改参数"
+      }).catch(error => {
+        if (scope.isCurrent(token)) this.$modal.msgError(error && error.message || "参数读取失败，请重试")
       })
+    },
+    configWritePayload() {
+      const payload = {}
+      ;["configId", "configName", "configKey", "configType", "version", "groupCode", "valueType",
+        "sensitiveFlag", "validationRule", "displayOrder", "updateSensitiveValue", "remark"].forEach(key => {
+        if (this.form[key] !== undefined) payload[key] = this.form[key]
+      })
+      payload.configValue = this.normalizedConfigValue()
+      return payload
     },
     /** 提交按钮 */
     submitForm() {
+      if (this.submitting) return
+      const scope = this.configScope(), id = this.form.configId || null
+      const token = scope.begin("submit", id), payload = this.configWritePayload()
+      this.submitting = true
+      this.submitError = ""
       this.$refs["form"].validate(valid => {
-        if (valid) {
-          if (this.form.configId != undefined) {
-            updateConfig({ ...this.form, configValue: this.normalizedConfigValue() }).then(() => {
-              this.$modal.msgSuccess("修改成功")
-              this.open = false
-              this.getList()
-            })
-          } else {
-            addConfig({ ...this.form, configValue: this.normalizedConfigValue() }).then(() => {
-              this.$modal.msgSuccess("新增成功")
-              this.open = false
-              this.getList()
-            })
+        if (!scope.isCurrent(token, this.form.configId || null)) return
+        if (!valid) { this.submitting = false; return }
+        const write = payload.configId != undefined ? updateConfig : addConfig
+        write(payload, { silentError: true }).then(() => {
+          if (!scope.isCurrent(token, this.form.configId || null)) return
+          this.$modal.msgSuccess(payload.configId != undefined ? "修改成功" : "新增成功")
+          this.cancel()
+          this.getList()
+        }).catch(error => {
+          if (scope.isCurrent(token, this.form.configId || null)) {
+            this.submitError = error && error.message || "保存失败，请核对后重试"
           }
-        }
+        }).finally(() => {
+          if (scope.isCurrent(token, this.form.configId || null)) this.submitting = false
+        })
       })
     },
     /** 删除按钮操作 */

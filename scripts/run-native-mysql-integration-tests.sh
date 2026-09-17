@@ -42,7 +42,7 @@ if [[ "${HOST}" != "127.0.0.1" && "${HOST}" != "localhost" && "${HOST}" != "::1"
 fi
 
 command -v mysql >/dev/null 2>&1 || fail "mysql CLI is required"
-command -v mvn >/dev/null 2>&1 || fail "mvn is required"
+[[ -x "${ROOT_DIR}/mvnw" ]] || fail "repository Maven wrapper is required"
 
 export ERP_IT_RUN_ID="${RUN_ID}"
 DATABASE_PREFIX="erp_it_${RUN_ID}_"
@@ -97,8 +97,6 @@ cleanup()
     fi
     exit "${cleanup_status}"
 }
-trap cleanup EXIT INT TERM
-
 VERSION="$(mysql_server_query 'SELECT VERSION()')" || fail "unable to connect to native MySQL"
 [[ -n "${VERSION}" ]] || fail "native MySQL returned an empty version"
 if [[ -n "${EXPECTED_VERSION}" && "${VERSION}" != "${EXPECTED_VERSION}"* ]]; then
@@ -107,6 +105,7 @@ fi
 
 EXISTING="$(list_run_databases)"
 [[ -z "${EXISTING}" ]] || fail "current run id already has isolation databases: ${EXISTING}"
+trap cleanup EXIT INT TERM
 printf '[native-mysql-it] host=%s:%s version=%s run_id=%s\n' \
     "${HOST}" "${PORT}" "${VERSION}" "${RUN_ID}"
 
@@ -115,7 +114,7 @@ EXPECTED_CLASSES=(
     HrEmployeeTransferTransactionIT
     HrOffboardingTransactionIT
     HrOnboardingTransactionIT
-    HrSignEventOutboxNativeMySqlIT
+    HrSignEventOutboxMySql57IT
 )
 for class_name in "${EXPECTED_CLASSES[@]}"; do
     rm -f "${REPORT_DIR}/TEST-com.erp.system.service.impl.${class_name}.xml"
@@ -123,7 +122,7 @@ done
 
 (
     cd "${ROOT_DIR}"
-    mvn -pl erp-modules/erp-system -am -Pnative-mysql-it verify
+    ./mvnw -pl erp-modules/erp-system -am -Pnative-mysql-it verify
 )
 
 TOTAL_TESTS=0

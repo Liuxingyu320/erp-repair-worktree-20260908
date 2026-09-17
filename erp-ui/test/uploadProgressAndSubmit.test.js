@@ -41,6 +41,7 @@ function environment() {
     return cache[relative]
   }
   function dependency(id) {
+    if (id === '@/utils/inventoryQuantity') return require('../src/utils/inventoryQuantity')
     if (id === '@/utils/uploadProgress') return load('src/utils/uploadProgress.js')
     if (id === 'element-ui/packages/upload/src/ajax' || id === './ajax') return xhr
     if (id === '@/utils/shopContext') return { getSelectedDeptId: () => dept, getSelectedDeptName: () => 'Warehouse', isSelectedWarehouse: () => true }
@@ -62,6 +63,7 @@ function environment() {
     if (['../mobileReturnSourceOrders', '@/api/inventory/sales', '@/api/inventory/purchaseReturn'].includes(id)) return {}
     if (['./upload-list', './upload', 'element-ui/packages/progress', 'element-ui/src/mixins/migrating', './upload-dragger.vue',
       '@/components/UploadQueue', '@/components/ImageGallery', './MobileEntityPicker.vue', './MobileLineItemsEditor.vue', '@/components/ImageUpload'].includes(id)) return {}
+    if (id.endsWith('.vue')) return {}
     throw Error('Unexpected dependency ' + id)
   }
   function create(component, props, parent) {

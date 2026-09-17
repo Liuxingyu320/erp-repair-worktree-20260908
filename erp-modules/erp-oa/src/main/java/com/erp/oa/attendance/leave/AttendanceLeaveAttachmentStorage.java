@@ -1,5 +1,6 @@
 package com.erp.oa.attendance.leave;
 
+import com.erp.common.core.utils.file.UploadImageNormalizer;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -63,6 +64,8 @@ public class AttendanceLeaveAttachmentStorage
         if (bytes.length <= 0 || bytes.length > maxBytes)
             throw new ServiceException("LEAVE_ATTACHMENT_SIZE_INVALID");
         String contentType = validate(extension, bytes);
+        if (!".pdf".equals(extension) && !".ofd".equals(extension))
+            bytes = UploadImageNormalizer.normalize(bytes, originalName);
         return new PreparedAttachment(originalName, contentType,
                 extension.substring(1), bytes, sha256(bytes));
     }

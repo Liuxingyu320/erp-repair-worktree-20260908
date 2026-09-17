@@ -125,7 +125,26 @@ class AliyunDeploymentContractTest(unittest.TestCase):
 
     def make_host_runner_fixture(self, root: Path) -> Path:
         runner = root / "run-erp-service.sh"
-        runner.write_text(HOST_RUNNER, encoding="utf-8")
+        # The host runner has no production bypass. Substitute only filesystem
+        # paths in the fixture; execute the real path/mount guards against fake findmnt.
+        data = root.resolve() / "data"
+        fixture = HOST_RUNNER.replace("/data", str(data))
+        fixture = fixture.replace('require_data_path "$BASE_DIR"', 'require_data_path "' + str(data / "erp-new/releases") + '"')
+        for relative in ["erp-new/releases", "erp-new/packages", "erp-new/backups", "erp-new-data/uploadPath"]:
+            (data / relative).mkdir(parents=True, exist_ok=True)
+        for kind in ["logs", "tmp", "cache"]:
+            for service in SERVICES:
+                (data / "erp-new-data" / kind / service).mkdir(parents=True, exist_ok=True)
+        for name in ["attendance", "reimbursement"]:
+            (data / "erp-new-data/tmp" / name).mkdir(parents=True, exist_ok=True)
+        for name in ["sign-package", "sign-package-temp", "attendance", "reimbursement", "drive"]:
+            (data / "erp-new-data/uploadPath/private" / name).mkdir(parents=True, exist_ok=True)
+        (root / "logs").symlink_to(data / "erp-new-data/logs")
+        findmnt = root / "findmnt-fixture"
+        findmnt.write_text("#!/usr/bin/env bash\nprintf '%s\\n' \"${TEST_MOUNT_TARGET:-" + str(data) + "}\"\n")
+        findmnt.chmod(0o700)
+        fixture = fixture.replace("findmnt -n", '"' + str(findmnt) + '" -n')
+        runner.write_text(fixture, encoding="utf-8")
         runner.chmod(runner.stat().st_mode | stat.S_IXUSR)
         return runner
 
@@ -511,7 +530,7 @@ class AliyunDeploymentContractTest(unittest.TestCase):
                 capture_output=True,
                 text=True,
             )
-            self.assertEqual("legacy:gateway --sample", result.stdout.strip())
+            self.assertEqual("legacy:gateway --sample", (root.resolve()/"data/erp-new-data/logs/gateway/stdout.log").read_text().strip())
 
     def test_host_runner_does_not_evaluate_dotenv_shell_syntax(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -541,8 +560,9 @@ class AliyunDeploymentContractTest(unittest.TestCase):
                 text=True,
                 env=env,
             )
-            self.assertIn("--spring.profiles.active=local", result.stdout)
-            self.assertIn(f"env:$(touch {marker})", result.stdout)
+            output = (root.resolve()/"data/erp-new-data/logs/approval/stdout.log").read_text()
+            self.assertIn("--spring.profiles.active=local", output)
+            self.assertIn(f"env:$(touch {marker})", output)
             self.assertFalse(marker.exists())
 
     def test_host_runner_rejects_storage_service_with_wrong_common_root(self):
@@ -565,6 +585,41 @@ class AliyunDeploymentContractTest(unittest.TestCase):
             )
             self.assertEqual(65, result.returncode)
             self.assertIn("ERP_UPLOAD_ROOT must equal", result.stderr)
+
+    def test_host_runner_missing_data_mount_never_starts_or_creates_files(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            runner = self.make_host_runner_fixture(root)
+            (root / ".env").write_text("SPRING_PROFILE=local\n")
+            result = subprocess.run([str(runner), "gateway"], env={**os.environ, "TEST_MOUNT_TARGET": "/"}, capture_output=True, text=True)
+            self.assertEqual(73, result.returncode)
+            self.assertIn("required project path", result.stderr)
+            self.assertFalse((root / "data/erp-new-data/logs/gateway/stdout.log").exists())
+
+    def test_host_runner_rejects_cache_symlink_outside_data(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            runner = self.make_host_runner_fixture(root)
+            (root / ".env").write_text("SPRING_PROFILE=local\n")
+            outside = root / "outside-cache"
+            outside.mkdir()
+            cache = root / "data/erp-new-data/cache/gateway"
+            cache.rmdir()
+            cache.symlink_to(outside)
+            result = subprocess.run([str(runner), "gateway"], capture_output=True, text=True)
+            self.assertEqual(73, result.returncode)
+            self.assertEqual([], list(outside.iterdir()))
+
+    def test_host_runner_rejects_missing_temp_directory_without_fallback(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            runner = self.make_host_runner_fixture(root)
+            (root / ".env").write_text("SPRING_PROFILE=local\n")
+            target = root / "data/erp-new-data/tmp/gateway"
+            target.rmdir()
+            result = subprocess.run([str(runner), "gateway"], capture_output=True, text=True)
+            self.assertEqual(73, result.returncode)
+            self.assertFalse(target.exists())
 
     def test_host_release_uses_persistent_upload_root(self):
         self.assertIn('HOST_SHARED_UPLOAD_ROOT = "/data/erp-new-data/uploadPath"', HELPER)

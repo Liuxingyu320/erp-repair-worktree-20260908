@@ -157,6 +157,7 @@ public class InvPurchaseServiceImpl extends InvBaseService implements IInvPurcha
             locked = requireLockedPurchase(order.getOrderId());
             assertPurchaseBelongsToSelectedWarehouse(locked, shopDeptId);
             InvStateGuard.requireDraftForEdit(locked.getStatus());
+            com.erp.inventory.support.InvDraftRevision.requireCurrent(order.getVersion(), locked.getVersion());
         }
         normalizeAndValidateDraft(order, details);
         if (details != null) itemResolver.lockReferences(details.stream().filter(java.util.Objects::nonNull)
@@ -170,6 +171,7 @@ public class InvPurchaseServiceImpl extends InvBaseService implements IInvPurcha
             order.setApplicantName(SecurityUtils.getUsername());
             order.setApplicantDeptId(SecurityUtils.getLoginUser().getSysUser().getDeptId());
             order.setCreateBy(SecurityUtils.getUsername());
+            order.setVersion(0L);
             order.setStatus(InvStatusConstants.DRAFT);
             order.setOrderNo(generateOrderNo("PO"));
             if (purchaseOrderMapper.insertInvPurchaseOrder(order) != 1 || order.getOrderId() == null)
@@ -254,7 +256,12 @@ public class InvPurchaseServiceImpl extends InvBaseService implements IInvPurcha
             {
                 throw new ServiceException("采购明细不能为空");
             }
-            validateDecimal(detail.getQuantity(), true, 4, "采购数量");
+            validateDecimal(detail.getQuantity(), true, 2, "采购数量");
+            // inv_purchase_detail.quantity is DECIMAL(16,2).
+            if (detail.getQuantity().compareTo(new BigDecimal("100000000000000")) >= 0)
+            {
+                throw new ServiceException("采购数量精度无效");
+            }
             if (detail.getUnitPrice() != null)
             {
                 validateDecimal(detail.getUnitPrice(), false, 6, "采购进价");
@@ -499,12 +506,13 @@ public class InvPurchaseServiceImpl extends InvBaseService implements IInvPurcha
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public InvPurchaseOrder submitSavedPurchase(Long orderId, Long selectedShopDeptId)
+    public InvPurchaseOrder submitSavedPurchase(Long orderId, Long version, Long selectedShopDeptId)
     {
         Long selectedWarehouseId = requireWarehouseContext(selectedShopDeptId, PURCHASE_WAREHOUSE_CONTEXT_MESSAGE);
         InvPurchaseOrder locked = requireLockedPurchase(orderId);
         assertPurchaseBelongsToSelectedWarehouse(locked, selectedWarehouseId);
         InvStateGuard.requireDraftForEdit(locked.getStatus());
+        com.erp.inventory.support.InvDraftRevision.requireCurrent(version, locked.getVersion());
         transitionPurchaseStatus(orderId, InvStatusConstants.DRAFT,
                 InvStatusConstants.SUBMITTED, null, "采购草稿已变化，请刷新后重试");
         return projectBusinessStage(purchaseOrderMapper.selectInvPurchaseOrderById(orderId));

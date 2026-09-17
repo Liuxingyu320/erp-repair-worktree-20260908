@@ -39,6 +39,35 @@ class SysTodoMapperBindingTest
     }
 
     @Test
+    void scopedEmployeeCandidatesRequireBothCurrentAndAuthorizedDeptIds() throws Exception
+    {
+        Configuration configuration = new Configuration();
+        HealthCertificateMapperFragments.register(configuration);
+        try (InputStream input = Resources.getResourceAsStream("mapper/system/SysTodoMapper.xml"))
+        {
+            new XMLMapperBuilder(input, configuration, "mapper/system/SysTodoMapper.xml",
+                    configuration.getSqlFragments()).parse();
+        }
+        TodoQuery query = new TodoQuery();
+        Map<String, Object> both = params(query, Set.of("HR_PROFILE_INCOMPLETE"),
+                List.of(10L), List.of(10L, 20L));
+        both.put("asOfDate", java.time.LocalDate.of(2026, 9, 17));
+        String bothSql = candidateSql(configuration, both);
+        assertThat(bothSql).contains("root.dept_id in ( ? )", "auth.dept_id in ( ? , ? )")
+                .doesNotContain("and 1 = 0");
+
+        Map<String, Object> emptyCurrent = params(query, Set.of("HR_PROFILE_INCOMPLETE"),
+                List.of(), List.of(10L, 20L));
+        emptyCurrent.put("asOfDate", java.time.LocalDate.of(2026, 9, 17));
+        assertThat(candidateSql(configuration, emptyCurrent)).contains("and 1 = 0");
+
+        Map<String, Object> emptyAuthorized = params(query, Set.of("HR_PROFILE_INCOMPLETE"),
+                List.of(10L), List.of());
+        emptyAuthorized.put("asOfDate", java.time.LocalDate.of(2026, 9, 17));
+        assertThat(candidateSql(configuration, emptyAuthorized)).contains("and 1 = 0");
+    }
+
+    @Test
     void rendersCrossOrganizationReviewAndPersonalReturnedLaneIndependently() throws Exception
     {
         Configuration configuration = new Configuration();
@@ -82,6 +111,14 @@ class SysTodoMapperBindingTest
     {
         BoundSql bound = configuration.getMappedStatement(
                 "com.erp.system.mapper.SysTodoMapper.selectHealthCertificateTodoCandidates")
+                .getBoundSql(params);
+        return bound.getSql().replaceAll("\\s+", " ").trim();
+    }
+
+    private static String candidateSql(Configuration configuration, Map<String, Object> params)
+    {
+        BoundSql bound = configuration.getMappedStatement(
+                "com.erp.system.mapper.SysTodoMapper.selectScopedTodoCandidates")
                 .getBoundSql(params);
         return bound.getSql().replaceAll("\\s+", " ").trim();
     }

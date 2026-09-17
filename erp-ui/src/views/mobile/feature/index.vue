@@ -1,6 +1,7 @@
 <template>
   <div class="mobile-feature-page mobile-system-page">
     <main class="mobile-feature-shell" :aria-label="feature.title">
+      <inventory-draft-recovery v-if="['purchase', 'salesReturn', 'purchaseReturn'].includes(featureKey)" :feature="featureKey" @recovered="onDraftRecovered" />
       <section class="feature-stage mobile-system-scroll" data-mobile-scroll-root>
         <header class="feature-header mobile-system-topbar">
           <div>
@@ -326,6 +327,7 @@
 </template>
 
 <script>
+import InventoryDraftRecovery from "@/views/inventory/components/InventoryDraftRecovery.vue"
 import { acknowledgeTransferCommand } from "@/utils/request"
 import { listShopTree } from "@/api/system/dept"
 import { getCustomerServiceCardPhoto } from "@/api/inventory/customer"
@@ -426,7 +428,7 @@ function withMobileRetry(factory, retries = 1, delay = 250) {
 
 export default {
   name: "MobileFeaturePage",
-  components: { MobileDetailSheet, MobileFormSheet, MobileActionDialog, MobileCustomerRecordDialog, MobileConfirmDialog },
+  components: { InventoryDraftRecovery, MobileDetailSheet, MobileFormSheet, MobileActionDialog, MobileCustomerRecordDialog, MobileConfirmDialog },
   data() {
     const selectedContext = getSelectedDeptContext()
     return {
@@ -862,6 +864,16 @@ export default {
     this.confirmLeaveMobileForm(next)
   },
   methods: {
+    onDraftRecovered({ record, response }) {
+      const key = this.featureKey === "purchase" ? "orderId" : "returnId"
+      if (this.formSheet.open && String(this.formSheet.data[key] || "new") === String(record.payload[key] || "new")) {
+        this.$set(this.formSheet.data, key, response.data[key])
+        this.$set(this.formSheet.data, "version", response.data.version)
+        this.$set(this.formSheet.data, "status", response.data.status)
+        this.formSheet.error = "已找回原单，当前输入仍保留；请核对状态后继续"
+      }
+      return this.refresh()
+    },
     markRefreshed() {
       const now = new Date()
       this.refreshedAt = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`

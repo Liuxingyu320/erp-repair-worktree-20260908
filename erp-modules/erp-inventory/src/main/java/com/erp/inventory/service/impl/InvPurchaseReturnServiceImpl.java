@@ -96,6 +96,7 @@ public class InvPurchaseReturnServiceImpl extends InvBaseService implements IInv
             purchaseReturn.setApplicantName(SecurityUtils.getUsername());
             purchaseReturn.setApplicantDeptId(SecurityUtils.getLoginUser().getSysUser().getDeptId());
             purchaseReturn.setCreateBy(SecurityUtils.getUsername());
+            purchaseReturn.setVersion(0L);
             purchaseReturn.setStatus(InvStatusConstants.DRAFT);
             purchaseReturn.setReturnNo(generateReturnNo("PR"));
             int inserted = purchaseReturnMapper.insertInvPurchaseReturn(purchaseReturn);
@@ -113,6 +114,7 @@ public class InvPurchaseReturnServiceImpl extends InvBaseService implements IInv
         {
             InvPurchaseReturn db = requireLockedScopedReturn(purchaseReturn.getReturnId(), shopDeptId);
             InvStateGuard.requireDraftForEdit(db.getStatus());
+            com.erp.inventory.support.InvDraftRevision.requireCurrent(purchaseReturn.getVersion(), db.getVersion());
             if (purchaseReturn.getPurchaseOrderId() == null)
             {
                 purchaseReturn.setPurchaseOrderId(db.getPurchaseOrderId());
@@ -152,12 +154,13 @@ public class InvPurchaseReturnServiceImpl extends InvBaseService implements IInv
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public InvPurchaseReturn submitSavedReturn(Long returnId, Long selectedShopDeptId)
+    public InvPurchaseReturn submitSavedReturn(Long returnId, Long version, Long selectedShopDeptId)
     {
         Long selectedWarehouseId = requireWarehouseContext(selectedShopDeptId,
                 PURCHASE_RETURN_WAREHOUSE_CONTEXT_MESSAGE);
         InvPurchaseReturn locked = requireLockedScopedReturn(returnId, selectedWarehouseId);
         InvStateGuard.requireDraftForEdit(locked.getStatus());
+        com.erp.inventory.support.InvDraftRevision.requireCurrent(version, locked.getVersion());
         validateAndNormalizeReturnHeader(locked);
         requireReturnDetails(purchaseReturnDetailMapper
                 .selectInvPurchaseReturnDetailByReturnIdForUpdate(returnId));

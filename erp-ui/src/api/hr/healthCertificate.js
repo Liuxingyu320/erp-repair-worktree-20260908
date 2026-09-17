@@ -5,7 +5,7 @@ export const getHealthCertificateCapability = () => request({
 })
 
 export const getMyHealthCertificates = () => request({
-  url: '/system/hr/health-certificate/me', method: 'get'
+  url: '/system/hr/health-certificate/me', method: 'get', silentError: true
 })
 
 export const saveMyHealthCertificateDraft = data => request({

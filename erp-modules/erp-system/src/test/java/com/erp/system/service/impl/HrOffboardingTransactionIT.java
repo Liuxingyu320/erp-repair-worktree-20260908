@@ -52,9 +52,8 @@ import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.EnableTransactionManagement;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.mysql.MySQLContainer;
+import org.junit.jupiter.api.extension.RegisterExtension;
+import com.erp.system.testsupport.MySqlTransactionTestDatabase;
 import com.erp.common.core.exception.ServiceException;
 import com.erp.system.domain.dto.HrOffboardingCompletionStatus;
 import com.erp.system.domain.dto.HrOffboardingConfirmRequest;
@@ -73,14 +72,13 @@ import com.erp.system.mapper.SysUserProfileMapper;
 import com.erp.system.service.IHrLifecycleService;
 import com.erp.system.service.ISysUserShopService;
 
-@Testcontainers(disabledWithoutDocker = false)
 @ActiveProfiles("hr-offboarding-it")
 @SpringBootTest(classes = HrOffboardingTransactionIT.ItConfiguration.class,
         webEnvironment = SpringBootTest.WebEnvironment.NONE,
         properties = { "spring.cloud.nacos.config.enabled=false",
                 "spring.cloud.nacos.discovery.enabled=false",
                 "spring.cloud.discovery.enabled=false" })
-@DisplayName("HR离职 MySQL 5.7 事务与并发")
+@DisplayName("HR离职 MySQL 事务与并发")
 class HrOffboardingTransactionIT
 {
     private static final Instant FIXED_NOW = Instant.parse("2026-07-13T02:30:00Z");
@@ -88,14 +86,9 @@ class HrOffboardingTransactionIT
     private static final String RISK_STATEMENT =
             "我已核对离职类型、最后工作日、工资结算、资产交接、竞业决定及补偿信息，并确认立即执行离职及账号停用";
 
-    @Container
-    static final MySQLContainer MYSQL = new MySQLContainer("mysql:5.7.44")
-            .withDatabaseName("hr_offboarding_it")
-            .withUsername("hr_it")
-            .withPassword("hr_it_password")
-            .withEnv("MYSQL_INITDB_SKIP_TZINFO", "1")
-            .withCommand("--character-set-server=utf8mb4",
-                    "--collation-server=utf8mb4_unicode_ci");
+    @RegisterExtension
+    static final MySqlTransactionTestDatabase MYSQL =
+            new MySqlTransactionTestDatabase("offboarding", "hr.offboarding.it");
 
     @DynamicPropertySource
     static void mysqlProperties(DynamicPropertyRegistry registry)
@@ -162,11 +155,11 @@ class HrOffboardingTransactionIT
     }
 
     @Test
-    @DisplayName("事务测试必须运行在真实 MySQL 5.7.44")
-    void usesMySql5744()
+    @DisplayName("事务测试必须运行在配置的真实 MySQL")
+    void usesConfiguredMySqlVersion()
     {
         assertThat(jdbc.queryForObject("select version()", String.class))
-                .startsWith("5.7.44");
+                .startsWith(MYSQL.getExpectedVersionPrefix());
     }
 
     @Test

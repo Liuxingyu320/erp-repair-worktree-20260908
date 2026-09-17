@@ -1,5 +1,6 @@
 package com.erp.file.service;
 
+import com.erp.common.core.utils.file.UploadImageNormalizer;
 import java.io.InputStream;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -41,6 +42,8 @@ public class MinioSysFileServiceImpl implements ISysFileService
         InputStream inputStream = null;
         try
         {
+            FileUploadUtils.assertAllowed(file, com.erp.common.core.utils.file.MimeTypeUtils.DEFAULT_ALLOWED_EXTENSION);
+            file = UploadImageNormalizer.normalize(file);
             String fileName = FileUploadUtils.extractFilename(file);
             inputStream = file.getInputStream();
             PutObjectArgs args = PutObjectArgs.builder()

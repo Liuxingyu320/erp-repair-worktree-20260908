@@ -4,8 +4,8 @@ export function listGift(query, config) {
   return request(Object.assign({ url: '/inventory/gift/list', method: 'get', params: query }, config))
 }
 
-export function getGift(giftId) {
-  return request({ url: '/inventory/gift/' + giftId, method: 'get' })
+export function getGift(giftId, options) {
+  return request({ url: '/inventory/gift/' + giftId, method: 'get', silentError: options && options.silentError === true })
 }
 
 export function addGift(data) {

@@ -104,7 +104,7 @@ function createMobileActionRuntime(api) {
   function runPurchaseAction(actionId, item, options) {
     const orderId = requireTargetId("purchase", item)
     if (actionId === "submitPurchase") {
-      return call("submitPurchaseDraft", orderId)
+      return call("submitPurchaseDraft", orderId, getMobileActionRow(item).version)
     }
     if (actionId === "deletePurchaseDraft") return call("deleteDraftPurchase", orderId)
     if (actionId === "qualityCheckPurchase") {
@@ -157,7 +157,7 @@ function createMobileActionRuntime(api) {
   function runSalesReturnAction(actionId, item) {
     const returnId = requireTargetId("salesReturn", item)
     if (actionId === "submitSalesReturn") {
-      return call("submitSalesReturnDraft", returnId)
+      return call("submitSalesReturnDraft", returnId, getMobileActionRow(item).version)
     }
     if (actionId === "confirmSalesReturn") return call("confirmSalesReturn", returnId)
     if (actionId === "cancelSalesReturn") return call("cancelSalesReturn", returnId)
@@ -167,7 +167,7 @@ function createMobileActionRuntime(api) {
   function runPurchaseReturnAction(actionId, item) {
     const returnId = requireTargetId("purchaseReturn", item)
     if (actionId === "submitPurchaseReturn") {
-      return call("submitPurchaseReturnDraft", returnId)
+      return call("submitPurchaseReturnDraft", returnId, getMobileActionRow(item).version)
     }
     if (actionId === "confirmPurchaseReturn") return call("confirmPurchaseReturn", returnId)
     if (actionId === "cancelPurchaseReturn") return call("cancelPurchaseReturn", returnId)

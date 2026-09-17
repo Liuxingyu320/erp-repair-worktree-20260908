@@ -60,9 +60,8 @@ import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.EnableTransactionManagement;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.mysql.MySQLContainer;
+import org.junit.jupiter.api.extension.RegisterExtension;
+import com.erp.system.testsupport.MySqlTransactionTestDatabase;
 import com.erp.common.core.constant.SecurityConstants;
 import com.erp.common.core.context.SecurityContextHolder;
 import com.erp.common.core.exception.ServiceException;
@@ -97,22 +96,17 @@ import com.erp.system.service.ISysUserShopService;
 import com.erp.system.support.HrEmployeeNoGenerator;
 import com.erp.system.support.HrSensitiveFieldMasker;
 
-@Testcontainers(disabledWithoutDocker = false)
 @ActiveProfiles("hr-onboarding-it")
 @SpringBootTest(classes = HrOnboardingTransactionIT.ItConfiguration.class,
         webEnvironment = SpringBootTest.WebEnvironment.NONE,
         properties = { "spring.cloud.nacos.config.enabled=false",
                 "spring.cloud.nacos.discovery.enabled=false", "spring.cloud.discovery.enabled=false" })
-@DisplayName("HR 入职 MySQL 5.7 事务集成")
+@DisplayName("HR 入职 MySQL 事务集成")
 class HrOnboardingTransactionIT
 {
-    @Container
-    static final MySQLContainer MYSQL = new MySQLContainer("mysql:5.7.44")
-            .withDatabaseName("hr_onboarding_it")
-            .withUsername("hr_it")
-            .withPassword("hr_it_password")
-            .withEnv("MYSQL_INITDB_SKIP_TZINFO", "1")
-            .withCommand("--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci");
+    @RegisterExtension
+    static final MySqlTransactionTestDatabase MYSQL =
+            new MySqlTransactionTestDatabase("onboarding", "hr.onboarding.it");
 
     @DynamicPropertySource
     static void mysqlProperties(DynamicPropertyRegistry registry)
@@ -440,6 +434,7 @@ class HrOnboardingTransactionIT
                     resolver.getResource("classpath:mapper/system/SysPostMapper.xml"),
                     resolver.getResource("classpath:mapper/system/SysRoleMapper.xml"),
                     resolver.getResource("classpath:mapper/system/SysUserMapper.xml"),
+                    resolver.getResource("classpath:mapper/system/HrHealthCertificateMapper.xml"),
                     resolver.getResource("classpath:mapper/system/SysUserPostMapper.xml"),
                     resolver.getResource("classpath:mapper/system/SysUserProfileMapper.xml"),
                     resolver.getResource("classpath:mapper/system/SysUserRoleMapper.xml"),

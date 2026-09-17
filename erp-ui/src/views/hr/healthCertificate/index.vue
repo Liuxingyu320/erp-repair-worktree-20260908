@@ -34,9 +34,10 @@
     <el-tabs v-model="activeTab" type="border-card">
       <el-tab-pane label="我的健康证" name="mine">
         <div class="tab-actions">
-          <el-button v-hasPermi="['hr:healthCertificate:self:edit']" type="primary" size="mini" icon="el-icon-plus" :disabled="!intakeEnabled" @click="openMineForm()">新增证件</el-button>
+          <el-button v-hasPermi="['hr:healthCertificate:self:edit']" type="primary" size="mini" icon="el-icon-plus" :disabled="!intakeEnabled || saving || attachmentBusy" @click="openMineForm()">新增证件</el-button>
           <span>续证保留历史。未来生效的证件通过后显示待生效，当前有效证继续保留。</span>
         </div>
+        <el-alert v-if="mineError" :title="mineError" type="error" :closable="false"><el-button type="text" @click="loadMine">重试列表</el-button></el-alert>
         <el-table ref="mineTable" v-loading="mineLoading" class="mine-health-table" :data="mineRows" size="small" empty-text="暂无健康证记录" highlight-current-row row-key="certificateId" :row-class-name="mineRowClass">
           <el-table-column label="证件编号" prop="certificateNo" min-width="150"/>
           <el-table-column label="办理日期" prop="issuedDate" width="120"/>
@@ -49,7 +50,7 @@
             <template slot-scope="s">
               <el-button v-if="s.row.attachmentPresent" type="text" size="mini" @click="previewAttachment(s.row)">预览附件</el-button>
               <el-button v-if="s.row.approvalInstanceId" type="text" size="mini" @click="openApproval(s.row)">审批轨迹</el-button>
-              <el-button v-if="editable(s.row)" v-hasPermi="['hr:healthCertificate:self:edit']" type="text" size="mini" :disabled="!intakeEnabled" @click="openMineForm(s.row)">编辑</el-button>
+              <el-button v-if="editable(s.row)" v-hasPermi="['hr:healthCertificate:self:edit']" type="text" size="mini" :disabled="!intakeEnabled || saving || attachmentBusy" @click="openMineForm(s.row)">编辑</el-button>
               <el-button v-if="editable(s.row)" v-hasPermi="['hr:healthCertificate:self:submit']" type="text" size="mini" :disabled="!intakeEnabled" @click="submitMine(s.row)">提交审核</el-button>
               <el-button v-if="canWithdrawMine(s.row)" v-hasPermi="['hr:healthCertificate:self:submit']" type="text" size="mini" class="withdraw-action" :loading="withdrawLoadingId === s.row.certificateId" @click="withdrawMine(s.row)">撤回审批</el-button>
             </template>
@@ -89,20 +90,18 @@
       </el-tab-pane>
     </el-tabs>
 
-    <el-dialog :title="mineForm.certificateId ? '编辑健康证' : '新增健康证'" :visible.sync="mineDialog" width="620px" custom-class="health-certificate-mine-dialog" append-to-body :close-on-click-modal="false">
-      <el-form ref="mineForm" :model="mineForm" :rules="mineRules" label-width="100px">
+    <el-dialog :title="mineForm.certificateId ? '编辑健康证' : '新增健康证'" :visible.sync="mineDialog" width="620px" custom-class="health-certificate-mine-dialog" append-to-body :close-on-click-modal="false" :before-close="handleMineDialogClose" :close-on-press-escape="!saving && !attachmentBusy" :show-close="!saving && !attachmentBusy">
+      <el-alert v-if="mineSaveError" :title="mineSaveError" type="error" :closable="false"/>
+      <el-form :disabled="saving" ref="mineForm" :model="mineForm" :rules="mineRules" label-width="100px">
         <el-form-item label="证件编号"><el-input v-model="mineForm.certificateNo" maxlength="100"/></el-form-item>
         <el-row :gutter="12"><el-col :span="12"><el-form-item label="办理日期" prop="issuedDate"><el-date-picker v-model="mineForm.issuedDate" value-format="yyyy-MM-dd" type="date" style="width:100%"/></el-form-item></el-col><el-col :span="12"><el-form-item label="生效日期"><el-date-picker v-model="mineForm.validFrom" value-format="yyyy-MM-dd" type="date" style="width:100%"/></el-form-item></el-col></el-row>
         <el-form-item label="到期日期" prop="expiresOn"><el-date-picker v-model="mineForm.expiresOn" value-format="yyyy-MM-dd" type="date" style="width:100%"/></el-form-item>
         <el-form-item label="发证机构"><el-input v-model="mineForm.issuerName" maxlength="128"/></el-form-item>
         <el-form-item v-if="driveEnabled" label="云盘附件">
-          <el-select v-model="mineForm.attachmentNodeId" clearable filterable style="width:100%" placeholder="选择最近上传的云盘文件">
-            <el-option v-for="file in recentFiles" :key="file.nodeId" :label="file.nodeName || file.name" :value="file.nodeId"/>
-          </el-select>
-          <div class="form-tip">请先把健康证照片或 PDF 上传到“我的云盘”，再在此绑定受控文件。</div>
+          <drive-attachment-picker v-if="mineDialog" :key="mineEditorRevision" v-model="mineForm.attachmentNodeId" :disabled="saving" @busy="attachmentBusy = $event" />
         </el-form-item>
       </el-form>
-      <div slot="footer"><el-button @click="mineDialog=false">取消</el-button><el-button type="primary" :loading="saving" :disabled="!intakeEnabled" @click="saveMine">保存草稿</el-button></div>
+      <div slot="footer"><el-button :disabled="saving || attachmentBusy" @click="requestMineClose">取消</el-button><el-button type="primary" :loading="saving" :disabled="!intakeEnabled || attachmentBusy" @click="saveMine">保存草稿</el-button></div>
     </el-dialog>
 
     <el-dialog title="审核健康证" :visible.sync="reviewDialog" width="520px" custom-class="health-certificate-review-dialog" append-to-body>
@@ -162,7 +161,7 @@
 <script>
 const { createUiOperationScope } = require('@/utils/uiOperationScope')
 import { getSelectedDeptId } from '@/utils/shopContext'
-import { listRecentDriveNodes } from '@/api/drive'
+import DriveAttachmentPicker from '@/views/drive/components/DriveAttachmentPicker.vue'
 import { listHealthCertificateApprovalStartOutboxes, replayHealthCertificateApprovalStart, getHealthCertificateCapability, getHealthCertificateAttachment, getHealthCertificateOpsSummary, getMyHealthCertificates, saveMyHealthCertificateDraft, submitMyHealthCertificate, withdrawMyHealthCertificate, listHealthCertificates, reviewHealthCertificate } from '@/api/hr/healthCertificate'
 import { getApprovalInstance } from '@/api/approval/monitor'
 import { approveApprovalTask, returnApprovalTask } from '@/api/approval/task'
@@ -170,8 +169,10 @@ import { statusLabel as approvalStatusLabel, statusType as approvalStatusType } 
 
 export default {
   name: 'HrHealthCertificate',
+  components: { DriveAttachmentPicker },
   data() {
     return {
+      mineError: '', mineSaveError: '', mineEditorRevision: 0, mineBaseline: '', healthInactive: false, attachmentBusy: false,
       activeTab: 'mine', mineLoading: false, adminLoading: false, saving: false, reviewing: false,
       approvalDialog: false, approvalLoading: false, approvalActionLoading: false,
       withdrawLoadingId: undefined,
@@ -180,7 +181,7 @@ export default {
       opsSummary: {}, opsLoaded: false, opsLoading: false, opsError: '', adminError: '',
       focusCertificateId: '', approvalTaskId: '', approvalInstanceId: '', routeApprovalOpened: false,
       approvalRow: null, approvalDetail: null,
-      mineRows: [], adminRows: [], adminTotal: 0, recentFiles: [], mineDialog: false, reviewDialog: false,
+      mineRows: [], adminRows: [], adminTotal: 0, mineDialog: false, reviewDialog: false,
       mineForm: {}, reviewRow: null, reviewForm: { decision: 'APPROVED', rejectionReason: '' },
       query: { pageNum: 1, pageSize: 10, certificateId: undefined, reviewStatus: 'PENDING_ALL', healthCertificateStatus: undefined },
       mineRules: { issuedDate: [{ required: true, message: '请选择办理日期', trigger: 'change' }], expiresOn: [{ required: true, message: '请选择到期日期', trigger: 'change' }] }
@@ -204,17 +205,18 @@ export default {
     if (typeof window !== 'undefined') window.addEventListener('erp:dept-changed', this.healthDeptChanged)
     this.applyTodoRoute()
     this.refreshAll()
-    this.loadCapability().then(() => { if (this.intakeEnabled && this.driveEnabled) this.loadRecentFiles() })
+    this.loadCapability()
   },
   beforeDestroy() { this.healthScope().deactivate(); if (typeof window !== 'undefined') window.removeEventListener('erp:dept-changed', this.healthDeptChanged) },
-  deactivated() { this.healthScope().deactivate() },
-  activated() { this.healthScope().activate() },
+  deactivated() { this.healthInactive = true; this.healthScope().deactivate() },
+  activated() { this.healthScope().activate(); if (this.healthInactive) { this.healthInactive = false; this.refreshAll(); this.loadCapability() } },
+  beforeRouteLeave(to, from, next) { this.requestMineClose().then(closed => next(closed !== false)) },
   watch: {
-    '$store.state.user.sessionRevision'() { this.healthScope().invalidate(); this.opsLoaded = false; this.refreshAll() },
-    '$route.fullPath'() { this.healthScope().invalidate(); this.applyTodoRoute(); this.refreshAll() }
+    '$store.state.user.sessionRevision'() { this.resetHealthContext(); this.refreshAll(); this.loadCapability() },
+    '$route.fullPath'() { this.resetHealthContext(); this.applyTodoRoute(); this.refreshAll(); this.loadCapability() }
   },
   methods: {
-    healthDeptChanged() { this.startRecoveryOpen = false; this.healthScope().invalidate(); this.opsLoaded = false; this.query.currentDeptId = undefined; this.refreshAll() },
+    healthDeptChanged() { this.resetHealthContext(); this.query.currentDeptId = undefined; this.refreshAll(); this.loadCapability() },
     healthScope() {
       if (!this._healthScope) this._healthScope = createUiOperationScope(() => ({
         actor: this.$store && this.$store.state && this.$store.state.user && this.$store.state.user.id,
@@ -266,11 +268,13 @@ export default {
     approvalStatusLabel,
     approvalStatusType,
     loadCapability() {
+      const scope = this.healthScope(), token = scope.begin('capability')
+      this.capabilityLoaded = false
       return getHealthCertificateCapability().then(r => {
-        this.capability = r.data || { intakeEnabled: false, reason: '健康证新受理暂未开放' }
+        if (scope.isCurrent(token)) this.capability = r.data || { intakeEnabled: false, reason: '健康证新受理暂未开放' }
       }).catch(() => {
-        this.capability = { intakeEnabled: false, reason: '受理能力检查失败，系统已按关闭处理' }
-      }).finally(() => { this.capabilityLoaded = true })
+        if (scope.isCurrent(token)) this.capability = { intakeEnabled: false, reason: '受理能力检查失败，系统已按关闭处理' }
+      }).finally(() => { if (scope.isCurrent(token)) this.capabilityLoaded = true })
     },
     requireIntake() {
       if (this.intakeEnabled) return true
@@ -308,8 +312,27 @@ export default {
         if (todoType === 'HR_HEALTH_CERT_REVIEW' && this.canManage) this.query.certificateId = certificateId
       }
     },
-    refreshAll() { this.loadMine(); if (this.canManage) { this.loadAdmin(); this.loadOpsSummary() } },
-    loadMine() { this.mineLoading = true; return getMyHealthCertificates().then(r => { this.mineRows = r.data || []; const focused = this.mineRows.find(row => String(row.certificateId) === this.focusCertificateId); if (focused) { this.$nextTick(() => this.$refs.mineTable && this.$refs.mineTable.setCurrentRow(focused)); this.maybeOpenRouteApproval(focused) } }).finally(() => { this.mineLoading = false }) },
+    resetHealthContext() {
+      this.healthScope().invalidate(); this.opsLoaded = false; this.mineRows = []; this.mineLoading = false; this.mineError = ''
+      this.startRecoveryOpen = false; this.approvalDialog = false; this.invalidateMineEditor()
+    },
+    refreshAll() { return Promise.all([this.loadMine(), ...(this.canManage ? [this.loadAdmin(), this.loadOpsSummary()] : [])]) },
+    loadMine() {
+      const scope = this.healthScope(), token = scope.begin('mine')
+      this.mineLoading = true; this.mineError = ''
+      return getMyHealthCertificates().then(r => {
+        if (!scope.isCurrent(token)) return
+        if (!r || !Array.isArray(r.data)) throw Error('健康证列表响应不完整')
+        this.mineRows = r.data
+        const focused = this.mineRows.find(row => String(row.certificateId) === this.focusCertificateId)
+        if (focused) this.$nextTick(() => {
+          if (!scope.isCurrent(token)) return
+          if (this.$refs.mineTable) this.$refs.mineTable.setCurrentRow(focused)
+          this.maybeOpenRouteApproval(focused)
+        })
+      }).catch(error => { if (scope.isCurrent(token)) this.mineError = error.message || '健康证列表读取失败，请重试' })
+        .finally(() => { if (scope.isCurrent(token)) this.mineLoading = false })
+    },
     loadAdmin() {
       const scope = this.healthScope(), payload = { ...this.query }, token = scope.begin('admin', payload)
       this.adminLoading = true; this.adminError = ''
@@ -333,34 +356,46 @@ export default {
         .finally(() => { if (scope.isCurrent(token)) this.opsLoading = false })
     },
     resetAdmin() { this.query = { pageNum: 1, pageSize: this.query.pageSize || 10, certificateId: undefined, reviewStatus: undefined, healthCertificateStatus: undefined, currentDeptId: undefined }; this.loadAdmin() },
-    loadRecentFiles() {
-      if (!this.driveEnabled) {
-        this.recentFiles = []
-        return Promise.resolve([])
-      }
-      return listRecentDriveNodes(50).then(r => {
-        if (!this.driveEnabled) {
-          this.recentFiles = []
-          return []
-        }
-        const rows = r.rows || r.data || []
-        this.recentFiles = Array.isArray(rows) ? rows.filter(x => {
-          const contentType = String(x.contentType || '').toLowerCase()
-          return x.nodeType !== 'FOLDER' && ((contentType.startsWith('image/') && contentType !== 'image/svg+xml') || contentType === 'application/pdf')
-        }) : []
-        return this.recentFiles
-      }).catch(() => {
-        this.recentFiles = []
-        return []
-      })
-    },
     editable(row) { return ['DRAFT', 'REJECTED', 'RETURNED', 'WITHDRAWN'].includes(row.reviewStatus) },
     canWithdrawMine(row) {
       if (!row || row.reviewStatus !== 'APPROVAL_PENDING') return false
       return this.mineRows.some(item => String(item.certificateId) === String(row.certificateId))
     },
-    openMineForm(row) { if (!this.requireIntake()) return; this.mineForm = row ? { ...row } : { certificateId: undefined, version: undefined, certificateNo: '', issuedDate: '', validFrom: '', expiresOn: '', issuerName: '', attachmentNodeId: undefined }; this.mineDialog = true; this.$nextTick(() => this.$refs.mineForm && this.$refs.mineForm.clearValidate()) },
-    saveMine() { if (!this.requireIntake()) return; this.$refs.mineForm.validate(ok => { if (!ok) return; this.saving = true; saveMyHealthCertificateDraft(this.mineForm).then(() => { this.$modal.msgSuccess('草稿已保存'); this.mineDialog = false; this.refreshTodo(); this.loadMine() }).finally(() => { this.saving = false }) }) },
+    invalidateMineEditor() {
+      this.healthScope().invalidate('mine-save'); this.healthScope().invalidate('mine-close')
+      this.mineEditorRevision += 1; this.mineDialog = false; this.saving = false; this.attachmentBusy = false; this.mineSaveError = ''; this.mineBaseline = ''
+    },
+    openMineForm(row) {
+      if (this.saving || this.attachmentBusy || !this.requireIntake()) return
+      this.invalidateMineEditor()
+      this.mineForm = row ? { ...row } : { certificateId: undefined, version: undefined, certificateNo: '', issuedDate: '', validFrom: '', expiresOn: '', issuerName: '', attachmentNodeId: undefined }
+      this.mineBaseline = JSON.stringify(this.mineForm); this.mineDialog = true
+      const revision = this.mineEditorRevision
+      this.$nextTick(() => { if (revision === this.mineEditorRevision && this.$refs.mineForm) this.$refs.mineForm.clearValidate() })
+    },
+    requestMineClose() {
+      if (!this.mineDialog) return Promise.resolve(true)
+      if (this.saving || this.attachmentBusy) { this.$modal.msgWarning('请等待当前保存或附件上传完成'); return Promise.resolve(false) }
+      const scope = this.healthScope(), revision = this.mineEditorRevision, token = scope.begin('mine-close')
+      const dirty = this.mineBaseline && this.mineBaseline !== JSON.stringify(this.mineForm)
+      const confirm = dirty ? this.$modal.confirm('健康证有未保存内容，确定放弃修改？', '未保存提醒', { confirmButtonText: '放弃修改', cancelButtonText: '继续编辑' }) : Promise.resolve()
+      return confirm.then(() => { if (!scope.isCurrent(token) || revision !== this.mineEditorRevision) return false; this.invalidateMineEditor(); return true }).catch(() => false)
+    },
+    handleMineDialogClose() { return this.requestMineClose() },
+    saveMine() {
+      if (this.saving || this.attachmentBusy || !this.mineDialog || !this.requireIntake()) return Promise.resolve()
+      const scope = this.healthScope(), revision = this.mineEditorRevision, token = scope.begin('mine-save'), payload = { ...this.mineForm }
+      const current = () => scope.isCurrent(token) && this.mineDialog && revision === this.mineEditorRevision
+      this.saving = true; this.mineSaveError = ''
+      return new Promise(resolve => this.$refs.mineForm.validate(resolve)).then(ok => {
+        if (!ok || !current()) return
+        return saveMyHealthCertificateDraft(payload).then(() => {
+          if (!current()) return
+          this.$modal.msgSuccess('草稿已保存'); this.invalidateMineEditor(); this.refreshTodo(); return this.loadMine()
+        })
+      }).catch(error => { if (current()) this.mineSaveError = error.message || '保存结果待核对，填写内容已保留' })
+        .finally(() => { if (scope.isCurrent(token) && revision === this.mineEditorRevision) this.saving = false })
+    },
     submitMine(row) { if (!this.requireIntake()) return; this.$modal.confirm('提交后将进入统一审批，确认提交？').then(() => submitMyHealthCertificate({ certificateId: row.certificateId, version: row.version })).then(() => { this.$modal.msgSuccess('已提交统一审批'); this.refreshTodo(); this.refreshAll() }) },
     withdrawMine(row) {
       if (!this.canWithdrawMine(row) || this.withdrawLoadingId) {

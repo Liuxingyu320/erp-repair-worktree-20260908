@@ -1,11 +1,18 @@
 import request from '@/utils/request'
 
-export function listFixedAssetConfigs(params) {
+export function listFixedAssetConfigs(params, options) {
   return request({
     url: '/oa/fixedAsset/config/list',
-    method: 'get',
+    method: 'get', silentError: options && options.silentError === true,
     params
   })
+}
+
+export function listFixedAssetStores(params) {
+  return request({ url: '/oa/fixedAsset/config/stores', method: 'get', params, silentError: true })
+}
+export function getFixedAssetStoreDetails(params) {
+  return request({ url: '/oa/fixedAsset/config/store-details', method: 'get', params, silentError: true })
 }
 
 export function getFixedAssetConfig(configId) {
@@ -30,10 +37,10 @@ export function deleteFixedAssetConfig(configId) {
   })
 }
 
-export function getFixedAssetQuota(params) {
+export function getFixedAssetQuota(params, options) {
   return request({
     url: '/oa/fixedAsset/config/quota',
-    method: 'get',
+    method: 'get', silentError: options && options.silentError === true,
     params
   })
 }

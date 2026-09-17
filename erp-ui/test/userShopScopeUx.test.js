@@ -116,5 +116,12 @@ assert.ok(
     source.includes('暂无组织，请先在部门管理中维护组织类型'),
   'authorization page copy should explain inherited organization scope instead of only direct shop binding'
 )
+assert.ok(
+  source.includes('shopScopeLoadFailed') &&
+    source.includes('读取失败，可重试') &&
+    source.includes('未授权') &&
+    !source.includes('this.appendPreservedScopeCount(this.getUserDeptScopeLabel(row), row.userId)'),
+  'organization-scope column must not fall back to department name when authorization is empty or failed'
+)
 
 console.log('userShopScopeUx tests passed')

@@ -37,9 +37,12 @@ function loadSfc(source, filename, globals) {
     .replace(/^import .*$/gm, "")
     .replace("export default", "module.exports =")
   const sandbox = {
-    module: { exports: {} },
+    module: { exports: {} }, InventoryDraftRecovery: {}, SalesMaterialPicker: {}, MobileQuickCustomerForm: {}, checkPermi: () => false,
     exports: {},
     require(specifier) {
+      if (specifier === "@/utils/inventoryQuantity") return require("../src/utils/inventoryQuantity")
+      if (specifier === "@/utils/salesRecentChoices") return require("../src/utils/salesRecentChoices")
+      if (specifier === "@/views/mobile/feature/mobileQuickCustomer") return require("../src/views/mobile/feature/mobileQuickCustomer")
       if (specifier === "@/utils/uiOperationScope") return require("../src/utils/uiOperationScope")
       if (specifier === "@/utils/salesWarehouse") return require("../src/utils/salesWarehouse")
       if (specifier === "@/mixins/todoBusinessFocus") {
@@ -60,7 +63,7 @@ function loadSfc(source, filename, globals) {
 function bind(component, initial = {}) {
   const base = { ...initial }
   const data = component.data ? component.data.call(base) : {}
-  const target = { ...data, ...initial }
+  const target = { $store: { getters: { id: "7" }, state: { user: { sessionRevision: 1 } } }, $route: { fullPath: "/test" }, $set: (obj, key, value) => { obj[key] = value }, ...data, ...initial }
   Object.entries(component.methods || {}).forEach(([name, method]) => {
     target[name] = method.bind(target)
   })
@@ -251,7 +254,7 @@ async function assertSalesEditorSingleFlight() {
   instance.$refs.formRef.validate = callback => callback(true)
   const retry = instance.doSave(false)
   assert.strictEqual(instance.formSubmitting, true)
-  retryWrite.resolve({})
+  retryWrite.resolve({ data: { orderId: "1", version: "0" } })
   await retry
   assert.strictEqual(instance.formSubmitting, false)
   assert.strictEqual(instance.open, false)
@@ -307,7 +310,7 @@ async function assertPurchaseEditorSingleFlight() {
 
   instance.$refs.formRef.validate = callback => callback(true)
   const retry = instance.doSave(false)
-  retryWrite.resolve({})
+  retryWrite.resolve({ data: { orderId: "1", version: "0" } })
   await retry
   assert.strictEqual(instance.formSubmitting, false)
   assert.strictEqual(instance.open, false)

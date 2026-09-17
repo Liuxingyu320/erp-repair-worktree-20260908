@@ -1,20 +1,33 @@
 # ERP 生产发布与回滚标准
 
+2026-09-14 用户确认：后续项目存储全部使用数据盘，图片上传必须压缩。具体范围、固定上传路径及尚未实现的事项见[项目存储与图片上传规则](../项目存储与图片上传规则.md)。存储候选、依赖、演练与切换状态见[实施说明](../存储迁移与图片压缩实施说明_20260914.md)。以下为目标布局，线上迁移完成情况必须另外验证。
+
 ## 1. 发布目录
 
 生产主机采用不可变版本目录，不允许把构建结果直接覆盖到长期存在的 Docker 源目录。
 
 ```text
-/opt/erp-new/
+/data/erp-new/
   releases/
-    <release-id>/       # 只读解包目录
-  current -> releases/<release-id>
-  previous -> releases/<previous-release-id>
+    <release-id>/<release-id>/docker/  # deploy-host 归档解包后的运行目录
+  packages/            # 发布压缩包
+  backups/             # 项目备份
+  current -> releases/<release-id>/<release-id>/docker
+  previous -> releases/<previous-release-id>/<previous-release-id>/docker
+/opt/erp-new -> /data/erp-new/current  # 保留程序兼容入口
 /data/erp-new-data/
   uploadPath/           # 数据盘上的唯一通用文件根
+  mysql/                # MySQL 3306 持久化数据
+  redis/                # Redis 6379 持久化数据
+  logs/
+  tmp/
+  cache/
+/data/erp-new-runtime/image-codecs/  # 原格式图片编解码环境
 ```
 
 `current` 和 `previous` 只能通过同文件系统原子指针切换；解包后的目录不得再次修改。数据库、上传文件、日志和缓存不得放入版本目录。
+
+发布包、解包目录、项目数据库、日志、缓存和备份的实际存储也必须位于数据盘。数据盘未挂载时禁止回退到系统盘写入。
 
 ## 2. 来源链和版本
 

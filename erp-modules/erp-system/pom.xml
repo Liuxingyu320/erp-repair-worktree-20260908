@@ -176,6 +176,9 @@
                         <version>3.5.4</version>
                         <configuration>
                             <failIfNoTests>true</failIfNoTests>
+                            <systemPropertyVariables>
+                                <erp.it.native-mysql>true</erp.it.native-mysql>
+                            </systemPropertyVariables>
                             <!-- The packaged artifact is a Spring Boot fat JAR; tests need raw classes. -->
                             <classesDirectory>${project.build.outputDirectory}</classesDirectory>
                             <forkCount>1</forkCount>
@@ -184,7 +187,7 @@
                                 <include>**/HrEmployeeTransferTransactionIT.java</include>
                                 <include>**/HrOffboardingTransactionIT.java</include>
                                 <include>**/HrOnboardingTransactionIT.java</include>
-                                <include>**/HrSignEventOutboxNativeMySqlIT.java</include>
+                                <include>**/HrSignEventOutboxMySql57IT.java</include>
                             </includes>
                         </configuration>
                         <executions>

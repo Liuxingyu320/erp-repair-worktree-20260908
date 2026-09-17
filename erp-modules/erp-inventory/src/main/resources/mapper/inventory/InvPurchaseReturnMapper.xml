@@ -4,6 +4,7 @@
 
     <resultMap type="InvPurchaseReturn" id="InvPurchaseReturnResult">
         <id property="returnId" column="return_id"/>
+        <result property="version" column="version"/>
         <result property="returnNo" column="return_no"/>
         <result property="purchaseOrderId" column="purchase_order_id"/>
         <result property="purchaseOrderNo" column="purchase_order_no"/>
@@ -33,7 +34,7 @@
     </resultMap>
 
     <sql id="selectInvPurchaseReturnVo">
-        select r.return_id, r.return_no, r.purchase_order_id, r.purchase_order_no, r.return_title,
+        select r.version, r.return_id, r.return_no, r.purchase_order_id, r.purchase_order_no, r.return_title,
                r.supplier_name, r.total_amount,
                coalesce(detail_summary.total_quantity, 0) as total_quantity,
                coalesce(detail_summary.returned_quantity, 0) as returned_quantity,
@@ -49,7 +50,7 @@
              left join sys_user u on u.user_id = r.applicant_id
              left join sys_dept applicant_dept on applicant_dept.dept_id = r.applicant_dept_id
              left join (
-                 select return_id,
+                 select version, return_id,
                         sum(coalesce(quantity, 0)) as total_quantity,
                         sum(coalesce(returned_quantity, 0)) as returned_quantity,
                         sum(coalesce(quantity, 0) - coalesce(returned_quantity, 0)) as remaining_quantity
@@ -109,6 +110,7 @@
     <update id="updateInvPurchaseReturn" parameterType="InvPurchaseReturn">
         update inv_purchase_return
         <set>
+            version = version + 1,
             <if test="returnTitle != null and returnTitle != ''">return_title = #{returnTitle},</if>
             <if test="supplierName != null and supplierName != ''">supplier_name = #{supplierName},</if>
             <if test="totalAmount != null">total_amount = #{totalAmount},</if>
@@ -120,17 +122,17 @@
             remark = #{remark},
             update_by = #{updateBy}, update_time = sysdate()
         </set>
-        where return_id = #{returnId}
+        where return_id = #{returnId} and status = 'draft' and version = #{version}
     </update>
 
     <update id="updateInvPurchaseReturnStatus">
         update inv_purchase_return
-        set status = #{status}, update_by = #{updateBy}, update_time = sysdate()
+        set version = version + 1, status = #{status}, update_by = #{updateBy}, update_time = sysdate()
         where return_id = #{returnId}
     </update>
 
     <select id="selectInvPurchaseReturnByIdForUpdate" parameterType="Long" resultMap="InvPurchaseReturnResult">
-        select return_id, return_no, purchase_order_id, purchase_order_no, return_title,
+        select version, return_id, return_no, purchase_order_id, purchase_order_no, return_title,
                supplier_name, total_amount, return_date, status, return_reason, responsibility,
                attachment_urls, shop_dept_id,
                applicant_id, applicant_name, applicant_dept_id,

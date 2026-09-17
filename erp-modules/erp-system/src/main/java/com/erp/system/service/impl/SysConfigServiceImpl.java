@@ -102,8 +102,20 @@ public class SysConfigServiceImpl implements ISysConfigService
     @Override
     public String selectConfigByKeyForExternal(String configKey)
     {
-        sensitivityPolicy.assertExternalReadAllowed(configKey);
-        return selectConfigByKey(configKey);
+        SysConfig query = new SysConfig();
+        query.setConfigKey(configKey);
+        if (sensitivityPolicy.isSensitive(query))
+        {
+            throw new ServiceException("敏感参数不支持通过通用接口读取");
+        }
+        SysConfig config = configMapper.selectConfig(query);
+        if (sensitivityPolicy.isSensitive(config))
+        {
+            throw new ServiceException("敏感参数不支持通过通用接口读取");
+        }
+        // Read the value from the same database snapshot as its sensitivity metadata.
+        // A concurrent update must not substitute a newer secret from the cache.
+        return config == null ? StringUtils.EMPTY : config.getConfigValue();
     }
 
     /**
@@ -347,8 +359,8 @@ public class SysConfigServiceImpl implements ISysConfigService
 
     private void resolveUpdatedConfigValue(SysConfig existing, SysConfig update)
     {
-        boolean sensitive = sensitivityPolicy.isSensitive(existing.getConfigKey())
-                || sensitivityPolicy.isSensitive(update.getConfigKey());
+        boolean sensitive = sensitivityPolicy.isSensitive(existing)
+                || sensitivityPolicy.isSensitive(update);
         if (!sensitive)
         {
             requireConfiguredValue(update.getConfigValue());

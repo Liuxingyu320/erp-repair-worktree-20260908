@@ -32,17 +32,19 @@ class InvSpecialistReadControllerTest
     IInvPurchaseService purchase=mock(IInvPurchaseService.class);
     IInvPurchaseReturnService purchaseReturn=mock(IInvPurchaseReturnService.class);
     IInvSalesReturnService salesReturn=mock(IInvSalesReturnService.class);
+    com.erp.inventory.service.impl.InvDraftCommandService draftCommands=mock(com.erp.inventory.service.impl.InvDraftCommandService.class);
     MockMvc mvc;
     @BeforeEach void setup()
     {
         var p=new InvPurchaseController();var pr=new InvPurchaseReturnController();var sr=new InvSalesReturnController();
+        ReflectionTestUtils.setField(p,"draftCommands",draftCommands);ReflectionTestUtils.setField(pr,"draftCommands",draftCommands);ReflectionTestUtils.setField(sr,"draftCommands",draftCommands);
         ReflectionTestUtils.setField(p,"purchaseService",purchase);ReflectionTestUtils.setField(pr,"purchaseReturnService",purchaseReturn);ReflectionTestUtils.setField(sr,"salesReturnService",salesReturn);
         when(purchase.selectPurchaseSuppliers(any(),any())).thenReturn(List.of());
         when(purchase.selectPurchaseProducts(any(),any())).thenReturn(List.of());
         when(purchase.selectPurchaseOeItems(any(),any())).thenReturn(List.of());
         when(purchase.selectPurchaseGifts(any(),any())).thenReturn(List.of());
         when(salesReturn.selectReturnableSourceOrders(any(),any())).thenReturn(List.of());
-        when(salesReturn.submitSavedReturn(anyLong(),any())).thenReturn(new InvSalesReturn());
+        when(salesReturn.submitSavedReturn(anyLong(),any(),any())).thenReturn(new InvSalesReturn());
         mvc=MockMvcBuilders.standaloneSetup(p,pr,sr).defaultRequest(get("/").accept("application/json")).setControllerAdvice(new GlobalExceptionHandler())
                 .addInterceptors(new HandlerInterceptor() {
                     @Override public boolean preHandle(HttpServletRequest req,HttpServletResponse res,Object handler)
@@ -78,10 +80,10 @@ class InvSpecialistReadControllerTest
     void exactDutyPermissionAllowsAndMissingPermissionDenies(String verb,String url,String permission) throws Exception
     {
         login(permission);
-        mvc.perform((verb.equals("GET")?get(url):post(url)).header("Authorization","Bearer local-f5-test").header("Dept-NumId","20"))
+        mvc.perform((verb.equals("GET")?get(url):post(url)).header("Authorization","Bearer local-f5-test").header("Dept-NumId","20").param("version", "0"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.code").value(200));
         clearInvocations(purchase,purchaseReturn,salesReturn);login("");
-        mvc.perform((verb.equals("GET")?get(url):post(url)).header("Authorization","Bearer local-f5-test").header("Dept-NumId","20"))
+        mvc.perform((verb.equals("GET")?get(url):post(url)).header("Authorization","Bearer local-f5-test").header("Dept-NumId","20").param("version", "0"))
                 .andExpect(jsonPath("$.code").value(403));
         verifyNoInteractions(purchase,purchaseReturn,salesReturn);
     }
@@ -89,23 +91,23 @@ class InvSpecialistReadControllerTest
     void dutyDoesNotGrantOrdinaryQuery(String feature,String duty) throws Exception
     {
         login("inv:"+feature+":"+duty);
-        mvc.perform(get("/"+feature+"/1").header("Authorization","Bearer local-f5-test").header("Dept-NumId","20"))
+        mvc.perform(get("/"+feature+"/1").header("Authorization","Bearer local-f5-test").header("Dept-NumId","20").param("version", "0"))
                 .andExpect(jsonPath("$.code").value(403));verifyNoInteractions(purchase,purchaseReturn,salesReturn);
     }
     @ParameterizedTest @CsvSource({"purchase,list","purchase,query","purchaseReturn,list","purchaseReturn,query","salesReturn,list","salesReturn,query"})
     void generalReadPermissionDoesNotGrantSpecialistActionContext(String feature,String permission) throws Exception
     {
         login("inv:"+feature+":"+permission);
-        mvc.perform(get("/"+feature+"/action-context/1").header("Authorization","Bearer local-f5-test").header("Dept-NumId","20"))
+        mvc.perform(get("/"+feature+"/action-context/1").header("Authorization","Bearer local-f5-test").header("Dept-NumId","20").param("version", "0"))
                 .andExpect(jsonPath("$.code").value(403));verifyNoInteractions(purchase,purchaseReturn,salesReturn);
     }
     @Test void actionContextHeaderIsMinimalNoStoreAndExactIdentity() throws Exception
     {
-        InvPurchaseOrder order=new InvPurchaseOrder();order.setOrderId(Long.MAX_VALUE);order.setOrderNo("PO");order.setStatus("submitted");order.setShopDeptId(20L);
+        InvPurchaseOrder order=new InvPurchaseOrder();order.setVersion(0L);order.setOrderId(Long.MAX_VALUE);order.setOrderNo("PO");order.setStatus("submitted");order.setShopDeptId(20L);
         order.setSupplierName("private supplier");order.setTotalAmount(new java.math.BigDecimal("999"));order.setDetails(List.of(new InvPurchaseDetail()));
         order.setQcStatus("pending");order.setReceivedQuantity(java.math.BigDecimal.ONE);order.setRemainingQuantity(java.math.BigDecimal.TEN);
         when(purchase.getActionContext(Long.MAX_VALUE,20L)).thenReturn(InvSpecialistActionContext.purchase(order));login("inv:purchase:qc");
-        mvc.perform(get("/purchase/action-context/9223372036854775807").header("Authorization","Bearer local-f5-test").header("Dept-NumId","20").param("shopDeptId","99"))
+        mvc.perform(get("/purchase/action-context/9223372036854775807").header("Authorization","Bearer local-f5-test").header("Dept-NumId","20").param("version", "0").param("shopDeptId","99"))
                 .andExpect(header().string("Cache-Control","no-store, max-age=0"))
                 .andExpect(jsonPath("$.data.orderId").value(Long.toString(Long.MAX_VALUE)))
                 .andExpect(jsonPath("$.data.qcStatus").value("pending"))
@@ -116,32 +118,45 @@ class InvSpecialistReadControllerTest
     }
     @Test void savedSubmitReturnsOnlyTaskSummaryAndExactId() throws Exception
     {
-        InvSalesReturn saved=new InvSalesReturn();saved.setReturnId(Long.MAX_VALUE);saved.setReturnNo("SR-SAVED");
+        InvSalesReturn saved=new InvSalesReturn();saved.setVersion(0L);saved.setReturnId(Long.MAX_VALUE);saved.setReturnNo("SR-SAVED");
         saved.setStatus("submitted");saved.setShopDeptId(20L);saved.setSalesOrderId(Long.MAX_VALUE-1);
         saved.setCustomerName("private customer");saved.setApplicantName("private applicant");
         saved.setTotalAmount(new java.math.BigDecimal("777.31"));saved.setRemark("private remark");
         saved.setDetails(List.of(new InvSalesReturnDetail()));
-        when(salesReturn.submitSavedReturn(Long.MAX_VALUE,20L)).thenReturn(InvSpecialistReadVo.salesReturn(saved));
+        when(salesReturn.submitSavedReturn(Long.MAX_VALUE, 0L, 20L)).thenReturn(InvSpecialistReadVo.salesReturn(saved));
         login("inv:salesReturn:submit");
         var result=mvc.perform(post("/salesReturn/submit/9223372036854775807")
-                .header("Authorization","Bearer local-f5-test").header("Dept-NumId","20"))
+                .header("Authorization","Bearer local-f5-test").header("Dept-NumId","20").param("version", "0"))
                 .andExpect(jsonPath("$.code").value(200)).andExpect(header().string("Cache-Control","no-store, max-age=0"))
                 .andReturn();
         var data=new ObjectMapper().readTree(result.getResponse().getContentAsString()).get("data");
         java.util.Set<String> fields=new java.util.HashSet<>();data.fieldNames().forEachRemaining(fields::add);
-        assertThat(fields).containsExactlyInAnyOrder("returnId","returnNo","status","shopDeptId","_specialistSummaryOnly");
+        assertThat(fields).containsExactlyInAnyOrder("returnId","returnNo","status","shopDeptId","version","_specialistSummaryOnly");
         assertThat(data.get("returnId").isTextual()).isTrue();assertThat(data.get("returnId").asText()).isEqualTo(Long.toString(Long.MAX_VALUE));
         assertThat(data.get("status").asText()).isEqualTo("submitted");
-        verify(salesReturn).submitSavedReturn(Long.MAX_VALUE,20L);
+        verify(salesReturn).submitSavedReturn(Long.MAX_VALUE, 0L, 20L);
+    }
+    @ParameterizedTest @CsvSource({"purchase,save,false","purchase,submit,true","purchaseReturn,save,false","purchaseReturn,submit,true","salesReturn,save,false","salesReturn,submit,true"})
+    void everyBodyWriteUsesDurableCommandAndPreservesVersion(String feature,String action,boolean submit) throws Exception
+    {
+        login("inv:"+feature+":add");
+        com.erp.common.security.utils.SecurityUtils.getLoginUser().setPermissions(Set.of("inv:"+feature+":add","inv:"+feature+":submit"));
+        var body="{\"orderTitle\":\"purchase\",\"returnTitle\":\"return\",\"supplierName\":\"supplier\",\"customerName\":\"customer\",\"purchaseOrderId\":\"10\",\"salesOrderId\":\"10\",\"version\":\"9223372036854775807\",\"returnDate\":\"2026-09-14\",\"returnReason\":\"repair test\",\"responsibility\":\"supplier\",\"details\":[{}]}";
+        mvc.perform(post("/"+feature+"/"+action).header("Authorization","Bearer local-f5-test").header("X-Request-Id","draft-route-command").header("Dept-NumId","20")
+                .contentType("application/json").content(body)).andExpect(jsonPath("$.code").value(200));
+        if(feature.equals("purchase")) verify(draftCommands).purchase(eq("draft-route-command"),argThat(row -> row.getVersion().equals(Long.MAX_VALUE)),eq(20L),eq(submit));
+        else if(feature.equals("purchaseReturn")) verify(draftCommands).purchaseReturn(eq("draft-route-command"),argThat(row -> row.getVersion().equals(Long.MAX_VALUE)),eq(20L),eq(submit));
+        else verify(draftCommands).salesReturn(eq("draft-route-command"),argThat(row -> row.getVersion().equals(Long.MAX_VALUE)),eq(20L),eq(submit));
+        verifyNoInteractions(purchase,purchaseReturn,salesReturn);
     }
     @Test void legacyAddAndSubmitKeepsItsExistingFullResultContract() throws Exception
     {
-        InvSalesReturn saved=new InvSalesReturn();saved.setReturnId(1L);saved.setCustomerName("saved customer");
+        InvSalesReturn saved=new InvSalesReturn();saved.setVersion(0L);saved.setReturnId(1L);saved.setCustomerName("saved customer");
         saved.setTotalAmount(new java.math.BigDecimal("12.34"));saved.setDetails(List.of(new InvSalesReturnDetail()));
-        when(salesReturn.submitReturn(any(),any(),eq(20L))).thenReturn(saved);
+        when(draftCommands.salesReturn(eq("draft-test-controller"),any(),eq(20L),eq(true))).thenReturn(saved);
         login("inv:salesReturn:add");
         com.erp.common.security.utils.SecurityUtils.getLoginUser().setPermissions(Set.of("inv:salesReturn:add","inv:salesReturn:submit"));
-        mvc.perform(post("/salesReturn/submit").header("Authorization","Bearer local-f5-test").header("Dept-NumId","20")
+        mvc.perform(post("/salesReturn/submit").header("X-Request-Id", "draft-test-controller").header("Authorization","Bearer local-f5-test").header("Dept-NumId","20").param("version", "0")
                 .contentType("application/json").content("{\"returnTitle\":\"return\",\"customerName\":\"customer\",\"details\":[]}"))
                 .andExpect(jsonPath("$.code").value(200)).andExpect(jsonPath("$.data.customerName").value("saved customer"))
                 .andExpect(jsonPath("$.data.totalAmount").value(12.34)).andExpect(jsonPath("$.data.details").isArray());
@@ -151,19 +166,19 @@ class InvSpecialistReadControllerTest
     {
         Object source;Object line;String url;String permission;
         if(route.startsWith("purchaseReturn")) {
-            InvPurchaseReturn row=new InvPurchaseReturn();InvPurchaseReturnDetail detail=new InvPurchaseReturnDetail();
+            InvPurchaseReturn row=new InvPurchaseReturn();row.setVersion(0L);InvPurchaseReturnDetail detail=new InvPurchaseReturnDetail();
             source=row;line=detail;fillLongIdentities(row);fillLongIdentities(detail);row.setDetails(List.of(detail));
             when(purchaseReturn.getReturnDraft(Long.MAX_VALUE,20L)).thenReturn(InvSpecialistReadVo.purchaseReturn(row));
             url="/purchaseReturn/draft/9223372036854775807";permission="inv:purchaseReturn:add";
         } else if(route.startsWith("purchase")) {
-            InvPurchaseOrder row=new InvPurchaseOrder();InvPurchaseDetail detail=new InvPurchaseDetail();
+            InvPurchaseOrder row=new InvPurchaseOrder();row.setVersion(0L);InvPurchaseDetail detail=new InvPurchaseDetail();
             source=row;line=detail;fillLongIdentities(row);fillLongIdentities(detail);row.setDetails(List.of(detail));
             when(purchase.getPurchaseDraft(Long.MAX_VALUE,20L)).thenReturn(InvSpecialistReadVo.purchase(row));
             when(purchase.getReceiveContext(Long.MAX_VALUE,20L)).thenReturn(InvSpecialistReadVo.purchase(row));
             boolean receive=route.equals("purchaseReceive");url="/purchase/"+(receive?"receive-context":"draft")+"/9223372036854775807";
             permission="inv:purchase:"+(receive?"receive":"add");
         } else if(route.equals("salesReturnDraft")) {
-            InvSalesReturn row=new InvSalesReturn();InvSalesReturnDetail detail=new InvSalesReturnDetail();
+            InvSalesReturn row=new InvSalesReturn();row.setVersion(0L);InvSalesReturnDetail detail=new InvSalesReturnDetail();
             source=row;line=detail;fillLongIdentities(row);fillLongIdentities(detail);row.setDetails(List.of(detail));
             when(salesReturn.getReturnDraft(Long.MAX_VALUE,20L)).thenReturn(InvSpecialistReadVo.salesReturn(row));
             url="/salesReturn/draft/9223372036854775807";permission="inv:salesReturn:add";
@@ -175,7 +190,7 @@ class InvSpecialistReadControllerTest
             url="/salesReturn/source-orders"+(route.equals("sourceList")?"":"/9223372036854775807");permission="inv:salesReturn:add";
         }
         login(permission);
-        var result=mvc.perform(get(url).header("Authorization","Bearer local-f5-test").header("Dept-NumId","20"))
+        var result=mvc.perform(get(url).header("Authorization","Bearer local-f5-test").header("Dept-NumId","20").param("version", "0"))
                 .andExpect(jsonPath("$.code").value(200)).andReturn();
         var json=new ObjectMapper().readTree(result.getResponse().getContentAsString());
         var data=route.equals("sourceList")?json.get("rows").get(0):json.get("data");
@@ -203,33 +218,33 @@ class InvSpecialistReadControllerTest
     @Test void submitOnlyCannotCreateOrRewriteUsingLegacyBody() throws Exception
     {
         login("inv:salesReturn:submit");
-        mvc.perform(post("/salesReturn/submit").header("Authorization","Bearer local-f5-test").header("Dept-NumId","20")
+        mvc.perform(post("/salesReturn/submit").header("X-Request-Id", "draft-test-controller").header("Authorization","Bearer local-f5-test").header("Dept-NumId","20").param("version", "0")
                 .contentType("application/json").content("{}"))
                 .andExpect(jsonPath("$.code").value(403));verifyNoInteractions(salesReturn);
     }
     @Test void sourceQueryCannotOverrideAuthenticatedOrganizationAndExactLongBinding() throws Exception
     {
         login("inv:salesReturn:add");
-        mvc.perform(get("/salesReturn/source-orders").header("Authorization","Bearer local-f5-test").header("Dept-NumId","20")
+        mvc.perform(get("/salesReturn/source-orders").header("Authorization","Bearer local-f5-test").header("Dept-NumId","20").param("version", "0")
                 .param("shopDeptId","99").param("params.scopeDeptIds","99").param("keyword","客户"))
                 .andExpect(jsonPath("$.code").value(200));
         verify(salesReturn).selectReturnableSourceOrders(argThat(q -> "客户".equals(q.getKeyword())),eq(20L));
-        mvc.perform(get("/salesReturn/source-orders/9223372036854775807").header("Authorization","Bearer local-f5-test").header("Dept-NumId","20"));
+        mvc.perform(get("/salesReturn/source-orders/9223372036854775807").header("Authorization","Bearer local-f5-test").header("Dept-NumId","20").param("version", "0"));
         verify(salesReturn).getReturnableSourceOrder(Long.MAX_VALUE,20L);
     }
     @ParameterizedTest @CsvSource({"pageSize,0","pageSize,101","pageNum,0","pageNum,2147483648","startDate,2026-02-30","startDate,2026-9-12","endDate,2026-09-12T00:00:00"})
     void malformedQueryNeverReachesService(String field,String value) throws Exception
     {
-        login("inv:salesReturn:add");mvc.perform(get("/salesReturn/source-orders").header("Authorization","Bearer local-f5-test").header("Dept-NumId","20").param(field,value));
+        login("inv:salesReturn:add");mvc.perform(get("/salesReturn/source-orders").header("Authorization","Bearer local-f5-test").header("Dept-NumId","20").param("version", "0").param(field,value));
         verifyNoInteractions(salesReturn);
     }
     @ParameterizedTest @ValueSource(strings={"purchase","purchaseReturn","salesReturn"})
     void purposeReadVoKeepsLongIdsExactAndOldJsonNumeric(String feature) throws Exception
     {
         Object original,projected;String key;
-        if(feature.equals("purchase")) { InvPurchaseOrder row=new InvPurchaseOrder();row.setOrderId(Long.MAX_VALUE);original=row;projected=InvSpecialistReadVo.purchase(row);key="orderId"; }
-        else if(feature.equals("purchaseReturn")) { InvPurchaseReturn row=new InvPurchaseReturn();row.setReturnId(Long.MAX_VALUE);original=row;projected=InvSpecialistReadVo.purchaseReturn(row);key="returnId"; }
-        else { InvSalesReturn row=new InvSalesReturn();row.setReturnId(Long.MAX_VALUE);original=row;projected=InvSpecialistReadVo.salesReturn(row);key="returnId"; }
+        if(feature.equals("purchase")) { InvPurchaseOrder row=new InvPurchaseOrder();row.setVersion(0L);row.setOrderId(Long.MAX_VALUE);original=row;projected=InvSpecialistReadVo.purchase(row);key="orderId"; }
+        else if(feature.equals("purchaseReturn")) { InvPurchaseReturn row=new InvPurchaseReturn();row.setVersion(0L);row.setReturnId(Long.MAX_VALUE);original=row;projected=InvSpecialistReadVo.purchaseReturn(row);key="returnId"; }
+        else { InvSalesReturn row=new InvSalesReturn();row.setVersion(0L);row.setReturnId(Long.MAX_VALUE);original=row;projected=InvSpecialistReadVo.salesReturn(row);key="returnId"; }
         var mapper=new ObjectMapper();assertThat(mapper.readTree(mapper.writeValueAsString(projected)).get(key).asText()).isEqualTo(Long.toString(Long.MAX_VALUE));
         assertThat(mapper.readTree(mapper.writeValueAsString(projected)).get(key).isTextual()).isTrue();
         assertThat(mapper.readTree(mapper.writeValueAsString(original)).get(key).isIntegralNumber()).isTrue();

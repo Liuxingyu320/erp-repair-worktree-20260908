@@ -6,8 +6,8 @@ export function listProduct(query, config) {
 }
 
 // 查询商品详情
-export function getProduct(productId) {
-  return request({ url: '/inventory/product/' + productId, method: 'get' })
+export function getProduct(productId, options) {
+  return request({ url: '/inventory/product/' + productId, method: 'get', silentError: options && options.silentError === true })
 }
 
 // 新增商品

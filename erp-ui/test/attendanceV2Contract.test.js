@@ -240,6 +240,8 @@ assert.ok(siteManagement.includes("v-hasPermi=\"['oa:attendance:site:add']\"") &
 assert.ok(desktopPage.includes('<day-result-management'), 'desktop attendance center must replace the day-result placeholder with the real manager page')
 assert.ok(desktopPage.includes('<leave-management') && desktopPage.includes('<correction-management'), 'desktop attendance center must expose real leave and correction lists')
 assert.ok(desktopLeave.includes('listShopAttendanceLeaves') && desktopCorrection.includes('listShopAttendanceCorrections'), 'desktop request lists must read the V2 scoped APIs')
+assert.ok(desktopCorrection.includes('拟补打卡时间') && desktopCorrection.includes('提交时间') && desktopCorrection.includes('employeeKeyword'), 'correction lists must separate requested punch time from submit time and allow finding a person by name')
+assert.ok(desktopLeave.includes('employeeKeyword') && desktopLeave.includes('filteredRequests') && desktopLeave.includes('attachmentThresholdMinutes == null'), 'leave lists must find people by name and keep optional type fields empty')
 assert.ok(!desktopPage.includes('handleCheckIn') && !desktopPage.includes('handleCheckOut'), 'desktop center must not retain WEB punch buttons')
 assert.ok(shiftManagement.includes("const CONTINUOUS_PUNCH_MODE = 'SHIFT_BOUNDARY'") && shiftManagement.includes("const SEGMENT_PUNCH_MODE = 'PER_WORK_SEGMENT'"), 'shift management must expose compatible boundary and per-work-segment punch modes')
 assert.ok(!shiftManagement.includes('this.form.punchMode = SEGMENT_PUNCH_MODE'), 'adding a work segment must not auto-select PER_WORK_SEGMENT')

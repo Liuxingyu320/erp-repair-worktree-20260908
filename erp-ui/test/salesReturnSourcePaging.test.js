@@ -31,6 +31,7 @@ function setup(relative = 'src/views/inventory/components/SalesReturnSourcePicke
   const c = new Vue({ ...definition, mixins: [], created: [], mounted: [], propsData: { contextKey: 'form1', active: true, ...props },
     beforeCreate() { this.$store = store; this.$route = route; this.$modal = { msgError: m => errors.push(m), msgWarning: m => errors.push(m), msgSuccess() {} } }
   })
+  if (relative === 'src/views/inventory/salesReturn/index.vue') c.getList = () => Promise.resolve()
   c.$on('select', x => emitted.push(x))
   return { c, definition, env, calls, focusSpecs, errors, store, route, emitted, take: () => calls.at(-1),
     async page(rows, total=rows.length) { const pending=c.loadPage(); calls.at(-1).resolve({rows,total}); await pending; await tick() },

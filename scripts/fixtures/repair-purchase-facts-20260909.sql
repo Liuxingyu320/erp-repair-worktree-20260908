@@ -472,6 +472,8 @@ CREATE TABLE `inv_sales_return_detail` (
   `detail_id` bigint NOT NULL AUTO_INCREMENT COMMENT '明细ID',
   `return_id` bigint NOT NULL COMMENT '退货单ID',
   `sales_detail_id` bigint DEFAULT NULL COMMENT '原销售明细ID',
+  `item_type` varchar(20) NOT NULL DEFAULT 'product',
+  `item_id` bigint DEFAULT NULL,
   `product_id` bigint NOT NULL COMMENT '商品ID',
   `product_name` varchar(128) NOT NULL COMMENT '商品名称',
   `sku` varchar(64) DEFAULT '' COMMENT 'SKU',

@@ -41,9 +41,8 @@ import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.EnableTransactionManagement;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.mysql.MySQLContainer;
+import org.junit.jupiter.api.extension.RegisterExtension;
+import com.erp.system.testsupport.MySqlTransactionTestDatabase;
 import org.mybatis.spring.SqlSessionFactoryBean;
 import org.mybatis.spring.SqlSessionTemplate;
 import org.mybatis.spring.annotation.MapperScan;
@@ -55,7 +54,6 @@ import com.erp.system.domain.SysHrLifecycleAction;
 import com.erp.system.domain.SysHrSignEventOutbox;
 import com.erp.system.mapper.SysHrSignEventOutboxMapper;
 
-@Testcontainers(disabledWithoutDocker = false)
 @ActiveProfiles("hr-sign-outbox-it")
 @SpringBootTest(classes = HrSignEventOutboxMySql57IT.ItConfiguration.class,
         webEnvironment = SpringBootTest.WebEnvironment.NONE,
@@ -67,14 +65,9 @@ class HrSignEventOutboxMySql57IT
 {
     private static final Instant NOW = Instant.parse("2026-07-13T04:00:00Z");
 
-    @Container
-    static final MySQLContainer MYSQL = new MySQLContainer("mysql:5.7.44")
-            .withDatabaseName("hr_sign_outbox_it")
-            .withUsername("hr_outbox_it")
-            .withPassword("hr_outbox_it_password")
-            .withEnv("MYSQL_INITDB_SKIP_TZINFO", "1")
-            .withCommand("--character-set-server=utf8mb4",
-                    "--collation-server=utf8mb4_unicode_ci");
+    @RegisterExtension
+    static final MySqlTransactionTestDatabase MYSQL =
+            new MySqlTransactionTestDatabase("sign_outbox", "hr.sign.outbox.it");
 
     @DynamicPropertySource
     static void mysqlProperties(DynamicPropertyRegistry registry)
@@ -226,10 +219,10 @@ class HrSignEventOutboxMySql57IT
     }
 
     @Test
-    void databaseIsRealMySql5744()
+    void databaseUsesConfiguredMySqlVersion()
     {
         assertThat(jdbc.queryForObject("select version()", String.class))
-                .startsWith("5.7.44");
+                .startsWith(MYSQL.getExpectedVersionPrefix());
     }
 
     private SysHrSignEventOutbox insertRow(Long actionId, String status,

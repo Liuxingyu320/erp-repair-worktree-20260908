@@ -39,7 +39,7 @@
           <option v-for="event in punchEvents" :key="event.punchEventId" :value="event.punchEventId">{{ eventPunchLabel(event) }}·{{ dateTime(event.serverPunchTime) }}</option>
         </select>
       </label>
-      <label><span>申请更正为</span><input v-model="form.requestedPunchTime" type="datetime-local" step="60" required></label>
+      <label><span>拟补打卡时间</span><input v-model="form.requestedPunchTime" type="datetime-local" step="60" required></label>
       <label><span>更正原因</span><textarea v-model.trim="form.reason" maxlength="1000" rows="4" placeholder="请说明为何需要补卡，原事件不会被修改" required /></label>
       <div class="evidence-note"><i class="el-icon-lock" /><span>通过后服务端会生成更正结果；原始打卡事件和照片证据保持不变。</span></div>
       </fieldset>
@@ -60,7 +60,7 @@
       <div v-else-if="!rows.length" class="correction-state">暂无补卡申请。</div>
       <article v-for="row in rows" v-else :key="row.correctionRequestId" class="correction-row">
         <div class="correction-row__top"><div><strong>{{ correctionLabel(row.correctionType) }}</strong><small>{{ row.userName || '' }}{{ row.correctionRequestNo ? `·${row.correctionRequestNo}` : '' }}</small></div><span :class="['correction-status', statusTone(row.status)]">{{ statusLabel(row.status) }}</span></div>
-        <p>{{ row.businessDate || '-' }}·{{ correctionRowPunchLabel(row) }}·申请 {{ dateTime(row.requestedPunchTime) }}</p>
+        <p>{{ row.businessDate || '-' }}·{{ correctionRowPunchLabel(row) }}·拟补 {{ dateTime(row.requestedPunchTime) }}</p>
         <p v-if="correctionChangeText(row)" class="correction-change">{{ correctionChangeText(row) }}<small v-if="row.originalPunchEventId">原事件 #{{ row.originalPunchEventId }}</small></p>
         <p>{{ row.reason || '-' }}</p>
         <div v-if="!approvalFocus" class="correction-row__actions">
@@ -361,7 +361,7 @@ export default {
       if (!this.form.scheduleId) return '请选择排班'
       if (this.usesSlotTargeting && (!this.form.targetPunchSlotKey || !this.form.targetScheduleSegmentSnapshotId)) return '请选择需要补卡的具体工作段'
       if (this.requiresOriginalEvent && !this.form.originalPunchEventId) return '请选择需要更正的原打卡事件'
-      if (!this.form.requestedPunchTime) return '请填写申请更正时间'
+      if (!this.form.requestedPunchTime) return '请填写拟补打卡时间'
       if (!String(this.form.reason || '').trim()) return '请填写更正原因'
       return ''
     },

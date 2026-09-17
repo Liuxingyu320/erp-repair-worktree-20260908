@@ -170,7 +170,7 @@
     >
       <el-form ref="formRef" :model="form" :rules="rules" :disabled="formSubmitting" label-width="96px">
         <el-form-item label="标题" prop="orderTitle">
-          <el-input ref="salesTitleInput" v-model="form.orderTitle" aria-label="销售单标题" maxlength="120"/>
+          <el-input ref="salesTitleInput" v-model="form.orderTitle" aria-label="销售单标题" maxlength="120" @input="titleEdited = true"/>
         </el-form-item>
         <el-form-item label="客户" prop="customerId">
           <el-select
@@ -192,6 +192,8 @@
               :value="item.customerId"
             />
           </el-select>
+          <el-button v-if="canQuickCreateCustomer" type="text" :disabled="formSubmitting" @click="openQuickCustomer">新增客户并选中</el-button>
+          <div v-if="recentCustomers.length">最近使用：<el-button v-for="customer in recentCustomers" :key="customer.id" type="text" :disabled="formSubmitting" @click="chooseRecentCustomer(customer)">{{ customer.label }}</el-button></div>
         </el-form-item>
         <el-form-item label="销售日期" prop="orderDate">
           <el-date-picker v-model="form.orderDate" type="date" placeholder="选择日期" value-format="yyyy-MM-dd" style="width:100%"/>
@@ -206,6 +208,7 @@
           <el-input v-model="form.remark" type="textarea" :rows="2" maxlength="500"/>
         </el-form-item>
         <el-divider content-position="left">销售明细</el-divider>
+        <el-button size="small" icon="el-icon-goods" :disabled="formSubmitting" @click="batchPickerOpen = true">批量选择物料</el-button>
         <el-row v-for="(item, idx) in form.details" :key="idx" :gutter="8" class="mb8 sales-detail-row">
           <el-col :span="5">
             <el-radio-group v-model="item.itemType" size="mini" @change="onItemTypeChange(item)">
@@ -226,13 +229,17 @@
             </div>
           </el-col>
           <el-col :span="4">
-            <el-input-number v-model="item.quantity" :min="1" :precision="2" placeholder="数量" size="small" style="width:100%"/>
+            <label :for="'sales-quantity-' + idx">数量<span class="sales-field-context">（{{ item.itemName || item.productName || ('第 ' + (idx + 1) + ' 行') }}）</span></label>
+            <el-input :id="'sales-quantity-' + idx" v-model="item.quantity" inputmode="decimal" aria-label="销售数量，最多两位小数" placeholder="数量" size="small" style="width:100%"/>
+            <span v-if="!validInventoryQuantity(item.quantity)" class="text-danger" role="alert">请输入大于 0 的数量，最多两位小数</span>
           </el-col>
           <el-col :span="4">
-            <el-input-number v-model="item.unitPrice" :min="0.01" :precision="2" placeholder="单价" size="small" style="width:100%"/>
+            <label :for="'sales-price-' + idx">单价<span class="sales-field-context">（{{ item.itemName || item.productName || ('第 ' + (idx + 1) + ' 行') }}）</span></label>
+            <el-input-number :id="'sales-price-' + idx" :label="'单价（' + (item.itemName || item.productName || ('第 ' + (idx + 1) + ' 行')) + '）'" v-model="item.unitPrice" :min="0.01" :precision="2" placeholder="单价" size="small" style="width:100%"/>
           </el-col>
           <el-col :span="2">
-            <span class="amount-txt">{{ (item.quantity * item.unitPrice || 0).toFixed(2) }}</span>
+            <div>金额<span class="sales-field-context">（{{ item.itemName || item.productName || ('第 ' + (idx + 1) + ' 行') }}）</span></div>
+            <span class="amount-txt" aria-label="明细金额">{{ (item.quantity * item.unitPrice || 0).toFixed(2) }}</span>
           </el-col>
           <el-col :span="2">
             <el-button type="text" size="mini" style="color:#F56C6C" @click="removeDetail(idx)">删除</el-button>
@@ -254,10 +261,28 @@
         <el-button v-hasPermi="['inv:sales:submit']" type="success" :loading="formSubmitting" :disabled="!isStoreContext || formSubmitting" @click="doSave(true)">保存并提交</el-button>
       </div>
     </el-dialog>
+    <sales-material-picker :open="batchPickerOpen && open" :context-key="choiceScope + ':' + editorRevision" :recent="recentMaterials" @close="batchPickerOpen = false" @confirm="addBatchMaterials" />
+    <mobile-quick-customer-form :open="quickCustomerOpen && open" v-model="quickCustomerDraft" :saving="quickCustomerSaving" :error="quickCustomerError" @close="quickCustomerOpen = false" @submit="createQuickCustomer" />
+    <el-dialog title="保留未保存的销售内容" :visible.sync="closeChoiceOpen" width="min(520px, 96vw)" append-to-body :close-on-click-modal="false" :show-close="false" :close-on-press-escape="false">
+      <p>当前内容尚未保存，可以继续填写，也可保留内容后离开。保留的内容仅在本次登录、当前门店页面中恢复。</p>
+      <div slot="footer">
+        <el-button :disabled="formSubmitting" @click="finishCloseChoice('continue')">继续编辑</el-button>
+        <el-button :disabled="formSubmitting" @click="finishCloseChoice('discard')">放弃修改</el-button>
+        <el-button :disabled="formSubmitting" @click="finishCloseChoice('keep')">保留并关闭</el-button>
+        <el-button v-hasPermi="['inv:sales:add']" type="primary" :loading="formSubmitting" @click="finishCloseChoice('save')">保存草稿</el-button>
+      </div>
+    </el-dialog>
   </div>
 </template>
 
 <script>
+import SalesMaterialPicker from "@/views/inventory/components/SalesMaterialPicker.vue"
+import MobileQuickCustomerForm from "@/views/mobile/feature/components/MobileQuickCustomerForm.vue"
+import { createCustomerServiceCard, getCustomerServiceCardCapabilities } from "@/api/inventory/customer"
+import { checkPermi } from "@/utils/permission"
+const { createCustomerDraft, normalizeQuickCustomerPayload, normalizeCustomerServiceCardCapabilities, isCustomerQuickCreateAllowed } = require("@/views/mobile/feature/mobileQuickCustomer")
+const { rememberSalesChoice, recentSalesChoices } = require("@/utils/salesRecentChoices")
+const { validInventoryQuantity } = require("@/utils/inventoryQuantity")
 import { listSales, getSalesDetail, saveSales, submitSales, cancelSales } from "@/api/inventory/sales"
 import { createDeliveryNotice as createDeliveryNoticeApi, repairSalesWarehouses } from "@/api/inventory/deliveryNotice"
 import { listCustomerOptions } from "@/api/inventory/customer"
@@ -270,9 +295,12 @@ const { createUiOperationScope } = require("@/utils/uiOperationScope")
 const { defaultSalesWarehouse, fillEmptySalesWarehouses } = require("@/utils/salesWarehouse")
 export default {
   name: "InvSales",
-  components: { InventoryItemSelect, WarehouseSelect },
+  components: { SalesMaterialPicker, MobileQuickCustomerForm, InventoryItemSelect, WarehouseSelect },
   data() {
     return {
+      closeChoiceOpen: false, retainedDraft: null, formBaseline: "", autoTitle: "", titleEdited: false,
+      batchPickerOpen: false, recentRevision: 0,
+      quickCustomerOpen: false, quickCustomerSaving: false, quickCustomerError: "", quickCustomerDraft: {}, quickCustomerRequestKey: "", customerKeyword: "", customerCapability: {},
       loading: false, total: 0, list: [], listError: "", listRequestSequence: 0, activeListQuerySnapshot: "",
       open: false, formSubmitting: false, detailOpen: false, detailLoading: false,
       customerLoading: false, customerOptions: [], dateRange: [],
@@ -292,6 +320,12 @@ export default {
     }
   },
   computed: {
+    choiceScope() { return JSON.stringify([this.$store.getters.id, this.$store.state.user.sessionRevision, this.selectedDeptContext.deptId]) },
+    recentCustomers() { void this.recentRevision; return recentSalesChoices(this.choiceScope, "customer") },
+    recentMaterials() { void this.recentRevision; return recentSalesChoices(this.choiceScope, "material") },
+    formDirty() { return this.open && this.formBaseline !== JSON.stringify(this.form) },
+    customerContextKey() { return String(this.selectedDeptContext.deptId || "") + "|STORE" },
+    canQuickCreateCustomer() { return this.open && this.isStoreContext && isCustomerQuickCreateAllowed({ entity: "customer", field: { quickCreate: true }, hasPermission: checkPermi(["inv:customerCard:add"]), capability: this.customerCapability, contextKey: this.customerContextKey }) },
     selectedDeptContext() {
       void this.contextRevision
       return getSelectedDeptContext()
@@ -320,11 +354,21 @@ export default {
     window.addEventListener("erp:dept-changed", this._deptChanged)
     this.getList()
   },
+  beforeRouteLeave(to, from, next) {
+    if (this.formSubmitting || this.quickCustomerSaving) { this.$modal.msgWarning("请等待当前保存完成"); next(false); return }
+    if (!this.formDirty) { next(); return }
+    this._pendingNavigation = next
+    this.closeChoiceOpen = true
+  },
+  deactivated() { this.operationScope().deactivate(); this.batchPickerOpen = false; this.quickCustomerOpen = false },
+  activated() { this.operationScope().activate(); this.getList() },
   beforeDestroy() {
     window.removeEventListener("erp:dept-changed", this._deptChanged)
     this.operationScope().deactivate()
   },
   watch: {
+    "form.orderDate"() { this.updateAutomaticTitle() },
+    "$store.state.user.sessionRevision"() { this.retainedDraft = null; this.handleContextChanged() },
     "$store.getters.id"() { this.handleContextChanged() },
     "$store.getters.token"() { this.handleContextChanged() },
     open(value) { if (!value) this.invalidateEditor() },
@@ -332,6 +376,7 @@ export default {
     repairOpen(value) { if (!value) { this.repairRevision += 1; this.operationScope().invalidate("repair"); this.repairSubmitting = false } }
   },
   methods: {
+    validInventoryQuantity,
     openWarehouseRepair(row) {
       if (!this.ensureStoreContext()) return
       this.repairRevision += 1
@@ -423,6 +468,8 @@ export default {
       return this._salesScope
     },
     handleContextChanged() {
+      this.closeChoiceOpen = false; this.batchPickerOpen = false; this.quickCustomerOpen = false; this.quickCustomerSaving = false; this.customerCapability = {}
+      if (this._pendingNavigation) { this._pendingNavigation(false); this._pendingNavigation = null }
       this.contextRevision += 1
       this.operationScope().invalidate()
       this.invalidateEditor()
@@ -522,6 +569,8 @@ export default {
       this.form = { orderId: undefined, orderTitle: "", customerId: undefined, customerName: "", orderDate: this.defaultOrderDate(), remark: "", totalAmount: 0, details: [] }
       this.customerOptions = []
       this.defaultWarehouseId = undefined
+      this.titleEdited = false; this.autoTitle = ""
+      this.formBaseline = JSON.stringify(this.form)
     },
     defaultOrderDate() {
       return parseTime(new Date(), "{y}-{m}-{d}")
@@ -531,13 +580,14 @@ export default {
       return customer.customerName + (customer.customerCode ? "（" + customer.customerCode + "）" : "")
     },
     loadCustomers(keyword) {
+      this.customerKeyword = keyword || ""
       if (!this.isStoreContext) {
         this.customerOptions = []
         return Promise.resolve([])
       }
       const operation = this.operationScope().begin("customers", this.editorRevision)
       this.customerLoading = true
-      return listCustomerOptions(keyword ? String(keyword).trim() : undefined).then(res => {
+      return listCustomerOptions(keyword ? String(keyword).trim() : undefined, { silentError: true }).then(res => {
         if (!this.operationScope().isCurrent(operation, this.editorRevision)) return []
         const selected = this.customerOptions.find(item => String(item.customerId) === String(this.form.customerId))
         this.customerOptions = res.data || []
@@ -554,6 +604,7 @@ export default {
     onCustomerChange(customerId) {
       const customer = this.customerOptions.find(item => String(item.customerId) === String(customerId))
       this.form.customerName = customer ? customer.customerName : ""
+      this.updateAutomaticTitle()
     },
     itemTypeLabel(type) {
       return { product: "商品", gift: "礼盒" }[type] || "其他物料"
@@ -625,14 +676,23 @@ export default {
       this.lastSalesDialogTrigger = null
     },
     openForm(row, event) {
+      if (this.formSubmitting || this.quickCustomerSaving) return Promise.resolve({ busy: true })
       if (!this.ensureStoreContext()) return
       this.invalidateEditor()
       this.captureSalesDialogTrigger(event)
       const operation = this.operationScope().begin("editor", this.editorRevision)
       if (!row) {
         this.resetForm()
+        if (this.retainedDraft && this.retainedDraft.scope === this.choiceScope) {
+          this.form = JSON.parse(JSON.stringify(this.retainedDraft.form))
+          this.formBaseline = this.retainedDraft.baseline
+          this.titleEdited = this.retainedDraft.titleEdited
+          this.customerOptions = this.retainedDraft.customers
+          this.defaultWarehouseId = this.retainedDraft.defaultWarehouseId
+        }
         this.open = true
-        this.loadCustomers()
+        this.loadCustomerCapability()
+        this.loadCustomers(this.form.customerName)
         return
       }
       return getSalesDetail(row.orderId).then(res => {
@@ -643,7 +703,10 @@ export default {
           details: (data.details || []).map(this.normalizeDetail)
         })
         this.customerOptions = data.customerId ? [{ customerId: data.customerId, customerName: data.customerName }] : []
+        this.formBaseline = JSON.stringify(this.form)
+        this.titleEdited = true
         this.open = true
+        this.loadCustomerCapability()
         this.loadCustomers(data.customerName)
       })
     },
@@ -659,12 +722,79 @@ export default {
     addDetail() { this.form.details.push({ warehouseId: this.defaultWarehouseId, itemType: null, itemId: null, itemCode: "", itemName: "", productId: null, productName: "", productCode: "", sku: "", spec: "", unit: "", quantity: 1, unitPrice: 0, amount: 0 }) },
     removeDetail(idx) { this.form.details.splice(idx, 1) },
     handleFormBeforeClose(done) {
-      if (this.formSubmitting) return
+      if (this.formSubmitting || this.quickCustomerSaving) return
+      if (this.formDirty) { this.closeChoiceOpen = true; return }
       done()
     },
-    closeForm() {
-      if (this.formSubmitting) return
-      this.open = false
+    closeForm() { return this.handleFormBeforeClose(() => { this.open = false }) },
+    finishCloseChoice(action) {
+      if (this.formSubmitting || this.quickCustomerSaving) return
+      if (action === "save") return this.doSave(false).then(result => { if (result && result.success) this.finishCloseChoice("discard") })
+      if (action === "keep") this.retainedDraft = { scope: this.choiceScope, form: JSON.parse(JSON.stringify(this.form)), baseline: this.formBaseline, titleEdited: this.titleEdited, customers: this.customerOptions.map(row => ({ ...row })), defaultWarehouseId: this.defaultWarehouseId }
+      if (action === "discard") this.retainedDraft = null
+      this.closeChoiceOpen = false
+      if (action !== "continue") this.open = false
+      if (this._pendingNavigation) { const next = this._pendingNavigation; this._pendingNavigation = null; next(action === "continue" ? false : undefined) }
+    },
+    updateAutomaticTitle() {
+      if (this.titleEdited || !this.form || this.form.orderId) return
+      const title = this.form.customerName ? [this.form.customerName, this.form.orderDate].filter(Boolean).join(" ").slice(0, 120) : ""
+      this.form.orderTitle = title; this.autoTitle = title
+    },
+    loadCustomerCapability() {
+      const operation = this.operationScope().begin("customer-capability", this.editorRevision), contextKey = this.customerContextKey
+      this.customerCapability = {}
+      if (!checkPermi(["inv:customerCard:add"]) || !checkPermi(["inv:customerCard:list"])) return Promise.resolve()
+      return getCustomerServiceCardCapabilities().then(response => {
+        if (this.operationScope().isCurrent(operation, this.editorRevision)) this.customerCapability = normalizeCustomerServiceCardCapabilities(response, contextKey)
+      }).catch(() => {})
+    },
+    openQuickCustomer() {
+      if (!this.canQuickCreateCustomer || this.formSubmitting) return
+      this.quickCustomerDraft = createCustomerDraft(this.customerKeyword)
+      this.quickCustomerRequestKey = "desktop-card-" + crypto.randomUUID()
+      this.quickCustomerError = ""; this.quickCustomerOpen = true
+    },
+    createQuickCustomer() {
+      if (this.quickCustomerSaving || !this.canQuickCreateCustomer) return
+      let payload
+      try { payload = normalizeQuickCustomerPayload(this.quickCustomerDraft) } catch (error) { this.quickCustomerError = error.message; return }
+      const operation = this.operationScope().begin("quick-customer", this.editorRevision), deptId = this.selectedDeptContext.deptId
+      const assertContext = () => { if (!this.operationScope().isCurrent(operation, this.editorRevision)) throw new Error("账号或组织已变化，请回到原客户创建窗口核对") }
+      this.quickCustomerSaving = true; this.quickCustomerError = ""
+      return createCustomerServiceCard({ ...payload, requestKey: this.quickCustomerRequestKey, sourceClient: "DESKTOP" }, { deptId, assertContext }).then(response => {
+        if (!this.operationScope().isCurrent(operation, this.editorRevision) || !this.quickCustomerOpen) return
+        if (!response.data || !response.data.customerId) throw new Error("客户已处理，请搜索客户名称核对结果")
+        this.customerOptions.unshift(response.data)
+        this.form.customerId = response.data.customerId
+        this.onCustomerChange(response.data.customerId)
+        this.quickCustomerOpen = false
+      }).catch(error => { if (this.operationScope().isCurrent(operation, this.editorRevision)) this.quickCustomerError = error.message || "创建失败，重试将使用同一操作编号" })
+        .finally(() => { if (this.operationScope().isCurrent(operation, this.editorRevision)) this.quickCustomerSaving = false })
+    },
+    chooseRecentCustomer(choice) {
+      const operation = this.operationScope().begin("recent-customer", this.editorRevision)
+      return listCustomerOptions(choice.label, { silentError: true }).then(response => {
+        if (!this.open || !this.operationScope().isCurrent(operation, this.editorRevision)) return
+        const customer = (response.data || []).find(row => String(row.customerId) === choice.id)
+        if (!customer) { this.$modal.msgWarning("该客户当前不可选，请重新搜索"); return }
+        this.customerOptions = [customer, ...this.customerOptions.filter(row => String(row.customerId) !== choice.id)]
+        this.form.customerId = customer.customerId; this.onCustomerChange(customer.customerId)
+      }).catch(() => { if (this.operationScope().isCurrent(operation, this.editorRevision)) this.$modal.msgError("客户核对失败，请重试") })
+    },
+    addBatchMaterials(items) {
+      if (!this.open || !this.batchPickerOpen || this.formSubmitting) return
+      items.forEach(item => {
+        const existing = this.form.details.find(row => row.itemType === item.itemType && String(row.itemId) === String(item.itemId))
+        if (existing) return
+        this.addDetail(); this.onItemSelected(item, this.form.details.length - 1)
+      })
+      this.batchPickerOpen = false
+    },
+    rememberChoices() {
+      rememberSalesChoice(this.choiceScope, "customer", { id: this.form.customerId, label: this.form.customerName })
+      this.form.details.forEach(row => rememberSalesChoice(this.choiceScope, "material", { id: row.itemId || row.productId, type: row.itemType || "product", label: row.itemName || row.productName }))
+      this.recentRevision += 1
     },
     validateEditorForm() {
       return new Promise(resolve => {
@@ -704,6 +834,7 @@ export default {
         this.$modal.msgError("请为每条明细选择已授权的出库仓库，核对后提交")
         return { invalid: true }
       }
+      if (this.form.details.some(row => !validInventoryQuantity(row.quantity))) { this.$modal.msgError("数量必须大于 0 且最多两位小数，请检查标红的明细"); return { invalid: true } }
       const zeroPriceItem = this.form.details.find(d => this.toNumber(d.unitPrice) <= 0)
       if (zeroPriceItem) {
         this.$modal.msgError("物料 [" + (zeroPriceItem.itemName || zeroPriceItem.productName || "未命名") + "] 售价必须大于0，请先维护售价")
@@ -721,6 +852,9 @@ export default {
       const api = submitAfter ? submitSales : saveSales
       return api(payload).then(() => {
         if (operation && !this.operationScope().isCurrent(operation, this.editorRevision)) return { discarded: true }
+        this.rememberChoices()
+        this.retainedDraft = null
+        this.formBaseline = JSON.stringify(this.form)
         this.$modal.msgSuccess(submitAfter ? "提交成功" : "已保存草稿")
         this.open = false
         this.getList()
@@ -780,6 +914,7 @@ export default {
 }
 </script>
 <style lang="scss" scoped>
+.sales-field-context { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 .mb12 { margin-bottom: 12px }
 .mb8 { margin-bottom: 8px }
 .order-detail { min-height: 120px; }

@@ -627,6 +627,7 @@ public class OaLaborContractDocumentService
         {
             throw new ServiceException("签名图片不能超过1MB");
         }
+        bytes = com.erp.common.core.utils.file.UploadImageNormalizer.normalize(bytes, "signature.png");
         BufferedImage signatureImage = ImageIO.read(new ByteArrayInputStream(bytes));
         if (signatureImage == null)
         {

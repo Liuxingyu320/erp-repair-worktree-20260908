@@ -10,6 +10,7 @@ function load(relative, mocks) {
   const module = { exports: {} }
   vm.runInNewContext(code, { module, exports: module.exports, Promise, JSON, console,
     require(name) {
+      if (name === '@/utils/inventoryQuantity') return require('../src/utils/inventoryQuantity')
       if (mocks[name]) return mocks[name]
       if (name === '@/mixins/todoBusinessFocus') return { createTodoBusinessFocusMixin: () => ({}) }
       if (name === '@/utils/purchaseQualityRecovery') return { createPurchaseQualityRecovery: () => ({}) }

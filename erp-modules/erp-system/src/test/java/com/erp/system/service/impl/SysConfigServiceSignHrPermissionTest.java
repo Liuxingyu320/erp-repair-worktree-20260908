@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.any;
 
@@ -188,6 +189,40 @@ class SysConfigServiceSignHrPermissionTest
                 .isInstanceOf(ServiceException.class)
                 .hasMessageContaining("敏感参数");
         verify(configMapper, never()).selectConfig(any());
+    }
+
+    @Test
+    void externalReadUsesTheSameSnapshotForValueAndSensitivity()
+    {
+        SysConfig existing = config(12L, "custom.integration", "previous-public-value");
+        existing.setConfigType("N");
+        existing.setSensitiveFlag("N");
+        when(configMapper.selectConfig(any())).thenReturn(existing);
+
+        assertThat(service.selectConfigByKeyForExternal("custom.integration"))
+                .isEqualTo("previous-public-value");
+        verify(configMapper).selectConfig(any());
+        verifyNoInteractions(redisService);
+
+        when(configMapper.selectConfig(any())).thenReturn(null);
+        assertThat(service.selectConfigByKeyForExternal("custom.missing")).isEmpty();
+    }
+
+    @Test
+    void metadataSensitiveConfigCannotBeReadOrOverwrittenWithoutExplicitReplacement()
+    {
+        SysConfig existing = config(12L, "custom.integration", "stored-secret");
+        existing.setConfigType("N");
+        existing.setSensitiveFlag("Y");
+        when(configMapper.selectConfig(any())).thenReturn(existing);
+        assertThatThrownBy(() -> service.selectConfigByKeyForExternal("custom.integration"))
+                .isInstanceOf(ServiceException.class).hasMessageContaining("敏感参数");
+        SysConfig edit = config(12L, "custom.integration", "unrequested-change");
+        edit.setConfigType("N");
+        when(configMapper.selectConfigById(12L)).thenReturn(existing);
+        when(configMapper.updateConfig(any())).thenReturn(1);
+        service.updateConfig(edit);
+        assertThat(edit.getConfigValue()).isEqualTo("stored-secret");
     }
 
     private SysConfig config(Long id, String key, String value)

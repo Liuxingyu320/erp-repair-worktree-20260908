@@ -30,6 +30,9 @@ import com.erp.inventory.service.IInvPurchaseReturnService;
 public class InvPurchaseReturnController extends InvBaseController
 {
     @Autowired
+    private com.erp.inventory.service.impl.InvDraftCommandService draftCommands;
+
+    @Autowired
     private IInvPurchaseReturnService purchaseReturnService;
 
     @RequiresPermissions(value = { "inv:purchaseReturn:add", "inv:purchaseReturn:submit", "inv:purchaseReturn:confirm", "inv:purchaseReturn:remove" }, logical = Logical.OR)
@@ -103,25 +106,37 @@ public class InvPurchaseReturnController extends InvBaseController
     }
 
     @RequiresPermissions("inv:purchaseReturn:add")
-    @IdempotentSubmit(timeout = 30)
+    @com.erp.inventory.annotation.PersistentCommand
     @Log(title = "采购退货管理", businessType = BusinessType.INSERT)
     @PostMapping("/save")
     public AjaxResult save(@Validated @RequestBody InvPurchaseReturnSaveRequest request,
-            HttpServletRequest httpRequest, HttpServletResponse response)
+            @org.springframework.web.bind.annotation.RequestHeader("X-Request-Id") String requestId, HttpServletRequest httpRequest, HttpServletResponse response)
     {
         disableCaching(response);
-        return success(purchaseReturnService.saveDraft(request, request.getDetails(), resolveShopDeptId(httpRequest)));
+        try { return success(draftCommands.purchaseReturn(requestId, request, resolveShopDeptId(httpRequest), false)); }
+        catch (com.erp.common.core.exception.ServiceException exception)
+        {
+            AjaxResult rejected = AjaxResult.error(exception.getMessage());
+            rejected.put("draftOutcome", "REJECTED");
+            return rejected;
+        }
     }
 
     @RequiresPermissions(value = { "inv:purchaseReturn:add", "inv:purchaseReturn:submit" })
-    @IdempotentSubmit(timeout = 30)
+    @com.erp.inventory.annotation.PersistentCommand
     @Log(title = "采购退货管理", businessType = BusinessType.UPDATE)
     @PostMapping("/submit")
     public AjaxResult submit(@Validated @RequestBody InvPurchaseReturnSaveRequest request,
-            HttpServletRequest httpRequest, HttpServletResponse response)
+            @org.springframework.web.bind.annotation.RequestHeader("X-Request-Id") String requestId, HttpServletRequest httpRequest, HttpServletResponse response)
     {
         disableCaching(response);
-        return success(purchaseReturnService.submitReturn(request, request.getDetails(), resolveShopDeptId(httpRequest)));
+        try { return success(draftCommands.purchaseReturn(requestId, request, resolveShopDeptId(httpRequest), true)); }
+        catch (com.erp.common.core.exception.ServiceException exception)
+        {
+            AjaxResult rejected = AjaxResult.error(exception.getMessage());
+            rejected.put("draftOutcome", "REJECTED");
+            return rejected;
+        }
     }
 
     @RequiresPermissions("inv:purchaseReturn:submit")
@@ -132,8 +147,7 @@ public class InvPurchaseReturnController extends InvBaseController
             HttpServletRequest request, HttpServletResponse response)
     {
         disableCaching(response);
-        return success(purchaseReturnService.submitSavedReturn(returnId,
-                resolveShopDeptId(request)));
+        return success(purchaseReturnService.submitSavedReturn(returnId, requireDraftVersion(request), resolveShopDeptId(request)));
     }
 
     @RequiresPermissions("inv:purchaseReturn:confirm")
@@ -175,5 +189,10 @@ public class InvPurchaseReturnController extends InvBaseController
     {
         response.setHeader("Cache-Control", "no-store, max-age=0");
         response.setHeader("Pragma", "no-cache");
+    }
+    private Long requireDraftVersion(HttpServletRequest request)
+    {
+        try { return Long.valueOf(request.getParameter("version")); }
+        catch (RuntimeException exception) { throw new com.erp.common.core.exception.ServiceException("提交草稿缺少有效版本，请刷新页面"); }
     }
 }

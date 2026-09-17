@@ -38,6 +38,23 @@ class OaPurchaseControllerFeatureGateTest
         verifyNoInteractions(purchaseService);
     }
 
+    @Test
+    void availabilitySeparatesDraftAndSubmitSwitches()
+    {
+        for (boolean base : new boolean[] {false, true})
+        {
+            for (boolean submit : new boolean[] {false, true})
+            {
+                org.mockito.Mockito.when(featureGate.isEnabled(BusinessFeatureGate.OA_PURCHASE)).thenReturn(base);
+                org.mockito.Mockito.when(purchaseService.isSubmissionEnabled()).thenReturn(submit);
+                java.util.Map<?, ?> data = (java.util.Map<?, ?>) controller.availability().get("data");
+                org.assertj.core.api.Assertions.assertThat(data.get("canSave")).isEqualTo(base);
+                org.assertj.core.api.Assertions.assertThat(data.get("canSubmit")).isEqualTo(base && submit);
+                org.assertj.core.api.Assertions.assertThat(data.get("enabled")).isEqualTo(base && submit);
+            }
+        }
+    }
+
     private void assertDisabled(org.assertj.core.api.ThrowableAssert.ThrowingCallable callable)
     {
         assertThatThrownBy(callable)

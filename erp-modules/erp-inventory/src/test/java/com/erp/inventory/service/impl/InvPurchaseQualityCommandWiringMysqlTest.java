@@ -90,23 +90,34 @@ class InvPurchaseQualityCommandWiringMysqlTest
 
     @AfterEach void clearLogin() { SecurityContextHolder.remove(); }
 
-    @Test void legacyEntryProjectsTwoBatchesUnderOneParentCommandAndReplaysAfterCompletion()
+    @Test void legacyHistoricalReceiptsPersistOneCommandAndReplayAfterCompletion()
     {
-        Fixture f = new Fixture(2);
+        Fixture f = new Fixture(2, true);
         f.service.qualityCheckWithRequest(10L, InvStatusConstants.QC_PASSED, "整单验收", 20L, "legacy-two-batches");
         assertThat(countCommands()).isEqualTo(1);
         assertThat(jdbc.queryForObject("select command_type from inv_quality_command", String.class)).isEqualTo("PURCHASE_QUALITY_CHECK_LEGACY");
         assertThat(jdbc.queryForObject("select request_id from inv_quality_command", String.class)).isEqualTo("legacy-two-batches");
-        assertThat(countFacts("inspection")).isEqualTo(2);
+        assertThat(countFacts("inspection")).isZero();
         assertThat(stockQuantity()).isEqualByComparingTo("20");
         assertThat(f.order.getStatus()).isEqualTo(InvStatusConstants.RECEIVED);
         // A new executor instance must replay persisted results even after the order left pending QC.
         f.replaceExecutor();
         f.service.qualityCheckWithRequest(10L, InvStatusConstants.QC_PASSED, "整单验收", 20L, "legacy-two-batches");
         assertThat(countCommands()).isEqualTo(1);
-        assertThat(countFacts("inspection")).isEqualTo(2);
+        assertThat(countFacts("inspection")).isZero();
         assertThat(stockQuantity()).isEqualByComparingTo("20");
-        verify(f.batches, times(1)).selectPendingByOrderId(10L);
+        verify(f.batches, never()).selectPendingByOrderId(10L);
+    }
+
+    @Test void legacyEntryRejectsBatchBackedReceiptsWithoutPersistingCommandOrStock()
+    {
+        Fixture f = new Fixture(2);
+        assertThatThrownBy(() -> f.service.qualityCheckWithRequest(10L, InvStatusConstants.QC_PASSED,
+                "", 20L, "legacy-cannot-consume-batches"))
+                .isInstanceOf(ServiceException.class).hasMessageContaining("批次");
+        assertThat(countCommands()).isZero();
+        assertThat(stockQuantity()).isEqualByComparingTo("0");
+        assertThat(countFacts("inspection")).isZero();
     }
 
     @Test void batchEntryPersistsRequestAndPartialReplayDoesNotRepeatStockOrInspection()
@@ -130,14 +141,14 @@ class InvPurchaseQualityCommandWiringMysqlTest
     {
         for (boolean legacy : List.of(false, true))
         {
-            Fixture failing = new Fixture(1);
+            Fixture failing = new Fixture(1, legacy);
             failing.failAfterStock = true;
             String id = legacy ? "legacy-late-failure" : "batch-late-failure";
             assertThatThrownBy(() -> invoke(failing, legacy, id)).isInstanceOf(ServiceException.class).hasMessageContaining("forced late failure");
             assertThat(countCommands()).isZero();
             assertThat(jdbc.queryForObject("select count(*) from wiring_fact", Integer.class)).isZero();
             // Fresh metadata emulates the database rollback, then the exact failed request ID is reusable.
-            invoke(new Fixture(1), legacy, id);
+            invoke(new Fixture(1, legacy), legacy, id);
             assertThat(countCommands()).isEqualTo(1);
             assertThat(stockQuantity()).isEqualByComparingTo("10");
             jdbc.update("delete from inv_quality_command");
@@ -149,22 +160,25 @@ class InvPurchaseQualityCommandWiringMysqlTest
     {
         for (boolean legacy : List.of(false, true))
         {
-            Fixture f = new Fixture(1);
+            Fixture f = new Fixture(1, legacy);
             String id = legacy ? "legacy-scope-check" : "batch-scope-check";
             invoke(f, legacy, id);
             when(f.scope.resolveRequiredShopDept(20L)).thenThrow(new ServiceException("无权选择当前仓库"));
             assertThatThrownBy(() -> invoke(f, legacy, id)).hasMessageContaining("无权选择当前仓库");
             assertThat(countCommands()).isEqualTo(1);
-            assertThat(countFacts("inspection")).isEqualTo(1);
+            assertThat(countFacts("inspection")).isEqualTo(legacy ? 0 : 1);
             jdbc.update("delete from inv_quality_command");
             jdbc.update("delete from wiring_fact");
-            Fixture otherWarehouse = new Fixture(1);
+            Fixture otherWarehouse = new Fixture(1, legacy);
             assertThatThrownBy(() -> invokeAt(otherWarehouse, legacy, id, 30L)).hasMessageContaining("只能操作当前仓库");
             assertThatThrownBy(() -> invokeAt(otherWarehouse, legacy, id, 40L)).hasMessageContaining("请选择仓库");
             assertThat(countCommands()).isZero();
-            otherWarehouse.batchRows.get(0).setWarehouseId(30L);
-            assertThatThrownBy(() -> invoke(otherWarehouse, legacy, id)).hasMessageContaining("只能质检当前仓库");
-            assertThat(countCommands()).isZero();
+            if (!legacy)
+            {
+                otherWarehouse.batchRows.get(0).setWarehouseId(30L);
+                assertThatThrownBy(() -> invoke(otherWarehouse, false, id)).hasMessageContaining("只能质检当前仓库");
+                assertThat(countCommands()).isZero();
+            }
         }
     }
 
@@ -222,7 +236,8 @@ class InvPurchaseQualityCommandWiringMysqlTest
         final List<InvReceiptBatch> batchRows = new ArrayList<>();
         final List<InvReceiptBatchDetail> rows = new ArrayList<>();
         boolean failAfterStock;
-        Fixture(int batchCount)
+        Fixture(int batchCount) { this(batchCount, false); }
+        Fixture(int batchCount, boolean historical)
         {
             InvDeptScopeMapper departments = mock(InvDeptScopeMapper.class);
             when(departments.selectDeptTypeById(anyLong())).thenAnswer(call -> ((Long) call.getArgument(0)) == 40L ? "STORE" : "WAREHOUSE");
@@ -246,6 +261,7 @@ class InvPurchaseQualityCommandWiringMysqlTest
             when(details.selectInvPurchaseDetailByOrderIdForUpdate(10L)).thenReturn(List.of(purchase));
             InvReceiptBatchDetailMapper batchDetails = mock(InvReceiptBatchDetailMapper.class);
             InvInboundRecordMapper inboundMapper = mock(InvInboundRecordMapper.class);
+            List<InvInboundRecord> inboundRows = new ArrayList<>();
             for (int index = 0; index < batchCount; index++)
             {
                 InvReceiptBatch batch = new InvReceiptBatch();
@@ -258,10 +274,22 @@ class InvPurchaseQualityCommandWiringMysqlTest
                 when(batchDetails.selectByBatchId(batch.getBatchId())).thenReturn(List.of(row));
                 when(batchDetails.selectByBatchIdForUpdate(batch.getBatchId())).thenReturn(List.of(row));
                 InvInboundRecord inbound = new InvInboundRecord();
+                inbound.setInboundId(2000L + index);
+                inbound.setQuantity(BigDecimal.TEN);
+                inbound.setQcResult(InvStatusConstants.QC_PENDING);
+                if (!historical)
+                {
+                    inbound.setReceiptBatchId(batch.getBatchId());
+                    inbound.setReceiptBatchDetailId(row.getBatchDetailId());
+                }
+                inboundRows.add(inbound);
                 inbound.setPurchaseOrderId(10L); inbound.setPurchaseDetailId(201L); inbound.setProductId(1L);
                 inbound.setItemType("product"); inbound.setItemId(1L); inbound.setShopDeptId(20L); inbound.setWarehouseId(20L);
                 when(inboundMapper.selectByBatchDetailIdForUpdate(row.getBatchDetailId())).thenReturn(inbound);
             }
+            when(inboundMapper.selectByOrderIdForUpdate(10L)).thenReturn(inboundRows);
+            when(batches.selectByOrderIdForUpdate(10L)).thenReturn(historical ? List.of() : batchRows);
+            when(batchDetails.selectByOrderIdForUpdate(10L)).thenReturn(historical ? List.of() : rows);
             when(batches.selectPendingByOrderId(10L)).thenAnswer(call -> new ArrayList<>(batchRows));
             when(batches.countPendingByOrderId(10L)).thenAnswer(call -> (int) batchRows.stream().filter(b -> b.getPendingQuantity().signum() > 0).count());
             when(batches.updateProgress(anyLong(), any(), anyString(), anyString())).thenAnswer(call -> {
@@ -285,7 +313,10 @@ class InvPurchaseQualityCommandWiringMysqlTest
                 return jdbc.update("insert into wiring_fact(kind,quantity) values('stock',?)", stock.getCurrentQuantity());
             });
             InvStockLogMapper logs = mock(InvStockLogMapper.class);
-            when(logs.insertInvStockLog(any())).thenReturn(1);
+            when(logs.insertInvStockLog(any())).thenAnswer(call -> {
+                if (failAfterStock) throw new ServiceException("forced late failure");
+                return 1;
+            });
             ReflectionTestUtils.setField(target, "purchaseOrderMapper", orders);
             ReflectionTestUtils.setField(target, "purchaseDetailMapper", details);
             ReflectionTestUtils.setField(target, "receiptBatchMapper", batches);

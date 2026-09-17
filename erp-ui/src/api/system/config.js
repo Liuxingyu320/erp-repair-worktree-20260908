@@ -11,10 +11,11 @@ export function listConfig(query, config) {
 }
 
 // 查询参数详细
-export function getConfig(configId) {
+export function getConfig(configId, config) {
   return request({
     url: '/system/config/' + configId,
-    method: 'get'
+    method: 'get',
+    silentError: !!(config && config.silentError)
   })
 }
 
@@ -35,20 +36,22 @@ export function getConfigKey(configKey) {
 }
 
 // 新增参数配置
-export function addConfig(data) {
+export function addConfig(data, config) {
   return request({
     url: '/system/config',
     method: 'post',
-    data: data
+    data: data,
+    silentError: !!(config && config.silentError)
   })
 }
 
 // 修改参数配置
-export function updateConfig(data) {
+export function updateConfig(data, config) {
   return request({
     url: '/system/config',
     method: 'put',
-    data: data
+    data: data,
+    silentError: !!(config && config.silentError)
   })
 }
 

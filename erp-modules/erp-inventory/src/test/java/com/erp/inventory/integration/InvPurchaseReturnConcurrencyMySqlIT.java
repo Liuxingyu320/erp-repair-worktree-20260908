@@ -302,7 +302,7 @@ class InvPurchaseReturnConcurrencyMySqlIT
         finally { start.countDown(); pool.shutdownNow(); assertThat(pool.awaitTermination(10, TimeUnit.SECONDS)).isTrue(); }
     }
 
-    private void submit(Long id) { service.submitSavedReturn(id, 20L); }
+    private void submit(Long id) { service.submitSavedReturn(id, 0L, 20L); }
     private void confirm(Long id) { service.confirmReturn(id, 20L); }
     private String status(Long id) { return jdbc.queryForObject("select status from inv_purchase_return where return_id=?", String.class, id); }
     private long submittedId() { return jdbc.queryForObject("select return_id from inv_purchase_return where status='submitted'", Long.class); }
@@ -332,7 +332,7 @@ class InvPurchaseReturnConcurrencyMySqlIT
         jdbc.update("insert into inv_purchase_return_detail(return_id,purchase_detail_id,item_type,item_id,product_id,product_name,quantity,unit_price,amount,returned_quantity) values(?,?,'product',?,?,'tea',?,1,?,0)", id, detail, product, product, new BigDecimal(quantity), new BigDecimal(quantity));
     }
     private static InvPurchaseReturn header()
-    { InvPurchaseReturn r = new InvPurchaseReturn(); r.setPurchaseOrderId(10L); r.setReturnTitle("new return"); r.setReturnDate(new Date()); r.setReturnReason("quality"); r.setResponsibility("supplier"); return r; }
+    { InvPurchaseReturn r = new InvPurchaseReturn();r.setVersion(0L); r.setPurchaseOrderId(10L); r.setReturnTitle("new return"); r.setReturnDate(new Date()); r.setReturnReason("quality"); r.setResponsibility("supplier"); return r; }
     private static InvPurchaseReturnDetail item(String quantity)
     { InvPurchaseReturnDetail d = new InvPurchaseReturnDetail(); d.setPurchaseDetailId(201L); d.setItemType("product"); d.setItemId(1L); d.setProductId(1L); d.setQuantity(new BigDecimal(quantity)); return d; }
     private static int indexCount() { return jdbc.queryForObject("select count(*) from information_schema.statistics where table_schema=database() and index_name in ('idx_ipr_purchase','idx_iprd_return')", Integer.class); }

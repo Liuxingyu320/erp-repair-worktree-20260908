@@ -71,6 +71,22 @@ const rightToolbarSource = fs.readFileSync(
 )
 
 assert.ok(
+  userSource.includes('prop="deptId"') &&
+    userSource.includes('prop="roleIds"') &&
+    userSource.includes("wizardTabs()") &&
+    userSource.includes("wizardStepCount") &&
+    !userSource.includes("/ 5 步"),
+  "new-user wizard must collect department and roles on a visible step instead of five broken empty steps"
+)
+
+assert.ok(
+  userSource.includes("userListRequestId") &&
+    userSource.includes("userListError") &&
+    userSource.includes("silentError: true"),
+  "user search must ignore stale responses and surface list load failures"
+)
+
+assert.ok(
   userSource.includes("system:user:resetPwd"),
   "password reset must use its dedicated high-risk permission"
 )
@@ -273,7 +289,10 @@ assert.ok(
 assert.ok(
   authUserSource.includes("确认取消用户「") &&
     authUserSource.includes("确认取消选中的") &&
-    authUserSource.includes("个用户的当前角色授权"),
+    authUserSource.includes("个用户在角色「") &&
+    authUserSource.includes("roleHeaderTitle") &&
+    authUserSource.includes("角色信息暂未加载") &&
+    authUserSource.includes("重试角色信息"),
   "role authorization cancellation should explain the user count and authorization impact"
 )
 

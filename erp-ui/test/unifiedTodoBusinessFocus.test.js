@@ -173,7 +173,7 @@ async function runDesktopFocusBehavior() {
       confirmSalesReturn(row) { opened.push(row.returnId) }
     }
   })
-  const context = {
+  const context = { InventoryDraftRecovery: {},
     ...mixin.data(),
     queryParams: { pageNum: 3, pageSize: 10 },
     $route: { path: "/inventory/salesReturn", query: {
@@ -243,6 +243,7 @@ function loadMobileFeatureComponent(actionFactory) {
     partitionMobileDetailActions: actions => ({ primary: actions || [], secondary: [] })
   }
   const context = {
+    InventoryDraftRecovery: {},
     module: { exports: {} },
     exports: {},
     require(request) {
@@ -516,6 +517,7 @@ function loadVueComponent(relativePath, overrides) {
     module: { exports: {} },
     exports: {},
     require(request) {
+      if (request === '@/utils/inventoryQuantity') return require('../src/utils/inventoryQuantity')
       if (request === '@/utils/uiOperationScope') return require('../src/utils/uiOperationScope')
       if (request === '@/utils/oaPurchaseContext') return require('../src/utils/oaPurchaseContext')
       if (request === '@/utils/todoBusinessFocus') return require('../src/utils/todoBusinessFocus')
@@ -526,7 +528,7 @@ function loadVueComponent(relativePath, overrides) {
       }
       return {}
     },
-    ApprovalCommandRecovery: {},
+    InventoryDraftRecovery: {}, ApprovalCommandRecovery: {},
     createApprovalCommandRecovery: () => ({}),
     getSelectedDeptId: () => '20',
     Treeselect: {},
@@ -727,6 +729,7 @@ async function runOaDesktopFocusBehavior() {
     submitPurchase() { return Promise.resolve() }
   })
   const purchaseContext = Object.assign({}, purchaseComponent.data(), purchaseComponent.methods, {
+    purchaseDraftAvailable: true, purchaseAvailabilityResolved: true,
     $nextTick(callback) { if (typeof callback === "function") callback.call(purchaseContext) }
   })
   await purchaseContext.openForm({ purchaseId: exactPurchaseId })

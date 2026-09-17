@@ -234,7 +234,27 @@
                    end collate utf8mb4_general_ci as title,
                    concat_ws(' · ',
                        coalesce(nullif(u.nick_name, ''), concat('账号 ', r.employee_id)),
-                       '请补充签约所需的个人事实') collate utf8mb4_general_ci as summary,
+                       case when r.status = 'REJECTED' then concat(
+                            coalesce(nullif(left(trim(r.review_reason), 60), ''),
+                                     '未填写退回原因，请联系经办人'),
+                            case when char_length(ifnull(r.review_reason, '')) > 60 then '…' else '' end,
+                            '；可改：',
+                            coalesce(nullif(concat_ws('、',
+                                case when json_valid(r.allowed_fields_json)
+                                          and json_contains(r.allowed_fields_json, '"currentAddress"')
+                                     then '通讯地址' end,
+                                case when json_valid(r.allowed_fields_json)
+                                          and (json_contains(r.allowed_fields_json, '"schoolName"')
+                                               or json_contains(r.allowed_fields_json, '"studentStatus"'))
+                                     then '学校及在读信息' end,
+                                case when json_valid(r.allowed_fields_json)
+                                          and json_contains(r.allowed_fields_json, '"retirementStatus"')
+                                     then '退休情况' end,
+                                case when json_valid(r.allowed_fields_json)
+                                          and json_contains(r.allowed_fields_json, '"incomeStartYearMonth"')
+                                     then '收入起始月份' end
+                            ), ''), '见详情'))
+                            else '请补充签约所需的个人事实' end) collate utf8mb4_general_ci as summary,
                    r.status collate utf8mb4_general_ci as status,
                    case when r.status = 'REJECTED' then 'important'
                         else 'normal'

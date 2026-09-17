@@ -108,6 +108,7 @@
     </div>
 
     <div class="table-card role-table-card">
+    <div v-if="loadError" role="alert" class="system-list-error"><span>加载失败：{{ loadError }}</span> <el-button type="text" :disabled="loading" @click="getList">重新加载</el-button></div>
     <el-table v-accessible-table="'角色列表'" v-loading="loading" :data="roleList" @selection-change="handleSelectionChange">
       <el-table-column type="selection" width="55" align="center" />
       <el-table-column label="角色编号" prop="roleId" width="120" />
@@ -324,6 +325,7 @@
 </template>
 
 <script>
+import systemListRecovery from "@/mixins/systemListRecovery"
 import { listRole, getRole, delRole, addRole, updateRole, dataScope, changeRoleStatus, deptTreeSelect } from "@/api/system/role"
 import { treeselect as menuTreeselect, roleMenuTreeselect } from "@/api/system/menu"
 import { confirmExportAction } from "@/utils/exportConfirm"
@@ -331,6 +333,7 @@ import RoleWizard from "./components/RoleWizard.vue"
 
 export default {
   name: "Role",
+  mixins: [systemListRecovery],
   components: { RoleWizard },
   dicts: ['sys_normal_disable'],
   data() {
@@ -443,13 +446,12 @@ export default {
   methods: {
     /** 查询角色列表 */
     getList() {
-      this.loading = true
-      listRole(this.addDateRange(this.queryParams, this.dateRange)).then(response => {
-          this.roleList = response.rows
-          this.total = response.total
-          this.loading = false
-        }
-      )
+      const query = this.addDateRange({ ...this.queryParams }, this.dateRange)
+      return this.runSystemListRequest(() => listRole(query, { silentError: true }), response => {
+        if (!response || !Array.isArray(response.rows)) throw new Error("列表响应无效，请重试")
+        this.roleList = response.rows
+        this.total = Number(response.total) || 0
+      })
     },
     /** 查询菜单树结构 */
     getMenuTreeselect() {

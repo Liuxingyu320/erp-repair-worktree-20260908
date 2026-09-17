@@ -62,6 +62,7 @@ CREATE TABLE `inv_sales_order` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='销售订单表';
 
 CREATE TABLE `inv_sales_return` (
+  version BIGINT NOT NULL DEFAULT 0,
   `return_id` bigint NOT NULL AUTO_INCREMENT COMMENT '退货单ID',
   `return_no` varchar(32) NOT NULL COMMENT '退货单号（SR+日期+序号）',
   `sales_order_id` bigint NOT NULL COMMENT '原销售单ID',

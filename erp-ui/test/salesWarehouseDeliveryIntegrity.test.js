@@ -8,6 +8,10 @@ function harness(page){
  vm.runInNewContext(code,{module,exports:module.exports,console,Promise,Set,Map,Array,Object,String,Number,JSON,document:{},window:{addEventListener(){},removeEventListener(){}},require(id){
  if(id.startsWith('@/api/'))return api
  if(id==='@/utils/shopContext')return{getSelectedDeptContext:()=>({deptId:env.dept,isStore:true,deptName:'门店'}),isSelectedStore:()=>true,isSelectedWarehouse:()=>false,getSelectedDeptId:()=>env.dept,getSelectedDeptName:()=> 'Store'}
+ if(id==='@/utils/permission')return {checkPermi:()=>false}
+ if(id==='@/utils/inventoryQuantity')return require('../src/utils/inventoryQuantity')
+ if(id==='@/utils/salesRecentChoices')return require('../src/utils/salesRecentChoices')
+ if(id==='@/views/mobile/feature/mobileQuickCustomer')return require('../src/views/mobile/feature/mobileQuickCustomer')
  if(id==='@/utils/uiOperationScope')return require('../src/utils/uiOperationScope')
  if(id==='@/utils/salesWarehouse')return utilities
  if(id==='@/utils/supplierOptionState')return require('../src/utils/supplierOptionState')

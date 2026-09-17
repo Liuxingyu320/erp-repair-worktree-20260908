@@ -30,8 +30,8 @@ for (const [feature, name, idKey] of [['purchase', 'Purchase', 'orderId'], ['pur
       submitPurchase: fail, submitPurchaseReturn: fail, submitSalesReturn: fail,
       ['submit' + name + 'Draft']: (...args) => { calls.push(args); return Promise.resolve({ data: { status: 'submitted' } }) }
     })
-    await runtime.runMobileFeatureAction(feature, 'submit' + name, { [idKey]: maxId, remark: 'unsaved row values' })
-    assert.deepEqual(calls, [[maxId]])
+    await runtime.runMobileFeatureAction(feature, 'submit' + name, { [idKey]: maxId, version: '7', remark: 'unsaved row values' })
+    assert.deepEqual(calls, [[maxId, '7']])
   })
   const draftApi = 'get' + name + 'Draft', readApi = 'get' + name + (feature === 'purchase' ? 'Detail' : '')
   test('H5 ' + feature + ' add-only uses draft read; query-only keeps general read', async () => {
@@ -39,13 +39,13 @@ for (const [feature, name, idKey] of [['purchase', 'Purchase', 'orderId'], ['pur
       const expected = permission === 'add' ? draftApi : readApi, calls = []
       const api = { [draftApi]: fail, [readApi]: fail, [expected]: id => { calls.push(id); return Promise.resolve({ data: { [idKey]: id, details: [{ quantity: 2 }] } }) } }
       const service = load('views/mobile/feature/featureService.js', { ['@/api/inventory/' + feature]: api })
-      const result = await service.fetchMobileFeatureDetail(feature, { [idKey]: maxId, status: 'draft' }, { inventoryPermissions: ['inv:' + feature + ':' + permission] })
+      const result = await service.fetchMobileFeatureDetail(feature, { [idKey]: maxId, status: 'draft', version: '7' }, { inventoryPermissions: ['inv:' + feature + ':' + permission] })
       assert.deepEqual(calls, [maxId]); assert.equal(result.details[0].quantity, 2)
     }
   })
   test('H5 ' + feature + ' submit-only uses list header; no-duty and add on submitted cannot hydrate', async () => {
     const service = load('views/mobile/feature/featureService.js', { ['@/api/inventory/' + feature]: { [readApi]: fail, [draftApi]: fail } })
-    const result = await service.fetchMobileFeatureDetail(feature, { [idKey]: maxId, status: 'draft', details: [{ quantity: 999 }] }, { inventoryPermissions: ['inv:' + feature + ':submit'] })
+    const result = await service.fetchMobileFeatureDetail(feature, { [idKey]: maxId, status: 'draft', version: '7', details: [{ quantity: 999 }] }, { inventoryPermissions: ['inv:' + feature + ':submit'] })
     assert.equal(result[idKey], maxId); assert.equal(result._specialistSummaryOnly, true); assert.equal(result.details, undefined)
     for (const permissions of [[], ['inv:' + feature + ':add']]) await assert.rejects(service.fetchMobileFeatureDetail(feature,
       { [idKey]: maxId, status: 'submitted' }, { inventoryPermissions: permissions }), /无权/)
@@ -92,9 +92,9 @@ for (const [name, pathPart, entity, idKey] of [['listPurchaseSuppliers', 'suppli
 test('real sales source list preserves server filters; submit sends no mutable body', async () => {
   const calls = [], api = load('api/inventory/salesReturn.js', { '@/utils/request': c => { calls.push(c); return Promise.resolve({}) } })
   const query = { keyword: '张', startDate: '2026-09-01', endDate: '2026-09-12', pageNum: 2, pageSize: 20 }
-  await api.listSalesReturnSourceOrders(query, { silentError: true }); await api.submitSalesReturnDraft(maxId)
+  await api.listSalesReturnSourceOrders(query, { silentError: true }); await api.submitSalesReturnDraft(maxId, '7')
   assert.deepEqual(plain(calls), [{ url: '/inventory/salesReturn/source-orders', method: 'get', params: query, silentError: true },
-    { url: '/inventory/salesReturn/submit/' + maxId, method: 'post' }])
+    { url: '/inventory/salesReturn/submit/' + maxId, method: 'post', params: { version: '7' } }])
 })
 test('H5 receive-only hydrates through receive context without query', async () => {
   const calls = [], service = load('views/mobile/feature/featureService.js', { '@/api/inventory/purchase': {
@@ -108,11 +108,11 @@ for (const [feature, name, idKey] of [['purchase', 'Purchase', 'orderId'], ['pur
   test('actual H5 Vue ' + feature + ' selected detail forwards duty permissions and enables saved-ID actions', async () => {
     const calls = [], service = load('views/mobile/feature/featureService.js', { ['@/api/inventory/' + feature]: {
       ['get' + name + (feature === 'purchase' ? 'Detail' : '')]: fail,
-      ['get' + name + 'Draft']: id => { calls.push(id); return Promise.resolve({ data: { [idKey]: id, status: 'draft', details: [{ quantity: 2 }] } }) }
+      ['get' + name + 'Draft']: id => { calls.push(id); return Promise.resolve({ data: { [idKey]: id, status: 'draft', version: '7', details: [{ quantity: 2 }] } }) }
     } })
     const definition = load('views/mobile/feature/index.vue', { './featureService': service })
     const page = new Vue({ data: () => ({ featureKey: feature, userPermissions: ['inv:' + feature + ':add'],
-      approvalRouteContext: {}, selectedItem: { [idKey]: maxId, status: 'draft' }, selectedItemEditSource: null,
+      approvalRouteContext: {}, selectedItem: { [idKey]: maxId, status: 'draft', version: '7' }, selectedItemEditSource: null,
       detailRequestToken: 0, detailLoading: false, detailLoadFailed: false, actionMessage: '' }),
       methods: { loadSelectedItemDetail: definition.methods.loadSelectedItemDetail,
         setActionMessage(message) { this.actionMessage = message }, mobileMapperContext() { return {} } } })
@@ -120,7 +120,7 @@ for (const [feature, name, idKey] of [['purchase', 'Purchase', 'orderId'], ['pur
     assert.deepEqual(calls, [maxId]); assert.equal(page.detailLoadFailed, false); assert.equal(page.detailLoading, false)
     assert.equal(page.selectedItemEditSource.details[0].quantity, 2)
     page.userPermissions = ['inv:' + feature + ':submit']
-    await page.loadSelectedItemDetail({ [idKey]: maxId, status: 'draft' })
+    await page.loadSelectedItemDetail({ [idKey]: maxId, status: 'draft', version: '7' })
     assert.equal(page.detailLoadFailed, false); assert.equal(page.selectedItemEditSource.details, undefined)
     assert.match(page.actionMessage, /当前岗位可处理/); assert.equal(calls.length, 1)
     page.$destroy()

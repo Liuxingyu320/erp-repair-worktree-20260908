@@ -96,7 +96,11 @@ public class OaPurchaseController extends OaBaseController
     @GetMapping("/availability")
     public AjaxResult availability()
     {
-        return success(Map.of("enabled", purchaseService.isSubmissionEnabled()));
+        boolean canSave = businessFeatureGate.isEnabled(BusinessFeatureGate.OA_PURCHASE);
+        boolean canSubmit = canSave && purchaseService.isSubmissionEnabled();
+        String reason = !canSave ? "采购申请暂未开放，当前可查看历史记录"
+                : !canSubmit ? "当前可以保存采购草稿，审批提交暂未开放" : "";
+        return success(Map.of("enabled", canSubmit, "canSave", canSave, "canSubmit", canSubmit, "reason", reason));
     }
 
     @RequiresPermissions(value = {

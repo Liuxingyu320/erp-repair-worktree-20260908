@@ -1,5 +1,6 @@
 <template>
   <div class="app-container warehouse-page">
+    <inventory-draft-recovery feature="purchaseReturn" @recovered="onDraftRecovered" />
     <inventory-page-hero
       title="采购退货"
       eyebrow="出库作业"
@@ -222,6 +223,7 @@
 </template>
 
 <script>
+import InventoryDraftRecovery from "@/views/inventory/components/InventoryDraftRecovery.vue"
 const { isReturnSelected, selectAllReturnRows } = require("@/utils/returnSelection")
 const { createUiOperationScope } = require("@/utils/uiOperationScope")
 import { listPurchaseReturn, getPurchaseReturn, getPurchaseReturnDraft, getPurchaseReturnActionContext, savePurchaseReturn, submitPurchaseReturn, submitPurchaseReturnDraft, listPurchaseReturnSourceOrders, getPurchaseReturnSourceOrder, confirmPurchaseReturn, cancelPurchaseReturn } from "@/api/inventory/purchaseReturn"
@@ -241,6 +243,7 @@ export default {
     }
   })],
   name: "InvPurchaseReturn",
+  components: { InventoryDraftRecovery },
   data() {
     return {
       loading: false, submitLoading: false, orderLoading: false, total: 0, list: [], orderOptions: [], dialogOpen: false, detailOpen: false,
@@ -249,7 +252,7 @@ export default {
       form: { returnId: undefined, returnNo: "", purchaseOrderId: undefined, purchaseOrderNo: "", returnTitle: "", supplierName: "", totalAmount: 0, returnDate: "", status: "draft", returnReason: "", responsibility: "", attachmentUrls: "", remark: "", details: [] },
       detailForm: { details: [] },
       rules: {
-        returnTitle: [{ required: true, message: "退货主题不能为空", trigger: "blur" }],
+        returnTitle: [{ required: true, whitespace: true, message: "退货主题不能为空", trigger: "blur" }],
         supplierName: [{ required: true, message: "供应商名称不能为空", trigger: "blur" }],
         returnDate: [{ required: true, message: "请选择退货日期", trigger: "change" }],
         purchaseOrderId: [{ required: true, message: "请选择原采购单", trigger: "change" }],
@@ -303,6 +306,16 @@ export default {
     this.returnScope().deactivate()
   },
   methods: {
+    onDraftRecovered({ record, response }) {
+      const data = response.data
+      if (this.dialogOpen && String(this.form.returnId || "new") === String(record.payload.returnId || "new")) {
+        this.$set(this.form, "returnId", data.returnId)
+        this.$set(this.form, "version", data.version)
+        this.$set(this.form, "status", data.status)
+        this.$modal.msgWarning(data.status === "draft" ? "已找回草稿编号，当前输入仍保留；请核对后再保存" : "上次操作已提交，当前输入保留供核对，请关闭窗口查看原单")
+      }
+      return this.getList()
+    },
     isReturnSelected,
     returnScope() {
       if (!this._returnScope) this._returnScope = createUiOperationScope(() => this.returnContextKey())
@@ -532,6 +545,7 @@ export default {
       })
     },
     buildPayload() {
+      if (this.form.status && this.form.status !== "draft") { this.$modal.msgWarning("原单已提交，请关闭窗口查看原单，当前输入仍保留"); return null }
       if (!this.form.details || !this.form.details.length) {
         this.$modal.msgError("请先选择原采购单并保留至少一条退货明细")
         return null
@@ -570,7 +584,7 @@ export default {
     handleSubmit(row) {
       if (!this.ensureWarehouseContext()) return
       this.$modal.confirm("确认提交该退货单？").then(() => {
-        submitPurchaseReturnDraft(row.returnId).then(() => { this.$modal.msgSuccess("提交成功"); this.getList() })
+        submitPurchaseReturnDraft(row.returnId, row.version).then(() => { this.$modal.msgSuccess("提交成功"); this.getList() })
       })
     },
     handleConfirm(row) {

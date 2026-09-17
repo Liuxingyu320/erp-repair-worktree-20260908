@@ -319,9 +319,24 @@ class OaFixedAssetServiceImplTest
         OaFixedAssetServiceImpl service = service(mappers, "2026-03-15T00:00:00Z");
 
         service.selectConfigList(new OaFixedAssetConfig(), 201L);
+        service.selectConfigStoreList(new OaFixedAssetConfig(), 201L);
 
         assertThat(mappers.configMapper.lastListQuery.getParams().get("scopeDeptIds"))
                 .isEqualTo(Arrays.asList(201L, 202L));
+    }
+
+    @Test
+    void storePaginationIsNotConsumedByPermissionLookups()
+    {
+        loginAsStoreUser();
+        FakeFixedAssetMappers mappers = seededMappers();
+        OaFixedAssetServiceImpl service = service(mappers, "2026-03-15T00:00:00Z");
+        com.github.pagehelper.Page<Object> page = com.github.pagehelper.PageHelper.startPage(2, 1);
+        try {
+            service.selectConfigStoreList(new OaFixedAssetConfig(), 201L);
+            assertThat(com.github.pagehelper.PageHelper.getLocalPage()).isSameAs(page);
+            assertThat(mappers.configMapper.lastListQuery.getParams().get("scopeDeptIds")).isNotNull();
+        } finally { com.github.pagehelper.PageHelper.clearPage(); }
     }
 
     @Test
@@ -461,6 +476,13 @@ class OaFixedAssetServiceImplTest
             config.setCreateTime(Date.from(Instant.parse(createTime)));
             configuredAssets.put(oeItemId, config);
             authorizeConfiguredShop(shopDeptId);
+        }
+
+        @Override
+        public List<com.erp.oa.domain.vo.OaFixedAssetStoreSummary> selectConfigStoreList(OaFixedAssetConfig config)
+        {
+            lastListQuery = config;
+            return java.util.Collections.emptyList();
         }
 
         @Override
@@ -765,6 +787,7 @@ class OaFixedAssetServiceImplTest
         @Override
         public List<Long> selectUserShopDeptIds(Long userId)
         {
+            assertThat(com.github.pagehelper.PageHelper.getLocalPage()).isNull();
             return Long.valueOf(9L).equals(userId) ? authorizedShopDeptIds : Collections.emptyList();
         }
 

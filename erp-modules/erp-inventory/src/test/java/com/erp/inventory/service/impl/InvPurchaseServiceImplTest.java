@@ -85,7 +85,7 @@ class InvPurchaseServiceImplTest
     private static InvPurchaseOrder purchaseStageOrder(String status, String qcStatus,
             String receivedQuantity, String remainingQuantity)
     {
-        InvPurchaseOrder order = new InvPurchaseOrder();
+        InvPurchaseOrder order = new InvPurchaseOrder();order.setVersion(0L);
         order.setStatus(status);
         order.setQcStatus(qcStatus);
         order.setReceivedQuantity(new BigDecimal(receivedQuantity));
@@ -174,7 +174,7 @@ class InvPurchaseServiceImplTest
     @DisplayName("采购保存按商品档案自动同步供应商和进价")
     void shouldApplyProductCatalogWhenSavingPurchaseDraft()
     {
-        InvPurchaseOrder order = new InvPurchaseOrder();
+        InvPurchaseOrder order = new InvPurchaseOrder();order.setVersion(0L);
         InvPurchaseDetail detail = new InvPurchaseDetail();
         detail.setProductId(101L);
         detail.setQuantity(new BigDecimal("2.00"));
@@ -208,7 +208,7 @@ class InvPurchaseServiceImplTest
         when(mapper.selectInvPurchaseOrderList(org.mockito.ArgumentMatchers.any()))
                 .thenReturn(Collections.emptyList());
         ReflectionTestUtils.setField(service, "purchaseOrderMapper", mapper);
-        InvPurchaseOrder query = new InvPurchaseOrder();
+        InvPurchaseOrder query = new InvPurchaseOrder();query.setVersion(0L);
 
         service.selectPurchaseList(query, 20L);
 
@@ -222,7 +222,7 @@ class InvPurchaseServiceImplTest
     {
         SecurityContextHolder.setUserId("1");
         SecurityContextHolder.setUserName("admin");
-        InvPurchaseOrder draft = new InvPurchaseOrder();
+        InvPurchaseOrder draft = new InvPurchaseOrder();draft.setVersion(0L);
         draft.setOrderId(1L);
         draft.setShopDeptId(20L);
         draft.setStatus(InvStatusConstants.DRAFT);
@@ -230,7 +230,7 @@ class InvPurchaseServiceImplTest
         InvPurchaseServiceImpl service = purchaseService(Map.of(20L, "WAREHOUSE"));
         ReflectionTestUtils.setField(service, "purchaseOrderMapper", mapper);
 
-        service.submitSavedPurchase(1L, 20L);
+        service.submitSavedPurchase(1L, 0L, 20L);
 
         assertThat(mapper.updatedStatus).isEqualTo(InvStatusConstants.SUBMITTED);
     }
@@ -270,7 +270,7 @@ class InvPurchaseServiceImplTest
         supplier.setCooperationStatus("0");
         when(supplierMapper.selectInvSupplierById(701L)).thenReturn(supplier);
         ReflectionTestUtils.setField(service, "supplierMapper", supplierMapper);
-        InvPurchaseOrder order = new InvPurchaseOrder();
+        InvPurchaseOrder order = new InvPurchaseOrder();order.setVersion(0L);
         order.setSupplierId(701L);
         order.setSupplierName(null);
 
@@ -285,12 +285,12 @@ class InvPurchaseServiceImplTest
     {
         SecurityContextHolder.setUserId("1");
         SecurityContextHolder.setUserName("admin");
-        InvPurchaseOrder existing = new InvPurchaseOrder();
-        existing.setOrderId(1L);
+        InvPurchaseOrder existing = new InvPurchaseOrder();existing.setVersion(0L);
+        existing.setOrderId(1L); existing.setVersion(0L);
         existing.setShopDeptId(20L);
         existing.setStatus(InvStatusConstants.DRAFT);
-        InvPurchaseOrder update = new InvPurchaseOrder();
-        update.setOrderId(1L);
+        InvPurchaseOrder update = new InvPurchaseOrder();update.setVersion(0L);
+        update.setOrderId(1L); update.setVersion(0L);
         update.setOrderTitle("越权采购测试");
         InvPurchaseDetail detail = purchaseDetail(101L, "1.00", "5.00");
         InvProduct outsideProduct = product(101L, "越权商品", "SP-101", "散装", "斤", "外部供应商", "5.00");
@@ -312,7 +312,7 @@ class InvPurchaseServiceImplTest
     @DisplayName("采购保存汇总多商品绑定供应商")
     void shouldSummarizeDistinctSuppliersFromSelectedProducts()
     {
-        InvPurchaseOrder order = new InvPurchaseOrder();
+        InvPurchaseOrder order = new InvPurchaseOrder();order.setVersion(0L);
         InvPurchaseDetail first = purchaseDetail(101L, "1.00", "5.00");
         InvPurchaseDetail second = purchaseDetail(102L, "1.00", "6.00");
         InvProduct firstProduct = product(101L, "白牡丹", "SP-101", "散装", "斤", "福鼎茶厂", "4.50");
@@ -329,7 +329,7 @@ class InvPurchaseServiceImplTest
     @DisplayName("采购商品未绑定供应商时不能保存")
     void shouldRejectPurchaseProductWithoutSupplier()
     {
-        InvPurchaseOrder order = new InvPurchaseOrder();
+        InvPurchaseOrder order = new InvPurchaseOrder();order.setVersion(0L);
         InvPurchaseDetail detail = purchaseDetail(101L, "1.00", "5.00");
         InvProduct product = product(101L, "未绑定商品", "SP-101", "散装", "斤", " ", "5.00");
 
@@ -440,7 +440,7 @@ class InvPurchaseServiceImplTest
     {
         SecurityContextHolder.setUserId("1");
         SecurityContextHolder.setUserName("admin");
-        InvPurchaseOrder order = new InvPurchaseOrder();
+        InvPurchaseOrder order = new InvPurchaseOrder();order.setVersion(0L);
         order.setOrderId(1L);
         order.setShopDeptId(20L);
         order.setOrderNo("PO1");
@@ -517,6 +517,20 @@ class InvPurchaseServiceImplTest
     }
 
     @Test
+    @DisplayName("采购数量允许小数并在数据库精度范围内")
+    void shouldKeepPurchaseQuantityWithinDecimalSixteenTwo()
+    {
+        InvPurchaseOrder order = new InvPurchaseOrder();order.setOrderTitle("精度验证");
+        InvPurchaseDetail detail = new InvPurchaseDetail();detail.setQuantity(new BigDecimal("0.5"));
+        org.springframework.test.util.ReflectionTestUtils.invokeMethod(InvPurchaseServiceImpl.class,"normalizeAndValidateDraft",order,List.of(detail));
+        for (String quantity : List.of("0.001", "100000000000000")) {
+            detail.setQuantity(new BigDecimal(quantity));
+            assertThatThrownBy(() -> org.springframework.test.util.ReflectionTestUtils.invokeMethod(InvPurchaseServiceImpl.class,"normalizeAndValidateDraft",order,List.of(detail)))
+                    .isInstanceOf(ServiceException.class).hasMessageContaining("精度无效");
+        }
+    }
+
+    @Test
     @DisplayName("逐行质检数量最多四位小数")
     void shouldRejectOverPrecisionQualityCheckQuantity()
     {
@@ -587,7 +601,7 @@ class InvPurchaseServiceImplTest
         SecurityContextHolder.setUserId("1");
         SecurityContextHolder.setUserName("admin");
         InvPurchaseServiceImpl service = purchaseService(Map.of(20L, "WAREHOUSE"));
-        InvPurchaseOrder order = new InvPurchaseOrder();
+        InvPurchaseOrder order = new InvPurchaseOrder();order.setVersion(0L);
         order.setOrderId(1L);
         order.setShopDeptId(20L);
         order.setOrderNo("PO1");
@@ -612,7 +626,7 @@ class InvPurchaseServiceImplTest
         SecurityContextHolder.setUserId("1");
         SecurityContextHolder.setUserName("admin");
         InvPurchaseServiceImpl service = purchaseService(Map.of(20L, "WAREHOUSE"));
-        InvPurchaseOrder order = new InvPurchaseOrder();
+        InvPurchaseOrder order = new InvPurchaseOrder();order.setVersion(0L);
         order.setOrderId(1L);
         order.setShopDeptId(20L);
         order.setOrderNo("PO1");
@@ -722,7 +736,7 @@ class InvPurchaseServiceImplTest
 
     private static InvPurchaseOrderMapper purchaseOrderMapper(Long shopDeptId)
     {
-        InvPurchaseOrder order = new InvPurchaseOrder();
+        InvPurchaseOrder order = new InvPurchaseOrder();order.setVersion(0L);
         order.setOrderId(1L);
         order.setShopDeptId(shopDeptId);
         order.setOrderNo("PO1");
@@ -733,7 +747,7 @@ class InvPurchaseServiceImplTest
     private static FakePurchaseOrderMapper cancelPurchaseWithStatus(String status, String qcStatus)
     {
         InvPurchaseServiceImpl service = purchaseService(Map.of(20L, "WAREHOUSE"));
-        InvPurchaseOrder order = new InvPurchaseOrder();
+        InvPurchaseOrder order = new InvPurchaseOrder();order.setVersion(0L);
         order.setOrderId(1L);
         order.setShopDeptId(20L);
         order.setOrderNo("PO1");

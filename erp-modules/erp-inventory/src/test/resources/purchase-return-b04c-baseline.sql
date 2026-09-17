@@ -3,6 +3,7 @@
 -- Lock indexes are deliberately absent so the production migration is exercised.
 
 CREATE TABLE `inv_purchase_return` (
+  version BIGINT NOT NULL DEFAULT 0,
   `return_id` bigint NOT NULL AUTO_INCREMENT COMMENT '退货单ID',
   `return_no` varchar(32) NOT NULL COMMENT '退货单号（PR+日期+序号）',
   `purchase_order_id` bigint NOT NULL COMMENT '原采购单ID',

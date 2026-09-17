@@ -15,6 +15,8 @@ public interface IOaFixedAssetService
     default int deleteConfigById(Long configId, Long selectedShopId, Long expectedVersion) { throw new UnsupportedOperationException("versioned config delete unavailable"); }
     List<OaFixedAssetConfig> selectConfigList(OaFixedAssetConfig config, Long selectedShopDeptId);
 
+    List<com.erp.oa.domain.vo.OaFixedAssetStoreSummary> selectConfigStoreList(OaFixedAssetConfig config, Long selectedShopDeptId);
+
     OaFixedAssetConfig selectConfigById(Long configId, Long selectedShopDeptId);
 
     OaFixedAssetConfig saveConfig(OaFixedAssetConfig config, Long selectedShopDeptId);

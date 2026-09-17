@@ -60,7 +60,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             </otherwise>
         </choose>
         <choose>
-            <when test="currentScopeDeptIds != null and currentScopeDeptIds.size() > 0">
+            <when test="currentScopeDeptIds != null and currentScopeDeptIds.size() > 0
+                    and authorizedScopeDeptIds != null and authorizedScopeDeptIds.size() > 0">
                 and exists (
                     select 1
                     from sys_dept root
@@ -69,6 +70,15 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
                         #{deptId}
                     </foreach>
                       and (p.dept_id = root.dept_id or find_in_set(root.dept_id, d.ancestors))
+                )
+                and exists (
+                    select 1
+                    from sys_dept auth
+                    where auth.dept_id in
+                    <foreach collection="authorizedScopeDeptIds" item="deptId" open="(" separator="," close=")">
+                        #{deptId}
+                    </foreach>
+                      and (p.dept_id = auth.dept_id or find_in_set(auth.dept_id, d.ancestors))
                 )
             </when>
             <otherwise>and 1 = 0</otherwise>

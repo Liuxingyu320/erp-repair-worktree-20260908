@@ -53,7 +53,7 @@ class InvPurchaseReturnMapperBindingTest
         assertThat(returnXml).contains(
                 "where r.applicant_id = #{applicantId}",
                 "remark = #{remark}",
-                "set status = #{status}, update_by = #{updateBy}, update_time = sysdate()");
+                "set version = version + 1, status = #{status}, update_by = #{updateBy}, update_time = sysdate()");
     }
 
     private static void parseMapper(Configuration configuration, String resource)

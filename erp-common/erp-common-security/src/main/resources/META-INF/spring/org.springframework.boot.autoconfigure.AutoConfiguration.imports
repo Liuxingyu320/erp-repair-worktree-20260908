@@ -1,5 +1,6 @@
 com.erp.common.security.config.WebMvcConfig
 com.erp.common.security.service.TokenService
+com.erp.common.security.service.LegacySalaryWriteGuard
 com.erp.common.security.aspect.PreAuthorizeAspect
 com.erp.common.security.aspect.InnerAuthAspect
 com.erp.common.security.handler.GlobalExceptionHandler

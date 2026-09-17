@@ -1,5 +1,6 @@
 package com.erp.oa.attendance.service;
 
+import com.erp.common.core.utils.file.UploadImageNormalizer;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -55,6 +56,8 @@ public class AttendanceRemainingWorkAttachmentStorage
         if (bytes.length <= 0 || bytes.length > maxBytes)
             throw new ServiceException("REMAINING_WORK_ATTACHMENT_SIZE_INVALID");
         String contentType = validate(extension, bytes);
+        if (!".pdf".equals(extension) && !".ofd".equals(extension))
+            bytes = UploadImageNormalizer.normalize(bytes, originalName);
         String storedName = UUID.randomUUID().toString().replace("-", "")
                 + extension;
         Path relative = Paths.get("remaining-work",

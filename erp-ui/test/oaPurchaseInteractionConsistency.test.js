@@ -93,6 +93,16 @@ assert.ok(
 )
 
 assert.ok(
+  pcPurchaseSource.includes("以此再申请") &&
+    pcPurchaseSource.includes("copyAsNewDraft(scope.row)") &&
+    pcPurchaseSource.includes("purchaseId: undefined") &&
+    pcPurchaseSource.includes("title: source.title || \"\"") &&
+    pcPurchaseSource.includes("amount: source.amount") &&
+    pcPurchaseSource.includes("reason: source.reason || \"\""),
+  "desktop purchase should copy title, amount and reason into a new draft without the original id or status"
+)
+
+assert.ok(
   pcPurchaseSource.includes('@click="openForm()"'),
   "the new-purchase button must not pass its click event as a purchase row"
 )
@@ -111,6 +121,7 @@ const detailResponse = id => ({
   }
 })
 const newFormHarness = {
+  purchaseDraftAvailable: true,
   purchaseScope: () => newFormScope,
   invalidatePurchaseForm() {},
   isFormDirty: () => false,
@@ -128,6 +139,7 @@ assert.deepStrictEqual(detailCalls, [],
   "a MouseEvent-like argument must open a blank form without requesting /purchase/undefined")
 assert.strictEqual(newFormHarness.form.purchaseId, undefined)
 const existingFormHarness = {
+  purchaseDraftAvailable: true,
   purchaseScope: () => existingFormScope,
   invalidatePurchaseForm() {},
   isFormDirty: () => false,

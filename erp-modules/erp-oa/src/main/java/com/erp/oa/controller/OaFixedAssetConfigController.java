@@ -42,6 +42,22 @@ public class OaFixedAssetConfigController extends OaBaseController
         return getDataTable(list);
     }
 
+    @RequiresPermissions("oa:fixedAsset:config:list")
+    @GetMapping("/stores")
+    public TableDataInfo stores(OaFixedAssetConfig config, HttpServletRequest request)
+    {
+        startPage();
+        return getDataTable(fixedAssetService.selectConfigStoreList(config, resolveShopDeptId(request)));
+    }
+
+    @RequiresPermissions("oa:fixedAsset:config:list")
+    @GetMapping("/store-details")
+    public AjaxResult storeDetails(OaFixedAssetConfig config, @RequestParam Long shopDeptId, HttpServletRequest request)
+    {
+        config.setShopDeptId(shopDeptId);
+        return success(fixedAssetService.selectConfigList(config, resolveShopDeptId(request)));
+    }
+
     @RequiresPermissions("oa:fixedAsset:config:query")
     @GetMapping("/{configId}")
     public AjaxResult getInfo(@PathVariable Long configId, HttpServletRequest request)

@@ -10,6 +10,14 @@ import com.erp.common.core.web.domain.BaseEntity;
 
 public class InvSalesReturn extends BaseEntity
 {
+    /** Revision of the opened draft; required when modifying an existing document. */
+    private Long version;
+
+    @tools.jackson.databind.annotation.JsonSerialize(using = tools.jackson.databind.ser.std.ToStringSerializer.class)
+    @com.fasterxml.jackson.databind.annotation.JsonSerialize(using = com.fasterxml.jackson.databind.ser.std.ToStringSerializer.class)
+    public Long getVersion() { return version; }
+    public void setVersion(Long version) { this.version = version; }
+
     private static final long serialVersionUID = 1L;
 
     private Long returnId;

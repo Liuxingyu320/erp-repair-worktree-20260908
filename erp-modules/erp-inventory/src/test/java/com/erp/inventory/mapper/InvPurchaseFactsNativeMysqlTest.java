@@ -33,6 +33,7 @@ class InvPurchaseFactsNativeMysqlTest
             JdbcTemplate jdbc = new JdbcTemplate(ds);
             String schema = Files.readString(Path.of("../../scripts/fixtures/repair-purchase-facts-20260909.sql"));
             for (String statement : schema.split(";\\s*(?:\\r?\\n|$)")) if (!statement.isBlank()) jdbc.execute(statement);
+            jdbc.execute("ALTER TABLE inv_purchase_order ADD COLUMN version BIGINT NOT NULL DEFAULT 0");
             Configuration config = new Configuration(new Environment("native", new JdbcTransactionFactory(), ds));
             config.getTypeAliasRegistry().registerAlias("InvStock", InvStock.class);
             config.getTypeAliasRegistry().registerAlias("InvPurchaseOrder", InvPurchaseOrder.class);

@@ -144,7 +144,8 @@ class SysTodoServiceImplTest
                 .containsEntry("healthCertificateView", "admin")
                 .containsEntry("affectedCount", "2");
         verify(mapper).selectHealthCertificateTodoCandidates(any(), anySet(),
-                eq(List.of()), eq(List.of(10L, 20L)), eq(7L));
+                eq(List.of(10L)), eq(List.of(10L, 20L)), eq(7L));
+        verify(mapper, never()).selectScopedTodoCandidates(any(), anySet(), anyList(), anyList(), any());
     }
 
     @Test
@@ -185,18 +186,17 @@ class SysTodoServiceImplTest
         service.permissions.addAll(Set.of("hr:completeness:list", "hr:employee:list", "hr:employee:edit"));
         List<SysTodoCandidateRow> rows = List.of(
                 candidate(1L, 10L, "门店A"), candidate(2L, 10L, "门店A"), candidate(3L, 20L, "门店B"));
-        when(mapper.selectScopedTodoCandidates(any(), anySet(), anyList(), anyList(), any())).thenReturn(rows);
+        stubCandidates(rows);
         TodoSummary summary = service.selectSummary(new TodoQuery(), 10L);
 
-        assertThat(summary.getTotal()).isEqualTo(2);
-        assertThat(summary.getTypeCounts()).containsEntry(SysTodoTypes.HR_PROFILE_INCOMPLETE, 2L);
-        assertThat(summary.getRecent()).hasSize(2);
-        assertThat(summary.getRecent()).extracting(item -> item.getRouteParams().get("count"))
-                .containsExactly("2", "1");
-        verify(evaluator, org.mockito.Mockito.times(3)).evaluate(any());
+        assertThat(summary.getTotal()).isEqualTo(1);
+        assertThat(summary.getTypeCounts()).containsEntry(SysTodoTypes.HR_PROFILE_INCOMPLETE, 1L);
+        assertThat(summary.getRecent()).hasSize(1);
+        assertThat(summary.getRecent().get(0).getRouteParams()).containsEntry("count", "2");
+        assertThat(summary.getRecent().get(0).getSummary()).isEqualTo("员工1、员工2，共 2 人待处理");
+        verify(evaluator, org.mockito.Mockito.times(2)).evaluate(any());
         verify(mapper).selectScopedTodoCandidates(any(), anySet(),
-                org.mockito.ArgumentMatchers.eq(List.of()),
-                org.mockito.ArgumentMatchers.eq(List.of(10L, 20L)), any());
+                eq(List.of(10L)), eq(List.of(10L, 20L)), any());
     }
 
     @Test
@@ -206,8 +206,7 @@ class SysTodoServiceImplTest
         SysTodoCandidateRow incomplete=candidate(1L,10L,"门店A");
         SysTodoCandidateRow complete=candidate(2L,10L,"门店A");
         complete.setBankAccount("6222000000000000");
-        when(mapper.selectScopedTodoCandidates(any(),anySet(),anyList(),anyList(),any()))
-                .thenReturn(List.of(incomplete,complete));
+        stubCandidates(List.of(incomplete,complete));
         when(evaluator.evaluate(any())).thenAnswer(invocation->{
             SysUser user=invocation.getArgument(0);
             boolean missing=user.getProfile().getBankAccount()==null;
@@ -231,9 +230,9 @@ class SysTodoServiceImplTest
         urgent.setContractEndDate(date(7));
         SysTodoCandidateRow warning = candidate(2L, 20L, "门店B");
         warning.setContractEndDate(date(30));
-        when(mapper.selectScopedTodoCandidates(any(), anySet(), anyList(), anyList(), any()))
-                .thenReturn(List.of(urgent, warning));
+        stubCandidates(List.of(urgent, warning));
         TodoQuery query = new TodoQuery();
+        query.setScopeMode("all_authorized");
         query.setPageNum(2);
         query.setPageSize(1);
 
@@ -257,8 +256,7 @@ class SysTodoServiceImplTest
         Date sameCreatedTime = new Date(service.now);
         profile.setCreateTime(sameCreatedTime);
         onboarding.setCreateTime(sameCreatedTime);
-        when(mapper.selectScopedTodoCandidates(any(), anySet(), anyList(), anyList(), any()))
-                .thenReturn(List.of(profile, onboarding));
+        stubCandidates(List.of(profile, onboarding));
         when(evaluator.evaluate(any())).thenAnswer(invocation -> {
             SysUser user = invocation.getArgument(0);
             boolean incomplete = Long.valueOf(1L).equals(
@@ -293,7 +291,7 @@ class SysTodoServiceImplTest
 
         verify(shopService, never()).checkUserShopScope(any(), any(), anyBoolean());
         verify(mapper).selectScopedTodoCandidates(any(), anySet(),
-                eq(List.of()), eq(List.of(10L, 20L)), any());
+                eq(List.of(10L, 20L)), eq(List.of(10L, 20L)), any());
     }
 
     @Test
@@ -304,8 +302,7 @@ class SysTodoServiceImplTest
         SysTodoCandidateRow row = candidate(1L, 10L, "门店A");
         row.setEmployeeName("张三");
         row.setEmployeeNo("E1001");
-        when(mapper.selectScopedTodoCandidates(any(), anySet(), anyList(), anyList(), any()))
-                .thenReturn(List.of(row));
+        stubCandidates(List.of(row));
 
         TodoQuery byEmployee = new TodoQuery();
         byEmployee.setScopeMode("all_authorized");
@@ -328,8 +325,7 @@ class SysTodoServiceImplTest
         SysTodoCandidateRow row = candidate(1L, 10L, "门店A");
         row.setHealthCertificateId(81L);
         row.setHealthCertificateExpiresOn(date(40));
-        when(mapper.selectScopedTodoCandidates(any(), anySet(), anyList(), anyList(), any()))
-                .thenReturn(List.of(row));
+        stubCandidates(List.of(row));
 
         SysTodoPage page = service.selectTodoPage(new TodoQuery(), 10L);
 
@@ -348,8 +344,7 @@ class SysTodoServiceImplTest
         when(configService.selectConfigByKey("todo.contract.warning.days")).thenReturn("30");
         SysTodoCandidateRow row = candidate(1L, 10L, "门店A");
         row.setContractEndDate(date(5));
-        when(mapper.selectScopedTodoCandidates(any(), anySet(), anyList(), anyList(), any()))
-                .thenReturn(List.of(row));
+        stubCandidates(List.of(row));
         TodoQuery query = new TodoQuery();
         query.setType(SysTodoTypes.HR_CONTRACT_DUE);
 
@@ -376,8 +371,7 @@ class SysTodoServiceImplTest
         offboard.setEmployeeStatus("离职");
         offboard.setLinkedAccountStatus("0");
         offboard.setLinkedAccountDelFlag("0");
-        when(mapper.selectScopedTodoCandidates(any(), anySet(), anyList(), anyList(), any()))
-                .thenReturn(List.of(profile, onboarding, contract, offboard));
+        stubCandidates(List.of(profile, onboarding, contract, offboard));
         TodoQuery query = new TodoQuery();
         query.setPageSize(100);
 
@@ -395,6 +389,84 @@ class SysTodoServiceImplTest
         assertThat(item(page, SysTodoTypes.HR_OFFBOARD_ACCOUNT).getRouteParams())
                 .containsEntry("deptId", "10")
                 .containsEntry("offboardAccountOnly", "true");
+    }
+
+    @Test
+    void actionableScopeKeepsCurrentShopAndDoesNotExpandEmptyOrUnauthorizedSelection()
+    {
+        service.permissions.addAll(Set.of("hr:completeness:list", "hr:employee:list", "hr:employee:edit"));
+        SysTodoCandidateRow shopA = candidate(1L, 10L, "门店A");
+        shopA.setEmployeeName("张三");
+        SysTodoCandidateRow shopB = candidate(2L, 20L, "门店B");
+        shopB.setEmployeeName("张三");
+        stubCandidates(List.of(shopA, shopB));
+
+        SysTodoPage currentShop = service.selectTodoPage(new TodoQuery(), 10L);
+        assertThat(currentShop.getTotal()).isEqualTo(1);
+        assertThat(currentShop.getRows().get(0).getDeptId()).isEqualTo(10L);
+        verify(mapper).selectScopedTodoCandidates(any(), anySet(),
+                eq(List.of(10L)), eq(List.of(10L, 20L)), any());
+
+        SysTodoPage unauthorized = service.selectTodoPage(new TodoQuery(), 999L);
+        assertThat(unauthorized.getTotal()).isZero();
+        verify(mapper).selectScopedTodoCandidates(any(), anySet(),
+                eq(List.of()), eq(List.of(10L, 20L)), any());
+
+        SysTodoPage missingSelection = service.selectTodoPage(new TodoQuery(), null);
+        assertThat(missingSelection.getTotal()).isZero();
+    }
+
+    @Test
+    void emptyAuthorizationAndScopeReadFailureStayEmpty()
+    {
+        service.permissions.addAll(Set.of("hr:completeness:list", "hr:employee:list", "hr:employee:edit"));
+        when(shopService.selectShopDeptIdsByUserId(7L)).thenReturn(List.of());
+        stubCandidates(List.of(candidate(1L, 10L, "门店A")));
+
+        assertThat(service.selectTodoPage(new TodoQuery(), 10L).getTotal()).isZero();
+        verify(mapper).selectScopedTodoCandidates(any(), anySet(),
+                eq(List.of()), eq(List.of()), any());
+
+        when(shopService.selectShopDeptIdsByUserId(7L)).thenThrow(new RuntimeException("scope failed"));
+        assertThat(service.selectTodoPage(new TodoQuery(), 10L).getTotal()).isZero();
+    }
+
+    @Test
+    void allAuthorizedKeepsSameNameAcrossShopsInSeparateGroups()
+    {
+        service.permissions.addAll(Set.of("hr:completeness:list", "hr:employee:list", "hr:employee:edit"));
+        SysTodoCandidateRow shopA = candidate(1L, 10L, "门店A");
+        shopA.setEmployeeName("张三");
+        SysTodoCandidateRow shopB = candidate(2L, 20L, "门店B");
+        shopB.setEmployeeName("张三");
+        stubCandidates(List.of(shopA, shopB));
+        TodoQuery query = new TodoQuery();
+        query.setScopeMode("all_authorized");
+
+        SysTodoPage page = service.selectTodoPage(query, 999L);
+
+        assertThat(page.getRows()).hasSize(2);
+        assertThat(page.getRows()).extracting(TodoItem::getDeptId).containsExactly(10L, 20L);
+        assertThat(page.getRows()).extracting(TodoItem::getSummary)
+                .containsExactly("张三，共 1 人待处理", "张三，共 1 人待处理");
+        assertThat(page.getRows()).extracting(item -> item.getRouteParams().get("deptId"))
+                .containsExactly("10", "20");
+    }
+
+    @Test
+    void summarizesThreeNamesExactlyAndAbbreviatesBeyondThree()
+    {
+        service.permissions.addAll(Set.of("hr:completeness:list", "hr:employee:list", "hr:employee:edit"));
+        stubCandidates(List.of(
+                named(1L, 10L, "甲"), named(2L, 10L, "乙"), named(3L, 10L, "丙")));
+        assertThat(service.selectTodoPage(new TodoQuery(), 10L).getRows().get(0).getSummary())
+                .isEqualTo("甲、乙、丙，共 3 人待处理");
+
+        stubCandidates(List.of(
+                named(1L, 10L, "甲"), named(2L, 10L, "乙"),
+                named(3L, 10L, "丙"), named(4L, 10L, "丁")));
+        assertThat(service.selectTodoPage(new TodoQuery(), 10L).getRows().get(0).getSummary())
+                .isEqualTo("甲、乙、丙等，共 4 人待处理");
     }
 
     private TodoItem item(SysTodoPage page, String type)
@@ -421,6 +493,32 @@ class SysTodoServiceImplTest
         assertThat(summary.getNormal()).isEqualTo(expectedNormal);
         assertThat(summary.getRecent()).isNotEmpty()
                 .allSatisfy(item -> assertThat(item.getPriority()).isEqualTo(priority));
+    }
+
+    @SuppressWarnings("unchecked")
+    private void stubCandidates(List<SysTodoCandidateRow> rows)
+    {
+        when(mapper.selectScopedTodoCandidates(any(), anySet(), anyList(), anyList(), any()))
+                .thenAnswer(invocation -> {
+                    List<Long> current = invocation.getArgument(2);
+                    List<Long> authorized = invocation.getArgument(3);
+                    if (current == null || current.isEmpty()
+                            || authorized == null || authorized.isEmpty())
+                    {
+                        return List.of();
+                    }
+                    return rows.stream()
+                            .filter(row -> current.contains(row.getDeptId())
+                                    && authorized.contains(row.getDeptId()))
+                            .toList();
+                });
+    }
+
+    private SysTodoCandidateRow named(Long profileId, Long deptId, String employeeName)
+    {
+        SysTodoCandidateRow row = candidate(profileId, deptId, "门店A");
+        row.setEmployeeName(employeeName);
+        return row;
     }
 
     private SysTodoCandidateRow candidate(Long profileId, Long deptId, String deptName)

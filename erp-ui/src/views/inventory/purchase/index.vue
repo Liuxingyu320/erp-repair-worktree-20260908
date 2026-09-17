@@ -1,5 +1,6 @@
 <template>
   <div class="app-container warehouse-page">
+    <inventory-draft-recovery feature="purchase" @recovered="onDraftRecovered" />
     <inventory-page-hero
       title="采购管理"
       eyebrow="入库作业"
@@ -247,7 +248,7 @@
           </el-table-column>
           <el-table-column label="数量" width="150">
             <template slot-scope="scope">
-              <el-input-number v-model="scope.row.quantity" :min="1" :precision="2" controls-position="right" size="small" style="width:120px"/>
+              <el-input v-model="scope.row.quantity" inputmode="decimal" aria-label="采购数量，最多两位小数" size="small" :disabled="formSubmitting"/><span v-if="!validInventoryQuantity(scope.row.quantity)" class="text-danger" role="alert">大于 0，最多两位小数</span>
             </template>
           </el-table-column>
           <el-table-column label="进价" width="160">
@@ -517,6 +518,8 @@
 </template>
 
 <script>
+import InventoryDraftRecovery from "@/views/inventory/components/InventoryDraftRecovery.vue"
+const { validInventoryQuantity } = require("@/utils/inventoryQuantity")
 import { listPurchase, getPurchaseDetail, getPurchaseDraft, getPurchaseActionContext, getPurchaseReceiveContext, listPurchaseSuppliers, listPurchaseProducts, listPurchaseOeItems, listPurchaseGifts, savePurchase, submitPurchase, submitPurchaseDraft, qualityCheckPurchase, listPendingReceiptBatches, qualityCheckPurchaseBatch, cancelPurchase, deleteDraftPurchase } from "@/api/inventory/purchase"
 import WarehouseSelect from "@/views/inventory/components/WarehouseSelect"
 import { parseTime } from "@/utils/common"
@@ -541,7 +544,7 @@ export default {
     }
   })],
   name: "InvPurchase",
-  components: { WarehouseSelect },
+  components: { InventoryDraftRecovery, WarehouseSelect },
   data() {
     return {
       loading: false, total: 0, list: [], listError: "", listRequestSequence: 0, activeListQuerySnapshot: "",
@@ -565,7 +568,7 @@ export default {
       receiveForm: { orderId: undefined, orderNo: "", shopDeptId: undefined, warehouseId: undefined, supplierBatchNo: "", deliveryNoteNo: "", arrivedTime: "", remark: "", details: [] },
       qcForm: { orderId: undefined, orderNo: "", receiptBatchId: undefined, items: [], qcResult: "", qcRemark: "" },
       rules: {
-        orderTitle: [{ required: true, message: "请输入标题", trigger: "blur" }],
+        orderTitle: [{ required: true, whitespace: true, message: "请输入标题", trigger: "blur" }],
         supplierId: [{ required: true, message: "请选择合作中的供应商档案", trigger: "change" }],
         orderDate: [{ required: true, message: "请选择采购日期", trigger: "change" }]
       },
@@ -616,15 +619,17 @@ export default {
   },
   created() { this.bindProductDeptListener(); this.getList(); this.refreshReceiveRecovery() },
   activated() { this.productPageInactive = false; this.bindProductDeptListener(); this.refreshReceiveRecovery() },
-  deactivated() { this.productPageInactive = true; this.closeProductSelector(); this.invalidateReceiveSession() },
+  deactivated() { this.productPageInactive = true; this.closeProductSelector(); this.invalidateReceiveSession(); this.invalidateEditor() },
   beforeDestroy() {
-    this.invalidateReceiveSession()
+    this.invalidateReceiveSession(); this.invalidateEditor()
     this.productPageInactive = true
     this.closeProductSelector()
     if (this.productDeptListenerBound && typeof window !== "undefined") window.removeEventListener("erp:dept-changed", this.handleProductDeptChanged)
     this.productDeptListenerBound = false
   },
   watch: {
+    open(value) { if (!value) this.invalidateEditor() },
+    "$store.state.user.sessionRevision"() { this.invalidateEditor() },
     productQuery: { deep: true, handler() { this.handleProductContextChange() } },
     selectedItemType() { this.handleProductContextChange() },
     "form.supplierId"() { this.handleProductContextChange() },
@@ -632,11 +637,22 @@ export default {
     form() { this.handleProductContextChange() },
     "form.orderId"() { this.handleProductContextChange() },
     productDialogOpen(value) { if (!value) this.handleProductSelectorClose() },
-    "$route.fullPath"() { this.closeProductSelector(); this.invalidateReceiveSession(); this.refreshReceiveRecovery() },
-    "$store.getters.id"() { this.closeProductSelector(); this.invalidateReceiveSession(); this.refreshReceiveRecovery() },
-    receiveOpen(value) { if (!value) { this.invalidateReceiveSession(); this.refreshReceiveRecovery() } }
+    "$route.fullPath"() { this.closeProductSelector(); this.invalidateReceiveSession(); this.invalidateEditor(); this.refreshReceiveRecovery() },
+    "$store.getters.id"() { this.closeProductSelector(); this.invalidateReceiveSession(); this.invalidateEditor(); this.refreshReceiveRecovery() },
+    receiveOpen(value) { if (!value) { this.invalidateReceiveSession(); this.invalidateEditor(); this.refreshReceiveRecovery() } }
   },
   methods: {
+    onDraftRecovered({ record, response }) {
+      const data = response.data
+      if (this.open && String(this.form.orderId || "new") === String(record.payload.orderId || "new")) {
+        this.$set(this.form, "orderId", data.orderId)
+        this.$set(this.form, "version", data.version)
+        this.$set(this.form, "status", data.status)
+        this.$modal.msgWarning(data.status === "draft" ? "已找回草稿编号，当前输入仍保留；请核对后再保存" : "上次操作已提交，当前输入保留供核对，请关闭窗口查看原单")
+      }
+      return this.getList()
+    },
+    validInventoryQuantity,
     statusType(s) { const m = { draft: 'info', submitted: 'warning', received: 'success', cancelled: 'danger' }; return m[s] || 'info' },
     statusLabel(s) { const m = { draft: '草稿', submitted: '已提交', received: '已收货', cancelled: '已取消' }; return m[s] || '未知采购状态' },
     itemTypeLabel(type) { return { product: "商品", oe: "OE 器皿", gift: "礼盒" }[type] || '其他物料' },
@@ -795,7 +811,7 @@ export default {
         this.productDeptListenerBound = true
       }
     },
-    handleProductDeptChanged() { this.closeProductSelector(); this.invalidateReceiveSession(); this.refreshReceiveRecovery() },
+    handleProductDeptChanged() { this.closeProductSelector(); this.invalidateReceiveSession(); this.invalidateEditor(); this.refreshReceiveRecovery() },
     isCurrentProductRead(seq, context) {
       return !this.productPageInactive && this.productDialogOpen && seq === this.productReadSeq && context === this.productContextKey()
     },
@@ -955,6 +971,8 @@ export default {
       }
     },
     openForm(row) {
+      if (this.formSubmitting) return Promise.resolve({ busy: true })
+      const epoch = this.editorEpoch = (this.editorEpoch || 0) + 1, context = this.editorContext()
       if (!this.ensureWarehouseContext()) return
       this.closeProductSelector()
       if (!row) {
@@ -965,7 +983,8 @@ export default {
         this.$nextTick(() => { if (this.$refs.formRef) this.$refs.formRef.clearValidate() })
         return
       }
-      getPurchaseDraft(row.orderId).then(res => {
+      return getPurchaseDraft(row.orderId, { silentError: true }).then(res => {
+        if (!this.editorCurrent(epoch, context)) return
         const data = res.data || {}
         this.form = Object.assign({}, data, {
           orderDate: data.orderDate || this.defaultOrderDate(),
@@ -975,7 +994,7 @@ export default {
         this.open = true
         this.loadSuppliers(data.supplierName)
         this.$nextTick(() => { if (this.$refs.formRef) this.$refs.formRef.clearValidate() })
-      })
+      }).catch(error => { if (this.editorCurrent(epoch, context)) this.$modal.msgError(error.message || "草稿加载失败，请重试") })
     },
     normalizeDetail(item) {
       return Object.assign({}, item, {
@@ -997,13 +1016,17 @@ export default {
     clearDetails() {
       this.form.details = []
     },
+    editorContext() { return JSON.stringify([getSelectedDeptId(), this.productActor(), this.$store && this.$store.state && this.$store.state.user && this.$store.state.user.sessionRevision, this.$route && this.$route.fullPath]) },
+    editorCurrent(epoch, context) { return !this.productPageInactive && epoch === this.editorEpoch && context === this.editorContext() },
+    invalidateEditor() { this.editorEpoch = (this.editorEpoch || 0) + 1; this.supplierReadSequence = (this.supplierReadSequence || 0) + 1; this.formSubmitting = false; this.open = false },
     handleFormBeforeClose(done) {
       if (this.formSubmitting) return
+      this.invalidateEditor()
       done()
     },
     closeForm() {
       if (this.formSubmitting) return
-      this.open = false
+      this.invalidateEditor()
     },
     validateEditorForm() {
       return new Promise(resolve => {
@@ -1018,15 +1041,17 @@ export default {
     doSave(submitAfter) {
       if (this.formSubmitting) return Promise.resolve({ busy: true })
       if (!this.ensureWarehouseContext()) return Promise.resolve({ invalidContext: true })
+      const epoch = this.editorEpoch, context = this.editorContext()
       this.formSubmitting = true
       return this.validateEditorForm().then(valid => {
-        if (!valid) return { invalid: true }
-        return this.submitValidatedForm(submitAfter)
-      }).catch(error => ({ failed: true, error })).finally(() => {
-        this.formSubmitting = false
+        if (!this.editorCurrent(epoch, context) || !valid) return { invalid: true }
+        return this.submitValidatedForm(submitAfter, epoch, context)
+      }).catch(error => { if (this.editorCurrent(epoch, context) && !error.notified) this.$modal.msgError(error.message || "保存失败，输入已保留"); return { failed: true, error } }).finally(() => {
+        if (this.editorCurrent(epoch, context)) this.formSubmitting = false
       })
     },
-    submitValidatedForm(submitAfter) {
+    submitValidatedForm(submitAfter, epoch = this.editorEpoch, context = this.editorContext()) {
+      if (this.form.status && this.form.status !== "draft") { this.$modal.msgWarning("原单已提交，请关闭窗口查看原单，当前输入仍保留"); return { invalid: true } }
       if (!this.form.details || this.form.details.length === 0) {
         this.$modal.msgError("请添加至少一条明细")
         return { invalid: true }
@@ -1041,9 +1066,9 @@ export default {
         this.$modal.msgError("请选择合作中的供应商档案")
         return { invalid: true }
       }
-      const invalidQuantity = this.form.details.find(d => this.toNumber(d.quantity) <= 0)
+      const invalidQuantity = this.form.details.find(d => !validInventoryQuantity(d.quantity))
       if (invalidQuantity) {
-        this.$modal.msgError("采购数量必须大于0")
+        this.$modal.msgError("采购数量必须大于 0 且最多两位小数")
         return { invalid: true }
       }
       const invalidPrice = this.form.details.find(d => this.toNumber(d.unitPrice) < 0)
@@ -1053,7 +1078,10 @@ export default {
       }
       const payload = this.buildPurchasePayload()
       const api = submitAfter ? submitPurchase : savePurchase
-      return api(payload).then(() => {
+      return api(payload).then(res => {
+        if (!this.editorCurrent(epoch, context)) return { discarded: true }
+        this.$set(this.form, "orderId", res.data.orderId)
+        this.$set(this.form, "version", res.data.version)
         this.$modal.msgSuccess(submitAfter ? "提交成功" : "已保存草稿")
         this.open = false
         this.getList()
@@ -1102,6 +1130,8 @@ export default {
       return supplier.supplierName + (supplier.supplierCode ? "（" + supplier.supplierCode + "）" : "")
     },
     loadSuppliers(keyword) {
+      const sequence = this.supplierReadSequence = (this.supplierReadSequence || 0) + 1, epoch = this.editorEpoch, context = this.editorContext()
+      const current = () => sequence === this.supplierReadSequence && this.editorCurrent(epoch, context)
       if (!this.isWarehouseContext) {
         this.supplierOptions = []
         return Promise.resolve([])
@@ -1114,6 +1144,7 @@ export default {
         cooperationStatus: "0",
         supplierName: keyword ? String(keyword).trim() : undefined
       }, { silentError: true }).then(res => {
+        if (!current()) return []
         const selected = this.supplierOptions.find(item => String(item.supplierId) === String(this.form.supplierId))
         this.supplierOptions = res.rows || []
         if (selected && !this.supplierOptions.some(item => String(item.supplierId) === String(selected.supplierId))) {
@@ -1121,9 +1152,10 @@ export default {
         }
         return this.supplierOptions
       }).catch(() => {
+        if (!current()) return []
         this.$modal.msgWarning("供应商选项加载失败，请检查供应商档案权限或稍后重试")
         return this.supplierOptions
-      }).finally(() => { this.supplierLoading = false })
+      }).finally(() => { if (current()) this.supplierLoading = false })
     },
     onSupplierChange(supplierId) {
       this.closeProductSelector()
@@ -1137,7 +1169,7 @@ export default {
     },
     doSubmit(row) {
       if (!this.ensureWarehouseContext()) return
-      submitPurchaseDraft(row.orderId).then(() => { this.$modal.msgSuccess("提交成功"); this.getList() })
+      submitPurchaseDraft(row.orderId, row.version).then(() => { this.$modal.msgSuccess("提交成功"); this.getList() })
     },
     invalidateReceiveSession() {
       this.receiveRequestSequence += 1

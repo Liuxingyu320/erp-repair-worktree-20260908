@@ -55,7 +55,7 @@
     </el-card>
 
     <el-alert
-      v-if="assetActionDisabled && !storeConfigRows.length"
+      v-if="!loading && !listError && !overviewQueryChanged && !hasAssetFilters && assetActionDisabled && total === 0"
       title="固定资产基础配置为空"
       description="可直接添加店铺固定资产明细，并在弹窗内选择店铺；导出前需先筛选店铺。"
       type="warning"
@@ -64,7 +64,10 @@
       class="mb12"
     />
 
-    <section class="quota-grid">
+    <el-alert v-if="listError" :title="listError" type="error" :closable="false"><el-button type="text" @click="getList">重试列表</el-button></el-alert>
+    <el-alert v-if="quotaError" :title="quotaError" type="warning" :closable="false"><el-button type="text" @click="loadQuota">重试额度</el-button></el-alert>
+    <p v-if="quotaLoading" role="status">正在读取店铺额度…</p>
+    <section v-if="quota" class="quota-grid">
       <div class="quota-cell">
         <span>固定资产总金额</span>
         <strong>{{ money(quota.assetTotalAmount) }}</strong>
@@ -104,7 +107,11 @@
           <template slot-scope="scope">{{ money(scope.row.assetTotalAmount) }}</template>
         </el-table-column>
         <el-table-column label="剩余可报销金额" prop="availableQuotaAmount" width="160" align="right">
-          <template slot-scope="scope">{{ money(scope.row.availableQuotaAmount) }}</template>
+          <template slot-scope="scope">
+            <span v-if="scope.row.quotaLoading">读取中…</span>
+            <template v-else-if="scope.row.quotaError"><span>{{ scope.row.quotaError }}</span><el-button type="text" @click="loadRowQuota(scope.row)">重试</el-button></template>
+            <span v-else>{{ scope.row.availableQuotaAmount == null ? '—' : money(scope.row.availableQuotaAmount) }}</span>
+          </template>
         </el-table-column>
         <el-table-column label="操作" width="230" fixed="right" align="center">
           <template slot-scope="scope">
@@ -144,7 +151,8 @@
         </div>
         <div class="drawer-metric">
           <span>剩余可报销金额</span>
-          <strong>{{ money(activeStoreConfig.availableQuotaAmount) }}</strong>
+          <strong>{{ activeStoreQuota.quotaLoading ? '正在读取…' : activeStoreQuota.availableQuotaAmount == null ? '暂时无法读取' : money(activeStoreQuota.availableQuotaAmount) }}</strong>
+          <el-button v-if="activeStoreQuota.quotaError" type="text" @click="loadRowQuota(activeStoreQuota)">重试额度</el-button>
         </div>
       </div>
       <div class="drawer-table-card">
@@ -152,7 +160,8 @@
           <span>明细列表</span>
           <strong>{{ (activeStoreConfig.details || []).length }} 条</strong>
         </div>
-        <el-table :data="activeStoreConfig.details || []" border size="small" empty-text="暂无固定资产明细">
+        <el-alert v-if="detailError" :title="detailError" type="error" :closable="false"><el-button type="text" @click="openDetailDrawer(activeStoreConfig)">重试明细</el-button></el-alert>
+        <el-table v-loading="detailLoading" :data="activeStoreConfig.details || []" border size="small" empty-text="暂无固定资产明细">
           <el-table-column label="OE编码" prop="oeItemCode" width="150" show-overflow-tooltip />
           <el-table-column label="固定资产明细" prop="oeItemName" min-width="260" show-overflow-tooltip />
           <el-table-column label="数量" prop="assetQuantity" width="90" align="right">
@@ -275,6 +284,8 @@
 </template>
 
 <script>
+const { createUiOperationScope } = require('@/utils/uiOperationScope')
+import { getSelectedDeptId } from '@/utils/shopContext'
 import fixedAssetConfigBatch from "@/mixins/fixedAssetConfigBatch"
 import Treeselect from "@riophae/vue-treeselect"
 import "@riophae/vue-treeselect/dist/vue-treeselect.css"
@@ -282,6 +293,8 @@ import {
   deleteFixedAssetConfig,
   getFixedAssetQuota,
   listFixedAssetConfigs,
+  listFixedAssetStores,
+  getFixedAssetStoreDetails,
   saveFixedAssetConfig
 } from "@/api/oa/fixedAsset"
 import { listOe } from "@/api/inventory/oe"
@@ -294,7 +307,7 @@ export default {
   components: { Treeselect },
   data() {
     return {
-      loading: false,
+      loading: false, listError: "", quotaError: "", quotaLoading: false, detailError: "", detailLoading: false, overviewInactive: false, overviewQueryChanged: false,
       saving: false,
       oeLoading: false,
       configOpen: false,
@@ -309,7 +322,7 @@ export default {
       selectedAssetRows: [],
       originalAssetRows: [],
       activeStoreConfig: { details: [] },
-      quota: {},
+      quota: null,
       queryParams: {
         pageNum: 1,
         pageSize: 10,
@@ -325,14 +338,32 @@ export default {
     }
   },
   created() {
+    if (typeof window !== 'undefined') window.addEventListener('erp:dept-changed', this.refreshOverviewContext)
     this.loadShopTree()
     this.getList()
   },
+  beforeDestroy() { if (typeof window !== 'undefined') window.removeEventListener('erp:dept-changed', this.refreshOverviewContext); this.overviewScope().deactivate() },
+  deactivated() { this.overviewInactive = true; this.overviewScope().deactivate() },
+  activated() { this.overviewScope().activate(); if (this.overviewInactive) { this.overviewInactive = false; this.getList() } },
+  watch: {
+    overviewIdentity() { this.refreshOverviewContext() },
+    queryParams: { deep: true, handler() { if (this._overviewQueryKey !== JSON.stringify(this.queryParams)) { this.invalidateOverview(); this.overviewQueryChanged = true } } },
+    detailDrawerOpen(value) { if (!value) this.overviewScope().invalidate('details') }
+  },
   computed: {
+    overviewIdentity() { return JSON.stringify([this.$store.getters.id, this.$store.state.user.sessionRevision, this.$route.fullPath]) },
+    activeStoreQuota() {
+      return this.storeConfigRows.find(row => String(row.shopDeptId) === String(this.activeStoreConfig.shopDeptId)) || this.activeStoreConfig
+    },
     assetActionDisabled() {
       return !this.queryParams.shopDeptId
     },
+    hasAssetFilters() {
+      return Boolean(this.queryParams.oeItemName || (this.queryParams.status !== undefined && this.queryParams.status !== null && this.queryParams.status !== ''))
+    },
     fixedAssetConfigEmptyText() {
+      if (this.overviewQueryChanged) return "筛选已修改，点击搜索查看结果"
+      if (this.hasAssetFilters) return "没有符合筛选条件的资产配置，请调整条件或重置筛选"
       return getBusinessEmptyText("fixedAssetConfig", this.assetActionDisabled ? "missingContext" : "missingBaseline")
     }
   },
@@ -345,9 +376,9 @@ export default {
       }
     },
     loadShopTree() {
-      shopTree().then(res => {
-        this.shopOptions = res.data || []
-      })
+      const scope = this.overviewScope(), token = scope.begin('shops')
+      return shopTree().then(res => { if (scope.isCurrent(token)) this.shopOptions = res.data || [] })
+        .catch(() => { if (scope.isCurrent(token)) this.listError = '店铺范围读取失败，请刷新重试' })
     },
     handleQuery() {
       this.queryParams.pageNum = 1
@@ -357,39 +388,79 @@ export default {
       this.queryParams = { pageNum: 1, pageSize: 10, shopDeptId: undefined, oeItemName: undefined, status: undefined }
       this.getList()
     },
+    overviewScope() {
+      if (!this._overviewScope) this._overviewScope = createUiOperationScope(() => ({ identity: this.overviewIdentity, dept: getSelectedDeptId() }))
+      return this._overviewScope
+    },
+    invalidateOverview() {
+      this._overviewQueryKey = null
+      this.overviewScope().invalidate()
+      this.storeConfigRows = []; this.allStoreConfigRows = []; this.rawConfigRows = []; this.total = 0
+      this.loading = false; this.quota = null; this.quotaError = ''; this.quotaLoading = false
+      this.detailDrawerOpen = false; this.detailLoading = false; this.detailError = ''; this.activeStoreConfig = { details: [] }
+    },
+    refreshOverviewContext() {
+      this.invalidateOverview()
+      this.shopOptions = []
+      if (!this.overviewInactive) { this.loadShopTree(); this.getList() }
+    },
     getList() {
-      this.loading = true
-      const listParams = Object.assign({}, this.queryParams, { pageNum: 1, pageSize: 5000 })
-      listFixedAssetConfigs(listParams).then(res => {
-        this.rawConfigRows = res.rows || []
-        this.loadQuota()
-        return this.hydrateStoreQuotaRows(this.groupFixedAssetConfigs(this.rawConfigRows))
-      }).then(rows => {
-        this.allStoreConfigRows = rows
-        this.total = this.allStoreConfigRows.length
-        this.storeConfigRows = this.paginateStoreRows(this.allStoreConfigRows)
-      }).finally(() => {
-        this.loading = false
-      })
+      if (this.overviewInactive) return Promise.resolve()
+      const scope = this.overviewScope(), query = { ...this.queryParams }, token = scope.begin('list', query)
+      this._overviewQueryKey = JSON.stringify(query); this.overviewQueryChanged = false
+      this.loading = true; this.listError = ''; this.storeConfigRows = []; this.total = 0
+      this.detailDrawerOpen = false
+      this.loadQuota()
+      return listFixedAssetStores(query).then(res => {
+        if (!scope.isCurrent(token, this.queryParams)) return
+        if (!res || !Array.isArray(res.rows) || !Number.isFinite(Number(res.total))) throw Error('资产列表响应不完整，请重试')
+        this._loadedOverviewQuery = query
+        this.total = Number(res.total)
+        this.storeConfigRows = res.rows.map(row => ({ ...row, quotaLoading: true, quotaError: '', availableQuotaAmount: null, annualRepairRatio: null }))
+        this.storeConfigRows.forEach(row => this.loadRowQuota(row))
+      }).catch(error => { if (scope.isCurrent(token, this.queryParams)) this.listError = error.message || '资产列表读取失败，请重试' })
+        .finally(() => { if (scope.isCurrent(token, this.queryParams)) this.loading = false })
     },
     loadQuota() {
-      getFixedAssetQuota({ shopDeptId: this.queryParams.shopDeptId }).then(res => {
-        this.quota = res.data || {}
-      }).catch(() => {
-        this.quota = {}
-      })
+      const scope = this.overviewScope(), shop = this.queryParams.shopDeptId, token = scope.begin('quota', shop)
+      this.quota = null; this.quotaError = ''; this.quotaLoading = !!shop
+      if (!shop) return Promise.resolve()
+      return getFixedAssetQuota({ shopDeptId: shop }, { silentError: true }).then(res => {
+        if (!scope.isCurrent(token, this.queryParams.shopDeptId)) return
+        if (!res || !res.data || res.data.availableQuotaAmount == null) throw Error('额度响应不完整')
+        this.quota = res.data
+      }).catch(error => { if (scope.isCurrent(token, this.queryParams.shopDeptId)) this.quotaError = error.message || '额度暂时无法读取' })
+        .finally(() => { if (scope.isCurrent(token, this.queryParams.shopDeptId)) this.quotaLoading = false })
+    },
+    loadRowQuota(row) {
+      const scope = this.overviewScope(), query = { ...this.queryParams }, token = scope.begin('row-quota:' + row.shopDeptId, query)
+      const current = () => scope.isCurrent(token, this.queryParams) && this.storeConfigRows.includes(row)
+      row.quotaLoading = true; row.quotaError = ''; row.availableQuotaAmount = null
+      return getFixedAssetQuota({ shopDeptId: row.shopDeptId }, { silentError: true }).then(res => {
+        if (!current()) return
+        if (!res || !res.data || res.data.availableQuotaAmount == null) throw Error('额度响应不完整')
+        row.availableQuotaAmount = res.data.availableQuotaAmount; row.annualRepairRatio = res.data.annualRepairRatio
+      }).catch(error => { if (current()) row.quotaError = '暂时无法读取' })
+        .finally(() => { if (current()) row.quotaLoading = false })
     },
     openDetailDrawer(row) {
-      this.activeStoreConfig = row || { details: [] }
-      this.detailDrawerOpen = true
+      const scope = this.overviewScope(), query = { ...this._loadedOverviewQuery, shopDeptId: row.shopDeptId }, token = scope.begin('details', query)
+      this.activeStoreConfig = { ...row, details: [] }; this.detailDrawerOpen = true; this.detailError = ''; this.detailLoading = true
+      return getFixedAssetStoreDetails(query).then(res => {
+        if (!scope.isCurrent(token) || !this.detailDrawerOpen) return
+        if (!res || !Array.isArray(res.data)) throw Error('资产明细响应不完整')
+        this.activeStoreConfig.details = res.data
+      }).catch(error => { if (scope.isCurrent(token) && this.detailDrawerOpen) this.detailError = error.message || '资产明细读取失败' })
+        .finally(() => { if (scope.isCurrent(token)) this.detailLoading = false })
     },
+
     openConfigForm(row) { return this.openConfigBatch(row) },
     handleConfigShopChange(shopDeptId) { return this.changeConfigShop(shopDeptId) },
     applyStoreConfigToForm(storeRow, shopDeptId) {
       const details = storeRow && storeRow.details ? storeRow.details : []
       const annualRepairRatio = storeRow && storeRow.annualRepairRatio != null
         ? Number(storeRow.annualRepairRatio)
-        : (this.form.annualRepairRatio || this.quota.annualRepairRatio || 20)
+        : (this.form.annualRepairRatio || (this.quota && this.quota.annualRepairRatio) || 20)
       this.form = {
         shopDeptId: storeRow ? storeRow.shopDeptId : shopDeptId,
         annualRepairRatio,
@@ -505,23 +576,6 @@ export default {
       })
       return groups
     },
-    hydrateStoreQuotaRows(rows) {
-      if (!rows || !rows.length) {
-        return Promise.resolve([])
-      }
-      return Promise.all(rows.map(row =>
-        getFixedAssetQuota({ shopDeptId: row.shopDeptId }).then(res => {
-          const quota = res.data || {}
-          return Object.assign({}, row, {
-            availableQuotaAmount: Number(quota.availableQuotaAmount || 0),
-            annualRepairRatio: Number(quota.annualRepairRatio || 0)
-          })
-        }).catch(() => Object.assign({}, row, {
-          availableQuotaAmount: 0,
-          annualRepairRatio: 0
-        }))
-      ))
-    },
     normalizeAssetDetail(item) {
       const quantity = Number(item.assetQuantity || 0)
       const unitPrice = Number(item.assetUnitPrice || 0)
@@ -540,7 +594,7 @@ export default {
     },
     findStoreConfigByShop(shopDeptId) {
       if (!shopDeptId) return null
-      return this.allStoreConfigRows.find(row => String(row.shopDeptId) === String(shopDeptId))
+      return this.storeConfigRows.find(row => String(row.shopDeptId) === String(shopDeptId))
     },
     resolveStoreStatus(details) {
       const rows = details || []

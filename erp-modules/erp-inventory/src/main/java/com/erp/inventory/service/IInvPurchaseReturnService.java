@@ -10,7 +10,7 @@ public interface IInvPurchaseReturnService
     com.erp.inventory.domain.vo.InvSpecialistActionContext getActionContext(Long returnId, Long selectedShopDeptId);
     InvPurchaseReturn saveDraft(InvPurchaseReturn purchaseReturn, List<InvPurchaseReturnDetail> details, Long selectedShopDeptId);
     InvPurchaseReturn submitReturn(InvPurchaseReturn purchaseReturn, List<InvPurchaseReturnDetail> details, Long selectedShopDeptId);
-    InvPurchaseReturn submitSavedReturn(Long returnId, Long selectedShopDeptId);
+    InvPurchaseReturn submitSavedReturn(Long returnId, Long version, Long selectedShopDeptId);
     InvPurchaseReturn getReturnDraft(Long returnId, Long selectedShopDeptId);
     InvPurchaseReturn getReturnDetail(Long returnId, Long selectedShopDeptId);
     List<InvPurchaseReturn> selectReturnList(InvPurchaseReturn purchaseReturn, Long selectedShopDeptId);

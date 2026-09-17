@@ -3,7 +3,7 @@ import request from '@/utils/request'
 export function savePurchase(data) {
   return request({
     url: '/oa/purchase/save',
-    method: 'post',
+    method: 'post', silentError: true,
     data
   })
 }

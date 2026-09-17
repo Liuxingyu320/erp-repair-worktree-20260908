@@ -11,7 +11,7 @@ const compiled = compiler.compile(sfc.template.content)
 assert.deepStrictEqual(compiled.errors, [])
 const code = babel.transformSync(sfc.script.content, { filename: file, babelrc: false, configFile: false, plugins: [require.resolve('@babel/plugin-transform-modules-commonjs')] }).code
 const tick = async () => { await new Promise(resolve => setImmediate(resolve)); await Vue.nextTick() }
-function setup(form = {}) {
+function setup(form = {}, apiOverrides = {}) {
   const writes = [], errors = [], module = { exports: {} }
   vm.runInNewContext(code, { module, exports: module.exports, Promise, Set, Map, Object, Array, String, Number, JSON, window: { addEventListener() {}, removeEventListener() {} },
     require(id) {
@@ -21,17 +21,18 @@ function setup(form = {}) {
         listConfig: () => Promise.resolve({ rows: [], total: 0 }),
         listConfigDescriptors: () => Promise.resolve({ data: [] }),
         addConfig: payload => { writes.push(payload); return Promise.resolve() },
-        updateConfig: payload => { writes.push(payload); return Promise.resolve() }
+        updateConfig: payload => { writes.push(payload); return Promise.resolve() },
+        ...apiOverrides
       }
       return {}
     }
   }, { filename: file })
-  const page = new Vue({ ...module.exports.default, beforeCreate() { this.$store = { getters: { id: '1' }, state: { user: { sessionRevision: 1 } } }; this.$route = { path: '/system/config' }; this.addDateRange = q => q; this.resetForm = () => {}; this.$modal = { msgSuccess() {} } } })
+  const page = new Vue({ ...module.exports.default, beforeCreate() { this.$store = { getters: { id: '1' }, state: { user: { sessionRevision: 1 } } }; this.$route = { path: '/system/config' }; this.addDateRange = q => q; this.resetForm = () => {}; this.$modal = { msgSuccess() {}, msgError(message) { errors.push(message) } } } })
   page.form = { configId: 5, configKey: 'test.key', configType: 'N', sensitive: false, ...form }
   page.$refs.form = { validate(complete) {
     page.rules.configValue[0].validator({}, page.form.configValue, error => { if (error) errors.push(error.message); complete(!error) })
   } }
-  return { page, writes, errors, async submit() { page.submitForm(); await tick() }, dispose() { page.$destroy() } }
+  return { page, writes, errors, async submit() { const submittedForm = { ...page.form }; page.open = true; page.submitForm(); await tick(); if (!page.open) page.form = submittedForm }, dispose() { page.$destroy() } }
 }
 const tests = []
 function test(name, run) { tests.push({ name, run }) }
@@ -91,6 +92,60 @@ test('JSON and text retain original representation; invalid JSON stays in the ed
   await h.submit(); assert.equal(h.writes.length, 0); assert.equal(h.page.form.configValue, '{bad}')
   h.page.form.configValue = '{"count": 2}'; await h.submit(); assert.equal(h.writes[0].configValue, '{"count": 2}')
   h.page.form.valueType = 'string'; h.page.form.configValue = '原有文本'; await h.submit(); assert.equal(h.writes[1].configValue, '原有文本'); h.dispose()
+})
+test('edit writes carry optimistic version and metadata but omit server timestamps and display fields', async () => {
+  const h = setup({ configName: '测试', configValue: 'text', version: 7, groupCode: 'custom',
+    valueType: 'string', displayOrder: 3, createTime: '2026-09-14T06:34:06.000Z',
+    updateTime: '2026-09-14T06:35:06.000Z', createBy: 'server', descriptorDescription: '只读说明', valueConfigured: true })
+  await h.submit()
+  assert.equal(h.writes[0].version, 7)
+  assert.equal(h.writes[0].groupCode, 'custom')
+  assert.equal(h.writes[0].displayOrder, 3)
+  for (const key of ['createTime', 'updateTime', 'createBy', 'descriptorDescription', 'valueConfigured', 'sensitive']) {
+    assert.equal(Object.hasOwn(h.writes[0], key), false, key)
+  }
+  h.dispose()
+})
+function deferred() { let resolve, reject; const promise = new Promise((a, b) => { resolve = a; reject = b }); return { promise, resolve, reject } }
+test('save failures stay visible and keep the entered value', async () => {
+  const h = setup({ configValue: 'my-edit', version: 2 }, { updateConfig: () => Promise.reject(new Error('参数已被其他管理员修改，请刷新后重试')) })
+  await h.submit()
+  assert(h.page.submitError.includes('其他管理员'))
+  assert.equal(h.page.form.configValue, 'my-edit'); assert.equal(h.page.open, true); assert.equal(h.page.submitting, false)
+  h.dispose()
+})
+test('late detail responses cannot replace the newer editor or reopen a cancelled editor', async () => {
+  const first = deferred(), second = deferred()
+  const h = setup({}, { getConfig: id => id === 1 ? first.promise : second.promise })
+  h.page.handleUpdate({ configId: 1 }); h.page.handleUpdate({ configId: 2 })
+  second.resolve({ data: { configId: 2, version: 4, configValue: 'newer' } }); await tick()
+  first.resolve({ data: { configId: 1, version: 1, configValue: 'older' } }); await tick()
+  assert.equal(h.page.form.configId, 2)
+  const cancelled = deferred(); const c = setup({}, { getConfig: () => cancelled.promise })
+  c.page.handleUpdate({ configId: 3 }); c.page.cancel()
+  cancelled.resolve({ data: { configId: 3, version: 1 } }); await tick()
+  assert.equal(c.page.open, false); h.dispose(); c.dispose()
+})
+test('late save failure and validation cannot affect a later opened form', async () => {
+  const pending = deferred()
+  const h = setup({ configValue: 'first', version: 2 }, { updateConfig: (payload, options) => { assert.equal(options.silentError, true); return pending.promise } })
+  h.page.submitForm(); h.page.cancel(); h.page.handleAdd(); h.page.form.configValue = 'new form'
+  pending.reject(new Error('old failure')); await tick()
+  assert.equal(h.page.submitError, ''); assert.equal(h.page.form.configValue, 'new form'); assert.equal(h.page.open, true)
+  const c = setup({ configValue: 'pending validation', version: 1 }); let complete
+  c.page.$refs.form.validate = fn => { complete = fn }
+  c.page.submitForm(); c.page.cancel(); c.page.handleAdd(); complete(true); await tick()
+  assert.equal(c.writes.length, 0); h.dispose(); c.dispose()
+})
+test('stale detail errors stay silent while current errors remain visible', async () => {
+  const pending = deferred()
+  const h = setup({}, { getConfig: (id, options) => { assert.equal(options.silentError, true); return pending.promise } })
+  h.page.handleUpdate({ configId: 1 }); h.page.cancel(); h.page.handleAdd()
+  pending.reject(new Error('old detail failure')); await tick()
+  assert.deepStrictEqual(h.errors, []); assert.equal(h.page.open, true)
+  const c = setup({}, { getConfig: () => Promise.reject(new Error('current detail failure')) })
+  await c.page.handleUpdate({ configId: 2 })
+  assert.deepStrictEqual(c.errors, ['current detail failure']); h.dispose(); c.dispose()
 })
 test('render branches use metadata and sensitive precedence', async () => {
   assert(sfc.template.content.indexOf('v-if="form.sensitive"') < sfc.template.content.indexOf('v-else-if="configValueType === \'boolean\'"'))

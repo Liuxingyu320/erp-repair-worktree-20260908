@@ -20,8 +20,7 @@
 
     <el-alert
       v-if="purchaseAvailabilityResolved && !purchaseSubmissionAvailable"
-      title="审批规则尚未发布或采购提交尚未开放"
-      description="当前仍可新建、编辑和保存采购草稿；审批规则发布后刷新页面即可提交。"
+      :title="purchaseAvailabilityReason"
       type="warning"
       :closable="false"
       show-icon
@@ -48,7 +47,7 @@
         </el-form-item>
         <el-form-item>
           <el-button type="primary" size="mini" icon="el-icon-search" @click="getList">搜索</el-button>
-          <el-button v-hasPermi="['oa:purchase:add']" size="mini" icon="el-icon-plus" @click="openForm()">新建采购申请</el-button>
+          <el-button v-hasPermi="['oa:purchase:add']" size="mini" icon="el-icon-plus" :disabled="!purchaseDraftAvailable" @click="openForm()">新建采购申请</el-button>
           <el-button v-hasPermi="['oa:purchase:export']" size="mini" icon="el-icon-download" @click="handleExport">导出</el-button>
         </el-form-item>
       </el-form>
@@ -85,12 +84,13 @@
           </template>
         </el-table-column>
         <el-table-column label="创建时间" prop="createTime" width="180"/>
-        <el-table-column label="操作" width="260" fixed="right">
+        <el-table-column label="操作" width="320" fixed="right">
           <template slot-scope="scope">
-            <el-button v-if="editable(scope.row)" v-hasPermi="['oa:purchase:add']" type="text" size="mini" @click="openForm(scope.row)">编辑</el-button>
+            <el-button v-if="editable(scope.row)" v-hasPermi="['oa:purchase:add']" type="text" size="mini" :disabled="!purchaseDraftAvailable" @click="openForm(scope.row)">编辑</el-button>
             <el-button v-if="editable(scope.row)" v-hasPermi="['oa:purchase:add']" type="text" size="mini" :disabled="!purchaseSubmissionAvailable" @click="doSubmit(scope.row)">提交</el-button>
             <el-button v-if="scope.row.status === 'pending'" v-hasPermi="['oa:purchase:add']" type="text" size="mini" @click="handleWithdraw(scope.row)">撤回</el-button>
             <el-button v-if="canClosePurchase(scope.row)" v-hasPermi="['oa:purchase:add']" type="text" size="mini" @click="handleClosePurchase(scope.row)">关闭申请</el-button>
+            <el-button v-hasPermi="['oa:purchase:add']" type="text" size="mini" :disabled="!purchaseDraftAvailable" @click="copyAsNewDraft(scope.row)">以此再申请</el-button>
             <el-button type="text" size="mini" @click="showDetail(scope.row.purchaseId)">详情</el-button>
           </template>
         </el-table-column>
@@ -126,11 +126,20 @@
       </el-form>
       <div slot="footer">
         <el-button :disabled="submitLoading" @click="requestCloseForm">取消</el-button>
-        <el-button type="primary" :loading="submitLoading" :disabled="submitLoading || formLoading || !formReady" @click="save(false)">保存草稿</el-button>
+        <el-button type="primary" :loading="submitLoading" :disabled="submitLoading || formLoading || !formReady || !purchaseDraftAvailable" @click="save(false)">保存草稿</el-button>
         <el-button type="success" :loading="submitLoading" :disabled="submitLoading || formLoading || !formReady || !purchaseSubmissionAvailable" @click="save(true)">保存并提交</el-button>
       </div>
     </el-dialog>
 
+    <el-dialog title="采购申请尚未保存" :visible.sync="closeChoiceOpen" width="460px" append-to-body :close-on-click-modal="false">
+      <p>可以保存草稿后关闭，也可以返回继续编辑。</p>
+      <p v-if="!purchaseDraftAvailable">{{ purchaseAvailabilityReason }}</p>
+      <span slot="footer">
+        <el-button @click="closeChoiceOpen = false">继续编辑</el-button>
+        <el-button @click="closeForm(true)">放弃修改</el-button>
+        <el-button type="primary" :disabled="!purchaseDraftAvailable || !formReady || submitLoading" @click="saveAndClose">保存并关闭</el-button>
+      </span>
+    </el-dialog>
     <el-dialog title="采购申请与审批轨迹" :visible.sync="detailVisible" width="960px" append-to-body>
       <el-alert v-if="detailError" :title="detailError" type="error" :closable="false" show-icon class="mb12" />
       <div v-loading="detailLoading">
@@ -226,6 +235,7 @@ export default {
       detailLoading: false,
       actionLoading: false,
       purchaseSubmissionAvailable: false,
+      purchaseDraftAvailable: false, purchaseAvailabilityReason: "正在检查采购功能", closeChoiceOpen: false,
       purchaseAvailabilityResolved: false,
       detail: null,
       approvalDetail: null,
@@ -292,6 +302,8 @@ export default {
       return this.$store && this.$store.getters ? this.$store.getters.id : undefined
     },
     oaPurchaseEmptyText() {
+      if (!this.purchaseAvailabilityResolved) return "正在检查采购功能…"
+      if (!this.purchaseDraftAvailable) return "暂无采购记录；" + this.purchaseAvailabilityReason
       return getBusinessEmptyText("oaPurchase", "missingBaseline")
     }
   },
@@ -357,6 +369,7 @@ export default {
       return Boolean(focus) && this.purchaseScope().isCurrent(focus.operationToken)
     },
     invalidatePurchaseForm() {
+      this.closeChoiceOpen = false
       ;["form", "form-open", "save", "submit"].forEach(lane => this.purchaseScope().invalidate(lane))
       this.formReady = false
       this.formLoading = false
@@ -384,16 +397,23 @@ export default {
     },
     loadPurchaseAvailability() {
       const scope = this.purchaseScope(), token = scope.begin("availability")
+      this._purchaseAvailabilityToken = token
       this.purchaseSubmissionAvailable = false
+      this.purchaseDraftAvailable = false
+      this.purchaseAvailabilityReason = "正在检查采购功能"
       this.purchaseAvailabilityResolved = false
-      return getPurchaseAvailability().then(res => {
+      this._purchaseAvailabilityPromise = getPurchaseAvailability().then(res => {
         if (!scope.isCurrent(token)) return
-        this.purchaseSubmissionAvailable = !!(res.data && res.data.enabled === true)
+        const capability = res.data || {}
+        this.purchaseDraftAvailable = capability.canSave === true
+        this.purchaseSubmissionAvailable = this.purchaseDraftAvailable && capability.canSubmit === true
+        this.purchaseAvailabilityReason = capability.reason || (this.purchaseDraftAvailable ? '审批提交暂未开放' : '采购功能暂时不可用，请刷新后重试')
       }).catch(() => {
-        if (scope.isCurrent(token)) this.purchaseSubmissionAvailable = false
+        if (scope.isCurrent(token)) { this.purchaseSubmissionAvailable = false; this.purchaseDraftAvailable = false; this.purchaseAvailabilityReason = "采购功能检查失败，请刷新后重试" }
       }).finally(() => {
         if (scope.isCurrent(token)) this.purchaseAvailabilityResolved = true
       })
+      return this._purchaseAvailabilityPromise
     },
     getList() {
       const scope = this.purchaseScope(), token = scope.begin("list")
@@ -411,9 +431,60 @@ export default {
         if (scope.isCurrent(token)) this.loading = false
       })
     },
+    copyAsNewDraft(row) {
+      if (!this.purchaseDraftAvailable) {
+        this.$modal.msgWarning(this.purchaseAvailabilityReason)
+        return Promise.resolve()
+      }
+      const purchaseId = row && row.purchaseId != null ? String(row.purchaseId).trim() : ""
+      if (!/^[1-9]\d{0,18}$/.test(purchaseId)) {
+        this.$modal.msgWarning("原申请不存在，无法再申请")
+        return Promise.resolve()
+      }
+      const start = () => {
+        this.invalidatePurchaseForm()
+        const scope = this.purchaseScope()
+        const token = scope.begin("form")
+        this._purchaseFormToken = token
+        this.formError = ""
+        this.open = true
+        this.formLoading = true
+        this.formReady = false
+        return getPurchaseDetail(purchaseId, { silentError: true }).then(res => {
+          if (!scope.isCurrent(token) || !this.open) return
+          const source = res.data || {}
+          if (String(source.purchaseId) !== purchaseId) throw new Error("原申请已变化，请刷新后再申请")
+          this.form = {
+            purchaseId: undefined,
+            title: source.title || "",
+            amount: source.amount,
+            reason: source.reason || ""
+          }
+          this.formReady = true
+          this.$nextTick(() => { if (scope.isCurrent(token)) this.markFormClean() })
+        }).catch(error => {
+          if (scope.isCurrent(token) && this.open) {
+            this.formError = (error && error.message) || "原申请加载失败，请稍后重试"
+          }
+        }).finally(() => {
+          if (scope.isCurrent(token)) this.formLoading = false
+        })
+      }
+      if (this.isFormDirty()) return this.confirmDiscardIfDirty().then(start).catch(() => {})
+      return start()
+    },
     openForm(row) {
       const scope = this.purchaseScope()
       const intent = scope.begin("form-open")
+      if (!this.purchaseAvailabilityResolved && !this.purchaseDraftAvailable) {
+        const target = row && typeof row === 'object' ? { purchaseId: row.purchaseId } : row
+        const capability = scope.isCurrent(this._purchaseAvailabilityToken)
+          ? this._purchaseAvailabilityPromise : this.loadPurchaseAvailability()
+        return capability.then(() => {
+          if (scope.isCurrent(intent) && this.purchaseAvailabilityResolved) return this.openForm(target)
+        })
+      }
+      if (!this.purchaseDraftAvailable) { this.$modal.msgWarning(this.purchaseAvailabilityReason); return Promise.resolve() }
       const eventLike = row && typeof row === "object" &&
         (typeof row.preventDefault === "function" || typeof row.stopPropagation === "function" ||
           (row.type && row.target))
@@ -448,6 +519,7 @@ export default {
       return load()
     },
     save(submitAfterSave) {
+      if (!this.purchaseDraftAvailable) { this.$modal.msgWarning(this.purchaseAvailabilityReason); return }
       const scope = this.purchaseScope()
       if (this.submitLoading || this.formLoading || !this.formReady || !this.open || !scope.isCurrent(this._purchaseFormToken)) return
       if (submitAfterSave && !this.purchaseSubmissionAvailable) {
@@ -474,7 +546,11 @@ export default {
           }
           return this.submitSavedPurchase({ ...res.data }, current)
         }).catch(error => {
-          if (current() && !(error && error.notified)) this.formError = error && error.message || "保存结果待核对，请保留填写内容后重试"
+          if (!current()) return
+          if (/FEATURE_DISABLED/.test(error && error.message || '')) {
+            this.formError = '采购功能当前不可用，填写内容已保留，请稍后重试'
+            this.loadPurchaseAvailability()
+          } else if (!(error && error.notified)) this.formError = error && error.message || '保存结果待核对，请保留填写内容后重试' 
         }).finally(() => {
           if (scope.isCurrent(token)) this.submitLoading = false
         })
@@ -529,16 +605,14 @@ export default {
     },
     requestCloseForm() {
       if (this.submitLoading) return
-      this.confirmDiscardIfDirty().then(() => {
-        this.closeForm(true)
-      }).catch(() => {})
+      if (this.isFormDirty()) this.closeChoiceOpen = true
+      else this.closeForm(true)
     },
-    handleDialogClose(done) {
-      if (this.submitLoading) return
-      this.confirmDiscardIfDirty().then(() => {
-        if (typeof done === "function") done()
-        this.formSnapshot = ""
-      }).catch(() => {})
+    handleDialogClose() { this.requestCloseForm() },
+    saveAndClose() {
+      if (this.submitLoading || !this.purchaseDraftAvailable) return
+      this.closeChoiceOpen = false
+      return this.save(false)
     },
     closeForm(force) {
       if (!force && this.isFormDirty()) {
@@ -546,6 +620,7 @@ export default {
         return
       }
       this.open = false
+      this.closeChoiceOpen = false
       this.formSnapshot = ""
       this.invalidatePurchaseForm()
     },
@@ -566,7 +641,7 @@ export default {
     },
     confirmDiscardIfDirty() {
       if (!this.isFormDirty()) return Promise.resolve()
-      return this.$modal.confirm("当前采购申请有未保存内容，确定放弃修改吗？", "未保存提醒")
+      return this.$modal.confirm("当前采购申请有未保存内容，确定放弃修改吗？", "未保存提醒", { confirmButtonText: "放弃修改", cancelButtonText: "继续编辑" })
     },
     showDetail(purchaseId) {
       const target = purchaseRouteTarget(this.$route && this.$route.query || {}, purchaseId)

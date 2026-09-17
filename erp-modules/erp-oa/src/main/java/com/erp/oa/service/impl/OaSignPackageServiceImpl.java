@@ -1790,6 +1790,7 @@ public class OaSignPackageServiceImpl implements IOaSignPackageService
             throw duplicate;
         }
 
+        signaturePng = com.erp.common.core.utils.file.UploadImageNormalizer.normalize(signaturePng, "signature.png");
         Date signedTime = new Date();
         Map<Long, SignedPdfResult> signedResults = new LinkedHashMap<>();
         GeneratedSignDocument certificate = null;

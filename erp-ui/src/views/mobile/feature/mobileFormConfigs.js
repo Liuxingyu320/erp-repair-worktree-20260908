@@ -369,6 +369,7 @@ const MOBILE_FORM_CONFIG = {
     ]
   },
   purchase: {
+    passthroughFields: ["version"],
     title: "采购单",
     idKey: "orderId",
     createLabel: "新建采购",
@@ -391,6 +392,7 @@ const MOBILE_FORM_CONFIG = {
     allowedItemTypes: REPLENISHMENT_ITEM_TYPES
   }),
   salesReturn: {
+    passthroughFields: ["version"],
     title: "销售退货",
     idKey: "returnId",
     createLabel: "新建销售退货",
@@ -408,6 +410,7 @@ const MOBILE_FORM_CONFIG = {
     ]
   },
   purchaseReturn: {
+    passthroughFields: ["version"],
     title: "采购退货",
     idKey: "returnId",
     createLabel: "新建采购退货",

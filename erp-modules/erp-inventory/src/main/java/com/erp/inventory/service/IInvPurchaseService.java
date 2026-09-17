@@ -17,7 +17,7 @@ public interface IInvPurchaseService
     com.erp.inventory.domain.vo.InvSpecialistActionContext getActionContext(Long orderId, Long selectedShopDeptId);
     InvPurchaseOrder saveDraft(InvPurchaseOrder order, List<InvPurchaseDetail> details, Long selectedShopDeptId);
     InvPurchaseOrder submitPurchase(InvPurchaseOrder order, List<InvPurchaseDetail> details, Long selectedShopDeptId);
-    InvPurchaseOrder submitSavedPurchase(Long orderId, Long selectedShopDeptId);
+    InvPurchaseOrder submitSavedPurchase(Long orderId, Long version, Long selectedShopDeptId);
     InvPurchaseOrder getPurchaseDraft(Long orderId, Long selectedShopDeptId);
     InvPurchaseOrder getReceiveContext(Long orderId, Long selectedShopDeptId);
     InvPurchaseOrder getPurchaseDetail(Long orderId, Long selectedShopDeptId);

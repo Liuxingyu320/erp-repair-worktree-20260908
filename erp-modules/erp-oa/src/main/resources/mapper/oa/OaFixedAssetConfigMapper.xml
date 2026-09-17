@@ -41,12 +41,11 @@
         left join inv_oe_item i on i.oe_item_id = c.oe_item_id and i.del_flag = '0'
     </sql>
 
-    <select id="selectConfigList" parameterType="OaFixedAssetConfig" resultMap="OaFixedAssetConfigResult">
-        select <include refid="baseColumns"/> <include refid="fromSql"/>
+    <sql id="configFilters">
         <where>
             <if test="shopDeptId != null">and c.shop_dept_id = #{shopDeptId}</if>
             <if test="oeItemId != null">and c.oe_item_id = #{oeItemId}</if>
-            <if test="oeItemName != null and oeItemName != ''">and i.oe_item_name like concat('%', #{oeItemName}, '%')</if>
+            <if test="oeItemName != null and oeItemName != ''">and (i.oe_item_name like concat('%', #{oeItemName}, '%') or i.oe_item_code like concat('%', #{oeItemName}, '%'))</if>
             <if test="status != null and status != ''">and c.status = #{status}</if>
             <if test="params.scopeDeptIds != null and params.scopeDeptIds.size() > 0">
                 and c.shop_dept_id in
@@ -55,7 +54,22 @@
                 </foreach>
             </if>
         </where>
+    </sql>
+
+    <select id="selectConfigList" parameterType="OaFixedAssetConfig" resultMap="OaFixedAssetConfigResult">
+        select <include refid="baseColumns"/> <include refid="fromSql"/>
+        <include refid="configFilters"/>
         order by c.config_id desc
+    </select>
+
+    <select id="selectConfigStoreList" parameterType="OaFixedAssetConfig" resultType="com.erp.oa.domain.vo.OaFixedAssetStoreSummary">
+        select c.shop_dept_id as shopDeptId, sd.dept_name as shopDeptName,
+               count(*) as detailCount, coalesce(sum(c.asset_quantity), 0) as assetTotalQuantity,
+               coalesce(sum(c.asset_amount), 0) as assetTotalAmount
+        <include refid="fromSql"/>
+        <include refid="configFilters"/>
+        group by c.shop_dept_id, sd.dept_name
+        order by c.shop_dept_id
     </select>
 
     <select id="selectConfigById" resultMap="OaFixedAssetConfigResult">

@@ -14,6 +14,13 @@ class LocalSysFileServiceImplTest
     @TempDir
     private Path uploadRoot;
 
+    private static byte[] validPng() throws Exception
+    {
+        var output = new java.io.ByteArrayOutputStream();
+        javax.imageio.ImageIO.write(new java.awt.image.BufferedImage(20, 20, java.awt.image.BufferedImage.TYPE_INT_ARGB), "png", output);
+        return output.toByteArray();
+    }
+
     @Test
     void uploadFileShouldStorePublicFilesUnderPublicDirectory() throws Exception
     {
@@ -23,7 +30,7 @@ class LocalSysFileServiceImplTest
         ReflectionTestUtils.setField(service, "localFilePath", uploadRoot.toString());
 
         String url = service.uploadFile(new MockMultipartFile("file", "avatar.png", "image/png",
-                new byte[] { 1, 2, 3 }));
+                validPng()));
 
         assertThat(url).startsWith("http://static.test/file/public/");
         String publicPath = url.substring("http://static.test/file/public/".length());

@@ -9,6 +9,7 @@ const readRepo = file => fs.readFileSync(path.resolve(repoRoot, file), "utf8")
 
 const api = readUi("src/api/hr/healthCertificate.js")
 const page = readUi("src/views/hr/healthCertificate/index.vue")
+const attachmentPicker = readUi("src/views/drive/components/DriveAttachmentPicker.vue")
 const employeeList = readUi("src/views/hr/components/HrEmployeeList.vue")
 const employeeDetail = readUi("src/views/hr/components/HrProfileDetailDrawer.vue")
 const mobileRoutes = readUi("src/views/mobile/mobileRouteDefinitions.js")
@@ -31,8 +32,9 @@ assert.ok(
 assert.ok(
   page.includes("getHealthCertificateAttachment") &&
     page.includes("URL.createObjectURL") &&
-    page.includes("contentType !== 'image/svg+xml'") &&
-    page.includes("contentType === 'application/pdf'"),
+    page.includes("<drive-attachment-picker") &&
+    attachmentPicker.includes("type !== 'image/svg+xml'") &&
+    attachmentPicker.includes("type === 'application/pdf'"),
   "health certificate attachments should use the authorized blob endpoint and reject SVG choices in the UI"
 )
 assert.ok(

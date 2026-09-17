@@ -1,5 +1,6 @@
 <template>
   <div class="app-container">
+    <inventory-draft-recovery feature="salesReturn" @recovered="onDraftRecovered" />
     <inventory-page-hero
       title="销售退货"
       eyebrow="售后处理"
@@ -150,14 +151,15 @@
       </el-form>
       <div slot="footer">
         <el-button :disabled="submitLoading" @click="closeEditor()">取消</el-button>
-        <el-button v-hasPermi="['inv:salesReturn:add']" type="primary" @click="doSave">保存草稿</el-button>
-        <el-button v-hasPermi="['inv:salesReturn:submit']" type="success" @click="doSubmit">保存并提交</el-button>
+        <el-button v-hasPermi="['inv:salesReturn:add']" type="primary" :disabled="submitLoading" :loading="submitLoading" @click="doSave">保存草稿</el-button>
+        <el-button v-hasPermi="['inv:salesReturn:submit']" type="success" :disabled="submitLoading" @click="doSubmit">保存并提交</el-button>
       </div>
     </el-dialog>
 
     <!-- 详情对话框 -->
     <el-dialog title="退货单详情" :visible.sync="detailOpen" width="700px" append-to-body :close-on-click-modal="false">
-      <el-descriptions :column="2" border size="small">
+      <el-alert v-if="detailError" :title="detailError" type="error" :closable="false"><el-button type="text" @click="openDetail(detailTarget)">重试</el-button></el-alert>
+      <el-descriptions v-loading="detailLoading" :column="2" border size="small">
         <el-descriptions-item label="退货单号">{{ detailForm.returnNo }}</el-descriptions-item>
         <el-descriptions-item label="原销售单号">{{ detailForm.salesOrderNo }}</el-descriptions-item>
         <el-descriptions-item label="客户">{{ detailForm.customerName }}</el-descriptions-item>
@@ -184,6 +186,7 @@
 </template>
 
 <script>
+import InventoryDraftRecovery from "@/views/inventory/components/InventoryDraftRecovery.vue"
 import { listSalesReturn, getSalesReturn, getSalesReturnActionContext, getSalesReturnDraft, getSalesReturnSourceOrder, saveSalesReturn, submitSalesReturn, submitSalesReturnDraft, confirmSalesReturn, cancelSalesReturn } from "@/api/inventory/salesReturn"
 import SalesReturnSourcePicker from "@/views/inventory/components/SalesReturnSourcePicker.vue"
 const { isReturnSelected, selectAllReturnRows } = require("@/utils/returnSelection")
@@ -203,16 +206,17 @@ export default {
     }
   })],
   name: "InvSalesReturn",
-  components: { SalesReturnSourcePicker },
+  components: { InventoryDraftRecovery, SalesReturnSourcePicker },
   data() {
     return {
+      listSequence: 0, detailSequence: 0, detailLoading: false, detailError: "", detailTarget: null, pageInactive: false,
       sourceLoading: false, sourceSequence: 0, sourcePickerOpen: false, formEpoch: 0, formReadSequence: 0, sourceError: "",
       loading: false, submitLoading: false, orderLoading: false, total: 0, list: [], orderOptions: [], dialogOpen: false, detailOpen: false,
       queryParams: { pageNum: 1, pageSize: 10, returnNo: undefined, salesOrderNo: undefined, customerName: undefined, status: undefined },
       form: { returnId: undefined, returnNo: "", salesOrderId: undefined, salesOrderNo: "", returnTitle: "", customerName: "", totalAmount: 0, returnDate: "", status: "draft", remark: "", details: [] },
       detailForm: { details: [] },
       rules: {
-        returnTitle: [{ required: true, message: "退货主题不能为空", trigger: "blur" }],
+        returnTitle: [{ required: true, whitespace: true, message: "退货主题不能为空", trigger: "blur" }],
         customerName: [{ required: true, message: "客户名称不能为空", trigger: "blur" }],
         returnDate: [{ required: true, message: "请选择退货日期", trigger: "change" }],
         salesOrderId: [{ required: true, message: "请选择原销售单", trigger: "change" }]
@@ -231,20 +235,34 @@ export default {
       return this.form.details.filter(isReturnSelected).reduce((sum, d) => sum + this.toNumber(d.quantity) * this.toNumber(d.unitPrice), 0).toFixed(2)
     }
   },
-  created() { this.getList() },
+  created() { this.getList(); if (typeof window !== "undefined") window.addEventListener("erp:dept-changed", this.handleScopeChange) },
+  activated() { if (this.pageInactive) { this.pageInactive = false; this.getList() } },
   watch: {
+    detailOpen(value) { if (!value) { this.detailSequence += 1; this.detailLoading = false; this.detailForm = { details: [] } } },
+    "$store.state.user.sessionRevision"() { this.handleScopeChange() },
     dialogOpen(value) { if (!value) { this.sourcePickerOpen = false; this.sourceSequence += 1; this.sourceLoading = false } },
-    "$store.getters.id"() { this.invalidateSourceContext() },
-    "$route.fullPath"() { this.invalidateSourceContext() }
+    "$store.getters.id"() { this.handleScopeChange() },
+    "$route.fullPath"() { this.handleScopeChange() }
   },
-  beforeDestroy() { this.invalidateSourceContext() },
-  deactivated() { this.invalidateSourceContext() },
+  beforeDestroy() { this.pageInactive = true; this.handleScopeChange(); if (typeof window !== "undefined") window.removeEventListener("erp:dept-changed", this.handleScopeChange) },
+  deactivated() { this.pageInactive = true; this.handleScopeChange() },
   methods: {
+    onDraftRecovered({ record, response }) {
+      const data = response.data
+      if (this.dialogOpen && String(this.form.returnId || "new") === String(record.payload.returnId || "new")) {
+        this.$set(this.form, "returnId", data.returnId)
+        this.$set(this.form, "version", data.version)
+        this.$set(this.form, "status", data.status)
+        this.$modal.msgWarning(data.status === "draft" ? "已找回草稿编号，当前输入仍保留；请核对后再保存" : "上次操作已提交，当前输入保留供核对，请关闭窗口查看原单")
+      }
+      return this.getList()
+    },
+    handleScopeChange() { this.invalidateSourceContext(); this.listSequence += 1; this.detailSequence += 1; this.loading = false; this.detailOpen = false; this.list = []; this.total = 0; if (!this.pageInactive) this.getList() },
     isReturnSelected,
     fillAllReturnable() { if (!this.submitLoading) this.form.details = selectAllReturnRows(this.form.details) },
     clearReturnSelection() { if (!this.submitLoading) this.form.details.forEach(row => this.$set(row, "returnSelected", false)) },
     sourceScope() { return JSON.stringify([getSelectedDeptId(), this.$store && this.$store.getters && this.$store.getters.id, this.$route && this.$route.fullPath]) },
-    invalidateSourceContext() { this.formReadSequence += 1; this.sourceSequence += 1; this.sourceLoading = false; this.sourcePickerOpen = false; this.dialogOpen = false },
+    invalidateSourceContext() { this.formEpoch += 1; this.submitLoading = false; this.formReadSequence += 1; this.sourceSequence += 1; this.sourceLoading = false; this.sourcePickerOpen = false; this.dialogOpen = false },
     closeEditor(done) { if (this.submitLoading) return; this.invalidateSourceContext(); if (typeof done === "function") done() },
     openSourcePicker() { if (this.dialogOpen && !this.form.returnId && !this.submitLoading && this.ensureStoreContext()) this.sourcePickerOpen = true },
     selectSourceOrder(order) {
@@ -261,17 +279,21 @@ export default {
       return false
     },
     getList() {
+      const sequence = ++this.listSequence, scope = this.sourceScope()
+      const current = () => !this.pageInactive && sequence === this.listSequence && scope === this.sourceScope()
+      const query = JSON.parse(JSON.stringify(this.queryParams))
       if (!this.isStoreContext) {
         this.list = []
         this.total = 0
         return this.handleTodoFocusRows(this.list)
       }
       this.loading = true
-      return this.loadTodoBusinessList(() => listSalesReturn(this.queryParams)).then(res => {
+      return this.loadTodoBusinessList(() => listSalesReturn(query, { silentError: true })).then(res => {
+        if (!current()) return
         this.list = res.rows || []
         this.total = res.total || 0
         return this.handleTodoFocusRows(this.list)
-      }).finally(() => { this.loading = false })
+      }).catch(error => { if (current()) { this.list = []; this.total = 0; this.$modal.msgError(error.message || "列表加载失败，请重试") } }).finally(() => { if (current()) this.loading = false })
     },
     openForm(row) {
       if (this.submitLoading) return
@@ -303,8 +325,16 @@ export default {
       this.$nextTick(() => { this.$refs.formRef && this.$refs.formRef.clearValidate() })
     },
     openDetail(row) {
+      const sequence = ++this.detailSequence, scope = this.sourceScope()
+      this.detailTarget = row
+      this.detailForm = { details: [] }
+      this.detailError = ""
       this.detailOpen = true
-      getSalesReturn(row.returnId).then(res => { this.detailForm = res.data || { details: [] } })
+      this.detailLoading = true
+      const current = () => this.detailOpen && !this.pageInactive && sequence === this.detailSequence && scope === this.sourceScope()
+      return getSalesReturn(row.returnId, { silentError: true }).then(res => { if (current()) this.detailForm = res.data || { details: [] } })
+        .catch(error => { if (current()) this.detailError = error.message || "详情加载失败" })
+        .finally(() => { if (current()) this.detailLoading = false })
     },
     removeDetail(idx) { this.form.details.splice(idx, 1) },
     handleSalesOrderChange(orderId) {
@@ -372,27 +402,30 @@ export default {
         }
       }).filter(item => item.maxReturnQuantity > 0)
     },
-    doSave() {
-      if (!this.ensureStoreContext()) return
-      this.$refs.formRef.validate(valid => {
-        if (!valid) return
+    doSave() { return this.saveEditor(false) },
+    doSubmit() { return this.saveEditor(true) },
+    saveEditor(submit) {
+      if (this.submitLoading || !this.dialogOpen || !this.ensureStoreContext()) return Promise.resolve({ busy: true })
+      const form = this.form, epoch = this.formEpoch, scope = this.sourceScope()
+      const current = () => this.dialogOpen && !this.pageInactive && this.form === form && epoch === this.formEpoch && scope === this.sourceScope()
+      this.submitLoading = true
+      return new Promise(resolve => this.$refs.formRef.validate(resolve)).then(valid => {
+        if (!current() || !valid) return
         const payload = this.buildPayload()
         if (!payload) return
-        this.submitLoading = true
-        saveSalesReturn(payload).then(() => { this.$modal.msgSuccess("保存成功"); this.dialogOpen = false; this.getList() }).finally(() => { this.submitLoading = false })
-      })
-    },
-    doSubmit() {
-      if (!this.ensureStoreContext()) return
-      this.$refs.formRef.validate(valid => {
-        if (!valid) return
-        const payload = this.buildPayload()
-        if (!payload) return
-        this.submitLoading = true
-        submitSalesReturn(payload).then(() => { this.$modal.msgSuccess("提交成功"); this.dialogOpen = false; this.getList() }).finally(() => { this.submitLoading = false })
-      })
+        return (submit ? submitSalesReturn : saveSalesReturn)(payload).then(res => {
+          if (!current()) return
+          this.$set(form, "returnId", res.data.returnId)
+          this.$set(form, "version", res.data.version)
+          this.$modal.msgSuccess(submit ? "提交成功" : "保存成功")
+          this.dialogOpen = false
+          return this.getList()
+        })
+      }).catch(error => { if (current() && !error.notified) this.$modal.msgError(error.message || "保存失败，输入已保留") })
+        .finally(() => { if (this.form === form && epoch === this.formEpoch && scope === this.sourceScope()) this.submitLoading = false })
     },
     buildPayload() {
+      if (this.form.status && this.form.status !== "draft") { this.$modal.msgWarning("原单已提交，请关闭窗口查看原单，当前输入仍保留"); return null }
       if (this.sourceError) { this.$modal.msgError(this.sourceError); return null }
       if (this.sourceLoading) {
         this.$modal.msgWarning("请等待原单明细加载完成")
@@ -431,7 +464,7 @@ export default {
       return this.$modal.confirm("确认提交该退货单？").then(() => {
         if (scope !== this.sourceScope() || this.submitLoading) return
         this.submitLoading = true
-        return submitSalesReturnDraft(returnId).then(() => { this.$modal.msgSuccess("提交成功"); this.getList() })
+        return submitSalesReturnDraft(returnId, row.version).then(() => { this.$modal.msgSuccess("提交成功"); this.getList() })
           .finally(() => { this.submitLoading = false })
       }).catch(error => ({ failed: true, error }))
     },

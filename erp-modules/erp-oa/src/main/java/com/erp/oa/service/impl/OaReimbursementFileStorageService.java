@@ -1,5 +1,6 @@
 package com.erp.oa.service.impl;
 
+import com.erp.common.core.utils.file.UploadImageNormalizer;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -70,6 +71,8 @@ public class OaReimbursementFileStorageService
             throw storageFailure("读取发票文件失败", exception);
         }
         String contentType = validateContent(extension, bytes);
+        if (!".pdf".equals(extension) && !".ofd".equals(extension))
+            bytes = UploadImageNormalizer.normalize(bytes, originalName);
         String storedName = UUID.randomUUID().toString().replace("-", "")
                 + extension;
         Path relative = Paths.get("invoices",

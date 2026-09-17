@@ -2,6 +2,7 @@
   <section class="attendance-module correction-management">
     <el-card shadow="never" class="oa-filter-card">
       <el-form :inline="true" size="small" @submit.native.prevent>
+        <el-form-item label="员工"><el-input v-model.trim="employeeKeyword" clearable placeholder="姓名或账号" @keyup.enter.native="load" /></el-form-item>
         <el-form-item label="状态"><el-select v-model="query.status" clearable placeholder="全部状态"><el-option v-for="item in statusOptions" :key="item.value" :label="item.label" :value="item.value" /></el-select></el-form-item>
         <el-form-item label="日期"><el-date-picker v-model="query.dates" type="daterange" value-format="yyyy-MM-dd" start-placeholder="开始日期" end-placeholder="结束日期" /></el-form-item>
         <el-form-item><el-button type="primary" icon="el-icon-search" @click="load">查询</el-button></el-form-item>
@@ -9,12 +10,13 @@
     </el-card>
     <el-card shadow="never" class="oa-table-card table-card">
       <el-alert v-if="readError" :title="readError" type="error" :closable="false" />
-      <el-table v-loading="loading" :data="rows" size="small" empty-text="暂无补卡申请">
+      <el-table v-loading="loading" :data="filteredRows" size="small" empty-text="暂无补卡申请">
         <el-table-column label="申请人" prop="userName" width="120" />
         <el-table-column label="业务日" prop="businessDate" width="110" />
         <el-table-column label="更正类型" width="130"><template slot-scope="scope">{{ correctionLabel(scope.row.correctionType) }}</template></el-table-column>
         <el-table-column label="目标卡" width="90"><template slot-scope="scope">{{ punchLabel(scope.row.targetPunchType) }}</template></el-table-column>
-        <el-table-column label="申请时间" min-width="165"><template slot-scope="scope">{{ dateTime(scope.row.requestedPunchTime) }}</template></el-table-column>
+        <el-table-column label="拟补打卡时间" min-width="165"><template slot-scope="scope">{{ dateTime(scope.row.requestedPunchTime) }}</template></el-table-column>
+        <el-table-column label="提交时间" min-width="165"><template slot-scope="scope">{{ dateTime(scope.row.createTime) }}</template></el-table-column>
         <el-table-column label="原因" prop="reason" min-width="180" show-overflow-tooltip />
         <el-table-column label="状态" width="100"><template slot-scope="scope"><el-tag :type="statusTag(scope.row.status)" size="mini">{{ statusLabel(scope.row.status) }}</el-tag></template></el-table-column>
         <el-table-column label="操作" width="90" fixed="right"><template slot-scope="scope"><el-button type="text" size="mini" @click="openDetail(scope.row.correctionRequestId)">详情</el-button></template></el-table-column>
@@ -33,7 +35,8 @@
           <el-descriptions-item label="目标卡">{{ punchLabel(detail.targetPunchType) }}</el-descriptions-item>
           <el-descriptions-item label="原事件 ID">{{ detail.originalPunchEventId || '无（缺卡补录）' }}</el-descriptions-item>
           <el-descriptions-item label="原打卡时间">{{ dateTime(detail.originalPunchTime) }}</el-descriptions-item>
-          <el-descriptions-item label="申请更正时间" :span="2">{{ dateTime(detail.requestedPunchTime) }}</el-descriptions-item>
+          <el-descriptions-item label="拟补打卡时间">{{ dateTime(detail.requestedPunchTime) }}</el-descriptions-item>
+          <el-descriptions-item label="提交时间">{{ dateTime(detail.createTime) }}</el-descriptions-item>
           <el-descriptions-item label="原因" :span="2">{{ detail.reason }}</el-descriptions-item>
         </el-descriptions>
         <el-alert title="原打卡事件和证据不会被覆盖；审批通过后由服务端生成更正结果。审批动作在统一待办执行。" type="info" :closable="false" show-icon class="detail-alert" />
@@ -53,7 +56,7 @@ export default {
   data() {
     return {
       readError: '', detailError: '',
-      loading: false, rows: [], detail: null, detailOpen: false, query: { status: '', dates: [] },
+      loading: false, rows: [], employeeKeyword: '', detail: null, detailOpen: false, query: { status: '', dates: [] },
       statusOptions: [
         { value: 'DRAFT', label: '草稿' }, { value: 'SUBMITTING', label: '提交中' }, { value: 'PENDING', label: '审批中' },
         { value: 'APPROVED', label: '已通过' }, { value: 'REJECTED', label: '已驳回' }, { value: 'RETURNED', label: '已退回' }
@@ -64,6 +67,12 @@ export default {
     actorContextKey() {
       const store = this.$store || {}
       return String((store.getters || {}).id || '') + ':' + String(((store.state || {}).user || {}).sessionRevision || 0)
+    },
+    filteredRows() {
+      const keyword = String(this.employeeKeyword || '').trim().toLowerCase()
+      if (!keyword) return this.rows
+      return this.rows.filter(row => [row.userName, row.employeeName, row.correctionRequestNo]
+        .some(value => String(value || '').toLowerCase().includes(keyword)))
     }
   },
   watch: {

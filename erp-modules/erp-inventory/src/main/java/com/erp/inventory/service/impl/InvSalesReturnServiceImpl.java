@@ -87,6 +87,7 @@ public class InvSalesReturnServiceImpl extends InvBaseService implements IInvSal
             salesReturn.setApplicantName(SecurityUtils.getUsername());
             salesReturn.setApplicantDeptId(SecurityUtils.getLoginUser().getSysUser().getDeptId());
             salesReturn.setCreateBy(SecurityUtils.getUsername());
+            salesReturn.setVersion(0L);
             salesReturn.setStatus(InvStatusConstants.DRAFT);
             salesReturn.setReturnNo(generateReturnNo("SR"));
             salesReturnMapper.insertInvSalesReturn(salesReturn);
@@ -103,6 +104,7 @@ public class InvSalesReturnServiceImpl extends InvBaseService implements IInvSal
         {
             InvSalesReturn db = lockScopedReturn(salesReturn.getReturnId(), selectedShopDeptId, salesReturn.getSalesOrderId());
             InvStateGuard.requireDraftForEdit(db.getStatus());
+            com.erp.inventory.support.InvDraftRevision.requireCurrent(salesReturn.getVersion(), db.getVersion());
             if (salesReturn.getSalesOrderId() == null)
             {
                 salesReturn.setSalesOrderId(db.getSalesOrderId());
@@ -112,7 +114,9 @@ public class InvSalesReturnServiceImpl extends InvBaseService implements IInvSal
             salesReturn.setStatus(InvStatusConstants.DRAFT);
             salesReturn.setUpdateBy(SecurityUtils.getUsername());
             salesReturn.getParams().put("updateContent", true);
-            salesReturnMapper.updateInvSalesReturn(salesReturn);
+            salesReturn.getParams().put("expectedStatus", InvStatusConstants.DRAFT);
+            if (salesReturnMapper.updateInvSalesReturn(salesReturn) != 1)
+                throw new ServiceException("退货草稿已变化，请保留输入并核对最新版本");
             if (details != null)
             {
                 salesReturnDetailMapper.deleteInvSalesReturnDetailByReturnId(salesReturn.getReturnId());
@@ -142,12 +146,13 @@ public class InvSalesReturnServiceImpl extends InvBaseService implements IInvSal
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public InvSalesReturn submitSavedReturn(Long returnId, Long selectedShopDeptId)
+    public InvSalesReturn submitSavedReturn(Long returnId, Long version, Long selectedShopDeptId)
     {
         Long shopDeptId = requireStoreContext(selectedShopDeptId, "请选择门店");
         InvSalesReturn draft = lockScopedReturn(returnId, shopDeptId);
         if (!shopDeptId.equals(draft.getShopDeptId())) throw new ServiceException("退货单不属于当前门店");
         InvStateGuard.requireDraftForEdit(draft.getStatus());
+        com.erp.inventory.support.InvDraftRevision.requireCurrent(version, draft.getVersion());
         if (draft.getReturnTitle() == null || draft.getReturnTitle().isBlank() || draft.getReturnTitle().length() > 128
                 || draft.getCustomerName() == null || draft.getCustomerName().isBlank())
             throw new ServiceException("退货草稿主题或客户资料不完整，请先编辑保存");
@@ -161,7 +166,7 @@ public class InvSalesReturnServiceImpl extends InvBaseService implements IInvSal
         update.setUpdateBy(SecurityUtils.getUsername());
         updateState(update, InvStatusConstants.DRAFT);
         // Return the locked persisted draft; no body fields or stale consistent reads can replace its content.
-        draft.setStatus(InvStatusConstants.SUBMITTED); draft.setDetails(details);
+        draft.setStatus(InvStatusConstants.SUBMITTED); draft.setVersion(draft.getVersion() + 1); draft.setDetails(details);
         return InvSpecialistReadVo.salesReturn(draft);
     }
 

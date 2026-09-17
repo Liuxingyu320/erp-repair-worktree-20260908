@@ -50,7 +50,7 @@ class InvPurchaseReturnControllerTest
         assertThat(source).contains(
                 "@RequiresPermissions(value = { \"inv:purchaseReturn:add\", \"inv:purchaseReturn:submit\" })",
                 "@PostMapping(\"/submit/{returnId}\")",
-                "purchaseReturnService.submitSavedReturn(returnId,");
+                "purchaseReturnService.submitSavedReturn(returnId, requireDraftVersion(request), ");
     }
 
     private static int countOccurrences(String source, String expected)

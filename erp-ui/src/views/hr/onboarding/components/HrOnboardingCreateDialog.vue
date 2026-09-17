@@ -55,7 +55,8 @@
     </el-form>
     <span slot="footer">
       <el-button @click="close">取消</el-button>
-      <el-button type="primary" :loading="submitting" @click="submit">创建</el-button>
+      <el-button type="primary" :loading="submitting" @click="submit(false)">创建</el-button>
+      <el-button type="success" :loading="submitting" @click="submit(true)">创建并继续下一位</el-button>
     </span>
   </el-dialog>
 </template>
@@ -138,7 +139,20 @@ export default {
         : {}
       this.submitMessage = body.msg || body.message || "创建失败，请核对填写内容。"
     },
-    submit() {
+    prepareNextPerson() {
+      const shared = {
+        expectedEntryDate: this.model.expectedEntryDate,
+        targetDeptId: this.model.targetDeptId,
+        targetPostId: this.model.targetPostId,
+        employeeCategory: this.model.employeeCategory,
+        ownerUserId: this.model.ownerUserId
+      }
+      this.model = Object.assign(createDefaultModel(), shared)
+      this.fieldErrors = {}
+      this.submitMessage = ""
+      this.$nextTick(() => { if (this.$refs.form) this.$refs.form.clearValidate() })
+    },
+    submit(continueNext) {
       if (this.submitting) return Promise.resolve(null)
       this.submitting = true
       const validationGeneration = this.dialogGeneration
@@ -158,6 +172,11 @@ export default {
             if (!this.isActiveWrite(generation, requestSequence)) return null
             const created = response && response.data ? response.data : response
             this.$emit("created", created || {})
+            if (continueNext) {
+              this.prepareNextPerson()
+              if (this.$modal && this.$modal.msgSuccess) this.$modal.msgSuccess("已创建，可继续填写下一位")
+              return created
+            }
             this.$emit("update:visible", false)
             return created
           })

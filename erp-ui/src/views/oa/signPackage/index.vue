@@ -2371,15 +2371,18 @@ export default {
     },
     openGeneratedDocument(document) {
       if (!this.detail || !document) return
-      this.openBlobFile(() => downloadSignPackageDocument(this.detail.packageId, document.documentId))
+      this.openBlobFile(() => downloadSignPackageDocument(this.detail.packageId, document.documentId),
+        "签约文件预览失败，请稍后重试")
     },
     openSignedDocument(document) {
       if (!this.detail || !document || !document.signedPdfUrl) return
-      this.openBlobFile(() => downloadSignedSignPackageDocument(this.detail.packageId, document.documentId))
+      this.openBlobFile(() => downloadSignedSignPackageDocument(this.detail.packageId, document.documentId),
+        "签名文件预览失败，请稍后重试")
     },
     openFinalDocument(document) {
       if (!this.detail || !document || !document.finalPdfUrl) return
-      this.openBlobFile(() => downloadFinalSignPackageDocument(this.detail.packageId, document.documentId))
+      this.openBlobFile(() => downloadFinalSignPackageDocument(this.detail.packageId, document.documentId),
+        "最终合同预览失败，请稍后重试")
     },
     canExportFinalDocument(document) {
       return !!this.detail && this.detail.status === "signed" &&
@@ -2417,21 +2420,27 @@ export default {
     },
     openGeneratedCertificate(document) {
       if (!this.detail || !document) return
-      this.openBlobFile(() => downloadSignPackageCertificate(this.detail.packageId, document.documentId))
+      this.openBlobFile(() => downloadSignPackageCertificate(this.detail.packageId, document.documentId),
+        "签署证明预览失败，请稍后重试")
     },
     openBlobFile(loader, errorMessage) {
-      const target = window.open("", "_blank")
-      return loader().then(blob => {
-        const url = URL.createObjectURL(new Blob([blob], { type: blob.type || "application/pdf" }))
-        if (target) {
-          target.location.href = url
-        } else {
-          window.open(url, "_blank")
-        }
+      const target = window.open("about:blank", "_blank")
+      if (!target) {
+        this.$message.warning("浏览器阻止了预览窗口，请允许弹窗后重试")
+        return Promise.resolve()
+      }
+      return loader().then(async blob => {
+        const fileBlob = blob instanceof Blob
+          ? blob
+          : new Blob([blob], { type: (blob && blob.type) || "application/pdf" })
+        if (!(await validatePdfBlob(fileBlob))) throw new Error("INVALID_PREVIEW_PDF")
+        if (target.closed) return
+        const url = URL.createObjectURL(fileBlob)
+        target.location.href = url
         setTimeout(() => URL.revokeObjectURL(url), 60000)
       }).catch(() => {
-        if (target) target.close()
-        if (errorMessage) this.$message.error(errorMessage)
+        if (!target.closed) target.close()
+        this.$message.error(errorMessage || "文件预览失败，请稍后重试")
       })
     },
     handlePreviewTemplate(row) {

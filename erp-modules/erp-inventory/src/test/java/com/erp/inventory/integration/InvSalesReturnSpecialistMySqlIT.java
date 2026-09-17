@@ -169,22 +169,22 @@ class InvSalesReturnSpecialistMySqlIT
     {
         source(1,"submitted","3",20,"customer","2026-09-12");draft(11,1,"2");
         var before=jdbc.queryForMap("select * from inv_sales_return_detail where return_id=11");
-        var result=service.submitSavedReturn(11L,20L);assertThat(result.getReturnTitle()).isEqualTo("frozen");assertThat(result.getDetails().get(0).getQuantity()).isEqualByComparingTo("2");
+        var result=service.submitSavedReturn(11L, 0L, 20L);assertThat(result.getReturnTitle()).isEqualTo("frozen");assertThat(result.getDetails().get(0).getQuantity()).isEqualByComparingTo("2");
         assertThat(jdbc.queryForMap("select * from inv_sales_return_detail where return_id=11")).isEqualTo(before);
         assertThat(jdbc.queryForObject("select status from inv_sales_return where return_id=11",String.class)).isEqualTo("submitted");
-        assertThatThrownBy(() -> service.submitSavedReturn(11L,20L)).isInstanceOf(ServiceException.class);
+        assertThatThrownBy(() -> service.submitSavedReturn(11L, 0L, 20L)).isInstanceOf(ServiceException.class);
     }
     @Test void lateStateWriteFailureRollsBackTheRealUpdate()
     {
         source(1,"submitted","3",20,"customer","2026-09-12");draft(11,1,"2");fault.afterStateWrite=true;
-        assertThatThrownBy(() -> service.submitSavedReturn(11L,20L)).isInstanceOf(ServiceException.class);
+        assertThatThrownBy(() -> service.submitSavedReturn(11L, 0L, 20L)).isInstanceOf(ServiceException.class);
         assertThat(jdbc.queryForObject("select status from inv_sales_return where return_id=11",String.class)).isEqualTo("draft");
         assertThat(jdbc.queryForObject("select quantity from inv_sales_return_detail where return_id=11",BigDecimal.class)).isEqualByComparingTo("2");
     }
     @Test void concurrentDifferentSavedDraftsCannotOverReserveOneSource() throws Exception
     {
         source(1,"submitted","3",20,"customer","2026-09-12");draft(11,1,"2");draft(12,1,"2");
-        List<Object> result=concurrent(() -> service.submitSavedReturn(11L,20L),() -> service.submitSavedReturn(12L,20L));
+        List<Object> result=concurrent(() -> service.submitSavedReturn(11L, 0L, 20L),() -> service.submitSavedReturn(12L, 0L, 20L));
         assertThat(result.stream().filter(x -> x instanceof InvSalesReturn).count()).isEqualTo(1);
         assertThat(result.stream().filter(x -> x instanceof ServiceException).count()).isEqualTo(1);
         assertThat(jdbc.queryForObject("select sum(d.quantity) from inv_sales_return_detail d join inv_sales_return r on r.return_id=d.return_id where r.status='submitted'",BigDecimal.class)).isEqualByComparingTo("2");
@@ -192,23 +192,24 @@ class InvSalesReturnSpecialistMySqlIT
     @Test void concurrentSameDraftSubmitsOnce() throws Exception
     {
         source(1,"submitted","3",20,"customer","2026-09-12");draft(11,1,"2");
-        var result=concurrent(() -> service.submitSavedReturn(11L,20L),() -> service.submitSavedReturn(11L,20L));
+        var result=concurrent(() -> service.submitSavedReturn(11L, 0L, 20L),() -> service.submitSavedReturn(11L, 0L, 20L));
         assertThat(result.stream().filter(x -> x instanceof InvSalesReturn).count()).isEqualTo(1);
         assertThat(result.stream().filter(x -> x instanceof ServiceException).count()).isEqualTo(1);
     }
     @Test void oldRepeatableReadSnapshotCannotReplaceNewerSavedDraft() throws Exception
     {
         source(1,"submitted","3",20,"customer","2026-09-12");draft(11,1,"1");
-        new TransactionTemplate(manager).executeWithoutResult(tx -> {
+        assertThatThrownBy(() -> new TransactionTemplate(manager).executeWithoutResult(tx -> {
             assertThat(session.getMapper(InvSalesReturnMapper.class).selectInvSalesReturnById(11L).getReturnTitle()).isEqualTo("frozen");
             var pool=Executors.newSingleThreadExecutor();
             try {
-                pool.submit(() -> {login();try { InvSalesReturn edit=new InvSalesReturn();edit.setReturnId(11L);edit.setSalesOrderId(1L);edit.setReturnTitle("new saved title");
+                pool.submit(() -> {login();try { InvSalesReturn edit=new InvSalesReturn();edit.setVersion(0L);edit.setReturnId(11L);edit.setSalesOrderId(1L);edit.setReturnTitle("new saved title");
                     InvSalesReturnDetail line=new InvSalesReturnDetail();line.setSalesDetailId(11L);line.setItemType("product");line.setProductId(1L);line.setQuantity(new BigDecimal("2"));
                     service.saveDraft(edit,List.of(line),20L); } finally {SecurityContextHolder.remove();} }).get(10,TimeUnit.SECONDS);
             } catch(Exception e) {throw new RuntimeException(e);} finally {pool.shutdownNow();}
-            var submitted=service.submitSavedReturn(11L,20L);assertThat(submitted.getReturnTitle()).isEqualTo("new saved title");assertThat(submitted.getDetails().get(0).getQuantity()).isEqualByComparingTo("2");
-        });
+            service.submitSavedReturn(11L, 0L, 20L);
+        })).isInstanceOf(ServiceException.class).hasMessageContaining("版本");
+        var submitted=service.submitSavedReturn(11L, 1L, 20L);assertThat(submitted.getReturnTitle()).isEqualTo("new saved title");assertThat(submitted.getDetails().get(0).getQuantity()).isEqualByComparingTo("2");
         assertThat(jdbc.queryForObject("select return_title from inv_sales_return where return_id=11",String.class)).isEqualTo("new saved title");
     }
     @Test void actionContextUsesActualHeaderAndRejectsForeignOrMissingWithoutLeakingDetail() throws Exception

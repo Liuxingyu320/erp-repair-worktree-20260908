@@ -1,4 +1,5 @@
 import request from '@/utils/request'
+import { inventoryDraftRecovery } from './draftRecovery'
 
 // 查询采购退货列表
 export function listPurchaseReturn(query) {
@@ -17,12 +18,12 @@ export function getPurchaseReturn(returnId) {
 
 // 保存草稿
 export function savePurchaseReturn(data) {
-  return request({ url: '/inventory/purchaseReturn/save', method: 'post', data: data })
+  return inventoryDraftRecovery.submit('purchaseReturn', 'save', data)
 }
 
 // 提交
 export function submitPurchaseReturn(data) {
-  return request({ url: '/inventory/purchaseReturn/submit', method: 'post', data: data })
+  return inventoryDraftRecovery.submit('purchaseReturn', 'submit', data)
 }
 
 // 确认退货
@@ -35,8 +36,8 @@ export function cancelPurchaseReturn(returnId) {
   return request({ url: '/inventory/purchaseReturn/' + returnId, method: 'delete' })
 }
 
-export function submitPurchaseReturnDraft(returnId) {
-  return request({ url: '/inventory/purchaseReturn/submit/' + returnId, method: 'post' })
+export function submitPurchaseReturnDraft(returnId, version) {
+  return request({ url: '/inventory/purchaseReturn/submit/' + returnId, method: 'post', params: { version } })
 }
 
 export function listPurchaseReturnSourceOrders(query, config = {}) {

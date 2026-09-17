@@ -1,4 +1,5 @@
 import request from '@/utils/request'
+import { inventoryDraftRecovery } from './draftRecovery'
 import store from '@/store'
 import { getSelectedInventoryDeptId } from '@/utils/shopContext'
 import { MessageBox } from '@/plugins/element-services'
@@ -24,12 +25,12 @@ const qualityRecovery = createPurchaseQualityRecovery({
 
 // 保存草稿
 export function savePurchase(data) {
-  return request({ url: '/inventory/purchase/save', method: 'post', data: data })
+  return inventoryDraftRecovery.submit('purchase', 'save', data)
 }
 
 // 提交采购单
 export function submitPurchase(data) {
-  return request({ url: '/inventory/purchase/submit', method: 'post', data: data })
+  return inventoryDraftRecovery.submit('purchase', 'submit', data)
 }
 
 // 采购单列表（全部）
@@ -90,8 +91,8 @@ export function deleteDraftPurchase(orderId) {
 }
 
 // 提交已保存草稿，仅要求采购提交权限。
-export function submitPurchaseDraft(orderId) {
-  return request({ url: '/inventory/purchase/submit/' + orderId, method: 'post' })
+export function submitPurchaseDraft(orderId, version) {
+  return request({ url: '/inventory/purchase/submit/' + orderId, method: 'post', params: { version } })
 }
 
 // Reads authorized by the task being performed; general query permission stays unchanged.

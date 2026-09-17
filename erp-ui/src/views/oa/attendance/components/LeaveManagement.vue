@@ -4,6 +4,9 @@
       <el-tab-pane v-if="can('oa:attendance:leave:list')" label="请假申请" name="requests">
         <el-card shadow="never" class="oa-filter-card">
           <el-form :inline="true" size="small" @submit.native.prevent>
+            <el-form-item label="员工">
+              <el-input v-model.trim="employeeKeyword" clearable placeholder="姓名或账号" @keyup.enter.native="loadRequests" />
+            </el-form-item>
             <el-form-item label="状态">
               <el-select v-model="query.status" clearable placeholder="全部状态">
                 <el-option v-for="item in statusOptions" :key="item.value" :label="item.label" :value="item.value" />
@@ -18,7 +21,7 @@
 
         <el-card shadow="never" class="oa-table-card table-card">
           <el-alert v-if="readError" :title="readError" type="error" :closable="false" />
-      <el-table v-loading="requestLoading" :data="requests" size="small" empty-text="暂无请假申请">
+      <el-table v-loading="requestLoading" :data="filteredRequests" size="small" empty-text="暂无请假申请">
             <el-table-column label="申请人" prop="userName" width="120" />
             <el-table-column label="请假类型" prop="leaveTypeName" width="120" />
             <el-table-column label="请假时间" min-width="260">
@@ -91,11 +94,11 @@
           <el-col :span="12"><el-form-item label="计量方式"><el-select v-model="typeForm.unitMode"><el-option label="按分钟" value="MINUTE" /><el-option label="半天" value="HALF_DAY" /><el-option label="按天" value="DAY" /><el-option label="混合" value="MIXED" /></el-select></el-form-item></el-col>
           <el-col :span="12"><el-form-item label="薪资规则"><el-select v-model="typeForm.payPolicy"><el-option label="带薪" value="PAID" /><el-option label="无薪" value="UNPAID" /><el-option label="按比例" value="POLICY" /></el-select></el-form-item></el-col>
           <el-col v-if="typeForm.payPolicy === 'POLICY'" :span="12"><el-form-item label="带薪比例"><el-input-number v-model="typeForm.paidRatio" :min="0" :max="1" :step="0.1" /></el-form-item></el-col>
-          <el-col :span="12"><el-form-item label="每日换算分钟"><el-input-number v-model="typeForm.minutesPerDay" :min="1" :max="1440" :controls="false" placeholder="按天申请时须配置" /></el-form-item></el-col>
+          <el-col :span="12"><el-form-item label="每日换算分钟"><el-input-number v-model="typeForm.minutesPerDay" :min="typeForm.minutesPerDay == null ? undefined : 1" :max="1440" :controls="false" placeholder="按天申请时须配置" /></el-form-item></el-col>
           <el-col :span="12"><el-form-item label="最少分钟"><el-input-number v-model="typeForm.minMinutes" :min="1" :max="525600" /></el-form-item></el-col>
           <el-col :span="12"><el-form-item label="递增步长"><el-input-number v-model="typeForm.stepMinutes" :min="1" :max="1440" /></el-form-item></el-col>
-          <el-col :span="12"><el-form-item label="单次上限"><el-input-number v-model="typeForm.maxMinutesPerRequest" :min="typeForm.minMinutes || 1" :max="525600" /></el-form-item></el-col>
-          <el-col :span="12"><el-form-item label="附件阈值"><el-input-number v-model="typeForm.attachmentThresholdMinutes" :min="1" :max="525600" placeholder="留空不按时长要求" /></el-form-item></el-col>
+          <el-col :span="12"><el-form-item label="单次上限"><el-input-number v-model="typeForm.maxMinutesPerRequest" :min="typeForm.maxMinutesPerRequest == null ? undefined : (typeForm.minMinutes || 1)" :max="525600" /></el-form-item></el-col>
+          <el-col :span="12"><el-form-item label="附件阈值"><el-input-number v-model="typeForm.attachmentThresholdMinutes" :min="typeForm.attachmentThresholdMinutes == null ? undefined : 1" :max="525600" placeholder="留空不按时长要求" /></el-form-item></el-col>
           <el-col :span="8"><el-form-item label="允许跨天"><el-switch v-model="typeForm.allowCrossDay" /></el-form-item></el-col>
           <el-col :span="8"><el-form-item label="始终需附件"><el-switch v-model="typeForm.attachmentRequired" /></el-form-item></el-col>
           <el-col :span="8"><el-form-item label="额度校验"><el-switch v-model="typeForm.balanceRequired" :disabled="requiresBalance(typeForm)" @change="enforceTypePolicy" /></el-form-item></el-col>
@@ -124,7 +127,7 @@ const { dataOf } = require('@/views/mobile/attendance/attendancePunchPolicy')
 const emptyType = () => ({
   leaveTypeId: null, typeCode: '', typeName: '', unitMode: 'MINUTE', payPolicy: 'UNPAID', paidRatio: 0,
   minutesPerDay: null, balanceRequired: false, attachmentRequired: false, attachmentThresholdMinutes: null,
-  minMinutes: 30, stepMinutes: 30, maxMinutesPerRequest: 43200,
+  minMinutes: 30, stepMinutes: 30, maxMinutesPerRequest: null,
   allowCrossDay: true, approvalRequired: true, sortNo: 0, status: 'DISABLED', rowVersion: null
 })
 
@@ -137,7 +140,7 @@ export default {
   data() {
     return {
       readError: '', detailError: '',
-      innerTab: 'requests', requestLoading: false, requests: [],
+      innerTab: 'requests', requestLoading: false, requests: [], employeeKeyword: '',
       query: { status: '', dates: [] }, detail: null, detailOpen: false,
       typeLoading: false, typeSaving: false, types: [], typeDialog: false, typeForm: emptyType(),
       typeRules: { typeCode: [{ required: true, message: '请输入类型编码', trigger: 'blur' }], typeName: [{ required: true, message: '请输入类型名称', trigger: 'blur' }] },
@@ -151,6 +154,12 @@ export default {
     actorContextKey() {
       const store = this.$store || {}
       return String((store.getters || {}).id || '') + ':' + String(((store.state || {}).user || {}).sessionRevision || 0)
+    },
+    filteredRequests() {
+      const keyword = String(this.employeeKeyword || '').trim().toLowerCase()
+      if (!keyword) return this.requests
+      return this.requests.filter(row => [row.userName, row.employeeName, row.leaveTypeName, row.leaveRequestNo]
+        .some(value => String(value || '').toLowerCase().includes(keyword)))
     }
   },
   watch: {

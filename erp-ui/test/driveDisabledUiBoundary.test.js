@@ -52,7 +52,6 @@ function auditExternalDriveReferences() {
   ], "drive-external user-visible references must stay within the audited protected files")
   assert.deepStrictEqual(driveApiConsumers.sort(), [
     "src/components/TransferEvidencePicker.vue",
-    "src/views/hr/healthCertificate/index.vue",
     "src/views/inventory/customer/index.vue"
   ], "only the explicitly gated business forms and controlled transfer evidence picker may consume drive APIs")
 }
@@ -120,7 +119,7 @@ function countRenderedFormItems(fragment, label, driveEnabled) {
   const instance = new Vue({
     data() {
       return {
-        driveEnabled,
+        driveEnabled, mineDialog: false,
         form: {},
         mineForm: {},
         recentImages: [],
@@ -195,71 +194,13 @@ async function verifyCustomerDriveBoundary() {
 }
 
 async function verifyHealthDriveBoundary() {
-  let recentCalls = 0
-  const component = loadComponent(healthPath, {
-    "@/utils/shopContext": new Function("sessionStorage", read("src/utils/shopContext.js").replace(/export /g, "") + ";return { getSelectedDeptId }")({ getItem: key => key === "selected_dept_id" ? "10" : null }),
-    "@/utils/uiOperationScope": require("../src/utils/uiOperationScope"),
-    "@/api/drive": {
-      listRecentDriveNodes() {
-        recentCalls += 1
-        return Promise.resolve({
-          rows: [
-            { nodeId: 11, nodeType: "FILE", contentType: "image/png" },
-            { nodeId: 12, nodeType: "FILE", contentType: "application/pdf" },
-            { nodeId: 13, nodeType: "FILE", contentType: "image/svg+xml" }
-          ]
-        })
-      }
-    },
-    "@/api/hr/healthCertificate": {},
-    "@/api/approval/monitor": {},
-    "@/api/approval/task": {},
-    "@/views/approval/manage/components/approvalUi": {
-      statusLabel: value => value,
-      statusType: () => ""
-    }
-  })
-
-  const disabled = bindMethods(component, {
-    $store: { getters: { driveEnabled: false, permissions: ["*:*:*"] } },
-    recentFiles: [{ nodeId: 99 }]
-  })
-  assert.strictEqual(disabled.driveEnabled, false)
-  await disabled.loadRecentFiles()
-  assert.strictEqual(recentCalls, 0, "disabled health-certificate forms must not request recent drive files")
-  assert.strictEqual(disabled.recentFiles.length, 0, "disabled health-certificate forms must clear stale drive choices")
-
-  const enabled = bindMethods(component, {
-    $store: { getters: { driveEnabled: true, permissions: [] } },
-    recentFiles: []
-  })
-  await enabled.loadRecentFiles()
-  assert.strictEqual(recentCalls, 1, "enabled health-certificate forms should retain the existing recent-file capability")
-  assert.deepStrictEqual(Array.from(enabled.recentFiles, item => item.nodeId), [11, 12], "enabled health-certificate forms should retain image/PDF filtering")
-
-  let disabledCreatedCalls = 0
-  component.created.call({
-    driveEnabled: false,
-    intakeEnabled: true,
-    applyTodoRoute() {},
-    refreshAll() {},
-    loadCapability: () => Promise.resolve(),
-    loadRecentFiles: () => { disabledCreatedCalls += 1 }
-  })
-  await flushPromises()
-  assert.strictEqual(disabledCreatedCalls, 0, "disabled health-certificate startup must not preload drive files")
-
-  let enabledCreatedCalls = 0
-  component.created.call({
-    driveEnabled: true,
-    intakeEnabled: true,
-    applyTodoRoute() {},
-    refreshAll() {},
-    loadCapability: () => Promise.resolve(),
-    loadRecentFiles: () => { enabledCreatedCalls += 1 }
-  })
-  await flushPromises()
-  assert.strictEqual(enabledCreatedCalls, 1, "enabled health-certificate startup should preserve drive-file preload")
+  // The business form mounts the controlled picker only while the feature and editor are open.
+  assert.ok(healthSource.includes('v-if="driveEnabled" label="云盘附件"'))
+  assert.ok(healthSource.includes('<drive-attachment-picker v-if="mineDialog"'))
+  assert.ok(!healthSource.includes('listRecentDriveNodes'), 'opening the health page must not preload drive files')
+  const picker = read('src/views/drive/components/DriveAttachmentPicker.vue')
+  assert.ok(picker.includes('restoreUploadReceipts'), 'the controlled picker must retain unknown upload receipts')
+  assert.ok(picker.includes('listDriveNodes(query)'), 'existing files must be searchable with server paging')
 }
 
 async function run() {

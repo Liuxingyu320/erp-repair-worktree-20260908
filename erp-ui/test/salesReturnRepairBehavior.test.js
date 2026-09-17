@@ -30,9 +30,11 @@ function loadModule(relative, deps = {}) {
       if (name === '@/mixins/todoBusinessFocus') return { createTodoBusinessFocusMixin() { return {} } }
       if (name === '@/utils/shopContext') return { isSelectedStore: () => true, isSelectedWarehouse: () => true, getSelectedDeptId: () => 8 }
       if (name === '@/utils/returnSelection') return require('../src/utils/returnSelection')
+      if (name === '@/views/inventory/components/InventoryDraftRecovery.vue') return {}
       if (name === '@/views/inventory/components/SalesReturnSourcePicker.vue') return {}
       if (name === '@/api/inventory/salesReturn') return {}
       if (name === '@/utils/businessEmptyState') return { getBusinessEmptyText: () => '' }
+      if (name === './draftRecovery') return { inventoryDraftRecovery: {} }
       if (name.startsWith('.')) return require(path.resolve(path.dirname(filename), name))
       throw new Error('Unexpected application dependency: ' + name)
     }
@@ -158,11 +160,11 @@ test('specialized purchase API requests only draft ID and scoped return source',
   const calls = []
   const request = options => { calls.push(plain(options)); return Promise.resolve() }
   const api = loadModule('api/inventory/purchaseReturn.js', { '@/utils/request': request })
-  await api.submitPurchaseReturnDraft(4)
+  await api.submitPurchaseReturnDraft(4, "3")
   await api.getPurchaseReturnSourceOrder(5)
   await api.listPurchaseReturnSourceOrders({ pageSize: 20 })
   assert.deepEqual(calls, [
-    { url: '/inventory/purchaseReturn/submit/4', method: 'post' },
+    { url: '/inventory/purchaseReturn/submit/4', method: 'post', params: { version: '3' } },
     { url: '/inventory/purchaseReturn/source-orders/5', method: 'get' },
     { url: '/inventory/purchaseReturn/source-orders', method: 'get', params: { pageSize: 20 } }
   ])

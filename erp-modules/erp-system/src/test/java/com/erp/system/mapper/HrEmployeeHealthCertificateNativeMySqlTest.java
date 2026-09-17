@@ -80,6 +80,8 @@ class HrEmployeeHealthCertificateNativeMySqlTest
                         "expires_on","issuer_name","attachment_node_id",
                         "review_status","current_flag","reviewed_by_user_id",
                         "reviewed_by_name","reviewed_time","rejection_reason",
+                        "approval_instance_id","approval_round",
+                        "last_approval_event_key",
                         "version","del_flag","create_by","create_time",
                         "update_by","update_time");
             }

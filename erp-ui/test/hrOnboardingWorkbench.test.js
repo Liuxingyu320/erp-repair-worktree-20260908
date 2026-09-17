@@ -88,6 +88,13 @@ assert.ok(backendRules.includes('"ACCOUNT_CONFIGURATION_MISSING"'), "frontend ri
 for (const key of ["employeeName", "phoneNumber", "expectedEntryDate", "targetDeptId", "targetPostId", "employeeCategory", "ownerUserId"]) {
   assert.ok(createDialog.includes(key), `quick create field ${key} must be present`)
 }
+assert.ok(
+  createDialog.includes("创建并继续下一位") &&
+    createDialog.includes("prepareNextPerson") &&
+    createDialog.includes("employeeName: \"\"") &&
+    createDialog.includes("phoneNumber: \"\""),
+  "quick create must keep shared org fields and clear personal identity for the next person"
+)
 assert.ok(createDialog.includes("append-to-body"),
   "quick create dialog must escape the desktop stacking context so its modal cannot cover the dialog")
 assert.ok(editDrawer.includes("append-to-body"),

@@ -9,6 +9,8 @@ public interface OaFixedAssetConfigMapper
 {
     List<OaFixedAssetConfig> selectConfigList(OaFixedAssetConfig config);
 
+    List<com.erp.oa.domain.vo.OaFixedAssetStoreSummary> selectConfigStoreList(OaFixedAssetConfig config);
+
     OaFixedAssetConfig selectConfigById(Long configId);
 
     BigDecimal sumAssetAmountByShop(Long shopDeptId);

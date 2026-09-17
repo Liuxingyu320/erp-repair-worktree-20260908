@@ -101,23 +101,23 @@ export default {
     },
     compress: {
       type: Boolean,
-      default: false
+      default: true
     },
     compressMaxWidth: {
       type: Number,
-      default: 1600
+      default: 0
     },
     compressMaxHeight: {
       type: Number,
-      default: 1600
+      default: 0
     },
     compressQuality: {
       type: Number,
-      default: 0.82
+      default: 0.92
     },
     compressMinSize: {
       type: Number,
-      default: 0.3
+      default: 0
     },
     // 是否显示提示
     isShowTip: {
@@ -302,42 +302,51 @@ export default {
       if (!this.shouldCompressImage(file)) {
         return Promise.resolve(file)
       }
-      return new Promise(resolve => {
+      return new Promise((resolve, reject) => {
         const reader = new FileReader()
         reader.onload = event => {
           const image = new Image()
           image.onload = () => {
-            const ratio = Math.min(
-              this.compressMaxWidth / image.width,
-              this.compressMaxHeight / image.height,
-              1
-            )
-            if (ratio >= 1) {
-              resolve(file)
-              return
-            }
-            const canvas = document.createElement("canvas")
-            canvas.width = Math.round(image.width * ratio)
-            canvas.height = Math.round(image.height * ratio)
-            const context = canvas.getContext("2d")
-            if (!context) {
-              resolve(file)
-              return
-            }
-            context.drawImage(image, 0, 0, canvas.width, canvas.height)
-            const outputType = file.type === "image/png" ? "image/jpeg" : file.type
-            canvas.toBlob(blob => {
-              if (!blob || blob.size >= file.size) {
+            try {
+              if (!image.width || !image.height || image.width * image.height > 40000000) {
+                reject(new Error("图片尺寸无效或超过 4000 万像素"))
+                return
+              }
+              // Browser canvas can round semi-transparent pixels. Keep PNG bytes
+              // intact here; the server performs lossless PNG optimization before hashing.
+              if (file.type === "image/png") {
                 resolve(file)
                 return
               }
-              resolve(this.createCompressedFile(file, blob, outputType))
-            }, outputType, this.compressQuality)
+              // Zero dimensions keep the original resolution.
+              const ratio = Math.min(
+                this.compressMaxWidth > 0 ? this.compressMaxWidth / image.width : 1,
+                this.compressMaxHeight > 0 ? this.compressMaxHeight / image.height : 1,
+                1
+              )
+              const canvas = document.createElement("canvas")
+              canvas.width = Math.round(image.width * ratio)
+              canvas.height = Math.round(image.height * ratio)
+              const context = canvas.getContext("2d")
+              if (!context) {
+                resolve(file)
+                return
+              }
+              context.drawImage(image, 0, 0, canvas.width, canvas.height)
+              const outputType = file.type === "image/jpg" ? "image/jpeg" : file.type
+              canvas.toBlob(blob => {
+                if (!blob || blob.size >= file.size) {
+                  resolve(file)
+                  return
+                }
+                resolve(this.createCompressedFile(file, blob, outputType))
+              }, outputType, this.compressQuality)
+            } catch (error) { reject(error) }
           }
-          image.onerror = () => resolve(file)
+          image.onerror = () => reject(new Error("图片内容无法解码，请重新选择"))
           image.src = event.target.result
         }
-        reader.onerror = () => resolve(file)
+        reader.onerror = () => reject(new Error("图片读取失败，请重新选择"))
         reader.readAsDataURL(file)
       })
     },
@@ -350,10 +359,13 @@ export default {
       const extension = outputType === "image/jpeg" ? "jpg" : outputType.replace("image/", "")
       const name = file.name.replace(/\.[^.]+$/, "") + "." + extension
       try {
-        return new File([blob], name, { type: outputType, lastModified: Date.now() })
+        const result = new File([blob], name, { type: outputType, lastModified: file.lastModified })
+        result.uid = file.uid
+        return result
       } catch (error) {
         blob.name = name
-        blob.lastModified = Date.now()
+        blob.lastModified = file.lastModified
+        blob.uid = file.uid
         return blob
       }
     },

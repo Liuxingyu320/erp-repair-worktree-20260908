@@ -35,7 +35,7 @@ class InvPurchaseControllerTest
         assertThat(source).contains(
                 "@RequiresPermissions(value = { \"inv:purchase:add\", \"inv:purchase:submit\" })",
                 "@PostMapping(\"/submit/{orderId}\")",
-                "purchaseService.submitSavedPurchase(orderId,");
+                "purchaseService.submitSavedPurchase(orderId, requireDraftVersion(request), ");
     }
 
     @Test

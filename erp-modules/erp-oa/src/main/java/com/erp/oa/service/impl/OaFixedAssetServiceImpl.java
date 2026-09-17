@@ -218,10 +218,18 @@ public class OaFixedAssetServiceImpl implements IOaFixedAssetService
     }
 
     @Override
+    public List<com.erp.oa.domain.vo.OaFixedAssetStoreSummary> selectConfigStoreList(OaFixedAssetConfig config, Long selectedShopDeptId)
+    {
+        OaFixedAssetConfig query = config == null ? new OaFixedAssetConfig() : config;
+        prepareConfigListScope(query);
+        return configMapper.selectConfigStoreList(query);
+    }
+
+    @Override
     public List<OaFixedAssetConfig> selectConfigList(OaFixedAssetConfig config, Long selectedShopDeptId)
     {
         OaFixedAssetConfig query = config == null ? new OaFixedAssetConfig() : config;
-        appendUserShopScope(query, query.getShopDeptId(), "无权访问该店铺固定资产");
+        prepareConfigListScope(query);
         return configMapper.selectConfigList(query);
     }
 
@@ -864,6 +872,15 @@ public class OaFixedAssetServiceImpl implements IOaFixedAssetService
         {
             throw new ServiceException(message);
         }
+    }
+
+    private void prepareConfigListScope(OaFixedAssetConfig query)
+    {
+        // Permission queries must not consume the pagination intended for the business list.
+        com.github.pagehelper.Page<Object> page = com.github.pagehelper.PageHelper.getLocalPage();
+        com.github.pagehelper.PageHelper.clearPage();
+        appendUserShopScope(query, query.getShopDeptId(), "无权访问该店铺固定资产");
+        if (page != null) com.github.pagehelper.PageHelper.setLocalPage(page);
     }
 
     private void appendUserShopScope(com.erp.common.core.web.domain.BaseEntity entity, Long targetShopDeptId, String message)

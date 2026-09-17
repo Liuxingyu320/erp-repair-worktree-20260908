@@ -203,9 +203,9 @@ public class InvSalesServiceImpl extends InvBaseService implements IInvSalesServ
             detail.setUnit(product.getUnit());
 
             BigDecimal quantity = detail.getQuantity();
-            if (quantity == null || quantity.compareTo(BigDecimal.ZERO) <= 0)
+            if (quantity == null || quantity.compareTo(BigDecimal.ZERO) <= 0 || quantity.stripTrailingZeros().scale() > 2 || quantity.compareTo(new BigDecimal("100000000000000")) >= 0)
             {
-                throw new ServiceException("商品 [" + product.getProductName() + "] 销售数量必须大于0");
+                throw new ServiceException("商品 [" + product.getProductName() + "] 销售数量必须大于 0 且最多两位小数");
             }
             BigDecimal unitPrice = detail.getUnitPrice();
             if (unitPrice == null)
@@ -252,9 +252,9 @@ public class InvSalesServiceImpl extends InvBaseService implements IInvSalesServ
             }
 
             BigDecimal quantity = detail.getQuantity();
-            if (quantity == null || quantity.compareTo(BigDecimal.ZERO) <= 0)
+            if (quantity == null || quantity.compareTo(BigDecimal.ZERO) <= 0 || quantity.stripTrailingZeros().scale() > 2 || quantity.compareTo(new BigDecimal("100000000000000")) >= 0)
             {
-                throw new ServiceException("物料 [" + item.getItemName() + "] 销售数量必须大于0");
+                throw new ServiceException("物料 [" + item.getItemName() + "] 销售数量必须大于 0 且最多两位小数");
             }
             BigDecimal unitPrice = detail.getUnitPrice();
             if (unitPrice == null)

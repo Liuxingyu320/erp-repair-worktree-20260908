@@ -75,8 +75,9 @@ public class SysTodoServiceImpl implements ISysTodoService
     @Override
     public TodoSummary selectSummary(TodoQuery query, Long selectedDeptId)
     {
+        String requestedScope = query == null ? null : query.getScopeMode();
         TodoQuery safeQuery = validateQuery(query);
-        List<TodoItem> items = buildTodos(safeQuery, selectedDeptId);
+        List<TodoItem> items = buildTodos(safeQuery, selectedDeptId, requestedScope);
         TodoSummary summary = new TodoSummary();
         summary.setSource(TodoConstants.SOURCE_SYSTEM);
         Map<String, Long> typeCounts = new LinkedHashMap<>();
@@ -97,8 +98,9 @@ public class SysTodoServiceImpl implements ISysTodoService
     @Override
     public SysTodoPage selectTodoPage(TodoQuery query, Long selectedDeptId)
     {
+        String requestedScope = query == null ? null : query.getScopeMode();
         TodoQuery safeQuery = validateQuery(query);
-        List<TodoItem> items = buildTodos(safeQuery, selectedDeptId);
+        List<TodoItem> items = buildTodos(safeQuery, selectedDeptId, requestedScope);
         int from = Math.min((safeQuery.getPageNum() - 1) * safeQuery.getPageSize(), items.size());
         int to = Math.min(from + safeQuery.getPageSize(), items.size());
         return new SysTodoPage(items.subList(from, to), items.size());
@@ -178,7 +180,7 @@ public class SysTodoServiceImpl implements ISysTodoService
         return safe;
     }
 
-    private List<TodoItem> buildTodos(TodoQuery query, Long selectedDeptId)
+    private List<TodoItem> buildTodos(TodoQuery query, Long selectedDeptId, String requestedScope)
     {
         Set<String> enabledTypes = query.getSource() == null
                 || TodoConstants.SOURCE_SYSTEM.equals(query.getSource())
@@ -187,7 +189,7 @@ public class SysTodoServiceImpl implements ISysTodoService
         {
             return new ArrayList<>();
         }
-        ScopeContext scope = buildScope(query, selectedDeptId);
+        ScopeContext scope = buildScope(selectedDeptId, requestedScope);
         Set<String> employeeTypes = new LinkedHashSet<>(enabledTypes);
         employeeTypes.remove(SysTodoTypes.HR_HEALTH_CERT_REVIEW);
         employeeTypes.remove(SysTodoTypes.HR_HEALTH_CERT_RETURNED);
@@ -299,24 +301,43 @@ public class SysTodoServiceImpl implements ISysTodoService
                 .sorted(todoComparator()).collect(Collectors.toCollection(ArrayList::new));
     }
 
-    private ScopeContext buildScope(TodoQuery query, Long selectedDeptId)
+    private ScopeContext buildScope(Long selectedDeptId, String requestedScope)
     {
         Long userId = currentUserId();
         if (userId == null)
         {
             throw new ServiceException("无法识别当前用户");
         }
-        boolean admin = currentUserIsAdmin();
-        List<Long> authorized = normalize(admin
-                ? todoMapper.selectAllActiveHrDeptIds()
-                : userShopService.selectShopDeptIdsByUserId(userId));
-        List<Long> current = Collections.emptyList();
-        if (TodoConstants.SCOPE_CURRENT_ORG.equals(query.getScopeMode())
-                && selectedDeptId != null && selectedDeptId > 0)
+        List<Long> authorized = readAuthorizedDeptIds();
+        List<Long> current;
+        if (TodoConstants.SCOPE_ALL_AUTHORIZED.equals(requestedScope))
+        {
+            current = authorized;
+        }
+        else if (selectedDeptId != null && selectedDeptId > 0 && authorized.contains(selectedDeptId))
         {
             current = List.of(selectedDeptId);
         }
+        else
+        {
+            current = Collections.emptyList();
+        }
         return new ScopeContext(current, authorized);
+    }
+
+    private List<Long> readAuthorizedDeptIds()
+    {
+        try
+        {
+            List<Long> ids = currentUserIsAdmin()
+                    ? todoMapper.selectAllActiveHrDeptIds()
+                    : userShopService.selectShopDeptIdsByUserId(currentUserId());
+            return normalize(ids);
+        }
+        catch (RuntimeException ignored)
+        {
+            return Collections.emptyList();
+        }
     }
 
     private boolean isIncomplete(SysTodoCandidateRow row)
@@ -462,7 +483,7 @@ public class SysTodoServiceImpl implements ISysTodoService
         item.setBusinessId(group.deptId);
         item.setBusinessNo(group.deptId + "-" + group.type);
         item.setTitle(title(group.type, group.deptName));
-        item.setSummary("共 " + group.count + " 人待处理");
+        item.setSummary(peopleSummary(group));
         item.setStatus("pending");
         item.setPriority(group.priority);
         item.setCreatedTime(group.createdTime);
@@ -613,6 +634,13 @@ public class SysTodoServiceImpl implements ISysTodoService
         return value == null ? "" : value;
     }
 
+    private String peopleSummary(TodoGroup group)
+    {
+        String people = group.displayNames.isEmpty() ? "姓名未记录" : String.join("、", group.displayNames);
+        String more = group.count > group.displayNames.size() ? "等" : "";
+        return people + more + "，共 " + group.count + " 人待处理";
+    }
+
     private String title(String type, String deptName)
     {
         String prefix = deptName == null || deptName.trim().isEmpty() ? "该组织" : deptName;
@@ -685,6 +713,7 @@ public class SysTodoServiceImpl implements ISysTodoService
         private String priority;
         private Date createdTime;
         private int count;
+        private final List<String> displayNames = new ArrayList<>();
         private final StringBuilder searchText = new StringBuilder();
         TodoGroup(SysTodoCandidateRow row, String type, String category, String priority)
         {
@@ -709,17 +738,27 @@ public class SysTodoServiceImpl implements ISysTodoService
         }
         void addSearchTerms(SysTodoCandidateRow row)
         {
+            addDisplayName(row.getEmployeeName());
             append(row.getEmployeeName());
             append(row.getEmployeeNo());
             append(row.getDeptName());
         }
         void addSearchTerms(SysHealthCertificateTodoCandidate row)
         {
+            addDisplayName(row.getEmployeeName());
             append(row.getEmployeeName());
             append(row.getEmployeeNo());
             append(row.getCertificateNo());
             append(row.getRejectionReason());
             append(row.getDeptName());
+        }
+        private void addDisplayName(String employeeName)
+        {
+            if (displayNames.size() >= 3)
+            {
+                return;
+            }
+            displayNames.add(employeeName == null || employeeName.isBlank() ? "姓名未记录" : employeeName.trim());
         }
         private void append(String value)
         {

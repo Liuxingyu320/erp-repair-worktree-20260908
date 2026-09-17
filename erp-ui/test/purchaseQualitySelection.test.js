@@ -12,6 +12,7 @@ function load(relative) {
   const module = { exports: {} }
   vm.runInNewContext(code, { module, exports: module.exports, Promise, console, require(id) {
     if (id === '@/utils/shopContext') return { isSelectedWarehouse: () => true }
+    if (id === '@/utils/inventoryQuantity') return require('../src/utils/inventoryQuantity')
     if (id === '@/mixins/todoBusinessFocus') return { createTodoBusinessFocusMixin: () => ({}) }
     return {}
   } }, { filename: file })

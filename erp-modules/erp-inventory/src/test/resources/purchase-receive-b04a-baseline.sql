@@ -3,6 +3,7 @@
 CREATE TABLE sys_dept (dept_id bigint PRIMARY KEY, dept_name varchar(80)) ENGINE=InnoDB;
 CREATE TABLE sys_user (user_id bigint PRIMARY KEY, nick_name varchar(80)) ENGINE=InnoDB;
 CREATE TABLE inv_purchase_order (
+  version BIGINT NOT NULL DEFAULT 0,
  order_id bigint PRIMARY KEY AUTO_INCREMENT, order_no varchar(64), order_title varchar(200),
  supplier_id bigint, supplier_name varchar(100), total_amount decimal(18,4), order_date date,
  status varchar(20), qc_status varchar(20), shop_dept_id bigint, applicant_id bigint,

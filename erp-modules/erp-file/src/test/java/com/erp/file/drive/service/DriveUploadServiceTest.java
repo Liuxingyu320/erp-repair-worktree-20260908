@@ -99,6 +99,36 @@ class DriveUploadServiceTest
     }
 
     @Test
+    void imageReceiptBindsOriginalBytesWhileStorageQuotaAndHashUseCompressedBytes() throws Exception
+    {
+        var image = new java.awt.image.BufferedImage(30, 20, java.awt.image.BufferedImage.TYPE_INT_ARGB);
+        var out = new java.io.ByteArrayOutputStream();
+        javax.imageio.ImageIO.write(image, "png", out);
+        byte[] original = java.util.Arrays.copyOf(out.toByteArray(), 10000);
+        String originalHash = HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(original));
+        var file = new MockMultipartFile("file", "picture.png", "image/png", original);
+        var operations = mock(DriveUploadOperationService.class);
+        service.setUploadOperations(operations);
+        String id = "upload_12345678901234567890123456789012";
+        var claim = new DriveUploadOperationService.Claim(id, "owner", true);
+        when(operations.claim(id, actor, 4L, 0L, "picture.png", 10000L, originalHash)).thenReturn(claim);
+        when(operations.receipt(id, actor)).thenReturn(new DriveUploadOperationService.Receipt(id, "SUCCEEDED", "77"));
+        when(nodeService.availableFileName(4L, 0L, "picture.png")).thenReturn("picture.png");
+        when(reservationService.reserveBeforeStorage(eq(4L), any(), anyLong(), eq(actor))).thenReturn("image-reservation");
+        AtomicReference<byte[]> stored = new AtomicReference<>();
+        doAnswer(i -> { stored.set(((InputStream) i.getArgument(1)).readAllBytes()); return null; }).when(storage).put(any(), any());
+        when(persistence.persist(any(), anyLong(), eq("image-reservation"), eq(claim))).thenAnswer(i -> i.getArgument(0));
+        assertThat(service.uploadWithReceipt(file, 4L, 0L, actor, id).nodeId()).isEqualTo("77");
+        assertThat(stored.get().length).isLessThan(original.length);
+        var node = ArgumentCaptor.forClass(DriveNode.class);
+        verify(persistence).persist(node.capture(), eq((long) stored.get().length), eq("image-reservation"), eq(claim));
+        assertThat(node.getValue().getSizeBytes()).isEqualTo(stored.get().length);
+        assertThat(node.getValue().getSha256()).isEqualTo(HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(stored.get())));
+        verify(quotaService).preflight(space, stored.get().length);
+        verify(operations).claim(id, actor, 4L, 0L, "picture.png", 10000L, originalHash);
+    }
+
+    @Test
     void durableSuccessReceiptNeverStoresASecondFile() throws Exception
     {
         var operations = mock(DriveUploadOperationService.class);

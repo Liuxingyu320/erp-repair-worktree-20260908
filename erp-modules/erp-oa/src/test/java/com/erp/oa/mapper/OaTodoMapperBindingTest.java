@@ -140,8 +140,13 @@ class OaTodoMapperBindingTest
                 .doesNotContain("OrganizationScope")
                 .contains("oa_sign_onboard_data_request",
                         "r.status in ('PENDING_EMPLOYEE', 'REJECTED')",
-                        "r.employee_id = #{userId}")
-                .doesNotContain("oa_sign_onboard_import_batch", "SUBMITTED",
+                        "r.employee_id = #{userId}",
+                        "r.review_reason",
+                        "未填写退回原因，请联系经办人",
+                        "json_valid(r.allowed_fields_json)",
+                        "；可改：")
+                .doesNotContain("请进入详情查看经办人的退回说明",
+                        "oa_sign_onboard_import_batch", "SUBMITTED",
                         "PROFILE_SYNC_FAILED", "created_by_user_id");
         for (String type : List.of("OA_SIGN_NEEDS_DATA", "OA_SIGN_COMPANY_FINALIZE",
                 "OA_SIGN_SEND_FAILED", "OA_SIGN_REFUSED", "OA_SIGN_EXPIRED"))

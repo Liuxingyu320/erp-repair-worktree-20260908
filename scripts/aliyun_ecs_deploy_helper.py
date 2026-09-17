@@ -243,6 +243,20 @@ unit_exec_start_pre_has() {
   '
 }
 
+atomic_release_link() {
+  local target="$1" link="$2"
+  python3 - "$target" "$link" <<'PYLINK'
+import os, sys, uuid
+target, link = sys.argv[1:]
+candidate = link + ".next-" + uuid.uuid4().hex
+try:
+    os.symlink(target, candidate)
+    os.replace(candidate, link)
+finally:
+    if os.path.lexists(candidate): os.unlink(candidate)
+PYLINK
+}
+
 verify_storage_unit_contract() {
   local svc="$1"
   local root="$2"
@@ -316,7 +330,17 @@ EOF
     echo "persistent common-upload root must be mounted on /data, got: $common_mount" >&2
     return 1
   fi
-  for storage_svc in oa file; do
+  for entry in "$release_root" "$SIGN_PACKAGE_STORAGE_ROOT" "$OA_ATTENDANCE_STORAGE_ROOT" \
+      "$OA_REIMBURSEMENT_STORAGE_ROOT" "$DRIVE_LOCAL_PATH" \
+      /data/erp-new-data/uploadPath/private/sign-package-temp \
+      /data/erp-new-data/logs /data/erp-new-data/tmp /data/erp-new-data/cache; do
+    test -d "$entry" && test -w "$entry" &&
+      [ "$(findmnt -n -o TARGET -T "$entry")" = /data ] || return 1
+  done
+  test -x /data/erp-new-runtime/image-codecs/bin/python || return 1
+  [ "$(findmnt -n -o TARGET -T /data/erp-new-runtime/image-codecs/bin/python)" = /data ] || return 1
+  /data/erp-new-runtime/image-codecs/bin/python -I -c 'from PIL import features; import pillow_heif; assert features.check("webp"); assert pillow_heif.libheif_info()["HEIF"]' || return 1
+  for storage_svc in $SERVICES; do
     verify_storage_unit_contract "$storage_svc" "$SHARED_UPLOAD_ROOT" || return 1
   done
   test -x "$release_root/run-erp-service.sh" || {
@@ -489,6 +513,16 @@ verify_host_storage_runtime() {
   local cwd
   local assignment
   verify_release_upload_links "$release_root"
+  for svc in ${PREVIOUS_ACTIVE_SERVICES:-oa file}; do
+    process_has_environment "$svc" "ERP_LOG_ROOT=/data/erp-new-data/logs" || return 1
+    process_has_environment "$svc" "ERP_TEMP_ROOT=/data/erp-new-data/tmp" || return 1
+    process_has_environment "$svc" "ERP_CACHE_ROOT=/data/erp-new-data/cache" || return 1
+    process_has_environment "$svc" "TMPDIR=/data/erp-new-data/tmp/$svc" || return 1
+    local storage_pid
+    storage_pid="$(systemctl show "erp-new@$svc.service" --property=MainPID --value)"
+    tr '\0' '\n' < "/proc/$storage_pid/environ" |
+      grep -E '^JDK_JAVA_OPTIONS=.*-Djava.io.tmpdir=/data/erp-new-data/tmp/' >/dev/null || return 1
+  done
   for svc in oa file; do
     systemctl is-active --quiet "erp-new@$svc.service" || {
       echo "storage service is not active: $svc" >&2
@@ -583,7 +617,7 @@ rollback() {
     link_shared_upload_target "$PREV_TARGET"
     upload_status=$?
   fi
-  ln -sfn "$PREV_TARGET" "$CURRENT_LINK"
+  atomic_release_link "$PREV_TARGET" "$CURRENT_LINK"
   link_status=$?
   systemctl daemon-reload
   daemon_status=$?
@@ -1308,7 +1342,7 @@ def deploy_host(args):
     remote_package = args.remote_package
     if remote_package:
         remote_path = PurePosixPath(remote_package)
-        allowed_parent = PurePosixPath("/opt/erp-new-packages")
+        allowed_parent = PurePosixPath("/data/erp-new/packages")
         if (
             not remote_path.is_absolute()
             or remote_path.parent != allowed_parent
@@ -1316,7 +1350,7 @@ def deploy_host(args):
         ):
             raise SystemExit(
                 "--remote-package must be the same-named package directly under "
-                "/opt/erp-new-packages"
+                "/data/erp-new/packages"
             )
         package_sha = sha256_file(package)
         manifest_url = ""
@@ -1393,8 +1427,8 @@ os.replace(tmp, package)
 PY
 '''
 
-    release_name = f"erp-new-{time.strftime('%Y%m%d%H%M%S')}"
-    release_parent = "/opt"
+    release_name = verified_release["releaseId"]
+    release_parent = "/data/erp-new/releases"
     release_dir = f"{release_parent}/{release_name}"
     services = " ".join(HOST_SERVICE_PORTS)
     start_services = " ".join(HOST_SERVICE_START_ORDER)
@@ -1429,7 +1463,7 @@ SIGN_PACKAGE_STORAGE_ROOT={json.dumps(HOST_SIGN_PACKAGE_STORAGE_ROOT)}
 OA_ATTENDANCE_STORAGE_ROOT={json.dumps(HOST_ATTENDANCE_STORAGE_ROOT)}
 OA_REIMBURSEMENT_STORAGE_ROOT={json.dumps(HOST_REIMBURSEMENT_STORAGE_ROOT)}
 DRIVE_LOCAL_PATH={json.dumps(HOST_DRIVE_LOCAL_PATH)}
-CURRENT_LINK=/opt/erp-new
+CURRENT_LINK=/data/erp-new/current
 PREV_TARGET="$(readlink -f "$CURRENT_LINK" 2>/dev/null || true)"
 if [ -z "$PREV_TARGET" ] || [ ! -d "$PREV_TARGET" ]; then
   echo "previous /opt/erp-new target not found" >&2
@@ -1443,10 +1477,17 @@ if [ -e "$RELEASE_DIR" ]; then
   echo "release directory already exists: $RELEASE_DIR" >&2
   exit 31
 fi
+# Fail before creating or downloading anything if /data is absent or redirected.
+for project_path in /data/erp-new/releases /data/erp-new/packages /data/erp-new/backups \
+    /data/erp-new-data/logs /data/erp-new-data/tmp /data/erp-new-data/cache; do
+  test -d "$project_path" && test -w "$project_path"
+  test "$(findmnt -n -o TARGET -T "$project_path")" = /data
+done
+test -L /opt/erp-new
+test "$(readlink /opt/erp-new)" = /data/erp-new/current
 mkdir "$RELEASE_DIR"
-mkdir -p /opt/erp-new-packages
 chmod 755 "$RELEASE_DIR"
-cd /opt/erp-new-packages
+cd /data/erp-new/packages
 {acquire_package_script}
 ACTUAL_SHA="$(sha256sum "$PACKAGE" | awk '{{print $1}}')"
 if [ "$ACTUAL_SHA" != "$EXPECTED_SHA" ]; then
@@ -1479,7 +1520,8 @@ fi
 test -f "$LEGACY_RUNNER_SOURCE"
 cp -pL "$LEGACY_RUNNER_SOURCE" "$NEW_DOCKER/run-erp-service-legacy.sh"
 chmod 700 "$NEW_DOCKER/run-erp-service.sh" "$NEW_DOCKER/run-erp-service-legacy.sh"
-mkdir -p "$NEW_DOCKER/logs"
+test ! -e "$NEW_DOCKER/logs"
+ln -s /data/erp-new-data/logs "$NEW_DOCKER/logs"
 verify_host_service_contract "$NEW_DOCKER"
 trap 'rollback "$?"' ERR
 trap 'rollback_on_exit "$?"' EXIT
@@ -1491,7 +1533,7 @@ verify_release_upload_links "$NEW_DOCKER"
 
 {migration_script}
 
-ln -sfn "$NEW_DOCKER" "$CURRENT_LINK"
+atomic_release_link "$NEW_DOCKER" "$CURRENT_LINK"
 systemctl daemon-reload
 # Preserve the production service-state boundary: restart only services that
 # were active before the release. Optional job/monitor services must not be
@@ -1507,7 +1549,8 @@ for svc in $SERVICES; do
   printf '%s=%s\n' "$svc" "$(systemctl is-active "erp-new@$svc.service")"
 done
 ss -ltnp | grep -E ':(80|8080|9100|9200|9201|9203|9204|9205|9206|9300)\\b'
-rm -f "/opt/erp-new-packages/$PACKAGE"
+rm -f "/data/erp-new/packages/$PACKAGE"
+atomic_release_link "$PREV_TARGET" /data/erp-new/previous
 trap - ERR EXIT
 echo "DEPLOY_OK release=$RELEASE_DIR previous=$PREV_TARGET previous_services=$PREVIOUS_ACTIVE_SERVICES"
 """
@@ -1829,7 +1872,7 @@ def main():
     p_deploy_host.add_argument("--package", required=True)
     p_deploy_host.add_argument(
         "--remote-package",
-        help="reuse a same-named, pre-uploaded package directly under /opt/erp-new-packages",
+        help="reuse a same-named, pre-uploaded package directly under /data/erp-new/packages",
     )
     p_deploy_host.add_argument("--bucket")
     p_deploy_host.add_argument("--url-ttl", type=int, default=7200)

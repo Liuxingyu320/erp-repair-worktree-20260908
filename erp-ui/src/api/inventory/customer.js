@@ -25,8 +25,8 @@ export function delCustomer(customerIds) {
   return request({ url: '/inventory/customer/' + customerIds, method: 'delete' })
 }
 
-export function listCustomerOptions(keyword) {
-  return request({ url: '/inventory/customer/options', method: 'get', params: { keyword } })
+export function listCustomerOptions(keyword, options) {
+  return request({ url: '/inventory/customer/options', method: 'get', silentError: options && options.silentError === true, params: { keyword } })
 }
 
 export function listCustomerServiceCards(query) {
@@ -82,8 +82,12 @@ export async function validateCustomerPhotoBlob(blob) {
   return blob
 }
 
-export function createCustomerServiceCard(data) {
-  return request({ url: '/inventory/customer/service-card', method: 'post', data, silentError: true })
+export function createCustomerServiceCard(data, options) {
+  const scoped = options && typeof options.assertContext === 'function' ? {
+    inventoryDeptId: options.deptId,
+    transformRequest: [body => { options.assertContext(); return typeof body === 'string' ? body : JSON.stringify(body) }]
+  } : {}
+  return request({ url: '/inventory/customer/service-card', method: 'post', data, silentError: true, ...scoped })
 }
 
 export function updateCustomerServiceCard(customerId, data) {

@@ -1,6 +1,8 @@
 package com.erp.file.drive.service;
 
+import com.erp.common.core.utils.file.UploadImageNormalizer;
 import java.io.IOException;
+import java.io.InputStream;
 import java.security.MessageDigest;
 import java.security.DigestInputStream;
 import java.security.NoSuchAlgorithmException;
@@ -168,6 +170,13 @@ public class DriveUploadService
             DriveSpace space = spaceService.requireWritableSpace(spaceId, actor);
             DriveNode parent = nodeService.requireParent(spaceId, effectiveParent);
             filePolicy.validate(file.getOriginalFilename(), file.getContentType(), file.getSize());
+            if (UploadImageNormalizer.isImage(file.getOriginalFilename(), file.getContentType()))
+            {
+                file = UploadImageNormalizer.normalize(file, expectedHash);
+                // Bind the bytes actually handed to storage, in addition to the original request claim.
+                try (InputStream input = file.getInputStream())
+                { expectedHash = HexFormat.of().formatHex(messageDigest().digest(input.readAllBytes())); }
+            }
             quotaService.preflight(space, file.getSize());
             String originalName = namePolicy.normalizeDisplayName(file.getOriginalFilename());
             String extension = filePolicy.extension(originalName);
@@ -360,6 +369,10 @@ public class DriveUploadService
         {
             return driveException;
         }
+        if (error instanceof UploadImageNormalizer.ContentChangedException)
+            return new DriveException(DriveErrorCodes.DRIVE_CONCURRENT_MODIFICATION, error.getMessage());
+        if (error instanceof com.erp.common.core.exception.ServiceException serviceException)
+            return new DriveException(DriveErrorCodes.DRIVE_FILE_TYPE_REJECTED, serviceException.getMessage());
         return new DriveException(DriveErrorCodes.DRIVE_STORAGE_UNAVAILABLE,
                 "云盘上传失败，请稍后重试");
     }

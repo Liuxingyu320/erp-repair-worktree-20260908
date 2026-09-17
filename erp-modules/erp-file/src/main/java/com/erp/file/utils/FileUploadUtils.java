@@ -1,5 +1,6 @@
 package com.erp.file.utils;
 
+import com.erp.common.core.utils.file.UploadImageNormalizer;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Paths;
@@ -80,6 +81,7 @@ public class FileUploadUtils
         }
 
         assertAllowed(file, allowedExtension);
+        file = UploadImageNormalizer.normalize(file);
 
         String fileName = extractFilename(file);
 

@@ -28,12 +28,14 @@ function setupReturn() {
     return (...args) => { const pending = deferred(); calls.push({ name, args, ...pending }); return pending.promise }
   } })
   const component = loadComponent("src/views/inventory/purchaseReturn/index.vue", id => {
-    if (id === "@/utils/uiOperationScope") return scopeModule
+    if (id === '@/utils/inventoryQuantity') return require('../src/utils/inventoryQuantity')
+      if (id === "@/utils/uiOperationScope") return scopeModule
     if (id === "@/utils/returnSelection") return selection
     if (id === "@/utils/shopContext") return { isSelectedWarehouse: () => true, getSelectedDeptId: () => env.dept }
     if (id === "@/api/inventory/purchaseReturn") return api
     if (id === "@/mixins/todoBusinessFocus") return { createTodoBusinessFocusMixin: () => ({}) }
     if (id === "@/utils/businessEmptyState") return { getBusinessEmptyText: () => "empty" }
+    if (id.endsWith(".vue")) return {}
     throw Error("Unknown import " + id)
   })
   const store = Vue.observable({ getters: { id: "1" }, state: { user: { sessionRevision: 1 } } })
@@ -167,6 +169,7 @@ function setupPurchase(mobile) {
     if (id === "@/views/approval/manage/components/approvalUi") return { statusLabel: x => x, statusType: () => "info" }
     if (id === "@/utils/businessEmptyState") return { getBusinessEmptyText: () => "empty" }
     if (id === "../../mobileErrorMessage") return { mobileErrorMessage: (e, fallback) => e && e.message || fallback }
+    if (id.endsWith(".vue")) return {}
     throw Error("Unknown import " + id)
   })
   const page = new Vue({ ...component, created: [], beforeCreate() {
@@ -177,6 +180,7 @@ function setupPurchase(mobile) {
   } })
   page.loadTodoBusinessList = loader => loader()
   page.handleTodoFocusRows = () => Promise.resolve()
+  page.purchaseDraftAvailable = true; page.purchaseAvailabilityResolved = true
   page.$refs.formRef = { validate: fn => fn(true) }
   const take = name => {
     const call = calls.find(c => c.name === name && !c.used)
